@@ -9,7 +9,7 @@ const PDFEditorFromBackend = ({ token, pdfPath }) => {
     const fetchPdf = async () => {
       setLoading(true);
       try {
-        const response = await fetch("http://localhost:8080/get-pdf", {
+        const response = await fetch("http://localhost:8080/files/get-pdf", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

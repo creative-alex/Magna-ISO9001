@@ -4,12 +4,14 @@ const db = require("./db/firebase");
 const path = require("path");
 const serviceAccount = require(path.join(__dirname, "./db/serviceAccountKey.json"));
 const userRoute = require("./Routes/userRoutes");
+const pdfRoute = require("./Routes/pdfRoutes");
 
 const app = express();
 app.use(express.json());
 app.use(cors());
 
 app.use("/users", userRoute);
+app.use("/files", pdfRoute);
 
 
 const PORT = 8080;
