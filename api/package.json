@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
     "@react-native-firebase/storage": "^22.2.0",
     "body-parser": "^2.2.0",
