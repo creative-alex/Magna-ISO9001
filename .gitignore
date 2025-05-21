@@ -5,3 +5,6 @@
 api/node_modules/
 client/node_modules/
 
+# Ignorar arquivos .env
+*.env
+

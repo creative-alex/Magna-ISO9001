@@ -1,23 +1,27 @@
 // controllers/pdfController.js
 const admin = require("firebase-admin");
+const pdfParse = require('pdf-parse');
+
+// Configuração do Firebase (será inicializada no server.js)
 const bucket = admin.storage().bucket();
 
-const getPdfFromFirebase = async (req, res) => {
+const getPdfText = async (req, res) => {
   try {
-    const { token, pdfPath } = req.body;
-    // Exemplo: Aqui deverias validar o token (JWT, etc.)
-    // if (!isValidToken(token)) return res.status(401).send("Token inválido");
+    const [files] = await bucket.getFiles();
+    const pdfFile = files.find(f => f.name.endsWith(".pdf"));
+    if (!pdfFile) return res.status(404).send("Nenhum PDF encontrado");
 
-    const file = bucket.file(pdfPath);
-    const [exists] = await file.exists();
-    if (!exists) return res.status(404).send("Ficheiro não encontrado");
+    const [buffer] = await pdfFile.download();
+    const data = await pdfParse(buffer);
 
-    const stream = file.createReadStream();
-    res.setHeader("Content-Type", "application/pdf");
-    stream.pipe(res);
+    // Envia todas as linhas do texto como JSON
+    const lines = data.text.split('\n').map(line => line.trim()).filter(Boolean);
+    res.json({ lines });
   } catch (err) {
-    res.status(500).send("Erro ao buscar PDF: " + err.message);
+    res.status(500).send("Erro ao extrair texto do PDF: " + err.message);
   }
 };
 
-module.exports = { getPdfFromFirebase };
+module.exports = {
+  getPdfText,
+};
