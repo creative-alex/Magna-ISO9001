@@ -2,7 +2,8 @@ import React from "react";
 import Login from './features/Auth/login';
 import { ToastContainer } from 'react-toastify';
 import { Routes, Route, useNavigate } from "react-router-dom";
-import PDFEditorFromBackend from "./pages/superAdmin";
+import PDFEditorFromBackend from "./pages/tabelaPDF";
+import SuperAdmin from "./pages/superAdmin"
 import './App.css';
 
 function App() {
@@ -16,7 +17,7 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<Login onLoginSuccess={handleLoginSuccess} />} />
-      <Route path="/home" element={<PDFEditorFromBackend />} />
+      <Route path="/home" element={<SuperAdmin />} />
     </Routes>
   );
 }
