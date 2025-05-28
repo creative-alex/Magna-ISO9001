@@ -52,8 +52,14 @@ const uploadPdf = async (req, res) => {
       return res.status(400).send("Nenhum ficheiro enviado.");
     }
 
-    console.log("Nome do ficheiro:", req.file.originalname);
-    const blob = bucket.file(req.file.originalname || "uploaded.pdf");
+    // Recebe o array de pastas e o nome do ficheiro
+    const folders = req.body.folders ? JSON.parse(req.body.folders) : [];
+    const filename = req.body.filename || req.file.originalname;
+
+    // Junta tudo para formar o path
+    const filePath = [...folders, filename].join("/");
+
+    const blob = bucket.file(filePath);
     const blobStream = blob.createWriteStream({
       metadata: {
         contentType: req.file.mimetype,
@@ -61,18 +67,15 @@ const uploadPdf = async (req, res) => {
     });
 
     blobStream.on("error", (err) => {
-      console.error("Erro no blobStream:", err);
       res.status(500).send("Erro ao guardar PDF: " + err.message);
     });
 
     blobStream.on("finish", () => {
-      console.log("Upload finalizado com sucesso!");
       res.status(200).send("PDF guardado com sucesso!");
     });
 
     blobStream.end(req.file.buffer);
   } catch (err) {
-    console.error("Erro em uploadPdf:", err);
     res.status(500).send("Erro ao guardar PDF: " + err.message);
   }
 };
@@ -108,6 +111,65 @@ const getPdfFormData = async (req, res) => {
   }
 };
 
+// Função utilitária para construir a árvore
+function buildTree(paths) {
+  const root = [];
+  console.log("Iniciando buildTree...");
+  for (const path of paths) {
+    console.log(`\nProcessando path: "${path}"`);
+    const parts = path.split("/");
+    console.log("Parts:", parts);
+    let current = root;
+    for (let i = 0; i < parts.length; i++) {
+      const name = parts[i];
+      const isFile = name.endsWith(".pdf") && i === parts.length - 1;
+      console.log(`  Parte ${i}: "${name}" (${isFile ? "file" : "folder"})`);
+      let node = current.find(n => n.name === name);
+      if (node) {
+        console.log(`    Encontrado node existente:`, node);
+      } else {
+        node = {
+          name,
+          type: isFile ? "file" : "folder",
+        };
+        if (!isFile) node.children = [];
+        current.push(node);
+        console.log(`    Criado novo node:`, node);
+      }
+      if (!isFile) {
+        console.log(`    Descendo para children de "${name}"`);
+        current = node.children;
+      } else {
+        console.log(`    "${name}" é um arquivo, não desce mais.`);
+      }
+    }
+    console.log("Estado atual da árvore:", JSON.stringify(root, null, 2));
+  }
+  console.log("\nÁrvore final construída:");
+  console.log(JSON.stringify(root, null, 2));
+  return root;
+}
+
+
+const listPdfsTree = async (req, res) => {
+  try {
+    console.log("listPdfsTree chamado");
+    const [files] = await bucket.getFiles();
+    const pdfPaths = files
+      .filter(f => f.name.endsWith(".pdf"))
+      .map(f => f.name);
+    const tree = buildTree(pdfPaths);
+    res.json(tree);
+  } catch (err) {
+    console.error("Erro em listPdfsTree:", err);
+    res.status(500).send("Erro ao listar PDFs: " + err.message);
+  }
+};
+
 module.exports = {
-  getPdfText, uploadPdf, listPdfs, getPdfFormData,
+  getPdfText,
+  uploadPdf,
+  listPdfs,
+  getPdfFormData,
+  listPdfsTree, 
 };

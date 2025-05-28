@@ -2,8 +2,8 @@ import React from "react";
 import Login from './features/Auth/login';
 import { ToastContainer } from 'react-toastify';
 import { Routes, Route, useNavigate } from "react-router-dom";
-import PDFEditorFromBackend from "./pages/tabelaPDF";
-import SuperAdmin from "./pages/superAdmin"
+import SelecionarPdf from "./pages/selectPdf";
+import SuperAdmin from "./pages/superAdmin";
 import './App.css';
 
 function App() {
@@ -11,13 +11,15 @@ function App() {
 
   const handleLoginSuccess = (userData) => {
     console.log("Login bem-sucedido! Dados do utilizador:", userData);
-    navigate("/home");
+    navigate("/superadmin");
   };
 
   return (
     <Routes>
       <Route path="/" element={<Login onLoginSuccess={handleLoginSuccess} />} />
-      <Route path="/home" element={<SuperAdmin />} />
+      <Route path="/home" element={<SelecionarPdf />} />
+      <Route path="/superadmin" element={<SelecionarPdf />} />
+      <Route path="/superadmin/:filename" element={<SuperAdmin />} />
     </Routes>
   );
 }

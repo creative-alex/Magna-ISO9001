@@ -7,8 +7,10 @@ const { getPdfText } = require("../controllers/filesController");
 const { uploadPdf } = require("../controllers/filesController");
 const { listPdfs } = require("../controllers/filesController");
 const { getPdfFormData } = require("../controllers/filesController");
+const { listPdfsTree } = require("../controllers/filesController");
 
 router.post("/get-pdf", getPdfText);
+router.get('/list-pdfs-tree', listPdfsTree);
 router.post('/upload-pdf', upload.single('file'), uploadPdf);
 router.get('/list-pdfs', listPdfs);
 router.get('/pdf-form-data', getPdfFormData);

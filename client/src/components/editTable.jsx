@@ -1,12 +1,30 @@
-import React from "react";
+import React, { useRef, useEffect } from "react";
 
-export default function EditableTable({ data, onChange, headersHtml }) {
+function EditableTable({ data, onChange, headersHtml }) {
+  const textAreaRefs = useRef({});
+
+  useEffect(() => {
+    Object.values(textAreaRefs.current).forEach(ref => {
+      if (ref) {
+        ref.style.height = "auto";
+        ref.style.height = ref.scrollHeight + "px";
+      }
+    });
+  }, [data]);
+
+  const handleInput = e => {
+    e.target.style.height = "auto";
+    e.target.style.height = e.target.scrollHeight + "px";
+  };
+
   return (
     <table border="1" cellPadding={4}>
       <thead>
         <tr>
-          {headersHtml.map((header, idx) => (
-            <th key={idx} style={{ whiteSpace: "pre-line", textAlign: "center" }}>{header}</th>
+          {headersHtml.map((header, i) => (
+            <th key={i} style={{ whiteSpace: "pre-line", textAlign: "center" }}>
+              {header}
+            </th>
           ))}
         </tr>
       </thead>
@@ -16,18 +34,11 @@ export default function EditableTable({ data, onChange, headersHtml }) {
             {row.map((cell, colIdx) => (
               <td key={colIdx}>
                 <textarea
-                  style={{
-                    width: "100px",
-                    minHeight: "30px",
-                    resize: "none",
-                    overflow: "hidden",
-                  }}
+                  ref={el => (textAreaRefs.current[`${rowIdx}-${colIdx}`] = el)}
+                  style={{ width: "100px", minHeight: 30, resize: "none", overflow: "hidden" }}
                   value={cell}
                   onChange={e => onChange(rowIdx, colIdx, e.target.value)}
-                  onInput={e => {
-                    e.target.style.height = "auto";
-                    e.target.style.height = e.target.scrollHeight + "px";
-                  }}
+                  onInput={handleInput}
                 />
               </td>
             ))}
@@ -37,3 +48,5 @@ export default function EditableTable({ data, onChange, headersHtml }) {
     </table>
   );
 }
+
+export default EditableTable;

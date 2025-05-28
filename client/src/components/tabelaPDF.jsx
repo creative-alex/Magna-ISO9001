@@ -1,8 +1,20 @@
 import React, { useState } from "react";
-import EditableTable from "../components/editTable";
-import ExportPdfButton from "../components/Buttons/exportPdf";
+import EditableTable from "./editTable";
+import ExportPdfButton from "./Buttons/exportPdf";
 
 export default function TabelaPdf() {
+  // Nova tabela: 1 coluna, 5 linhas
+  const headersObs = ["Observações"];
+  const headersHtmlObs = [<>Observações</>];
+  const [dataObs, setDataObs] = useState(Array.from({ length: 5 }, () => [""]));
+
+  const handleChangeObs = (rowIdx, colIdx, value) => {
+    const newData = dataObs.map((row, r) =>
+      row.map((cell, c) => (r === rowIdx && c === colIdx ? value : cell))
+    );
+    setDataObs(newData);
+  };
+
   const headers = [
     'Fluxo\ndas Ações',
     'Descrição',
@@ -31,7 +43,9 @@ export default function TabelaPdf() {
 
   return (
     <div>
-      <h2>Tabela dinâmica (igual ao PDF)</h2>
+      <h2>Tabela Observações</h2>
+      <EditableTable data={dataObs} onChange={handleChangeObs} headersHtml={headersHtmlObs} />
+      <h2 style={{ marginTop: 32 }}>Tabela dinâmica (igual ao PDF)</h2>
       <EditableTable data={data} onChange={handleChange} headersHtml={headersHtml} />
       <div style={{ marginTop: 16 }}>
         <ExportPdfButton data={data} headers={headers} />

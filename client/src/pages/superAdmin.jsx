@@ -1,96 +1,108 @@
 import React, { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 import EditableTable from "../components/editTable";
 import ExportPdfButton from "../components/Buttons/exportPdf";
 
-const headers = [
-  'Fluxo\ndas Ações',
-  'Descrição',
-  'Responsável',
-  'Documentos\nAssociados',
-  'Instruções\nde Trabalho'
-];
-const headersHtml = [
-  <>Fluxo<br />das Ações</>,
-  <>Descrição</>,
-  <>Responsável</>,
-  <>Documentos<br />Associados</>,
-  <>Instruções<br />de Trabalho</>
-];
-
-const fieldNames = [
-  // Os nomes dos campos do PDF editável, na ordem da tabela
-  // Exemplo: ["table2_r2_c1", "table2_r2_c2", ...]
-  // Preencha conforme o nome dos campos que você usou ao gerar o PDF
-  [
-    "table2_r2_c1", "table2_r2_c2", "table2_r2_c3", "table2_r2_c4", "table2_r2_c5"
-  ],
-  [
-    "table2_r3_c1", "table2_r3_c2", "table2_r3_c3", "table2_r3_c4", "table2_r3_c5"
-  ],
-  [
-    "table2_r4_c1", "table2_r4_c2", "table2_r4_c3", "table2_r4_c4", "table2_r4_c5"
-  ],
-  [
-    "table2_r5_c1", "table2_r5_c2", "table2_r5_c3", "table2_r5_c4", "table2_r5_c5"
-  ],
-  [
-    "table2_r6_c1", "table2_r6_c2", "table2_r6_c3", "table2_r6_c4", "table2_r6_c5"
-  ],
-  [
-    "table2_r7_c1", "table2_r7_c2", "table2_r7_c3", "table2_r7_c4", "table2_r7_c5"
-  ]
+const tabelas = [
+  {
+    key: "obs",
+    label: "Tabela Observações",
+    headers: [<>Observações</>],
+    fieldNames: [
+      ["table1_r1"],
+      ["table1_r2"],
+      ["table1_r3"],
+      ["table1_r4"],
+      ["table1_r5"]
+    ],
+    rows: 5,
+    cols: 1
+  },
+  {
+    key: "main",
+    label: "Tabela dinâmica (igual ao PDF)",
+    headers: [
+      <>Fluxo<br />das Ações</>,
+      <>Descrição</>,
+      <>Responsável</>,
+      <>Documentos<br />Associados</>,
+      <>Instruções<br />de Trabalho</>
+    ],
+    fieldNames: [
+      [
+        "table2_r2_c1", "table2_r2_c2", "table2_r2_c3", "table2_r2_c4", "table2_r2_c5"
+      ],
+      [
+        "table2_r3_c1", "table2_r3_c2", "table2_r3_c3", "table2_r3_c4", "table2_r3_c5"
+      ],
+      [
+        "table2_r4_c1", "table2_r4_c2", "table2_r4_c3", "table2_r4_c4", "table2_r4_c5"
+      ],
+      [
+        "table2_r5_c1", "table2_r5_c2", "table2_r5_c3", "table2_r5_c4", "table2_r5_c5"
+      ],
+      [
+        "table2_r6_c1", "table2_r6_c2", "table2_r6_c3", "table2_r6_c4", "table2_r6_c5"
+      ],
+      [
+        "table2_r7_c1", "table2_r7_c2", "table2_r7_c3", "table2_r7_c4", "table2_r7_c5"
+      ]
+    ],
+    rows: 6,
+    cols: 5
+  }
 ];
 
 export default function SuperAdmin() {
-  const [pdfFiles, setPdfFiles] = useState([]);
-  const [selectedFile, setSelectedFile] = useState("");
-  const [data, setData] = useState(Array.from({ length: 6 }, () => Array(5).fill("")));
-
-  // Buscar lista de PDFs ao carregar
-  useEffect(() => {
-    fetch("http://localhost:8080/files/list-pdfs")
-      .then(res => res.json())
-      .then(setPdfFiles)
-      .catch(() => setPdfFiles([]));
-  }, []);
+  const { filename } = useParams();
+  const [tableData, setTableData] = useState(
+    tabelas.reduce((acc, t) => ({ ...acc, [t.key]: Array.from({ length: t.rows }, () => Array(t.cols).fill("")) }), {})
+  );
 
   // Buscar dados do PDF selecionado
   useEffect(() => {
-    if (!selectedFile) return;
-    fetch(`http://localhost:8080/files/pdf-form-data?filename=${encodeURIComponent(selectedFile)}`)
+    if (!filename) return;
+    fetch(`http://localhost:8080/files/pdf-form-data?filename=${encodeURIComponent(filename)}`)
       .then(res => res.json())
       .then(formData => {
-        // Monta a matriz data a partir dos nomes dos campos
-        const newData = fieldNames.map(row =>
-          row.map(field => formData[field] || "")
-        );
-        setData(newData);
+        const newTableData = {};
+        tabelas.forEach(t => {
+          newTableData[t.key] = t.fieldNames.map(row =>
+            row.map(field => formData[field] || "")
+          );
+        });
+        setTableData(newTableData);
       });
-  }, [selectedFile]);
-
-  const handleChange = (rowIdx, colIdx, value) => {
-    const newData = data.map((row, r) =>
-      row.map((cell, c) => (r === rowIdx && c === colIdx ? value : cell))
-    );
-    setData(newData);
-  };
+  }, [filename]);
 
   return (
     <div>
       <h2>Super Admin - Listar e Editar PDFs</h2>
-      <div>
-        <label>Escolha um ficheiro PDF:&nbsp;</label>
-        <select value={selectedFile} onChange={e => setSelectedFile(e.target.value)}>
-          <option value="">Selecione...</option>
-          {pdfFiles.map(name => (
-            <option key={name} value={name}>{name}</option>
-          ))}
-        </select>
-      </div>
-      <EditableTable data={data} onChange={handleChange} headersHtml={headersHtml} />
+      {tabelas.map(t => (
+        <div key={t.key}>
+          <h2>{t.label}</h2>
+          <EditableTable
+            data={tableData[t.key]}
+            onChange={(rowIdx, colIdx, value) =>
+              setTableData(prev => {
+                const newData = prev[t.key].map(row => [...row]);
+                newData[rowIdx][colIdx] = value;
+                return { ...prev, [t.key]: newData };
+              })
+            }
+            headersHtml={t.headers}
+          />
+        </div>
+      ))}
       <div style={{ marginTop: 16 }}>
-        <ExportPdfButton data={data} headers={headers} />
+        <ExportPdfButton
+          data={tableData.main}
+          headers={tabelas[1].headers}
+          dataObs={tableData.obs}
+          headersObs={tabelas[0].headers}
+        />
       </div>
     </div>
   );
 }
+
