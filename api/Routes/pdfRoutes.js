@@ -13,5 +13,5 @@ router.post("/get-pdf", getPdfText);
 router.get('/list-pdfs-tree', listPdfsTree);
 router.post('/upload-pdf', upload.single('file'), uploadPdf);
 router.get('/list-pdfs', listPdfs);
-router.get('/pdf-form-data', getPdfFormData);
+router.post('/pdf-form-data', getPdfFormData);
 module.exports = router;

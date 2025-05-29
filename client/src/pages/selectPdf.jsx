@@ -1,46 +1,48 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import "../index.css";
 
 function FolderStructure({ nodes, onSelectFile, currentPath = [] }) {
-  const [selectedFolder, setSelectedFolder] = useState(null);
+  const [expandedFolder, setExpandedFolder] = useState(null);
 
-  // Filtra pastas e ficheiros do nível atual
   const folders = nodes.filter(n => n.type === "folder");
   const files = nodes.filter(n => n.type === "file");
 
-  const handleFolderClick = (folderName) => {
-    setSelectedFolder(folderName);
+  const toggleFolder = (folderName) => {
+    setExpandedFolder(expandedFolder === folderName ? null : folderName);
   };
 
   return (
-    <div style={{ marginLeft: 20 }}>
-      {/* Pastas */}
+    <div className="folder-structure">
       {folders.map(folder => (
-        <div key={folder.name} style={{ marginBottom: 8 }}>
-          <button
-            onClick={() => handleFolderClick(folder.name)}
-            style={{ marginRight: 8 }}
+        <div key={folder.name} className="folder">
+          <div
+            className={`folder-header ${expandedFolder === folder.name ? 'active' : ''}`}
+            onClick={() => toggleFolder(folder.name)}
           >
-            📁 {folder.name}
-          </button>
-          
-          {/* Subpastas/Ficheiros da pasta selecionada */}
-          {selectedFolder === folder.name && (
-            <FolderStructure
-              nodes={folder.children || []}
-              onSelectFile={onSelectFile}
-              currentPath={[...currentPath, folder.name]}
-            />
+            <span className="arrow">{expandedFolder === folder.name ? '▾' : '▸'}</span>
+            <span className="folder-name">{folder.name}</span>
+          </div>
+          {expandedFolder === folder.name && (
+            <div className="folder-content">
+              <FolderStructure
+                nodes={folder.children || []}
+                onSelectFile={onSelectFile}
+                currentPath={[...currentPath, folder.name]}
+              />
+            </div>
           )}
         </div>
       ))}
 
-      {/* Ficheiros */}
       {files.map(file => (
-        <div key={file.name} style={{ margin: "4px 0" }}>
-          <button onClick={() => onSelectFile([...currentPath, file.name].join('/'))}>
-            📄 {file.name}
-          </button>
+        <div key={file.name} className="file">
+          <span className="file-name">{file.name}</span>
+          <div className="file-actions">
+            <button onClick={() => onSelectFile([...currentPath, file.name].join("/"))}>👁️</button>
+            <button>⬆️</button>
+            <button>⬇️</button>
+          </div>
         </div>
       ))}
     </div>
@@ -63,10 +65,12 @@ export default function SelecionarPdf() {
   };
 
   return (
-    <div>
-      <h2>Super Admin - Selecionar PDF</h2>
-      <label>Escolha um ficheiro PDF:</label>
-      <FolderStructure nodes={pdfTree} onSelectFile={handleSelectFile} />
+    <div className="pdf-container">
+      <h2 className="title">Titulo Titulado</h2>
+      <div className="pdf-panel">
+        <div className="panel-title">Índice</div>
+        <FolderStructure nodes={pdfTree} onSelectFile={handleSelectFile} />
+      </div>
     </div>
   );
 }

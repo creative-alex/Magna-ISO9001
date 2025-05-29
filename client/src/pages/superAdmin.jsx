@@ -61,17 +61,23 @@ export default function SuperAdmin() {
 
   // Buscar dados do PDF selecionado
   useEffect(() => {
+    console.log(filename)
     if (!filename) return;
-    fetch(`http://localhost:8080/files/pdf-form-data?filename=${encodeURIComponent(filename)}`)
+    console.log("A pedir dados do PDF para:", filename);
+    fetch("http://localhost:8080/files/pdf-form-data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename }),
+    })
       .then(res => res.json())
       .then(formData => {
-        const newTableData = {};
-        tabelas.forEach(t => {
-          newTableData[t.key] = t.fieldNames.map(row =>
-            row.map(field => formData[field] || "")
-          );
-        });
-        setTableData(newTableData);
+        console.log("Dados recebidos do backend:", formData);
+        setTableData(
+          tabelas.reduce((acc, t) => ({
+            ...acc,
+            [t.key]: t.fieldNames.map(row => row.map(field => formData[field] || ""))
+          }), {})
+        );
       });
   }, [filename]);
 
@@ -100,6 +106,7 @@ export default function SuperAdmin() {
           headers={tabelas[1].headers}
           dataObs={tableData.obs}
           headersObs={tabelas[0].headers}
+          filePath={filename} 
         />
       </div>
     </div>

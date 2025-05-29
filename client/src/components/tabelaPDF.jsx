@@ -45,10 +45,15 @@ export default function TabelaPdf() {
     <div>
       <h2>Tabela Observações</h2>
       <EditableTable data={dataObs} onChange={handleChangeObs} headersHtml={headersHtmlObs} />
-      <h2 style={{ marginTop: 32 }}>Tabela dinâmica (igual ao PDF)</h2>
+      <h2 >Tabela dinâmica (igual ao PDF)</h2>
       <EditableTable data={data} onChange={handleChange} headersHtml={headersHtml} />
-      <div style={{ marginTop: 16 }}>
-        <ExportPdfButton data={data} headers={headers} />
+      <div>
+        <ExportPdfButton
+          data={data}
+          headers={headers}
+          dataObs={dataObs}
+          headersObs={headersObs}
+        />
       </div>
     </div>
   );
