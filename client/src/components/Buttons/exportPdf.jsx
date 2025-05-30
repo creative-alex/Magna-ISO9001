@@ -42,15 +42,13 @@ export default function ExportPdfButton({ data, headers, dataObs, headersObs, fi
           : String(h)
     );
 
-    const parts = filePath.split("/");
+    const parts = filePath.split("/n");
     const filename = parts.pop();
 
     const nonEditablePdfBytes = await generateNonEditablePdf(data, stringHeaders, dataObs, headersObs);
     const blob = new Blob([nonEditablePdfBytes], { type: "application/pdf" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = filename.replace(".pdf", "_nao_editavel.pdf");
-    link.click();
+    const blobUrl = URL.createObjectURL(blob);
+    window.open(blobUrl, "_blank"); // Abre o PDF em nova aba para preview
   };
 
   return (
@@ -58,7 +56,7 @@ export default function ExportPdfButton({ data, headers, dataObs, headersObs, fi
       <button onClick={handleSendToBackend}>
         Guardar Mudanças
       </button>
-      <button onClick={handleDownloadNonEditable} style={{ marginLeft: 8 }}>
+      <button onClick={handleDownloadNonEditable}>
         Baixar
       </button>
     </div>

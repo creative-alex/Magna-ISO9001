@@ -5,29 +5,6 @@ const { PDFDocument } = require('pdf-lib');
 // Configuração do Firebase (será inicializada no server.js)
 const bucket = admin.storage().bucket();
 
-const getPdfText = async (req, res) => {
-  try {
-    console.log("getPdfText chamado");
-    const [files] = await bucket.getFiles();
-    console.log("Arquivos encontrados:", files.map(f => f.name));
-    const pdfFile = files.find(f => f.name.endsWith(".pdf"));
-    if (!pdfFile) {
-      console.log("Nenhum PDF encontrado");
-      return res.status(404).send("Nenhum PDF encontrado");
-    }
-
-    const [buffer] = await pdfFile.download();
-    console.log("PDF baixado:", pdfFile.name);
-    const data = await pdfParse(buffer);
-
-    const lines = data.text.split('\n').map(line => line.trim()).filter(Boolean);
-    console.log("Linhas extraídas:", lines);
-    res.json({ lines });
-  } catch (err) {
-    console.error("Erro em getPdfText:", err);
-    res.status(500).send("Erro ao extrair texto do PDF: " + err.message);
-  }
-};
 const listPdfs = async (req, res) => {
   try {
     console.log("listPdfs chamado");
@@ -129,7 +106,7 @@ function buildTree(paths) {
           type: isFile ? "file" : "folder",
         };
         if (isFile) {
-          node.path = currentPath.join("/"); // <-- Adiciona o caminho completo
+          node.path = currentPath.join("/"); 
         } else {
           node.children = [];
         }
@@ -166,10 +143,27 @@ const listPdfsTree = async (req, res) => {
   }
 };
 
+const getPdf = async (req, res) => {
+  try {
+    const { path } = req.body;
+    if (!path) return res.status(400).send("Path não fornecido");
+
+    const file = bucket.file(path);
+    const [buffer] = await file.download();
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(path.split('/').pop())}"`);
+    res.send(buffer);
+  } catch (err) {
+    console.error("Erro ao buscar PDF:", err);
+    res.status(500).send("Erro ao buscar PDF: " + err.message);
+  }
+};
+
 module.exports = {
-  getPdfText,
   uploadPdf,
   listPdfs,
   getPdfFormData,
   listPdfsTree, 
+  getPdf,
 };

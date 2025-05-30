@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { PDFDocument } from "pdf-lib";
 import "../index.css";
 
 function FolderStructure({ nodes, onSelectFile, currentPath = [] }) {
@@ -40,8 +41,26 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [] }) {
           <span className="file-name">{file.name}</span>
           <div className="file-actions">
             <button onClick={() => onSelectFile([...currentPath, file.name].join("/"))}>👁️</button>
-            <button>⬆️</button>
-            <button>⬇️</button>
+            <button
+              onClick={async () => {
+                const res = await fetch("http://localhost:8080/files/get-pdf", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ path: file.path, name: file.name }),
+                });
+                const arrayBuffer = await res.arrayBuffer();
+
+                // Torna o PDF não editável removendo todos os campos de formulário
+                const pdfDoc = await PDFDocument.load(arrayBuffer);
+                const form = pdfDoc.getForm();
+                form.getFields().forEach(field => form.removeField(field));
+                const nonEditablePdfBytes = await pdfDoc.save();
+
+                const blob = new Blob([nonEditablePdfBytes], { type: "application/pdf" });
+                const blobUrl = URL.createObjectURL(blob);
+                window.open(blobUrl, "_blank");
+              }}
+            >⬇️</button>
           </div>
         </div>
       ))}
