@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import EditableTable from "../components/editTable";
 import ExportPdfButton from "../components/Buttons/exportPdf";
@@ -59,11 +59,13 @@ export default function SuperAdmin() {
     tabelas.reduce((acc, t) => ({ ...acc, [t.key]: Array.from({ length: t.rows }, () => Array(t.cols).fill("")) }), {})
   );
 
+  // Refs para as tabelas
+  const mainTableRef = useRef(null);
+  const obsTableRef = useRef(null);
+
   // Buscar dados do PDF selecionado
   useEffect(() => {
-    console.log(filename)
     if (!filename) return;
-    console.log("A pedir dados do PDF para:", filename);
     fetch("http://localhost:8080/files/pdf-form-data", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -71,7 +73,6 @@ export default function SuperAdmin() {
     })
       .then(res => res.json())
       .then(formData => {
-        console.log("Dados recebidos do backend:", formData);
         setTableData(
           tabelas.reduce((acc, t) => ({
             ...acc,
@@ -81,32 +82,57 @@ export default function SuperAdmin() {
       });
   }, [filename]);
 
+  // Função para obter o HTML das tabelas
+  const getTablesHtml = () => ({
+    mainTableHtml: mainTableRef.current ? mainTableRef.current.outerHTML : "",
+    obsTableHtml: obsTableRef.current ? obsTableRef.current.outerHTML : ""
+  });
+
   return (
     <div>
       <h2>Super Admin - Listar e Editar PDFs</h2>
-      {tabelas.map(t => (
-        <div key={t.key}>
-          <h2>{t.label}</h2>
-          <EditableTable
-            data={tableData[t.key]}
-            onChange={(rowIdx, colIdx, value) =>
-              setTableData(prev => {
-                const newData = prev[t.key].map(row => [...row]);
-                newData[rowIdx][colIdx] = value;
-                return { ...prev, [t.key]: newData };
-              })
-            }
-            headersHtml={t.headers}
-          />
+      <div>
+        <div>
+          <h2>{tabelas[0].label}</h2>
+          <div ref={obsTableRef}>
+            <EditableTable
+              data={tableData.obs}
+              onChange={(rowIdx, colIdx, value) =>
+                setTableData(prev => {
+                  const newData = prev.obs.map(row => [...row]);
+                  newData[rowIdx][colIdx] = value;
+                  return { ...prev, obs: newData };
+                })
+              }
+              headersHtml={tabelas[0].headers}
+            />
+          </div>
         </div>
-      ))}
+        <div>
+          <h2>{tabelas[1].label}</h2>
+          <div ref={mainTableRef}>
+            <EditableTable
+              data={tableData.main}
+              onChange={(rowIdx, colIdx, value) =>
+                setTableData(prev => {
+                  const newData = prev.main.map(row => [...row]);
+                  newData[rowIdx][colIdx] = value;
+                  return { ...prev, main: newData };
+                })
+              }
+              headersHtml={tabelas[1].headers}
+            />
+          </div>
+        </div>
+      </div>
       <div style={{ marginTop: 16 }}>
         <ExportPdfButton
           data={tableData.main}
           headers={tabelas[1].headers}
           dataObs={tableData.obs}
           headersObs={tabelas[0].headers}
-          filePath={filename} 
+          filePath={filename}
+          getTablesHtml={getTablesHtml} // Passa a função para obter o HTML
         />
       </div>
     </div>
