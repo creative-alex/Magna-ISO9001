@@ -1,21 +1,18 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
-// Configuração da tabela principal
 const colWidths = [150, 140, 70, 70, 70];
 const rowHeights = Array(7).fill(50);
 const pageSize = [600, 800];
 const xStart = 50;
 const yStart = 750;
 
-// Configuração da tabela de observações
 const obsColWidth = [500];
-const obsRowHeight = 100;
+const obsRowHeight = 25;
 const obsRows = 5;
 const obsTableHeight = obsRows * obsRowHeight;
 const obsXStart = xStart;
 const obsYStart = yStart;
 
-// Espaço entre as tabelas
 const spaceBetweenTables = 30;
 
 async function createBasePdf() {
@@ -25,14 +22,14 @@ async function createBasePdf() {
   return { pdfDoc, page, font };
 }
 
-// Função utilitária para quebrar texto em várias linhas
 function wrapText(text, font, fontSize, maxWidth) {
+  // Remove quebras de linha, pois PDF-lib não suporta \n
+  text = text.replace(/\n/g, ' ');
   let lines = [];
   let currentLine = '';
 
   for (let word of text.split(' ')) {
     if (font.widthOfTextAtSize(word, fontSize) > maxWidth) {
-      // Palavra muito longa, quebra-a em pedaços
       let subWord = '';
       for (let char of word) {
         const testSubWord = subWord + char;
@@ -74,14 +71,12 @@ function drawObsTable(page, font, dataObs) {
   const maxWidth = obsColWidth[0] - 8;
   const lineHeight = fontSize + 2;
 
-  // Calcula a altura de cada linha com base no texto
   const rowHeights = safeDataObs.map(row => {
     const text = row[0] || '';
     const lines = wrapText(text, font, fontSize, maxWidth);
     return Math.max(obsRowHeight, lines.length * lineHeight + 16); // 16 = padding
   });
 
-  // Desenha linhas horizontais
   let yPos = obsYStart;
   for (let i = 0; i <= obsRows; i++) {
     page.drawLine({
@@ -126,13 +121,12 @@ function drawObsTable(page, font, dataObs) {
     yPos -= rowHeights[row];
   }
 
-  // Retorna a altura total da tabela de observações
   return rowHeights.reduce((a, b) => a + b, 0);
 }
 
-function drawTableLines(page, yOffset = 0) {
+function drawTableLines(page, yOffset = 0, yOrigin = null) {
   const totalWidth = colWidths.reduce((a, b) => a + b, 0);
-  let yPos = yStart - obsTableHeight - spaceBetweenTables - yOffset;
+  let yPos = yOrigin !== null ? yOrigin : yStart - obsTableHeight - spaceBetweenTables - yOffset;
 
   for (let i = 0; i <= rowHeights.length; i++) {
     page.drawLine({
@@ -147,8 +141,8 @@ function drawTableLines(page, yOffset = 0) {
   let xPos = xStart;
   for (let j = 0; j <= colWidths.length; j++) {
     page.drawLine({
-      start: { x: xPos, y: yStart - obsTableHeight - spaceBetweenTables - yOffset },
-      end: { x: xPos, y: yStart - obsTableHeight - spaceBetweenTables - yOffset - rowHeights.reduce((a, b) => a + b, 0) },
+      start: { x: xPos, y: yOrigin !== null ? yOrigin : yStart - obsTableHeight - spaceBetweenTables - yOffset },
+      end: { x: xPos, y: (yOrigin !== null ? yOrigin : yStart - obsTableHeight - spaceBetweenTables - yOffset) - rowHeights.reduce((a, b) => a + b, 0) },
       thickness: 1,
       color: rgb(0, 0, 0),
     });
@@ -156,9 +150,9 @@ function drawTableLines(page, yOffset = 0) {
   }
 }
 
-function drawHeaders(page, headers, font, yOffset = 0) {
+function drawHeaders(page, headers, font, yOffset = 0, yOrigin = null) {
   let xPos = xStart;
-  const yHeaders = yStart - obsTableHeight - spaceBetweenTables - yOffset;
+  const yHeaders = yOrigin !== null ? yOrigin : yStart - obsTableHeight - spaceBetweenTables - yOffset;
   const headerHeight = rowHeights[0];
 
   headers.forEach((header, col) => {
@@ -167,7 +161,6 @@ function drawHeaders(page, headers, font, yOffset = 0) {
     const fontSize = 10;
     const lineHeight = 12;
     const totalTextHeight = lines.length * lineHeight;
-    // Centraliza verticalmente dentro da célula
     let startY = yHeaders - ((headerHeight - totalTextHeight) / 2) - fontSize;
 
     lines.forEach((line, idx) => {
@@ -192,10 +185,8 @@ async function generateEditablePdf(data, headers, dataObs) {
   const { pdfDoc, page, font } = await createBasePdf();
   const form = pdfDoc.getForm();
 
-  // Desenha tabela de observações (sem headers) e obtém altura real
   const obsTableHeightReal = drawObsTable(page, font, dataObs);
 
-  // Campos editáveis para tabela de observações
   let yObs = obsYStart;
   const fontSize = 8;
   const maxWidth = obsColWidth[0] - 8;
@@ -260,47 +251,193 @@ async function generateEditablePdf(data, headers, dataObs) {
   return await pdfDoc.save();
 }
 
-/**
- * Gera um PDF não editável a partir de dados (arrays).
- */
-async function generateNonEditablePdf(data, headers, dataObs, headersObs) {
-  const { pdfDoc, page, font } = await createBasePdf();
 
-  // Desenha tabela de observações e obtém altura real
-  const obsTableHeightReal = drawObsTable(page, font, dataObs);
+async function generateNonEditablePdf(data, headers, dataObs) {
+  const { pdfDoc, page: firstPage, font } = await createBasePdf();
 
-  // Desenha tabela principal
-  drawTableLines(page, obsTableHeightReal - obsTableHeight);
-  drawHeaders(page, headers, font, obsTableHeightReal - obsTableHeight);
+  // Calcule a altura real da tabela de observações
+  const fontSize = 8;
+  const maxWidth = obsColWidth[0] - 8;
+  const lineHeight = fontSize + 2;
+  const safeDataObs = Array.from({ length: 5 }, (_, i) =>
+    Array.isArray(dataObs) && Array.isArray(dataObs[i]) ? dataObs[i] : [""]
+  );
+  const rowHeightsObs = safeDataObs.map(row => {
+    const text = row[0] || '';
+    const lines = wrapText(text, font, fontSize, maxWidth);
+    return Math.max(obsRowHeight, lines.length * lineHeight + 16);
+  });
+  const obsTableHeightReal = rowHeightsObs.reduce((a, b) => a + b, 0);
 
-  // Preenche dados da tabela principal
-  let yPos = yStart - obsTableHeightReal - spaceBetweenTables - rowHeights[0];
-  for (let row = 0; row < data.length; row++) {
+  // Desenha tabela de observações na primeira página
+  drawObsTable(firstPage, font, dataObs);
+
+  // --- Quebra de texto e altura dinâmica das linhas ---
+  const maxWidths = colWidths.map(w => w - 8);
+
+  // Calcula as linhas quebradas e alturas de cada linha
+  const wrappedData = data.map(row =>
+    row.map((cell, col) => wrapText(cell || "", font, fontSize, maxWidths[col]))
+  );
+  const rowHeightsDynamic = wrappedData.map(
+    row =>
+      Math.max(
+        ...row.map(lines => lines.length * lineHeight + 16),
+        50
+      )
+  );
+  rowHeightsDynamic.unshift(50); // header
+
+  // Parâmetros de página
+  const totalWidth = colWidths.reduce((a, b) => a + b, 0);
+  const marginBottom = 40;
+
+  // Posição inicial da tabela principal
+  let yPos = yStart - obsTableHeightReal - spaceBetweenTables;
+  let page = firstPage;
+  let rowIndex = 0;
+  let isFirstPage = true;
+
+  // Função para desenhar headers
+  function drawTableHeaders(page, y, headerHeight) {
     let xPos = xStart;
-    for (let col = 0; col < data[row].length; col++) {
-      const text = data[row][col] || "";
-      page.drawText(text, {
-        x: xPos + 4,
-        y: yPos - rowHeights[row + 1] + 8,
-        size: 8,
-        font,
-        color: rgb(0, 0, 0),
-        maxWidth: colWidths[col] - 8,
+    headers.forEach((header, col) => {
+      const lines = (header || "").split('\n');
+      const colWidth = colWidths[col];
+      const totalTextHeight = lines.length * 12;
+      let startY = y - ((headerHeight - totalTextHeight) / 2) - fontSize;
+      lines.forEach((line, idx) => {
+        const textWidth = font.widthOfTextAtSize(line, 10);
+        const textX = xPos + (colWidth - textWidth) / 2;
+        const textY = startY - idx * 12;
+        page.drawText(line, {
+          x: textX,
+          y: textY,
+          size: 10,
+          font,
+          color: rgb(0, 0, 0),
+        });
       });
       xPos += colWidths[col];
+    });
+  }
+
+  // Função para desenhar linhas horizontais e verticais da tabela
+function drawTableGrid(page, yStartTable, rowHeights, numRows, drawTopLine = true) {
+  let y = yStartTable;
+  
+  // Desenha linhas horizontais
+  for (let i = 0; i <= numRows; i++) {
+    if (i === 0 && !drawTopLine) {
+      y -= rowHeights[i] || 0;
+      continue;
     }
-    yPos -= rowHeights[row + 1];
+    page.drawLine({
+      start: { x: xStart, y: y },
+      end: { x: xStart + totalWidth, y: y },
+      thickness: 1,
+      color: rgb(0, 0, 0),
+    });
+    if (i < numRows) { // Evita subtrair altura após a última linha
+      y -= rowHeights[i] || 0;
+    }
+  }
+  
+  // Desenha linhas verticais - CORREÇÃO
+  let xPos = xStart;
+  // Calcula a altura total corretamente
+  const totalVerticalHeight = rowHeights.slice(0, numRows + (drawTopLine ? 1 : 0)).reduce((a, b) => a + b, 0);
+  
+  for (let j = 0; j <= colWidths.length; j++) {
+    page.drawLine({
+      start: { x: xPos, y: yStartTable },
+      end: { x: xPos, y: yStartTable - totalVerticalHeight },
+      thickness: 1,
+      color: rgb(0, 0, 0),
+    });
+    if (j < colWidths.length) { // Evita adicionar largura após a última coluna
+      xPos += colWidths[j];
+    }
+  }
+}
+
+
+
+  // Desenha a tabela principal, quebrando para nova página se necessário
+  while (rowIndex < data.length) {
+    // Calcular espaço disponível nesta página
+    let availableHeight;
+    if (isFirstPage) {
+      availableHeight = yPos - marginBottom;
+    } else {
+      yPos = yStart;
+      availableHeight = yPos - marginBottom;
+    }
+
+    // Quantas linhas cabem nesta página?
+    let rowsThisPage = 0;
+    let heightSum = isFirstPage ? rowHeightsDynamic[0] : 0; // header só na primeira página
+    while (
+      rowIndex + rowsThisPage < data.length &&
+      heightSum + rowHeightsDynamic[rowIndex + 1] <= availableHeight
+    ) {
+      heightSum += rowHeightsDynamic[rowIndex + 1];
+      rowsThisPage++;
+    }
+
+    // Desenha grid e headers
+    const rowsToDraw = rowsThisPage > 0 ? rowsThisPage : 1;
+    if (isFirstPage) {
+      // Desenha cabeçalho e linha de topo só na primeira página
+      drawTableGrid(page, yPos, [rowHeightsDynamic[0], ...rowHeightsDynamic.slice(rowIndex + 1, rowIndex + 1 + rowsToDraw)], rowsToDraw, true);
+      drawTableHeaders(page, yPos, rowHeightsDynamic[0]);
+    } else {
+      // Não desenha cabeçalho nem linha de topo nas páginas seguintes
+      drawTableGrid(page, yPos, rowHeightsDynamic.slice(rowIndex + 1, rowIndex + 1 + rowsToDraw), rowsToDraw, false);
+    }
+
+    // Desenha dados
+    let yData = yPos - (isFirstPage ? rowHeightsDynamic[0] : 0);
+    for (let i = 0; i < rowsToDraw; i++) {
+      let xPos = xStart;
+      const row = rowIndex + i;
+      for (let col = 0; col < data[row].length; col++) {
+        const lines = wrappedData[row][col];
+        let textY = yData - 8;
+        for (let l = 0; l < lines.length; l++) {
+          page.drawText(lines[l], {
+            x: xPos + 4,
+            y: textY - l * lineHeight,
+            size: fontSize,
+            font,
+            color: rgb(0, 0, 0),
+            maxWidth: maxWidths[col],
+          });
+        }
+        xPos += colWidths[col];
+      }
+      yData -= rowHeightsDynamic[row + 1];
+    }
+
+    rowIndex += rowsToDraw;
+
+    // Se ainda há linhas, cria nova página e continua
+    if (rowIndex < data.length) {
+      page = pdfDoc.addPage(pageSize);
+      yPos = yStart;
+      isFirstPage = false;
+    }
   }
 
   return await pdfDoc.save();
 }
 
 /**
- * Gera um PDF não editável a partir de HTML de tabelas.
- * @param {string} mainTableHtml - HTML da tabela principal
- * @param {string} obsTableHtml - HTML da tabela de observações
- * @returns {Promise<Uint8Array>} PDF em bytes
+ * @param {string} mainTableHtml
+ * @param {string} obsTableHtml
+ * @returns {Promise<Uint8Array>}
  */
+
 async function generateNonEditablePdfFromHtml(mainTableHtml, obsTableHtml) {
   const parser = new DOMParser();
   const htmlTableToArray = (html) => {
@@ -311,7 +448,6 @@ async function generateNonEditablePdfFromHtml(mainTableHtml, obsTableHtml) {
     doc.querySelectorAll("tr").forEach(tr => {
       const cells = [];
       tr.querySelectorAll("th,td").forEach(cell => {
-        // Usa innerText para manter quebras de linha e espaços
         cells.push(cell.innerText || cell.textContent || "");
       });
       rows.push(cells);
