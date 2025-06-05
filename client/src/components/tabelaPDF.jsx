@@ -43,9 +43,7 @@ export default function TabelaPdf() {
 
   return (
     <div>
-      <h2>Tabela Observações</h2>
       <EditableTable data={dataObs} onChange={handleChangeObs} headersHtml={headersHtmlObs} />
-      <h2 >Tabela dinâmica (igual ao PDF)</h2>
       <EditableTable data={data} onChange={handleChange} headersHtml={headersHtml} />
       <div>
         <ExportPdfButton

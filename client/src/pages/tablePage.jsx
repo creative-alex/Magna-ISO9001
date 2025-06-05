@@ -6,8 +6,7 @@ import ExportPdfButton from "../components/Buttons/exportPdf";
 const tabelas = [
   {
     key: "obs",
-    label: "Tabela Observações",
-    headers: [<>Observações</>],
+    headers: [],
     fieldNames: [
       ["table1_r1"],
       ["table1_r2"],
@@ -20,7 +19,6 @@ const tabelas = [
   },
   {
     key: "main",
-    label: "Tabela dinâmica (igual ao PDF)",
     headers: [
       <>Fluxo<br />das Ações</>,
       <>Descrição</>,
@@ -90,7 +88,7 @@ export default function SuperAdmin() {
 
   return (
     <div>
-      <h2>Super Admin - Listar e Editar PDFs</h2>
+      <h2>{tableData.filename}</h2>
       <div>
         <div>
           <h2>{tabelas[0].label}</h2>

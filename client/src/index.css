@@ -96,3 +96,79 @@ code {
   background: none;
   font-size: 16px;
 }
+
+
+/* Container geral para centrar e limitar a largura */
+.editable-table-container {
+  max-width: 960px;
+  margin: 40px auto;
+  padding: 0 24px;
+}
+
+/* Tabela principal */
+.editable-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+  font-family: 'Inter', 'Segoe UI', Tahoma, sans-serif;
+  background-color: #fff;
+  border: 1px solid #e5e7eb;
+}
+
+/* Cabeçalho da tabela */
+.editable-table-header {
+  background-color: #f9fafb;
+  color: #111827;
+  font-weight: 600;
+  font-size: 14px;
+  text-align: left;
+  padding: 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* Linhas da tabela */
+.editable-table-row {
+  background-color: #ffffff;
+  transition: background-color 0.2s ease;
+}
+.editable-table-row:nth-child(even) {
+  background-color: #f8fafc;
+}
+.editable-table-row:hover {
+  background-color: #eef2f7;
+}
+
+/* Células com textarea */
+.editable-table-cell {
+  position: relative;
+  padding: 0;
+  border-bottom: 1px solid #e5e7eb;
+  vertical-align: top;
+}
+
+/* Textarea ocupa 100% da célula */
+.editable-table-textarea {
+  width: 100%;
+  height: 100%;
+  min-height: 60px;
+  padding: 12px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  border: none;
+  outline: none;
+  background-color: transparent;
+  box-sizing: border-box;
+  resize: vertical;
+  transition: all 0.2s ease;
+}
+
+/* Quando em foco, estiliza de forma limpa */
+.editable-table-textarea:focus {
+  background-color: #fff;
+  box-shadow: inset 0 0 0 2px #3b82f6;
+  border-radius: 6px;
+}
+

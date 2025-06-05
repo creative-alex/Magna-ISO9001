@@ -4,7 +4,7 @@ const colWidths = [150, 140, 70, 70, 70];
 const rowHeights = Array(7).fill(50);
 const pageSize = [600, 800];
 const xStart = 50;
-const yStart = 750;
+const yStart = 780;
 
 const obsColWidth = [500];
 const obsRowHeight = 25;
@@ -67,7 +67,7 @@ function drawObsTable(page, font, dataObs) {
     Array.isArray(dataObs) && Array.isArray(dataObs[i]) ? dataObs[i] : [""]
   );
 
-  const fontSize = 8;
+  const fontSize = 6;
   const maxWidth = obsColWidth[0] - 8;
   const lineHeight = fontSize + 2;
 
@@ -256,7 +256,7 @@ async function generateNonEditablePdf(data, headers, dataObs) {
   const { pdfDoc, page: firstPage, font } = await createBasePdf();
 
   // Calcule a altura real da tabela de observações
-  const fontSize = 8;
+  const fontSize = 6;
   const maxWidth = obsColWidth[0] - 8;
   const lineHeight = fontSize + 2;
   const safeDataObs = Array.from({ length: 5 }, (_, i) =>
@@ -290,7 +290,7 @@ async function generateNonEditablePdf(data, headers, dataObs) {
 
   // Parâmetros de página
   const totalWidth = colWidths.reduce((a, b) => a + b, 0);
-  const marginBottom = 40;
+  const marginBottom = 25;
 
   // Posição inicial da tabela principal
   let yPos = yStart - obsTableHeightReal - spaceBetweenTables;
