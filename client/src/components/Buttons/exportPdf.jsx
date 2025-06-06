@@ -1,7 +1,18 @@
 import React from "react";
 import { generateEditablePdf, generateNonEditablePdfFromHtml } from "../../utils/pdfUtils";
 
-export default function ExportPdfButton({ data, headers, dataObs, headersObs, filePath = "meu_editavel.pdf", getTablesHtml }) {
+export default function ExportPdfButton({ data, headers, dataObs, headersObs, filePath = "meu_editavel.pdf", getTablesHtml, fieldNames }) {
+  // Função para preparar os dados para envio ao backend
+  const getMainTableFormData = () => {
+    const formDataObj = {};
+    fieldNames.forEach((rowFields, rowIdx) => {
+      rowFields.forEach((fieldName, colIdx) => {
+        formDataObj[fieldName] = data[rowIdx]?.[colIdx] || "";
+      });
+    });
+    return formDataObj;
+  };
+
   // Função para enviar PDF editável para o backend
   const handleSendToBackend = async () => {
     const stringHeaders = headers.map(h =>
@@ -23,6 +34,10 @@ export default function ExportPdfButton({ data, headers, dataObs, headersObs, fi
     formData.append("file", new Blob([editablePdfBytes], { type: "application/pdf" }), filename);
     formData.append("folders", JSON.stringify(folders));
     formData.append("filename", filename);
+
+    // Adiciona os dados dinâmicos ao formData
+    const mainTableFormData = getMainTableFormData();
+    formData.append("mainTableData", JSON.stringify(mainTableFormData));
 
     await fetch("http://localhost:8080/files/upload-pdf", {
       method: "POST",

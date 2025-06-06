@@ -82,48 +82,43 @@ const getPdfFormData = async (req, res) => {
   }
 };
 
-// Função utilitária para construir a árvore
-function buildTree(paths) {
+// Recebe dois arrays: pdfPaths (caminhos dos PDFs) e folderPaths (caminhos das pastas)
+function buildTree(pdfPaths, folderPaths = []) {
   const root = [];
-  console.log("Iniciando buildTree...");
-  for (const path of paths) {
-    console.log(`\nProcessando path: "${path}"`);
-    const parts = path.split("/");
-    console.log("Parts:", parts);
+
+  // Adiciona todas as pastas (mesmo vazias)
+  for (const folderPath of folderPaths) {
+    const parts = folderPath.split("/");
     let current = root;
-    let currentPath = [];
     for (let i = 0; i < parts.length; i++) {
       const name = parts[i];
-      currentPath.push(name);
-      const isFile = name.endsWith(".pdf") && i === parts.length - 1;
-      console.log(`  Parte ${i}: "${name}" (${isFile ? "file" : "folder"})`);
-      let node = current.find(n => n.name === name);
-      if (node) {
-        console.log(`    Encontrado node existente:`, node);
-      } else {
-        node = {
-          name,
-          type: isFile ? "file" : "folder",
-        };
-        if (isFile) {
-          node.path = currentPath.join("/"); 
-        } else {
-          node.children = [];
-        }
+      let node = current.find(n => n.name === name && n.type === "folder");
+      if (!node) {
+        node = { name, type: "folder", children: [] };
         current.push(node);
-        console.log(`    Criado novo node:`, node);
       }
-      if (!isFile) {
-        console.log(`    Descendo para children de "${name}"`);
-        current = node.children;
-      } else {
-        console.log(`    "${name}" é um arquivo, não desce mais.`);
-      }
+      current = node.children;
     }
-    console.log("Estado atual da árvore:", JSON.stringify(root, null, 2));
   }
-  console.log("\nÁrvore final construída:");
-  console.log(JSON.stringify(root, null, 2));
+
+  // Adiciona os arquivos PDF
+  for (const path of pdfPaths) {
+    const parts = path.split("/");
+    let current = root;
+    for (let i = 0; i < parts.length; i++) {
+      const name = parts[i];
+      const isFile = name.endsWith(".pdf") && i === parts.length - 1;
+      let node = current.find(n => n.name === name && (isFile ? n.type === "file" : n.type === "folder"));
+      if (!node) {
+        node = isFile
+          ? { name, type: "file", path }
+          : { name, type: "folder", children: [] };
+        current.push(node);
+      }
+      if (!isFile) current = node.children;
+    }
+  }
+
   return root;
 }
 

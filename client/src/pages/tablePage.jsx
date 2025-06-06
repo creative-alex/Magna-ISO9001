@@ -44,7 +44,9 @@ const tabelas = [
       ],
       [
         "table2_r7_c1", "table2_r7_c2", "table2_r7_c3", "table2_r7_c4", "table2_r7_c5"
-      ]
+      ],
+      
+
     ],
     rows: 6,
     cols: 5
@@ -56,6 +58,7 @@ export default function SuperAdmin() {
   const [tableData, setTableData] = useState(
     tabelas.reduce((acc, t) => ({ ...acc, [t.key]: Array.from({ length: t.rows }, () => Array(t.cols).fill("")) }), {})
   );
+  const [mainFieldNames, setMainFieldNames] = useState([...tabelas[1].fieldNames]);
 
   // Refs para as tabelas
   const mainTableRef = useRef(null);
@@ -71,14 +74,13 @@ export default function SuperAdmin() {
     })
       .then(res => res.json())
       .then(formData => {
-        setTableData(
-          tabelas.reduce((acc, t) => ({
-            ...acc,
-            [t.key]: t.fieldNames.map(row => row.map(field => formData[field] || ""))
-          }), {})
-        );
+        setTableData(prev => ({
+          ...prev,
+          main: mainFieldNames.map(row => row.map(field => formData[field] || "")),
+          obs: tabelas[0].fieldNames.map(row => row.map(field => formData[field] || ""))
+        }));
       });
-  }, [filename]);
+  }, [filename, mainFieldNames]);
 
   // Função para obter o HTML das tabelas
   const getTablesHtml = () => ({
@@ -86,7 +88,21 @@ export default function SuperAdmin() {
     obsTableHtml: obsTableRef.current ? obsTableRef.current.outerHTML : ""
   });
 
+  // Função para adicionar uma linha à tabela principal
+  const handleAddRow = () => {
+    // Novo índice para a linha
+    const newRowIdx = mainFieldNames.length + 2; // começa em 2
+    // Cria os novos nomes dos campos
+    const newFieldRow = Array.from({ length: tabelas[1].cols }, (_, colIdx) => `table2_r${newRowIdx}_c${colIdx + 1}`);
+    setMainFieldNames(prev => [...prev, newFieldRow]);
+    setTableData(prev => ({
+      ...prev,
+      main: [...prev.main, Array(tabelas[1].cols).fill("")]
+    }));
+  };
+
   return (
+    <>
     <div>
       <h2>{tableData.filename}</h2>
       <div>
@@ -130,10 +146,12 @@ export default function SuperAdmin() {
           dataObs={tableData.obs}
           headersObs={tabelas[0].headers}
           filePath={filename}
-          getTablesHtml={getTablesHtml} // Passa a função para obter o HTML
+          getTablesHtml={getTablesHtml}
+          fieldNames={mainFieldNames} 
         />
       </div>
     </div>
+          <button onClick={handleAddRow}>Adicionar Linha</button>
+</>
   );
 }
-
