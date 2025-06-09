@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
-import EditableTable from "../components/editTable";
+import EditableTable from "../components/ProcessTable";
 import ExportPdfButton from "../components/Buttons/exportPdf";
 
 const tabelas = [
@@ -53,6 +53,42 @@ const tabelas = [
   }
 ];
 
+const tabelasTemplate2 = [
+  {
+    key: "obs",
+    headers: ["Observações"], // Adiciona um header para a tabela de observações
+    fieldNames: [
+      ["t2_table1_r1"],
+      ["t2_table1_r2"],
+      ["t2_table1_r3"]
+    ],
+    rows: 3,
+    cols: 1
+  },
+  {
+    key: "main",
+    headers: [
+      <>Etapa</>,
+      <>Descrição</>,
+      <>Responsável</>,
+      <>Notas</>
+    ],
+    fieldNames: [
+      [
+        "t2_table2_r2_c1", "t2_table2_r2_c2", "t2_table2_r2_c3", "t2_table2_r2_c4"
+      ],
+      [
+        "t2_table2_r3_c1", "t2_table2_r3_c2", "t2_table2_r3_c3", "t2_table2_r3_c4"
+      ],
+      [
+        "t2_table2_r4_c1", "t2_table2_r4_c2", "t2_table2_r4_c3", "t2_table2_r4_c4"
+      ]
+    ],
+    rows: 3,
+    cols: 4
+  }
+];
+
 export default function SuperAdmin() {
   const { filename } = useParams();
   const [tableData, setTableData] = useState(
@@ -60,11 +96,7 @@ export default function SuperAdmin() {
   );
   const [mainFieldNames, setMainFieldNames] = useState([...tabelas[1].fieldNames]);
 
-  // Refs para as tabelas
-  const mainTableRef = useRef(null);
-  const obsTableRef = useRef(null);
-
-  // Buscar dados do PDF selecionado
+  // Buscar dados do PDF selecionado (ATUALIZADO)
   useEffect(() => {
     if (!filename) return;
     fetch("http://localhost:8080/files/pdf-form-data", {
@@ -80,26 +112,39 @@ export default function SuperAdmin() {
           obs: tabelas[0].fieldNames.map(row => row.map(field => formData[field] || ""))
         }));
       });
-  }, [filename, mainFieldNames]);
+  }, [filename]); // Removida a dependência mainFieldNames
 
-  // Função para obter o HTML das tabelas
+  // Função para substituir \n por <br/> no HTML das tabelas
+  const replaceNewlinesWithBr = html => html.replace(/\n/g, "<br/>");
+
+  // Função para obter o HTML das tabelas, já com <br/> nas quebras de linha
   const getTablesHtml = () => ({
-    mainTableHtml: mainTableRef.current ? mainTableRef.current.outerHTML : "",
-    obsTableHtml: obsTableRef.current ? obsTableRef.current.outerHTML : ""
+    mainTableHtml: mainTableRef.current
+      ? replaceNewlinesWithBr(mainTableRef.current.outerHTML)
+      : "",
+    obsTableHtml: obsTableRef.current
+      ? replaceNewlinesWithBr(obsTableRef.current.outerHTML)
+      : ""
   });
 
   // Função para adicionar uma linha à tabela principal
   const handleAddRow = () => {
-    // Novo índice para a linha
-    const newRowIdx = mainFieldNames.length + 2; // começa em 2
-    // Cria os novos nomes dos campos
-    const newFieldRow = Array.from({ length: tabelas[1].cols }, (_, colIdx) => `table2_r${newRowIdx}_c${colIdx + 1}`);
+    const newRowIdx = mainFieldNames.length + 2;
+    const newFieldRow = Array.from({ length: tabelas[1].cols }, (_, colIdx) =>
+      `table2_r${newRowIdx}_c${colIdx + 1}`
+    );
+    
+    // Atualização otimizada do estado
     setMainFieldNames(prev => [...prev, newFieldRow]);
     setTableData(prev => ({
       ...prev,
       main: [...prev.main, Array(tabelas[1].cols).fill("")]
     }));
   };
+
+  // Refs para as tabelas
+  const mainTableRef = useRef(null);
+  const obsTableRef = useRef(null);
 
   return (
     <>
@@ -147,7 +192,8 @@ export default function SuperAdmin() {
           headersObs={tabelas[0].headers}
           filePath={filename}
           getTablesHtml={getTablesHtml}
-          fieldNames={mainFieldNames} 
+          fieldNames={mainFieldNames}
+          filename={filename}  
         />
       </div>
     </div>

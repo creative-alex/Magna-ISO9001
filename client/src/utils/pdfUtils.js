@@ -23,43 +23,45 @@ async function createBasePdf() {
 }
 
 function wrapText(text, font, fontSize, maxWidth) {
-  // Remove quebras de linha, pois PDF-lib não suporta \n
-  text = text.replace(/\n/g, ' ');
+  // Divide o texto em parágrafos, mantendo as quebras manuais
+  const paragraphs = text.split('\n');
   let lines = [];
-  let currentLine = '';
-
-  for (let word of text.split(' ')) {
-    if (font.widthOfTextAtSize(word, fontSize) > maxWidth) {
-      let subWord = '';
-      for (let char of word) {
-        const testSubWord = subWord + char;
-        if (font.widthOfTextAtSize(testSubWord, fontSize) > maxWidth) {
-          if (subWord) lines.push(subWord);
-          subWord = char;
-        } else {
-          subWord = testSubWord;
+  for (const para of paragraphs) {
+    let currentLine = '';
+    for (let word of para.split(' ')) {
+      if (font.widthOfTextAtSize(word, fontSize) > maxWidth) {
+        let subWord = '';
+        for (let char of word) {
+          const testSubWord = subWord + char;
+          if (font.widthOfTextAtSize(testSubWord, fontSize) > maxWidth) {
+            if (subWord) lines.push(subWord);
+            subWord = char;
+          } else {
+            subWord = testSubWord;
+          }
         }
-      }
-      if (subWord) {
-        if (currentLine) {
-          lines.push(currentLine);
-          currentLine = '';
+        if (subWord) {
+          if (currentLine) {
+            lines.push(currentLine);
+            currentLine = '';
+          }
+          lines.push(subWord);
         }
-        lines.push(subWord);
-      }
-    } else {
-      const testLine = currentLine ? currentLine + ' ' + word : word;
-      if (font.widthOfTextAtSize(testLine, fontSize) > maxWidth && currentLine) {
-        lines.push(currentLine);
-        currentLine = word;
       } else {
-        currentLine = testLine;
+        const testLine = currentLine ? currentLine + ' ' + word : word;
+        if (font.widthOfTextAtSize(testLine, fontSize) > maxWidth && currentLine) {
+          lines.push(currentLine);
+          currentLine = word;
+        } else {
+          currentLine = testLine;
+        }
       }
     }
+    if (currentLine) lines.push(currentLine);
   }
-  if (currentLine) lines.push(currentLine);
   return lines;
 }
+
 
 function drawObsTable(page, font, dataObs) {
   // Garante sempre 5 linhas
@@ -251,7 +253,6 @@ async function generateEditablePdf(data, headers, dataObs) {
   return await pdfDoc.save();
 }
 
-
 async function generateNonEditablePdf(data, headers, dataObs) {
   const { pdfDoc, page: firstPage, font } = await createBasePdf();
 
@@ -379,9 +380,9 @@ function drawTableGrid(page, yStartTable, rowHeights, numRows, drawTopLine = tru
     let heightSum = isFirstPage ? rowHeightsDynamic[0] : 0; // header só na primeira página
     while (
       rowIndex + rowsThisPage < data.length &&
-      heightSum + rowHeightsDynamic[rowIndex + 1] <= availableHeight
+      heightSum + rowHeightsDynamic[rowIndex + rowsThisPage + 1] <= availableHeight
     ) {
-      heightSum += rowHeightsDynamic[rowIndex + 1];
+      heightSum += rowHeightsDynamic[rowIndex + rowsThisPage + 1];
       rowsThisPage++;
     }
 
@@ -440,20 +441,34 @@ function drawTableGrid(page, yStartTable, rowHeights, numRows, drawTopLine = tru
 
 async function generateNonEditablePdfFromHtml(mainTableHtml, obsTableHtml) {
   const parser = new DOMParser();
-  const htmlTableToArray = (html) => {
-    // Substitui <br> por \n para manter quebras de linha nos headers
-    html = html.replace(/<br\s*\/?>/gi, '\n');
-    const doc = parser.parseFromString(html, "text/html");
-    const rows = [];
-    doc.querySelectorAll("tr").forEach(tr => {
-      const cells = [];
-      tr.querySelectorAll("th,td").forEach(cell => {
-        cells.push(cell.innerText || cell.textContent || "");
-      });
-      rows.push(cells);
+  // Função para extrair texto de uma célula, convertendo <br> em \n
+function getCellTextWithBreaks(cell) {
+  let text = "";
+  cell.childNodes.forEach(node => {
+    if (node.nodeType === 3) { // Text node
+      // Substitui <br/> literal por \n
+      text += node.nodeValue.replace(/<br\s*\/?>/gi, "\n");
+    } else if (node.nodeName === "BR") {
+      text += "\n";
+    } else if (node.nodeType === 1) { // Element node
+      text += getCellTextWithBreaks(node);
+    }
+  });
+  return text;
+}
+
+const htmlTableToArray = (html) => {
+  const doc = parser.parseFromString(html, "text/html");
+  const rows = [];
+  doc.querySelectorAll("tr").forEach(tr => {
+    const cells = [];
+    tr.querySelectorAll("th,td").forEach(cell => {
+      cells.push(getCellTextWithBreaks(cell));
     });
-    return rows;
-  };
+    rows.push(cells);
+  });
+  return rows;
+};
 
   const mainTableArr = htmlTableToArray(mainTableHtml);
   const obsTableArr = htmlTableToArray(obsTableHtml);

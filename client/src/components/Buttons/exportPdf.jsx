@@ -5,9 +5,13 @@ export default function ExportPdfButton({ data, headers, dataObs, headersObs, fi
   // Função para preparar os dados para envio ao backend
   const getMainTableFormData = () => {
     const formDataObj = {};
-    fieldNames.forEach((rowFields, rowIdx) => {
-      rowFields.forEach((fieldName, colIdx) => {
-        formDataObj[fieldName] = data[rowIdx]?.[colIdx] || "";
+    // Garante que percorre todas as linhas de dados, mesmo que fieldNames esteja desatualizado
+    data.forEach((row, rowIdx) => {
+      const rowFields = fieldNames[rowIdx] || [];
+      row.forEach((cell, colIdx) => {
+        // Se não existir fieldName para esta célula, gera um nome padrão
+        const fieldName = rowFields[colIdx] || `table2_r${rowIdx + 2}_c${colIdx + 1}`;
+        formDataObj[fieldName] = cell || "";
       });
     });
     return formDataObj;

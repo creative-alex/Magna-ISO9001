@@ -52,26 +52,10 @@ function EditableTable({ data, onChange, headersHtml }) {
             {headersHtml.map((header, i) => (
               <th
                 key={i}
-                className="editable-table-header"
-                style={{
-                  whiteSpace: "pre-line",
-                  textAlign: "center",
-                  position: "relative",
-                  width: colWidths[i],
-                  minWidth: 50,
-                }}
+                className="editable-table-header"                
               >
                 {header}
-                <div
-                  style={{
-                    position: "absolute",
-                    right: 0,
-                    top: 0,
-                    height: "100%",
-                    width: 8,
-                    cursor: "col-resize",
-                    zIndex: 2,
-                  }}
+                <div               
                   onMouseDown={e => handleMouseDown(e, i)}
                 />
               </th>
@@ -85,12 +69,10 @@ function EditableTable({ data, onChange, headersHtml }) {
                 <td
                   key={colIdx}
                   className="editable-table-cell"
-                  style={{ width: colWidths[colIdx], minWidth: 50 }}
                 >
                   <textarea
                     ref={el => (textAreaRefs.current[`${rowIdx}-${colIdx}`] = el)}
                     className="editable-table-textarea"
-                    style={{ width: "100%", height: "auto", resize: "none" }}
                     value={cell}
                     onChange={e => onChange(rowIdx, colIdx, e.target.value)}
                     onInput={handleInput}
