@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import EditableTable from "../components/ProcessTable";
 import ExportPdfButton from "../components/Buttons/exportPdf";
+import PreviewPdfButton from "../components/Buttons/previewPDF";
 
 const tabelas = [
   {
@@ -44,9 +45,7 @@ const tabelas = [
       ],
       [
         "table2_r7_c1", "table2_r7_c2", "table2_r7_c3", "table2_r7_c4", "table2_r7_c5"
-      ],
-      
-
+      ],      
     ],
     rows: 6,
     cols: 5
@@ -184,17 +183,17 @@ export default function SuperAdmin() {
           </div>
         </div>
       </div>
-      <div style={{ marginTop: 16 }}>
+      <div>
         <ExportPdfButton
           data={tableData.main}
           headers={tabelas[1].headers}
           dataObs={tableData.obs}
           headersObs={tabelas[0].headers}
           filePath={filename}
-          getTablesHtml={getTablesHtml}
           fieldNames={mainFieldNames}
           filename={filename}  
         />
+        <PreviewPdfButton getTablesHtml={getTablesHtml} />
       </div>
     </div>
           <button onClick={handleAddRow}>Adicionar Linha</button>
