@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import EditableTable from "../components/ProcessTable";
 import ExportPdfButton from "../components/Buttons/exportPdf";
 import PreviewPdfButton from "../components/Buttons/previewPDF";
+import { generateEditablePdf } from "../utils/pdfUtils"; // Certifique-se que o caminho está correto
 
 const tabelas = [
   {
@@ -105,10 +106,31 @@ export default function SuperAdmin() {
     })
       .then(res => res.json())
       .then(formData => {
+        // Descobre quantas linhas existem nos campos table2_rX_cY
+        const mainFields = Object.keys(formData).filter(f => /^table2_r\d+_c\d+$/.test(f));
+        const rowNumbers = mainFields.map(f => parseInt(f.match(/^table2_r(\d+)_c\d+$/)[1], 10));
+        const maxRow = Math.max(...rowNumbers, 1); // pelo menos 1 linha
+
+        // Gera mainFieldNames dinamicamente
+        const newMainFieldNames = [];
+        for (let row = 2; row <= maxRow; row++) {
+          const rowFields = [];
+          for (let col = 1; col <= tabelas[1].cols; col++) {
+            rowFields.push(`table2_r${row}_c${col}`);
+          }
+          newMainFieldNames.push(rowFields);
+        }
+
+        setMainFieldNames(newMainFieldNames);
+
         setTableData(prev => ({
           ...prev,
-          main: mainFieldNames.map(row => row.map(field => formData[field] || "")),
-          obs: tabelas[0].fieldNames.map(row => row.map(field => formData[field] || ""))
+          main: newMainFieldNames.map(row =>
+            row.map(field => formData[field] || "")
+          ),
+          obs: tabelas[0].fieldNames.map(row =>
+            row.map(field => formData[field] || "")
+          )
         }));
       });
   }, [filename]); // Removida a dependência mainFieldNames
@@ -144,6 +166,36 @@ export default function SuperAdmin() {
   // Refs para as tabelas
   const mainTableRef = useRef(null);
   const obsTableRef = useRef(null);
+
+  function DownloadEditablePdfButton({ data, headers, dataObs, filePath = "meu_editavel.pdf", fieldNames }) {
+    const handleDownload = async () => {
+      const stringHeaders = headers.map(h =>
+        typeof h === "string"
+          ? h
+          : h?.props?.children
+            ? Array.isArray(h.props.children)
+              ? h.props.children.join('')
+              : h.props.children
+            : String(h)
+      );
+      const editablePdfBytes = await generateEditablePdf(data, stringHeaders, dataObs);
+      const blob = new Blob([editablePdfBytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filePath;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    };
+
+    return (
+      <button onClick={handleDownload}>
+        Download PDF Editável
+      </button>
+    );
+  }
 
   return (
     <>
@@ -184,6 +236,13 @@ export default function SuperAdmin() {
         </div>
       </div>
       <div>
+        <DownloadEditablePdfButton
+          data={tableData.main}
+          headers={tabelas[1].headers}
+          dataObs={tableData.obs}
+          filePath={filename}
+          fieldNames={mainFieldNames}
+        />
         <ExportPdfButton
           data={tableData.main}
           headers={tabelas[1].headers}

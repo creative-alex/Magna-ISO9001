@@ -1,7 +1,7 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
 const colWidths = [150, 140, 70, 70, 70];
-const rowHeights = Array(7).fill(50);
+//const rowHeights = Array(7).fill(50);
 const pageSize = [600, 800];
 const xStart = 50;
 const yStart = 780;
@@ -126,7 +126,7 @@ function drawObsTable(page, font, dataObs) {
   return rowHeights.reduce((a, b) => a + b, 0);
 }
 
-function drawTableLines(page, yOffset = 0, yOrigin = null) {
+function drawTableLines(page, yOffset = 0, yOrigin = null, rowHeights = []) {
   const totalWidth = colWidths.reduce((a, b) => a + b, 0);
   let yPos = yOrigin !== null ? yOrigin : yStart - obsTableHeight - spaceBetweenTables - yOffset;
 
@@ -152,7 +152,7 @@ function drawTableLines(page, yOffset = 0, yOrigin = null) {
   }
 }
 
-function drawHeaders(page, headers, font, yOffset = 0, yOrigin = null) {
+function drawHeaders(page, headers, font, yOffset = 0, yOrigin = null, rowHeights = []) {
   let xPos = xStart;
   const yHeaders = yOrigin !== null ? yOrigin : yStart - obsTableHeight - spaceBetweenTables - yOffset;
   const headerHeight = rowHeights[0];
@@ -220,12 +220,15 @@ async function generateEditablePdf(data, headers, dataObs) {
     yObs -= rowHeightsObs[row];
   }
 
+  // Gere dinamicamente os rowHeights para a tabela principal
+  const rowHeights = Array(data.length + 1).fill(50); // +1 para o header
+
   // Desenha tabela principal
-  drawTableLines(page, obsTableHeightReal - obsTableHeight); // <-- Ajusta o offset
-  drawHeaders(page, headers, font, obsTableHeightReal - obsTableHeight);
+  drawTableLines(page, obsTableHeightReal - obsTableHeight, undefined, rowHeights); // <-- Passe rowHeights
+  drawHeaders(page, headers, font, obsTableHeightReal - obsTableHeight, undefined, rowHeights);
 
   let yPos = yStart - obsTableHeightReal - spaceBetweenTables - rowHeights[0];
-  for (let row = 0; row < 6; row++) {
+  for (let row = 0; row < data.length; row++) {
     let xPos = xStart;
 
     for (let col = 0; col < 5; col++) {
