@@ -62,10 +62,14 @@ function wrapText(text, font, fontSize, maxWidth) {
   return lines;
 }
 
+function getObsRows(dataObs) {
+  // Garante pelo menos 3 linhas
+  return Math.max(3, Array.isArray(dataObs) ? dataObs.length : 0);
+}
 
 function drawObsTable(page, font, dataObs) {
-  // Garante sempre 5 linhas
-  const safeDataObs = Array.from({ length: 5 }, (_, i) =>
+  const obsRows = getObsRows(dataObs);
+  const safeDataObs = Array.from({ length: obsRows }, (_, i) =>
     Array.isArray(dataObs) && Array.isArray(dataObs[i]) ? dataObs[i] : [""]
   );
 
@@ -90,7 +94,7 @@ function drawObsTable(page, font, dataObs) {
     yPos -= rowHeights[i] || 0;
   }
 
-  // Desenha linhas verticais
+  // Linhas verticais
   page.drawLine({
     start: { x: obsXStart, y: obsYStart },
     end: { x: obsXStart, y: obsYStart - rowHeights.reduce((a, b) => a + b, 0) },
@@ -187,13 +191,15 @@ async function generateEditablePdf(data, headers, dataObs) {
   const { pdfDoc, page, font } = await createBasePdf();
   const form = pdfDoc.getForm();
 
+  // Use obsRows dinâmico
+  const obsRows = getObsRows(dataObs);
   const obsTableHeightReal = drawObsTable(page, font, dataObs);
 
   let yObs = obsYStart;
   const fontSize = 8;
   const maxWidth = obsColWidth[0] - 8;
   const lineHeight = fontSize + 2;
-  const safeDataObs = Array.from({ length: 5 }, (_, i) =>
+  const safeDataObs = Array.from({ length: obsRows }, (_, i) =>
     Array.isArray(dataObs) && Array.isArray(dataObs[i]) ? dataObs[i] : [""]
   );
   const rowHeightsObs = safeDataObs.map(row => {
@@ -201,7 +207,7 @@ async function generateEditablePdf(data, headers, dataObs) {
     const lines = wrapText(text, font, fontSize, maxWidth);
     return Math.max(obsRowHeight, lines.length * lineHeight + 16);
   });
-  for (let row = 0; row < 5; row++) {
+  for (let row = 0; row < obsRows; row++) {
     const fieldName = `table1_r${row + 1}`;
     const textField = form.createTextField(fieldName);
     textField.enableMultiline();

@@ -190,11 +190,11 @@ export default function SuperAdmin() {
       URL.revokeObjectURL(url);
     };
 
-    return (
-      <button onClick={handleDownload}>
-        Download PDF Editável
-      </button>
-    );
+    // return (
+    //   <button onClick={handleDownload}>
+    //     Download PDF Editável
+    //   </button>
+    // );
   }
 
   return (
@@ -255,7 +255,7 @@ export default function SuperAdmin() {
         <PreviewPdfButton getTablesHtml={getTablesHtml} />
       </div>
     </div>
-          <button onClick={handleAddRow}>Adicionar Linha</button>
+          <button onClick={handleAddRow}>+</button>
 </>
   );
-}
+};

@@ -92,4 +92,4 @@ export default function SelecionarPdf() {
       </div>
     </div>
   );
-}
+};

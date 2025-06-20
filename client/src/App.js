@@ -23,6 +23,6 @@ function App() {
       <Route path="/superadmin/:filename" element={<SuperAdmin />} />
     </Routes>
   );
-}
+};
 
 export default App;
