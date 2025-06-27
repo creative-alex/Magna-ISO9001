@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import EditableTable from "../components/ProcessTable";
 import ExportPdfButton from "../components/Buttons/exportPdf";
 import PreviewPdfButton from "../components/Buttons/previewPDF";
 import { generateEditablePdf } from "../utils/pdfUtils"; // Certifique-se que o caminho está correto
+import TabelaPdf from "../components/tabelaPDF"; // importa o componente
 
 const tabelas = [
   {
@@ -91,34 +92,85 @@ const tabelasTemplate2 = [
 
 export default function SuperAdmin() {
   const { filename } = useParams();
+  const location = useLocation();
+
+  const originalFilename =
+    location.state?.originalFilename
+      ? location.state.originalFilename
+      : decodeURIComponent(filename).replace(/__/g, '/').replace(/-/g, ' ');
+
+  // Extrai só o nome do ficheiro (após o último '__')
+const fileNameOnly = filename.split('__').pop();
+
+let template;
+console.log("Verificando template para filename:", fileNameOnly);
+if (/^\d{2}[-_]/.test(fileNameOnly)) {
+  console.log("Filename começa com dois dígitos seguidos de hífen ou underscore, usando template tabelas (template 1)");
+  template = tabelas;
+} else if (/^\d{1}[-_]/.test(fileNameOnly)) {
+  console.log("Filename começa com um dígito seguido de hífen ou underscore, usando template tabelasTemplate2 (template 2)");
+  template = tabelasTemplate2;
+} else {
+  console.log("Filename não começa com dígito seguido de hífen ou underscore, usando fallback tabelas (template 1)");
+  template = tabelas; // fallback
+}
+console.log("Template escolhido:", template);
+
+
+
   const [tableData, setTableData] = useState(
-    tabelas.reduce((acc, t) => ({ ...acc, [t.key]: Array.from({ length: t.rows }, () => Array(t.cols).fill("")) }), {})
+    template.reduce((acc, t) => ({ ...acc, [t.key]: Array.from({ length: t.rows }, () => Array(t.cols).fill("")) }), {})
   );
-  const [mainFieldNames, setMainFieldNames] = useState([...tabelas[1].fieldNames]);
+  const [mainFieldNames, setMainFieldNames] = useState([...template[1].fieldNames]);
 
   // Buscar dados do PDF selecionado (ATUALIZADO)
   useEffect(() => {
     if (!filename) return;
+
+    // Atualiza o template se o filename mudar
+    let currentTemplate = tabelas;
+    if (/^\d{1}_/.test(filename)) {
+      currentTemplate = tabelasTemplate2;
+    } else if (/^\d{2}_/.test(filename)) {
+      currentTemplate = tabelas;
+    }
+
     fetch("http://localhost:8080/files/pdf-form-data", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filename }),
+      body: JSON.stringify({ filename: originalFilename }),
     })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error("Erro no backend ou ficheiro não encontrado");
+        return res.json();
+      })
       .then(formData => {
-        // Descobre quantas linhas existem nos campos table2_rX_cY
-        const mainFields = Object.keys(formData).filter(f => /^table2_r\d+_c\d+$/.test(f));
-        const rowNumbers = mainFields.map(f => parseInt(f.match(/^table2_r(\d+)_c\d+$/)[1], 10));
-        const maxRow = Math.max(...rowNumbers, 1); // pelo menos 1 linha
-
-        // Gera mainFieldNames dinamicamente
-        const newMainFieldNames = [];
-        for (let row = 2; row <= maxRow; row++) {
-          const rowFields = [];
-          for (let col = 1; col <= tabelas[1].cols; col++) {
-            rowFields.push(`table2_r${row}_c${col}`);
+        // Descobre quantas linhas existem nos campos table2_rX_cY ou t2_table2_rX_cY
+        let mainFields, rowNumbers, maxRow, newMainFieldNames;
+        if (currentTemplate === tabelas) {
+          mainFields = Object.keys(formData).filter(f => /^table2_r\d+_c\d+$/.test(f));
+          rowNumbers = mainFields.map(f => parseInt(f.match(/^table2_r(\d+)_c\d+$/)[1], 10));
+          maxRow = Math.max(...rowNumbers, 1);
+          newMainFieldNames = [];
+          for (let row = 2; row <= maxRow; row++) {
+            const rowFields = [];
+            for (let col = 1; col <= currentTemplate[1].cols; col++) {
+              rowFields.push(`table2_r${row}_c${col}`);
+            }
+            newMainFieldNames.push(rowFields);
           }
-          newMainFieldNames.push(rowFields);
+        } else {
+          mainFields = Object.keys(formData).filter(f => /^t2_table2_r\d+_c\d+$/.test(f));
+          rowNumbers = mainFields.map(f => parseInt(f.match(/^t2_table2_r(\d+)_c\d+$/)[1], 10));
+          maxRow = Math.max(...rowNumbers, 2);
+          newMainFieldNames = [];
+          for (let row = 2; row <= maxRow; row++) {
+            const rowFields = [];
+            for (let col = 1; col <= currentTemplate[1].cols; col++) {
+              rowFields.push(`t2_table2_r${row}_c${col}`);
+            }
+            newMainFieldNames.push(rowFields);
+          }
         }
 
         setMainFieldNames(newMainFieldNames);
@@ -128,12 +180,16 @@ export default function SuperAdmin() {
           main: newMainFieldNames.map(row =>
             row.map(field => formData[field] || "")
           ),
-          obs: tabelas[0].fieldNames.map(row =>
+          obs: currentTemplate[0].fieldNames.map(row =>
             row.map(field => formData[field] || "")
           )
         }));
+      })
+      .catch(err => {
+        console.error("ERRO AO BUSCAR PDF:", err);
+        // Opcional: alert("Erro ao buscar PDF: " + err.message);
       });
-  }, [filename]); // Removida a dependência mainFieldNames
+  }, [filename, originalFilename]);
 
   // Função para substituir \n por <br/> no HTML das tabelas
   const replaceNewlinesWithBr = html => html.replace(/\n/g, "<br/>");
@@ -200,62 +256,50 @@ export default function SuperAdmin() {
   return (
     <>
     <div>
-      <h2>{tableData.filename}</h2>
-      <div>
+      <h2>{originalFilename}</h2>
+      {template === tabelasTemplate2 ? (
+        // Renderiza o layout especial para o template 2
+        <TabelaPdf templateType={2} />
+      ) : (
+        // Renderiza o layout antigo para o template 1
         <div>
-          <h2>{tabelas[0].label}</h2>
-          <div ref={obsTableRef}>
-            <EditableTable
-              data={tableData.obs}
-              onChange={(rowIdx, colIdx, value) =>
-                setTableData(prev => {
-                  const newData = prev.obs.map(row => [...row]);
-                  newData[rowIdx][colIdx] = value;
-                  return { ...prev, obs: newData };
-                })
-              }
-              headersHtml={tabelas[0].headers}
-            />
+          <div>
+            <h2>{template[0].label}</h2>
+            <div ref={obsTableRef}>
+              <EditableTable
+                data={tableData.obs}
+                onChange={(rowIdx, colIdx, value) =>
+                  setTableData(prev => {
+                    const newData = prev.obs.map(row => [...row]);
+                    newData[rowIdx][colIdx] = value;
+                    return { ...prev, obs: newData };
+                  })
+                }
+                headersHtml={template[0].headers}
+              />
+            </div>
+          </div>
+          <div>
+            <h2>{template[1].label}</h2>
+            <div ref={mainTableRef}>
+              <EditableTable
+                data={tableData.main}
+                onChange={(rowIdx, colIdx, value) =>
+                  setTableData(prev => {
+                    const newData = prev.main.map(row => [...row]);
+                    newData[rowIdx][colIdx] = value;
+                    return { ...prev, main: newData };
+                  })
+                }
+                headersHtml={template[1].headers}
+              />
+            </div>
           </div>
         </div>
-        <div>
-          <h2>{tabelas[1].label}</h2>
-          <div ref={mainTableRef}>
-            <EditableTable
-              data={tableData.main}
-              onChange={(rowIdx, colIdx, value) =>
-                setTableData(prev => {
-                  const newData = prev.main.map(row => [...row]);
-                  newData[rowIdx][colIdx] = value;
-                  return { ...prev, main: newData };
-                })
-              }
-              headersHtml={tabelas[1].headers}
-            />
-          </div>
-        </div>
-      </div>
-      <div>
-        <DownloadEditablePdfButton
-          data={tableData.main}
-          headers={tabelas[1].headers}
-          dataObs={tableData.obs}
-          filePath={filename}
-          fieldNames={mainFieldNames}
-        />
-        <ExportPdfButton
-          data={tableData.main}
-          headers={tabelas[1].headers}
-          dataObs={tableData.obs}
-          headersObs={tabelas[0].headers}
-          filePath={filename}
-          fieldNames={mainFieldNames}
-          filename={filename}  
-        />
-        <PreviewPdfButton getTablesHtml={getTablesHtml} />
-      </div>
+      )}
+      {/* Botões e preview continuam aqui, se quiseres */}
     </div>
-          <button onClick={handleAddRow}>+</button>
-</>
+    <button onClick={handleAddRow}>+</button>
+    </>
   );
 };

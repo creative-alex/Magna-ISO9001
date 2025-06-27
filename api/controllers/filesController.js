@@ -5,6 +5,8 @@ const { PDFDocument } = require('pdf-lib');
 // Configuração do Firebase (será inicializada no server.js)
 const bucket = admin.storage().bucket();
 
+console.log("pdfController.js carregado, bucket configurado");
+
 const listPdfs = async (req, res) => {
   try {
     console.log("listPdfs chamado");
@@ -21,34 +23,39 @@ const listPdfs = async (req, res) => {
   }
 };
 
-const uploadPdf  = async (req, res) => {
+const uploadPdf = async (req, res) => {
   try {
+    console.log("uploadPdf chamado");
+    console.log("Verificando req.file...");
     if (!req.file) {
+      console.log("Nenhum ficheiro enviado.");
       return res.status(400).send("Nenhum ficheiro enviado.");
     }
 
+    console.log("Extraindo folders e filename...");
     const folders = req.body.folders ? JSON.parse(req.body.folders) : [];
     const filename = req.body.filename || req.file.originalname;
     const filePath = [...folders, filename].join("/");
+    console.log("filePath construído:", filePath);
 
+    console.log("Criando blob para upload...");
     const blob = bucket.file(filePath);
-    
+    console.log("Blob criado, iniciando upload...");
+
     // Upload direto usando save()
     await blob.save(req.file.buffer, {
       metadata: {
         contentType: req.file.mimetype,
       }
     });
+    console.log("PDF guardado com sucesso!");
 
     res.status(200).send("PDF guardado com sucesso!");
-    
   } catch (err) {
     console.error("Erro no upload:", err);
     res.status(500).send("Erro ao guardar PDF: " + err.message);
   }
-}
-
-
+};
 
 const getPdfFormData = async (req, res) => {
   try {
@@ -61,12 +68,16 @@ const getPdfFormData = async (req, res) => {
       return res.status(400).send("Ficheiro não especificado.");
     }
 
+    console.log("Baixando PDF...");
     const file = bucket.file(filename); // Usa o caminho completo
     const [buffer] = await file.download();
     console.log("PDF baixado:", filename);
+
+    console.log("Carregando PDF com pdf-lib...");
     const pdfDoc = await PDFDocument.load(buffer);
     const form = pdfDoc.getForm();
 
+    console.log("Extraindo campos do formulário...");
     const fields = form.getFields();
     console.log("Campos encontrados:", fields.map(f => f.getName()));
     const data = {};
@@ -84,10 +95,12 @@ const getPdfFormData = async (req, res) => {
 
 // Recebe dois arrays: pdfPaths (caminhos dos PDFs) e folderPaths (caminhos das pastas)
 function buildTree(pdfPaths, folderPaths = []) {
+  console.log("buildTree chamado");
   const root = [];
 
-  // Adiciona todas as pastas (mesmo vazias)
+  console.log("Adicionando pastas...");
   for (const folderPath of folderPaths) {
+    console.log("Processando pasta:", folderPath);
     const parts = folderPath.split("/");
     let current = root;
     for (let i = 0; i < parts.length; i++) {
@@ -96,13 +109,16 @@ function buildTree(pdfPaths, folderPaths = []) {
       if (!node) {
         node = { name, type: "folder", children: [] };
         current.push(node);
+        console.log("Pasta adicionada:", name);
       }
       current = node.children;
     }
   }
+  console.log("Pastas adicionadas com sucesso.");
 
-  // Adiciona os arquivos PDF
+  console.log("Adicionando arquivos PDF...");
   for (const path of pdfPaths) {
+    console.log("Processando arquivo:", path);
     const parts = path.split("/");
     let current = root;
     for (let i = 0; i < parts.length; i++) {
@@ -114,14 +130,16 @@ function buildTree(pdfPaths, folderPaths = []) {
           ? { name, type: "file", path }
           : { name, type: "folder", children: [] };
         current.push(node);
+        console.log(isFile ? "Arquivo adicionado:" : "Pasta adicionada:", name);
       }
       if (!isFile) current = node.children;
     }
   }
+  console.log("Arquivos PDF adicionados com sucesso.");
 
+  console.log("Árvore construída:", JSON.stringify(root, null, 2));
   return root;
 }
-
 
 const listPdfsTree = async (req, res) => {
   try {
@@ -130,6 +148,7 @@ const listPdfsTree = async (req, res) => {
     const pdfPaths = files
       .filter(f => f.name.endsWith(".pdf"))
       .map(f => f.name);
+    console.log("PDFs encontrados:", pdfPaths);
     const tree = buildTree(pdfPaths);
     res.json(tree);
   } catch (err) {
@@ -140,11 +159,18 @@ const listPdfsTree = async (req, res) => {
 
 const getPdf = async (req, res) => {
   try {
+    console.log("getPdf chamado");
     const { path } = req.body;
-    if (!path) return res.status(400).send("Path não fornecido");
+    console.log("Path recebido:", path);
+    if (!path) {
+      console.log("Path não fornecido");
+      return res.status(400).send("Path não fornecido");
+    }
 
+    console.log("Baixando PDF...");
     const file = bucket.file(path);
     const [buffer] = await file.download();
+    console.log("PDF baixado com sucesso:", path);
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(path.split('/').pop())}"`);
@@ -159,6 +185,6 @@ module.exports = {
   uploadPdf,
   listPdfs,
   getPdfFormData,
-  listPdfsTree, 
+  listPdfsTree,
   getPdf,
 };

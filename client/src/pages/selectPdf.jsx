@@ -40,7 +40,7 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [] }) {
         <div key={file.name} className="file">
           <span className="file-name">{file.name}</span>
           <div className="file-actions">
-            <button onClick={() => onSelectFile([...currentPath, file.name].join("/"))}>👁️</button>
+           <button onClick={() => onSelectFile([...currentPath, file.name].join("/"))}>👁️</button>
             <button
               onClick={async () => {
                 const res = await fetch("http://localhost:8080/files/get-pdf", {
@@ -80,8 +80,10 @@ export default function SelecionarPdf() {
   }, []);
 
   const handleSelectFile = (filePath) => {
-    navigate(`/superadmin/${encodeURIComponent(filePath)}`);
-  };
+  // Substitui espaços por '-', barras por '__'
+  const formattedPath = filePath.replace(/\s/g, '-').replace(/\//g, '__');
+  navigate(`/superadmin/${formattedPath}`, { state: { originalFilename: filePath } });
+};
 
   return (
     <div className="pdf-container">
