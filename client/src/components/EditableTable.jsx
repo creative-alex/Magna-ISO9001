@@ -2,9 +2,12 @@ import React, { useRef, useEffect, useState } from "react";
 
 function EditableTable({ data, onChange, headersHtml }) {
   const textAreaRefs = useRef({});
+  
+  // Corrigido: Verifica se headersHtml existe antes de usar .map()
   const [colWidths, setColWidths] = useState(() =>
-    headersHtml.map((_, i) => (i === 1 ? 1000 : 100))
+    (headersHtml || []).map((_, i) => (i === 1 ? 1000 : 100))
   );
+  
   const resizingCol = useRef(null);
 
   useEffect(() => {
@@ -49,27 +52,19 @@ function EditableTable({ data, onChange, headersHtml }) {
       <table className="editable-table" border="1" cellPadding={4}>
         <thead>
           <tr>
-            {headersHtml.map((header, i) => (
-              <th
-                key={i}
-                className="editable-table-header"                
-              >
+            {(headersHtml || []).map((header, i) => ( // ✅ Seguro aqui também
+              <th key={i} className="editable-table-header">
                 {header}
-                <div               
-                  onMouseDown={e => handleMouseDown(e, i)}
-                />
+                <div onMouseDown={e => handleMouseDown(e, i)} />
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {data.map((row, rowIdx) => (
+          {(data || []).map((row, rowIdx) => ( // ✅ Seguro para data também
             <tr key={rowIdx} className="editable-table-row">
               {row.map((cell, colIdx) => (
-                <td
-                  key={colIdx}
-                  className="editable-table-cell"
-                >
+                <td key={colIdx} className="editable-table-cell">
                   <textarea
                     ref={el => (textAreaRefs.current[`${rowIdx}-${colIdx}`] = el)}
                     className="editable-table-textarea"

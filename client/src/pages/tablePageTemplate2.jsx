@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import EditableTable from "../components/ProcessTable";
+import EditableTable from "../components/EditableTable";
 import ExportPdfButton from "../components/Buttons/exportPdf";
 import PreviewPdfButton from "../components/Buttons/previewPDF";
 

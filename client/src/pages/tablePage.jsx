@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useLocation } from "react-router-dom";
-import EditableTable from "../components/ProcessTable";
+import EditableTable from "../components/templates/TabelaTemplate1";
 import ExportPdfButton from "../components/Buttons/exportPdf";
 import PreviewPdfButton from "../components/Buttons/previewPDF";
 import { generateEditablePdf } from "../utils/pdfUtils"; // Certifique-se que o caminho está correto
