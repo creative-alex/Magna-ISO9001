@@ -1,10 +1,8 @@
 import React from "react";
 import Login from './features/Auth/login';
-import { ToastContainer } from 'react-toastify';
-import { Routes, Route, useNavigate, BrowserRouter as Router } from "react-router-dom";
+import { Routes, Route, useNavigate } from "react-router-dom";
 import SelecionarPdf from "./pages/selectPdf";
-import TablePage from "./pages/tablePage";
-import TablePageTemplate2 from "./pages/tablePageTemplate2";
+import TablePage from "./pages/tableDisplay"; // TablePage agora é o unificado
 import './App.css';
 
 function App() {
@@ -22,7 +20,7 @@ function App() {
         <Route path="/superadmin" element={<SelecionarPdf />} />
         <Route path="/superadmin/:filename" element={<TablePage />} />
         <Route path="/table/:filename" element={<TablePage />} />
-        <Route path="/table2/:filename" element={<TablePageTemplate2 />} />
+        <Route path="/table2/:filename" element={<TablePage />} />
       </Routes>
   );
 };

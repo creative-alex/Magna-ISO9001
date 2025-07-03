@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import Template1 from "./templates/TabelaTemplate1";
 import Template2 from "./templates/TabelaTemplate2";
 
@@ -20,82 +20,16 @@ const headersHtml1 = [
   <>Instruções<br />de Trabalho</>
 ];
 
-export default function TabelaPdf({ templateType = 1 }) {
+export default function TabelaPdf({
+  templateType = 1,
+  data,
+  dataObs,
+  handleChangeMain,
+  handleChangeObs,
+  headers,
+  headersObs
+}) {
   const isTemplate2 = templateType === 2;
-
-  // Observações
-  const [dataObs, setDataObs] = useState(
-    Array.from({ length: isTemplate2 ? 3 : 5 }, () => [""])
-  );
-  const handleChangeObs = (rowIdx, colIdx, value) => {
-    const newData = dataObs.map((row, r) =>
-      row.map((cell, c) => (r === rowIdx && c === colIdx ? value : cell))
-    );
-    setDataObs(newData);
-  };
-
-  // Para o template 2, duas colunas: entrada e saída
-  const [data, setData] = useState([["", ""]]);
-  const handleChange = (rowIdx, colIdx, value) => {
-    const newData = data.map((row, r) =>
-      row.map((cell, c) => (r === rowIdx && c === colIdx ? value : cell))
-    );
-    setData(newData);
-  };
-
-  // Tabela "Principais Atividades"
-  const [atividades, setAtividades] = useState([
-    ["", "", "", "", "", ""],
-    ["", "", "", "", "", ""],
-    ["", "", "", "", "", ""],
-    ["", "", "", "", "", ""],
-    ["", "", "", "", "", ""],
-    ["", "", "", "", "", ""],
-    ["", "", "", "", "", ""],
-    ["", "", "", "", "", ""],
-    ["", "", "", "", "", ""],
-  ]);
-  const handleAtividadesChange = (rowIdx, colIdx, value) => {
-    const newData = atividades.map((row, r) =>
-      row.map((cell, c) => (r === rowIdx && c === colIdx ? value : cell))
-    );
-    setAtividades(newData);
-  };
-
-  // Tabela "Indicadores de monitorização do processo"
-  const [indicadores, setIndicadores] = useState([
-    [""],
-    [""],
-    [""],
-    [""],
-    [""],
-    [""],
-    [""],
-    [""],
-    [""],
-    [""],
-    [""],
-    [""],
-    [""],
-    [""],
-    [""],
-    [""],
-    [""],
-    [""],
-    [""],
-    [""],
-  ]);
-  const handleIndicadoresChange = (rowIdx, value) => {
-    const newData = indicadores.map((row, r) =>
-      r === rowIdx ? [value] : row
-    );
-    setIndicadores(newData);
-  };
-
-  // Dono do processo
-  const [donoProcesso, setDonoProcesso] = useState("Administrador (Rui Pena)");
-  // Objetivo do processo
-  const [objetivoProcesso, setObjetivoProcesso] = useState("");
 
   return (
     <div>
@@ -103,28 +37,20 @@ export default function TabelaPdf({ templateType = 1 }) {
         <Template2
           data={data}
           dataObs={dataObs}
-          handleChange={handleChange}
-          handleAtividadesChange={handleAtividadesChange}
-          handleIndicadoresChange={handleIndicadoresChange}
-          donoProcesso={donoProcesso}
-          setDonoProcesso={setDonoProcesso}
-          objetivoProcesso={objetivoProcesso}
-          setObjetivoProcesso={setObjetivoProcesso}
-          atividades={atividades}
-          indicadores={indicadores}
+          handleChange={handleChangeMain}
+          headers={headers}
+          headersObs={headersObs}
         />
       ) : (
         <Template1
           data={data}
           dataObs={dataObs}
-          handleChange={handleChange}
+          handleChange={handleChangeMain}
           handleChangeObs={handleChangeObs}
-          headers={headers1}
-          headersObs={headersObs1}
-          headersHtml={headersHtml1}
-          headersHtmlObs={headersHtmlObs1}
+          headers={headers}
+          headersObs={headersObs}
         />
       )}
     </div>
   );
-};
+}
