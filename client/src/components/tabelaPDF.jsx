@@ -26,6 +26,7 @@ export default function TabelaPdf({
   dataObs,
   handleChangeMain,
   handleChangeObs,
+  handleChange,
   headers,
   headersObs
 }) {
@@ -37,7 +38,7 @@ export default function TabelaPdf({
         <Template2
           data={data}
           dataObs={dataObs}
-          handleChange={handleChangeMain}
+          handleChange={handleChange}
           headers={headers}
           headersObs={headersObs}
         />

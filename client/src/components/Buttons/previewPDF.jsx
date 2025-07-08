@@ -1,5 +1,5 @@
 import React from "react";
-import { generateNonEditablePdfFromHtml } from "../../utils/pdfUtils";
+import { generateNonEditablePdfFromHtml } from "../../utils/pdfGenerate";
 
 export default function PreviewPdfButton({ getTablesHtml }) {
   const handlePreviewNonEditable = async () => {

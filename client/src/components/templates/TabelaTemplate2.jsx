@@ -1,18 +1,24 @@
 import React from "react";
 import ExportPdfButton from "../Buttons/exportPdf";
+ 
 
 export default function Template2({
-  data,
-  dataObs,
+  data = [[ "", "" ]],
   handleChange,
   handleAtividadesChange,
   handleIndicadoresChange,
-  donoProcesso,
+  donoProcesso = "",
   setDonoProcesso,
-  objetivoProcesso,
+  objetivoProcesso = "",
   setObjetivoProcesso,
-  atividades,
-  indicadores
+  atividades = 
+  [[ "", "", "", "", "", "" ],
+   [ "", "", "", "", "", "" ],
+   [ "", "", "", "", "", "" ],
+   [ "", "", "", "", "", "" ]
+],
+
+  indicadores = [[ ""]]
 }) {
   return (
     <>
@@ -77,9 +83,9 @@ export default function Template2({
           </tr>
         </thead>
         <tbody>
-          {atividades.map((row, rowIdx) => (
+          {(atividades || []).map((row, rowIdx) => (
             <tr key={rowIdx}>
-              {row.map((cell, colIdx) => (
+              {(row || []).map((cell, colIdx) => (
                 <td key={colIdx}>
                   <textarea
                     style={{ width: "100%", minHeight: 30 }}
@@ -101,7 +107,7 @@ export default function Template2({
           </tr>
         </thead>
         <tbody>
-          {indicadores.map((row, rowIdx) => (
+          {(indicadores || []).map((row, rowIdx) => (
             <tr key={rowIdx}>
               <td>
                 <textarea
@@ -114,17 +120,6 @@ export default function Template2({
           ))}
         </tbody>
       </table>
-
-      <ExportPdfButton
-        data={data}
-        headers={["SERVIÇOS DE ENTRADAS", "SERVIÇO DE SAÍDA"]}
-        dataObs={dataObs}
-        headersObs={["Observações"]}
-        getTablesHtml={() => ({
-          mainTableHtml: "",
-          obsTableHtml: ""
-        })}
-      />
     </>
   );
 }

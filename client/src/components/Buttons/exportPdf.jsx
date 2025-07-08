@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { generateEditablePdf } from "../../utils/pdfUtils";
+import { generateEditablePdf } from "../../utils/pdfGenerate";
 
 export default function ExportPdfButton({ data, headers, dataObs, filePath = "meu_editavel.pdf", fieldNames, exportRef }) {
   // Função para preparar os dados para envio ao backend
