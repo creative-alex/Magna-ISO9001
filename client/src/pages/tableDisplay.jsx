@@ -168,7 +168,6 @@ export default function TablePageUnified() {
 ]);
 const [indicadores, setIndicadores] = useState([
   [""],
-  [""]
 ]);
 const [donoProcesso, setDonoProcesso] = useState("");
 const [objetivoProcesso, setObjetivoProcesso] = useState("");

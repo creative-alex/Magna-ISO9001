@@ -172,3 +172,89 @@ code {
   border-radius: 6px;
 }
 
+
+.tabela-processo {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 24px;
+  background: #f9f9fb;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px #0001;
+}
+
+.tabela-processo th,
+.tabela-processo td {
+  border: 1px solid #e0e0e0;
+  padding: 10px 8px;
+}
+
+.tabela-processo th {
+  background: #e5e9f7;
+  color: #2d3a5a;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.tabela-atividades {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 24px;
+  background: #f7fafc;
+  border-radius: 8px;
+  box-shadow: 0 1px 6px #0001;
+}
+
+.tabela-atividades th,
+.tabela-atividades td {
+  border: 1px solid #d6dbe3;
+  padding: 8px 6px;
+}
+
+.tabela-atividades th {
+  background: #e9f2fb;
+  color: #2d3a5a;
+  font-weight: 500;
+}
+
+.tabela-indicadores {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 24px;
+  background: #f9f9fb;
+  border-radius: 8px;
+  box-shadow: 0 1px 6px #0001;
+}
+
+.tabela-indicadores th,
+.tabela-indicadores td {
+  border: 1px solid #e0e0e0;
+  padding: 10px 8px;
+}
+
+.tabela-indicadores th {
+  background: #e5e9f7;
+  color: #2d3a5a;
+  font-weight: 600;
+}
+
+.tabela-processo textarea,
+.tabela-indicadores textarea {
+  width: 100%;
+  min-height: 40px;
+  resize: vertical;
+  border-radius: 4px;
+  border: 1px solid #b0b8c1;
+  padding: 6px;
+  font-size: 0.98rem;
+  background: #fff;
+}
+
+.tabela-atividades input[type="text"] {
+  width: 100%;
+  border-radius: 4px;
+  border: 1px solid #b0b8c1;
+  padding: 5px;
+  font-size: 0.97rem;
+  background: #fff;
+}
