@@ -2,7 +2,7 @@ import React from "react";
 import Login from './features/Auth/login';
 import { Routes, Route, useNavigate } from "react-router-dom";
 import SelecionarPdf from "./pages/selectPdf";
-import TablePage from "./pages/tableDisplay"; // TablePage agora é o unificado
+import TablePage from "./components/tabelaPDF"; 
 import './App.css';
 
 function App() {
@@ -20,7 +20,6 @@ function App() {
         <Route path="/superadmin" element={<SelecionarPdf />} />
         <Route path="/superadmin/:filename" element={<TablePage />} />
         <Route path="/table/:filename" element={<TablePage />} />
-        <Route path="/table2/:filename" element={<TablePage />} />
       </Routes>
   );
 };

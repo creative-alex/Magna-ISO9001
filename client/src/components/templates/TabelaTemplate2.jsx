@@ -11,7 +11,8 @@ export default function Template2({
   setDonoProcesso,
   objetivoProcesso = "",
   setObjetivoProcesso,
-  atividades = [["", "", "", "", "", ""], ["", "", "", "", "", ""], ["", "", "", "", "", ""], ["", "", "", "", "", ""]],
+  atividades = [["", "", "", "", "", ""], 
+                ["", "", "", "", "", ""], ["", "", "", "", "", ""], ["", "", "", "", "", ""]],
   indicadores = [ "" ],
 }) {
   return (
