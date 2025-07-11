@@ -1,9 +1,33 @@
 import { createBasePdf, wrapText, pageSize, xStart, yStart } from './pdfBase';
-import { drawTableLines, drawHeaders, drawObsTable, getObsRows, colWidths, obsColWidth, obsRowHeight, spaceBetweenTables } from './pdfTables';
+import { drawTableLines, drawHeaders, drawObsTable, getObsRows, colWidths, obsColWidth, obsRowHeight, spaceBetweenTables, drawTemplate2Table, } from './pdfTables';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
 // Função principal para gerar PDF editável
-export async function generateEditablePdf(data, headers, dataObs) {
+export async function generateEditablePdf({
+  templateType = 1,
+  data,
+  headers,
+  dataObs,
+  headersObs,
+  atividades,
+  donoProcesso,
+  objetivoProcesso,
+  indicadores
+}) {
+  if (templateType === 2) {
+    return await generateEditablePdfTemplate2({
+      atividades,
+      donoProcesso,
+      objetivoProcesso,
+      indicadores
+    });
+  } else {
+    return await generateEditablePdfTemplate1(data, headers, dataObs, headersObs);
+  }
+}
+
+// Renomeie a função antiga para Template1
+export async function generateEditablePdfTemplate1(data, headers, dataObs, headersObs) {
   const { pdfDoc, page, font } = await createBasePdf();
   const form = pdfDoc.getForm();
 
@@ -71,6 +95,88 @@ export async function generateEditablePdf(data, headers, dataObs) {
       xPos += colWidths[col];
     }
     yPos -= rowHeights[row + 1];
+  }
+
+  return await pdfDoc.save();
+}
+
+// Implemente a função para Template2 conforme sugerido antes
+import { drawTemplate2Table, colWidthsTemplate2 } from './pdfTables';
+import { xStart, yStart } from './pdfBase';
+
+export async function generateEditablePdfTemplate2({ atividades, donoProcesso, objetivoProcesso, indicadores }) {
+  const { pdfDoc, page, font } = await createBasePdf();
+  const form = pdfDoc.getForm();
+
+  let yPos = yStart;
+
+  // DONO DO PROCESSO
+  page.drawText("DONO DO PROCESSO\n(nomeado):", { x: xStart, y: yPos, size: 12, font });
+  const donoField = form.createTextField('dono_processo');
+  donoField.enableMultiline();
+  donoField.setText(donoProcesso || "");
+  donoField.addToPage(page, { x: xStart + 320, y: yPos - 8, width: 230, height: 28 });
+  yPos -= 38;
+
+  // OBJETIVO DO PROCESSO
+  page.drawText("OBJETIVO DO PROCESSO:", { x: xStart, y: yPos, size: 12, font });
+  const objetivoField = form.createTextField('objetivo_processo');
+  objetivoField.enableMultiline();
+  objetivoField.setText(objetivoProcesso || "");
+  objetivoField.addToPage(page, { x: xStart + 320, y: yPos - 8, width: 230, height: 28 });
+  yPos -= 38;
+
+  // SERVIÇOS DE ENTRADAS / SAÍDA
+  page.drawText("SERVIÇOS DE ENTRADAS", { x: xStart, y: yPos, size: 12, font });
+  page.drawText("SERVIÇO DE SAÍDA", { x: xStart + 320, y: yPos, size: 12, font });
+  const entradaField = form.createTextField('servicos_entrada');
+  entradaField.enableMultiline();
+  entradaField.setText("");
+  entradaField.addToPage(page, { x: xStart, y: yPos - 28, width: 290, height: 48 });
+  const saidaField = form.createTextField('servico_saida');
+  saidaField.enableMultiline();
+  saidaField.setText("");
+  saidaField.addToPage(page, { x: xStart + 320, y: yPos - 28, width: 230, height: 48 });
+  yPos -= 88;
+
+  // Cabeçalhos da tabela de atividades
+  const headers = [
+    "Principais Atividades",
+    "Procedimentos Associados",
+    "Requisitos ISO 9001",
+    "Requisitos DGERT",
+    "Requisitos EQAVET",
+    "Requisitos CQCQ"
+  ];
+
+  // Desenha grid e cabeçalhos da tabela de atividades
+  drawTemplate2Table(page, font, yPos, atividades, headers);
+
+  // Campos editáveis para cada célula de atividades
+  let camposY = yPos - 20; // primeira linha de dados
+  for (let row = 0; row < atividades.length; row++) {
+    let xPos = xStart;
+    for (let col = 0; col < atividades[row].length; col++) {
+      const fieldName = `atividades_r${row + 1}_c${col + 1}`;
+      const textField = form.createTextField(fieldName);
+      textField.setText(atividades[row][col] || "");
+      textField.addToPage(page, { x: xPos + 2, y: camposY + 2, width: colWidthsTemplate2[col] - 4, height: 16 });
+      xPos += colWidthsTemplate2[col];
+    }
+    camposY -= 20;
+  }
+
+  // Indicadores
+  let indicadoresY = camposY - 32;
+  page.drawText("Indicadores de monitorização do processo", { x: xStart, y: indicadoresY, size: 12, font });
+  indicadoresY -= 22;
+  for (let row = 0; row < indicadores.length; row++) {
+    const fieldName = `indicadores_r${row + 1}`;
+    const textField = form.createTextField(fieldName);
+    textField.enableMultiline();
+    textField.setText(indicadores[row][0] || "");
+    textField.addToPage(page, { x: xStart, y: indicadoresY, width: 550, height: 28 });
+    indicadoresY -= 32;
   }
 
   return await pdfDoc.save();

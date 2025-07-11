@@ -1,7 +1,20 @@
 import React, { useEffect } from "react";
 import { generateEditablePdf } from "../../utils/pdfGenerate";
 
-export default function ExportPdfButton({ data, headers, dataObs, filePath = "meu_editavel.pdf", fieldNames, exportRef }) {
+export default function ExportPdfButton({
+  templateType = 1,
+  data,
+  headers,
+  dataObs,
+  headersObs,
+  atividades,
+  donoProcesso,
+  objetivoProcesso,
+  indicadores,
+  filePath = "meu_editavel.pdf",
+  fieldNames,
+  exportRef
+}) {
   // Função para preparar os dados para envio ao backend
   const getMainTableFormData = () => {
     const formDataObj = {};
@@ -31,20 +44,69 @@ export default function ExportPdfButton({ data, headers, dataObs, filePath = "me
     const filename = parts.pop();
     const folders = parts;
 
-    const editablePdfBytes = await generateEditablePdf(data, stringHeaders, dataObs);
+    // Passe todos os dados e o templateType
+    const editablePdfBytes = await generateEditablePdf({
+      templateType,
+      data,
+      headers: stringHeaders,
+      dataObs,
+      headersObs,
+      atividades,
+      donoProcesso,
+      objetivoProcesso,
+      indicadores
+    });
+
     const formData = new FormData();
     formData.append("file", new Blob([editablePdfBytes], { type: "application/pdf" }), filename);
     formData.append("folders", JSON.stringify(folders));
     formData.append("filename", filename);
 
     // Adiciona os dados dinâmicos ao formData
-    const mainTableFormData = getMainTableFormData();
-    formData.append("mainTableData", JSON.stringify(mainTableFormData));
+    if (templateType === 1) {
+      const mainTableFormData = getMainTableFormData();
+      formData.append("mainTableData", JSON.stringify(mainTableFormData));
+    } else if (templateType === 2) {
+      formData.append("atividades", JSON.stringify(atividades));
+      formData.append("donoProcesso", donoProcesso);
+      formData.append("objetivoProcesso", objetivoProcesso);
+      formData.append("indicadores", JSON.stringify(indicadores));
+    }
 
     await fetch("http://localhost:8080/files/upload-pdf", {
       method: "POST",
       body: formData,
     });
+  };
+
+  // Função para pré-visualizar o PDF editável
+  const handlePreviewPdf = async () => {
+    const stringHeaders = headers.map(h =>
+      typeof h === "string"
+        ? h
+        : h?.props?.children
+          ? Array.isArray(h.props.children)
+            ? h.props.children.join('')
+            : h.props.children
+          : String(h)
+    );
+
+    const editablePdfBytes = await generateEditablePdf({
+      templateType,
+      data,
+      headers: stringHeaders,
+      dataObs,
+      headersObs,
+      atividades,
+      donoProcesso,
+      objetivoProcesso,
+      indicadores
+    });
+
+    // Cria um blob e abre o PDF editável em uma nova aba
+    const blob = new Blob([editablePdfBytes], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
   };
 
   // Permite que o parent chame handleSendToBackend
@@ -55,8 +117,8 @@ export default function ExportPdfButton({ data, headers, dataObs, filePath = "me
   }, [exportRef, handleSendToBackend]);
 
   return (
-    <button onClick={handleSendToBackend}>
-      Guardar Mudanças
+    <button onClick={handlePreviewPdf}>
+      Preview PDF Editável
     </button>
   );
 }

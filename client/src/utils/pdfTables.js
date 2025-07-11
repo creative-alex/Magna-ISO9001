@@ -6,6 +6,9 @@ export const obsColWidth = [500];
 export const obsRowHeight = 25;
 export const spaceBetweenTables = 30;
 
+// Template 2
+export const colWidthsTemplate2 = [80, 80, 80, 80, 80, 80];
+
 // Função para obter o número de linhas da tabela de observações
 export function getObsRows(dataObs) {
   // Garante pelo menos 3 linhas
@@ -133,4 +136,42 @@ export function drawHeaders(page, headers, font, yOffset = 0, yOrigin = null, ro
 
     xPos += colWidths[col];
   });
+}
+
+// Função para desenhar a tabela do Template 2
+export function colWidthsTemplate2(page, font, yStart, atividades, headers) {
+  const rowHeight = 20;
+  let yPos = yStart;
+
+  // Cabeçalhos
+  let xPos = xStart;
+  headers.forEach((header, idx) => {
+    page.drawText(header, { x: xPos + 4, y: yPos - 14, size: 10, font });
+    xPos += colWidthsTemplate2[idx];
+  });
+
+  // Grid horizontal
+  let totalRows = atividades.length + 1; // +1 para header
+  let gridY = yPos;
+  for (let i = 0; i <= totalRows; i++) {
+    page.drawLine({
+      start: { x: xStart, y: gridY },
+      end: { x: xStart + colWidthsTemplate2.reduce((a, b) => a + b, 0), y: gridY },
+      thickness: 1,
+      color: rgb(0, 0, 0),
+    });
+    gridY -= rowHeight;
+  }
+
+  // Grid vertical
+  xPos = xStart;
+  for (let j = 0; j <= colWidthsTemplate2.length; j++) {
+    page.drawLine({
+      start: { x: xPos, y: yPos },
+      end: { x: xPos, y: yPos - rowHeight * totalRows },
+      thickness: 1,
+      color: rgb(0, 0, 0),
+    });
+    xPos += colWidthsTemplate2[j] || 0;
+  }
 }

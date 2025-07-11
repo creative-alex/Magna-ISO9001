@@ -105,7 +105,6 @@ const tabelasTemplate2 = [
     headers: ["Indicadores de monitorização do processo"],
     fieldNames: [
       ["indicadores_r1"],
-      ["indicadores_r2"]
       // Adiciona mais se precisares
     ],
     rows: 2,
@@ -159,12 +158,11 @@ export default function TablePageUnified() {
     return [...template[1].fieldNames];
   });
 
- const [atividades, setAtividades] = useState([
-  ["", "", "", "", "", ""], // Linha 1
-  ["", "", "", "", "", ""], // Linha 2
-  ["", "", "", "", "", ""], // Linha 3
-  ["", "", "", "", "", ""],  // Linha 4
-  ["", "", "", "", "", ""] 
+const [atividades, setAtividades] = useState([
+  ["", "", "", "", "", ""],
+  ["", "", "", "", "", ""],
+  ["", "", "", "", "", ""],
+  ["", "", "", "", "", ""]
 ]);
 const [indicadores, setIndicadores] = useState([
   [""],
@@ -199,7 +197,10 @@ const [objetivoProcesso, setObjetivoProcesso] = useState("");
     setTableData(initial);
     setMainFieldNames([...template[1].fieldNames]);
     // Reinicializa também os estados extra do Template2
-    setAtividades([["", "", "", "", "", ""]]);
+    setAtividades([["", "", "", "", "", ""],
+                   ["", "", "", "", "", ""],
+                   ["", "", "", "", "", ""],
+                   ["", "", "", "", "", ""]]);
     setIndicadores([[""]]);
     setDonoProcesso("");
     setObjetivoProcesso("");
@@ -357,11 +358,15 @@ const [objetivoProcesso, setObjetivoProcesso] = useState("");
             }
           />
           <ExportPdfButton
+            templateType={isTemplate2 ? 2 : 1}
             data={tableData.main}
             headers={template[1].headers}
             dataObs={tableData.obs}
             headersObs={template[0].headers}
-            getTablesHtml={getTablesHtml}
+            atividades={atividades}
+            donoProcesso={donoProcesso}
+            objetivoProcesso={objetivoProcesso}
+            indicadores={indicadores}
           />
           <PreviewPdfButton getTablesHtml={getTablesHtml} />
         </>
@@ -395,11 +400,15 @@ const [objetivoProcesso, setObjetivoProcesso] = useState("");
           </div>
           <button onClick={handleAddRow}>+</button>
           <ExportPdfButton
+            templateType={isTemplate2 ? 2 : 1}
             data={tableData.main}
             headers={template[1].headers}
             dataObs={tableData.obs}
             headersObs={template[0].headers}
-            getTablesHtml={getTablesHtml}
+            atividades={atividades}
+            donoProcesso={donoProcesso}
+            objetivoProcesso={objetivoProcesso}
+            indicadores={indicadores}
           />
           <PreviewPdfButton getTablesHtml={getTablesHtml} />
         </>
