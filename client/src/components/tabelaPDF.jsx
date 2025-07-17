@@ -169,6 +169,8 @@ const [indicadores, setIndicadores] = useState([
 ]);
 const [donoProcesso, setDonoProcesso] = useState("");
 const [objetivoProcesso, setObjetivoProcesso] = useState("");
+const [servicosEntrada, setServicosEntrada] = useState("");
+const [servicoSaida, setServicoSaida] = useState("");
 
 
   // Handlers para Template2
@@ -204,6 +206,8 @@ const [objetivoProcesso, setObjetivoProcesso] = useState("");
     setIndicadores([[""]]);
     setDonoProcesso("");
     setObjetivoProcesso("");
+    setServicosEntrada("");
+    setServicoSaida("");
   }, [template]);
 
   // Refs para exportação/preview
@@ -285,6 +289,51 @@ const [objetivoProcesso, setObjetivoProcesso] = useState("");
           console.log("Novo estado tableData após fetch:", newState);
           return newState;
         });
+
+        // Atualiza os estados extra do Template2
+        if (currentTemplate === tabelasTemplate2) {
+          setDonoProcesso(formData.dono_processo || "");
+          setObjetivoProcesso(formData.objetivo_processo || "");
+          setAtividades([
+            [
+              formData.atividades_r1_c1 || "",
+              formData.atividades_r1_c2 || "",
+              formData.atividades_r1_c3 || "",
+              formData.atividades_r1_c4 || "",
+              formData.atividades_r1_c5 || "",
+              formData.atividades_r1_c6 || "",
+            ],
+            [
+              formData.atividades_r2_c1 || "",
+              formData.atividades_r2_c2 || "",
+              formData.atividades_r2_c3 || "",
+              formData.atividades_r2_c4 || "",
+              formData.atividades_r2_c5 || "",
+              formData.atividades_r2_c6 || "",
+            ],
+            [
+              formData.atividades_r3_c1 || "",
+              formData.atividades_r3_c2 || "",
+              formData.atividades_r3_c3 || "",
+              formData.atividades_r3_c4 || "",
+              formData.atividades_r3_c5 || "",
+              formData.atividades_r3_c6 || "",
+            ],
+            [
+              formData.atividades_r4_c1 || "",
+              formData.atividades_r4_c2 || "",
+              formData.atividades_r4_c3 || "",
+              formData.atividades_r4_c4 || "",
+              formData.atividades_r4_c5 || "",
+              formData.atividades_r4_c6 || "",
+            ],
+          ]);
+          setIndicadores([
+            [formData.indicadores_r1 || ""]
+          ]);
+          setServicosEntrada(formData.servicos_entrada || "");
+          setServicoSaida(formData.servico_saida || "");
+        }
       })
       .catch(err => {
         console.error("ERRO AO BUSCAR PDF:", err);
@@ -344,7 +393,7 @@ const [objetivoProcesso, setObjetivoProcesso] = useState("");
             donoProcesso={donoProcesso}
             setDonoProcesso={setDonoProcesso}
             objetivoProcesso={objetivoProcesso}
-            setObjetivoProcesso={setObjetivoProcesso}
+            setObjetivoProcesso={setServicoSaida}
             handleAtividadesChange={handleAtividadesChange}
             handleIndicadoresChange={handleIndicadoresChange}
             handleChange={
@@ -356,6 +405,10 @@ const [objetivoProcesso, setObjetivoProcesso] = useState("");
                 });
               }
             }
+            servicosEntrada={servicosEntrada}
+            setServicosEntrada={setServicosEntrada}
+            servicoSaida={servicoSaida}
+            setServicoSaida={setServicoSaida}
           />
           <ExportPdfButton
             templateType={isTemplate2 ? 2 : 1}

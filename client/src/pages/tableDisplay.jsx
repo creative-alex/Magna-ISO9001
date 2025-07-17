@@ -37,6 +37,10 @@ export default function TabelaPdf({
   handleAtividadesChange,
   indicadores,
   handleIndicadoresChange,
+  servicosEntrada,
+  setServicosEntrada,
+  servicoSaida,
+  setServicoSaida,
 }) {
   const isTemplate2 = templateType === 2;
 
@@ -57,6 +61,10 @@ export default function TabelaPdf({
           handleAtividadesChange={handleAtividadesChange}
           indicadores={indicadores}
           handleIndicadoresChange={handleIndicadoresChange}
+          servicosEntrada={servicosEntrada}
+          setServicosEntrada={setServicosEntrada}
+          servicoSaida={servicoSaida}
+          setServicoSaida={setServicoSaida}
         />
       ) : (
         <Template1

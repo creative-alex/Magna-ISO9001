@@ -1,5 +1,5 @@
 import { createBasePdf, wrapText, pageSize, xStart, yStart } from './pdfBase';
-import { drawTableLines, drawHeaders, drawObsTable, getObsRows, colWidths, obsColWidth, obsRowHeight, spaceBetweenTables, drawTemplate2Table, } from './pdfTables';
+import { drawTableLines, drawHeaders, drawObsTable, getObsRows, colWidths, obsColWidth, obsRowHeight, spaceBetweenTables, drawTemplate2Table, colWidthTemplate2 } from './pdfTables';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
 // Função principal para gerar PDF editável
@@ -101,8 +101,6 @@ export async function generateEditablePdfTemplate1(data, headers, dataObs, heade
 }
 
 // Implemente a função para Template2 conforme sugerido antes
-import { drawTemplate2Table, colWidthsTemplate2 } from './pdfTables';
-import { xStart, yStart } from './pdfBase';
 
 export async function generateEditablePdfTemplate2({ atividades, donoProcesso, objetivoProcesso, indicadores }) {
   const { pdfDoc, page, font } = await createBasePdf();
@@ -160,8 +158,8 @@ export async function generateEditablePdfTemplate2({ atividades, donoProcesso, o
       const fieldName = `atividades_r${row + 1}_c${col + 1}`;
       const textField = form.createTextField(fieldName);
       textField.setText(atividades[row][col] || "");
-      textField.addToPage(page, { x: xPos + 2, y: camposY + 2, width: colWidthsTemplate2[col] - 4, height: 16 });
-      xPos += colWidthsTemplate2[col];
+      textField.addToPage(page, { x: xPos + 2, y: camposY + 2, width: colWidthTemplate2[col] - 4, height: 16 });
+      xPos += colWidthTemplate2[col];
     }
     camposY -= 20;
   }
@@ -399,4 +397,171 @@ export async function generateNonEditablePdfFromHtml(mainTableHtml, obsTableHtml
   const dataObs = obsTableArr.slice(1);
 
   return await generateNonEditablePdf(data, headers, dataObs, headersObs);
+}
+
+// Adicione esta função utilitária
+export function drawProcessHeaderTable(page, font, yPos, donoProcesso, objetivoProcesso, servicosEntrada, servicoSaida) {
+  // Larguras das colunas
+  const totalWidth = 500;
+  const leftColWidth = 180;
+  const rightColWidth = totalWidth - leftColWidth;
+  const rowHeight = 32;
+  const headerHeight = 28;
+  const entradaSaidaHeight = 24;
+  const contentHeight = 110;
+
+  // DONO DO PROCESSO
+  page.drawRectangle({
+    x: xStart,
+    y: yPos - headerHeight,
+    width: leftColWidth,
+    height: headerHeight,
+    color: rgb(0.85, 0.85, 0.85),
+    borderColor: rgb(0, 0, 0),
+    borderWidth: 1,
+  });
+  page.drawRectangle({
+    x: xStart + leftColWidth,
+    y: yPos - headerHeight,
+    width: rightColWidth,
+    height: headerHeight,
+    borderColor: rgb(0, 0, 0),
+    borderWidth: 1,
+  });
+  page.drawText('DONO DO PROCESSO\n(nomeado):', {
+    x: xStart + 8,
+    y: yPos - 18,
+    size: 11,
+    font,
+    color: rgb(0, 0, 0),
+    fontWeight: 'bold',
+  });
+  page.drawText(donoProcesso || '', {
+    x: xStart + leftColWidth + 8,
+    y: yPos - 18,
+    size: 11,
+    font,
+    color: rgb(0, 0, 0),
+  });
+
+  // OBJETIVO DO PROCESSO
+  page.drawRectangle({
+    x: xStart,
+    y: yPos - headerHeight - rowHeight,
+    width: leftColWidth,
+    height: rowHeight,
+    color: rgb(0.85, 0.85, 0.85),
+    borderColor: rgb(0, 0, 0),
+    borderWidth: 1,
+  });
+  page.drawRectangle({
+    x: xStart + leftColWidth,
+    y: yPos - headerHeight - rowHeight,
+    width: rightColWidth,
+    height: rowHeight,
+    borderColor: rgb(0, 0, 0),
+    borderWidth: 1,
+  });
+  page.drawText('OBJETIVO DO PROCESSO:', {
+    x: xStart + 8,
+    y: yPos - headerHeight - 18,
+    size: 11,
+    font,
+    color: rgb(0, 0, 0),
+    fontWeight: 'bold',
+  });
+  page.drawText(objetivoProcesso || '', {
+    x: xStart + leftColWidth + 8,
+    y: yPos - headerHeight - 18,
+    size: 11,
+    font,
+    color: rgb(0, 0, 0),
+    maxWidth: rightColWidth - 16,
+  });
+
+  // SERVIÇOS DE ENTRADAS / SAÍDA - Cabeçalho
+  page.drawRectangle({
+    x: xStart,
+    y: yPos - headerHeight - rowHeight - entradaSaidaHeight,
+    width: leftColWidth,
+    height: entradaSaidaHeight,
+    color: rgb(0.85, 0.85, 0.85),
+    borderColor: rgb(0, 0, 0),
+    borderWidth: 1,
+  });
+  page.drawRectangle({
+    x: xStart + leftColWidth,
+    y: yPos - headerHeight - rowHeight - entradaSaidaHeight,
+    width: rightColWidth,
+    height: entradaSaidaHeight,
+    color: rgb(0.85, 0.85, 0.85),
+    borderColor: rgb(0, 0, 0),
+    borderWidth: 1,
+  });
+  page.drawText('SERVIÇOS DE ENTRADAS', {
+    x: xStart + 8,
+    y: yPos - headerHeight - rowHeight - 14,
+    size: 11,
+    font,
+    color: rgb(0, 0, 0),
+    fontWeight: 'bold',
+  });
+  page.drawText('SERVIÇO DE SAÍDA', {
+    x: xStart + leftColWidth + 8,
+    y: yPos - headerHeight - rowHeight - 14,
+    size: 11,
+    font,
+    color: rgb(0, 0, 0),
+    fontWeight: 'bold',
+  });
+
+  // SERVIÇOS DE ENTRADAS / SAÍDA - Conteúdo
+  page.drawRectangle({
+    x: xStart,
+    y: yPos - headerHeight - rowHeight - entradaSaidaHeight - contentHeight,
+    width: leftColWidth,
+    height: contentHeight,
+    borderColor: rgb(0, 0, 0),
+    borderWidth: 1,
+  });
+  page.drawRectangle({
+    x: xStart + leftColWidth,
+    y: yPos - headerHeight - rowHeight - entradaSaidaHeight - contentHeight,
+    width: rightColWidth,
+    height: contentHeight,
+    borderColor: rgb(0, 0, 0),
+    borderWidth: 1,
+  });
+
+  // Texto dos serviços (ajuste wrapText conforme necessário)
+  let fontSize = 10;
+  let entradaLines = servicosEntrada.split('\n');
+  let saidaLines = servicoSaida.split('\n');
+  let entradaY = yPos - headerHeight - rowHeight - entradaSaidaHeight - 18;
+  let saidaY = entradaY;
+  entradaLines.forEach(line => {
+    page.drawText(line, {
+      x: xStart + 8,
+      y: entradaY,
+      size: fontSize,
+      font,
+      color: rgb(0, 0, 0),
+      maxWidth: leftColWidth - 16,
+    });
+    entradaY -= 14;
+  });
+  saidaLines.forEach(line => {
+    page.drawText(line, {
+      x: xStart + leftColWidth + 8,
+      y: saidaY,
+      size: fontSize,
+      font,
+      color: rgb(0, 0, 0),
+      maxWidth: rightColWidth - 16,
+    });
+    saidaY -= 14;
+  });
+
+  // Retorne a nova posição Y para continuar desenhando abaixo
+  return yPos - headerHeight - rowHeight - entradaSaidaHeight - contentHeight - 20;
 }

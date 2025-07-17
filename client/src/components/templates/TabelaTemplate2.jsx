@@ -14,6 +14,10 @@ export default function Template2({
   atividades = [["", "", "", "", "", ""], 
                 ["", "", "", "", "", ""], ["", "", "", "", "", ""], ["", "", "", "", "", ""]],
   indicadores = [ "" ],
+  servicosEntrada = "",
+  setServicosEntrada,
+  servicoSaida = "",
+  setServicoSaida,
 }) {
   return (
     <>
@@ -51,16 +55,16 @@ export default function Template2({
         <textarea
           className="tabela-processo-textarea"
           style={{ minHeight: 120 }}
-          value={data[0][0]}
-          onChange={e => handleChange(0, 0, e.target.value)}
+          value={servicosEntrada}
+          onChange={e => setServicosEntrada(e.target.value)}
         />
       </td>
       <td colSpan={3} style={{ verticalAlign: "top" }}>
         <textarea
           className="tabela-processo-textarea"
           style={{ minHeight: 120 }}
-          value={data[0][1]}
-          onChange={e => handleChange(0, 1, e.target.value)}
+          value={servicoSaida}
+          onChange={e => setServicoSaida(e.target.value)}
         />
       </td>
     </tr>
