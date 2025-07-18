@@ -11,9 +11,11 @@ export default function ExportPdfButton({
   donoProcesso,
   objetivoProcesso,
   indicadores,
-  filePath = "meu_editavel.pdf",
+  pathFilename,
   fieldNames,
-  exportRef
+  exportRef,
+  servicosEntrada,
+  servicoSaida
 }) {
   // Função para preparar os dados para envio ao backend
   const getMainTableFormData = () => {
@@ -30,6 +32,11 @@ export default function ExportPdfButton({
 
   // Função para enviar PDF editável para o backend
   const handleSendToBackend = async () => {
+    console.log("handleSendToBackend chamado com:");
+    console.log("templateType:", templateType);
+    console.log("servicosEntrada:", servicosEntrada);
+    console.log("servicoSaida:", servicoSaida);
+    
     const stringHeaders = headers.map(h =>
       typeof h === "string"
         ? h
@@ -40,7 +47,7 @@ export default function ExportPdfButton({
           : String(h)
     );
 
-    const parts = filePath.split("/");
+    const parts = pathFilename.split("/");
     const filename = parts.pop();
     const folders = parts;
 
@@ -54,23 +61,34 @@ export default function ExportPdfButton({
       atividades,
       donoProcesso,
       objetivoProcesso,
-      indicadores
+      indicadores,
+      servicosEntrada,
+      servicoSaida
     });
 
     const formData = new FormData();
     formData.append("file", new Blob([editablePdfBytes], { type: "application/pdf" }), filename);
     formData.append("folders", JSON.stringify(folders));
     formData.append("filename", filename);
+    formData.append("originalFilename", pathFilename); 
 
     // Adiciona os dados dinâmicos ao formData
     if (templateType === 1) {
       const mainTableFormData = getMainTableFormData();
       formData.append("mainTableData", JSON.stringify(mainTableFormData));
+      formData.append("servicos_entrada", servicosEntrada || "");
+      formData.append("servico_saida", servicoSaida || "");
+      console.log("Template 1 - Enviando servicos_entrada:", servicosEntrada || "");
+      console.log("Template 1 - Enviando servico_saida:", servicoSaida || "");
     } else if (templateType === 2) {
       formData.append("atividades", JSON.stringify(atividades));
       formData.append("donoProcesso", donoProcesso);
       formData.append("objetivoProcesso", objetivoProcesso);
+      formData.append("servicos_entrada", servicosEntrada);
+      formData.append("servico_saida", servicoSaida);
       formData.append("indicadores", JSON.stringify(indicadores));
+      console.log("Template 2 - Enviando servicos_entrada:", servicosEntrada);
+      console.log("Template 2 - Enviando servico_saida:", servicoSaida);
     }
 
     await fetch("http://localhost:8080/files/upload-pdf", {
@@ -99,6 +117,8 @@ export default function ExportPdfButton({
       headersObs,
       atividades,
       donoProcesso,
+      servicosEntrada,
+      servicoSaida,
       objetivoProcesso,
       indicadores
     });
@@ -117,7 +137,7 @@ export default function ExportPdfButton({
   }, [exportRef, handleSendToBackend]);
 
   return (
-    <button onClick={handlePreviewPdf}>
+    <button onClick={handleSendToBackend}>
       Preview PDF Editável
     </button>
   );

@@ -12,14 +12,18 @@ export async function generateEditablePdf({
   atividades,
   donoProcesso,
   objetivoProcesso,
-  indicadores
+  indicadores,
+  servicosEntrada,
+  servicoSaida
 }) {
   if (templateType === 2) {
     return await generateEditablePdfTemplate2({
       atividades,
       donoProcesso,
       objetivoProcesso,
-      indicadores
+      indicadores,
+      servicosEntrada,
+      servicoSaida,
     });
   } else {
     return await generateEditablePdfTemplate1(data, headers, dataObs, headersObs);
@@ -102,9 +106,12 @@ export async function generateEditablePdfTemplate1(data, headers, dataObs, heade
 
 // Implemente a função para Template2 conforme sugerido antes
 
-export async function generateEditablePdfTemplate2({ atividades, donoProcesso, objetivoProcesso, indicadores }) {
+export async function generateEditablePdfTemplate2({ atividades, donoProcesso, objetivoProcesso, indicadores, servicosEntrada, servicoSaida }) {
   const { pdfDoc, page, font } = await createBasePdf();
   const form = pdfDoc.getForm();
+
+  console.log("Template2 - servicosEntrada recebido:", servicosEntrada);
+  console.log("Template2 - servicoSaida recebido:", servicoSaida);
 
   let yPos = yStart;
 
@@ -129,11 +136,15 @@ export async function generateEditablePdfTemplate2({ atividades, donoProcesso, o
   page.drawText("SERVIÇO DE SAÍDA", { x: xStart + 320, y: yPos, size: 12, font });
   const entradaField = form.createTextField('servicos_entrada');
   entradaField.enableMultiline();
-  entradaField.setText("");
+  entradaField.setText(servicosEntrada || "");
+  entradaField.defaultUpdateAppearances(font);
+  console.log("Campo servicos_entrada criado com valor:", servicosEntrada || "");
   entradaField.addToPage(page, { x: xStart, y: yPos - 28, width: 290, height: 48 });
   const saidaField = form.createTextField('servico_saida');
   saidaField.enableMultiline();
-  saidaField.setText("");
+  saidaField.setText(servicoSaida || "");
+  saidaField.defaultUpdateAppearances(font);
+  console.log("Campo servico_saida criado com valor:", servicoSaida || "");
   saidaField.addToPage(page, { x: xStart + 320, y: yPos - 28, width: 230, height: 48 });
   yPos -= 88;
 
@@ -535,8 +546,8 @@ export function drawProcessHeaderTable(page, font, yPos, donoProcesso, objetivoP
 
   // Texto dos serviços (ajuste wrapText conforme necessário)
   let fontSize = 10;
-  let entradaLines = servicosEntrada.split('\n');
-  let saidaLines = servicoSaida.split('\n');
+  let entradaLines = (servicosEntrada || '').split('\n');
+  let saidaLines = (servicoSaida || '').split('\n');
   let entradaY = yPos - headerHeight - rowHeight - entradaSaidaHeight - 18;
   let saidaY = entradaY;
   entradaLines.forEach(line => {

@@ -74,8 +74,16 @@ export default function TabelaPdf({
           handleChangeObs={handleChangeObs}
           headers={headers}
           headersObs={headersObs}
+          headersHtml={headersHtml1}
+          headersHtmlObs={headersHtmlObs1}
+          templateType={templateType}
+          servicosEntrada={servicosEntrada}
+          servicoSaida={servicoSaida}
+          setServicosEntrada={setServicosEntrada}
+          setServicoSaida={setServicoSaida}
         />
       )}
     </div>
   );
 }
+

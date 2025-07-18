@@ -3,6 +3,26 @@ import { useNavigate } from "react-router-dom";
 import { PDFDocument } from "pdf-lib";
 import "../index.css";
 
+// Função recursiva para filtrar nodes por nome
+function filterTree(nodes, searchTerm) {
+  if (!searchTerm) return nodes;
+  return nodes
+    .map(node => {
+      if (node.type === "folder") {
+        const filteredChildren = filterTree(node.children || [], searchTerm);
+        if (filteredChildren.length > 0 || node.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+          return { ...node, children: filteredChildren };
+        }
+        return null;
+      }
+      if (node.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+        return node;
+      }
+      return null;
+    })
+    .filter(Boolean);
+}
+
 function FolderStructure({ nodes, onSelectFile, currentPath = [] }) {
   const [expandedFolder, setExpandedFolder] = useState(null);
 
@@ -70,6 +90,7 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [] }) {
 
 export default function SelecionarPdf() {
   const [pdfTree, setPdfTree] = useState([]);
+  const [searchTerm, setSearchTerm] = useState(""); // Novo estado para busca
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -80,17 +101,27 @@ export default function SelecionarPdf() {
   }, []);
 
   const handleSelectFile = (filePath) => {
-  // Substitui espaços por '-', barras por '__'
-  const formattedPath = filePath.replace(/\s/g, '-').replace(/\//g, '__');
-  navigate(`/superadmin/${formattedPath}`, { state: { originalFilename: filePath } });
-};
+    // Substitui espaços por '-', barras por '__'
+    const formattedPath = filePath.replace(/\s/g, '-').replace(/\//g, '__');
+    navigate(`/superadmin/${formattedPath}`, { state: { originalFilename: filePath } });
+  };
+
+  // Filtra a árvore conforme o termo de busca
+  const filteredTree = filterTree(pdfTree, searchTerm);
 
   return (
     <div className="pdf-container">
       <h2 className="title">Titulo Titulado</h2>
+      <input
+        type="text"
+        placeholder="Buscar arquivo ou pasta..."
+        value={searchTerm}
+        onChange={e => setSearchTerm(e.target.value)}
+        style={{ marginBottom: "1rem", width: "100%", padding: "0.5rem" }}
+      />
       <div className="pdf-panel">
         <div className="panel-title">Índice</div>
-        <FolderStructure nodes={pdfTree} onSelectFile={handleSelectFile} />
+        <FolderStructure nodes={filteredTree} onSelectFile={handleSelectFile} />
       </div>
     </div>
   );

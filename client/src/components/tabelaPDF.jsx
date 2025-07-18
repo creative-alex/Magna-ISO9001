@@ -115,6 +115,7 @@ const tabelasTemplate2 = [
 
 export default function TablePageUnified() {
   const { filename } = useParams();
+  console.log("Path Params filename:", filename);
   const location = useLocation();
 
   console.log("TablePageUnified renderizou");
@@ -171,6 +172,9 @@ const [donoProcesso, setDonoProcesso] = useState("");
 const [objetivoProcesso, setObjetivoProcesso] = useState("");
 const [servicosEntrada, setServicosEntrada] = useState("");
 const [servicoSaida, setServicoSaida] = useState("");
+
+console.log("Service de Entrada:", servicosEntrada);
+console.log("Service de Saída:", servicoSaida);
 
 
   // Handlers para Template2
@@ -333,6 +337,10 @@ const [servicoSaida, setServicoSaida] = useState("");
           ]);
           setServicosEntrada(formData.servicos_entrada || "");
           setServicoSaida(formData.servico_saida || "");
+        } else {
+          // Para Template 1, também carrega os serviços se existirem
+          setServicosEntrada(formData.servicos_entrada || "");
+          setServicoSaida(formData.servico_saida || "");
         }
       })
       .catch(err => {
@@ -379,6 +387,11 @@ const [servicoSaida, setServicoSaida] = useState("");
   console.log("tableData atual:", tableData);
   console.log("mainFieldNames atual:", mainFieldNames);
 
+
+
+  console.log("Service de Entrada:", servicosEntrada);
+  console.log("Service de Saída:", servicoSaida);
+
   return (
     <div>
       <h2>{originalFilename || "Template 2"}</h2>
@@ -389,11 +402,15 @@ const [servicoSaida, setServicoSaida] = useState("");
             data={tableData.main}
             dataObs={tableData.obs}
             atividades={atividades}
+            servicosEntrada={servicosEntrada}
+            setServicosEntrada={setServicosEntrada}
+            servicoSaida={servicoSaida}
+            setServicoSaida={setServicoSaida}
             indicadores={indicadores}
             donoProcesso={donoProcesso}
             setDonoProcesso={setDonoProcesso}
             objetivoProcesso={objetivoProcesso}
-            setObjetivoProcesso={setServicoSaida}
+            setObjetivoProcesso={setObjetivoProcesso}
             handleAtividadesChange={handleAtividadesChange}
             handleIndicadoresChange={handleIndicadoresChange}
             handleChange={
@@ -404,11 +421,7 @@ const [servicoSaida, setServicoSaida] = useState("");
                   return { ...prev, main: newData };
                 });
               }
-            }
-            servicosEntrada={servicosEntrada}
-            setServicosEntrada={setServicosEntrada}
-            servicoSaida={servicoSaida}
-            setServicoSaida={setServicoSaida}
+            }           
           />
           <ExportPdfButton
             templateType={isTemplate2 ? 2 : 1}
@@ -420,6 +433,9 @@ const [servicoSaida, setServicoSaida] = useState("");
             donoProcesso={donoProcesso}
             objetivoProcesso={objetivoProcesso}
             indicadores={indicadores}
+            pathFilename={originalFilename}
+            servicosEntrada={servicosEntrada}
+            servicoSaida={servicoSaida}
           />
           <PreviewPdfButton getTablesHtml={getTablesHtml} />
         </>
@@ -451,7 +467,7 @@ const [servicoSaida, setServicoSaida] = useState("");
               headersHtml={template[1].headers}
             />
           </div>
-          <button onClick={handleAddRow}>+</button>
+          <button onClick={handleAddRow}>+</button>          
           <ExportPdfButton
             templateType={isTemplate2 ? 2 : 1}
             data={tableData.main}
@@ -462,6 +478,10 @@ const [servicoSaida, setServicoSaida] = useState("");
             donoProcesso={donoProcesso}
             objetivoProcesso={objetivoProcesso}
             indicadores={indicadores}
+            pathFilename={originalFilename}
+            servicosEntrada={servicosEntrada}
+            servicoSaida={servicoSaida}
+            fieldNames={mainFieldNames}
           />
           <PreviewPdfButton getTablesHtml={getTablesHtml} />
         </>

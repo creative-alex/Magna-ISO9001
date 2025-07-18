@@ -26,6 +26,9 @@ const listPdfs = async (req, res) => {
 const uploadPdf = async (req, res) => {
   try {
     console.log("uploadPdf chamado");
+    console.log("req.body:", req.body);
+    console.log("servicos_entrada:", req.body.servicos_entrada);
+    console.log("servico_saida:", req.body.servico_saida);
     console.log("Verificando req.file...");
     if (!req.file) {
       console.log("Nenhum ficheiro enviado.");
