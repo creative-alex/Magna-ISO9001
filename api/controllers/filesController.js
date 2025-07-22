@@ -184,10 +184,84 @@ const getPdf = async (req, res) => {
   }
 };
 
+const downloadPdf = async (req, res) => {
+  try {
+    console.log("downloadPdf chamado");
+    const { path } = req.body;
+    console.log("Path recebido para download:", path);
+    if (!path) {
+      console.log("Path não fornecido");
+      return res.status(400).send("Path não fornecido");
+    }
+
+    const file = bucket.file(path);
+    console.log("Verificando se o arquivo existe:", path);
+    const [exists] = await file.exists();
+    if (!exists) {
+      console.log("Arquivo não encontrado:", path);
+      return res.status(404).send("Arquivo não encontrado");
+    }
+
+    console.log("Fazendo download do arquivo:", path);
+    const [buffer] = await file.download();
+    console.log("Download concluído, tamanho do buffer:", buffer.length);
+    
+    // Define o nome do arquivo para download
+    const filename = path.split('/').pop();
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (err) {
+    console.error("Erro ao fazer download do PDF:", err);
+    res.status(500).send("Erro ao fazer download do PDF: " + err.message);
+  }
+};
+
+const updateDonoProcesso = async (req, res) => {
+  try {
+    console.log("updateDonoProcesso chamado");
+    const { filename, donoProcesso } = req.body;
+    
+    if (!filename || donoProcesso === undefined) {
+      return res.status(400).json({ error: "filename e donoProcesso são obrigatórios" });
+    }
+
+    console.log("Atualizando donoProcesso:", { filename, donoProcesso });
+
+    // Acessa a coleção processos no Firestore
+    const db = admin.firestore();
+    const processosRef = db.collection('processos');
+
+    // Busca o documento pelo filename
+    const querySnapshot = await processosRef.where('filename', '==', filename).get();
+    
+    if (querySnapshot.empty) {
+      console.log("Documento não encontrado para o filename:", filename);
+      return res.status(404).json({ error: "Processo não encontrado" });
+    }
+
+    // Atualiza o primeiro documento encontrado
+    const doc = querySnapshot.docs[0];
+    await doc.ref.update({
+      donoProcesso: donoProcesso,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    console.log("donoProcesso atualizado com sucesso");
+    res.json({ success: true, message: "Dono do processo atualizado com sucesso" });
+
+  } catch (error) {
+    console.error("Erro ao atualizar donoProcesso:", error);
+    res.status(500).json({ error: "Erro interno do servidor", details: error.message });
+  }
+};
+
 module.exports = {
   uploadPdf,
   listPdfs,
   getPdfFormData,
   listPdfsTree,
   getPdf,
+  downloadPdf,
+  updateDonoProcesso,
 };

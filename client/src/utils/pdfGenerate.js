@@ -191,42 +191,226 @@ export async function generateEditablePdfTemplate2({ atividades, donoProcesso, o
   return await pdfDoc.save();
 }
 
+// Função para gerar PDF não editável do Template 2
+export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, objetivoProcesso, indicadores, servicosEntrada, servicoSaida) {
+  const { pdfDoc, page, font } = await createBasePdf();
+
+  // Validações de entrada
+  const safeAtividades = Array.isArray(atividades) && atividades.length > 0 ? atividades : [['', '', '', '', '', '']];
+  const safeIndicadores = Array.isArray(indicadores) && indicadores.length > 0 ? indicadores : [''];
+  const safeDonoProcesso = donoProcesso || '';
+  const safeObjetivoProcesso = objetivoProcesso || '';
+  const safeServicosEntrada = servicosEntrada || '';
+  const safeServicoSaida = servicoSaida || '';
+
+  console.log("generateNonEditablePdfTemplate2 - dados recebidos:");
+  console.log("atividades:", safeAtividades);
+  console.log("donoProcesso:", safeDonoProcesso);
+  console.log("objetivoProcesso:", safeObjetivoProcesso);
+  console.log("indicadores:", safeIndicadores);
+  console.log("servicosEntrada:", safeServicosEntrada);
+  console.log("servicoSaida:", safeServicoSaida);
+
+  // Usar a função utilitária para desenhar a tabela de cabeçalho do processo
+  let yPos = drawProcessHeaderTable(page, font, yStart, safeDonoProcesso, safeObjetivoProcesso, safeServicosEntrada, safeServicoSaida);
+
+  // Headers da tabela de atividades
+  const headers = [
+    "Principais\nAtividades",
+    "Procedimentos\nAssociados", 
+    "Requisitos\nISO 9001",
+    "Requisitos\nDGERT",
+    "Requisitos\nEQAVET",
+    "Requisitos\nCQCQ"
+  ];
+
+  // Desenha tabela de atividades
+  const fontSize = 8;
+  const lineHeight = fontSize + 2;
+  
+  // Calcula altura das linhas dinamicamente
+  const maxWidths = colWidthTemplate2.map(w => w - 8);
+  const wrappedAtividades = safeAtividades.map(row =>
+    row.map((cell, col) => {
+      const cellText = (cell || '').toString();
+      return wrapText(cellText, font, fontSize, maxWidths[col] || 80);
+    })
+  );
+  
+  const rowHeights = wrappedAtividades.map(row => {
+    const heights = row.map(lines => {
+      const height = lines.length * lineHeight + 8;
+      return isNaN(height) ? 30 : height;
+    });
+    const maxHeight = Math.max(...heights, 30);
+    return isNaN(maxHeight) ? 30 : maxHeight;
+  });
+  rowHeights.unshift(40); // header height
+
+  // Desenha grid da tabela de atividades
+  const totalWidth = colWidthTemplate2.reduce((a, b) => a + b, 0);
+  let currentY = yPos;
+  
+  // Desenha linhas horizontais
+  for (let i = 0; i <= safeAtividades.length + 1; i++) {
+    page.drawLine({
+      start: { x: xStart, y: currentY },
+      end: { x: xStart + totalWidth, y: currentY },
+      thickness: 1,
+      color: rgb(0, 0, 0),
+    });
+    if (i < rowHeights.length) {
+      currentY -= rowHeights[i];
+    }
+  }
+
+  // Desenha linhas verticais
+  let currentX = xStart;
+  for (let j = 0; j <= colWidthTemplate2.length; j++) {
+    page.drawLine({
+      start: { x: currentX, y: yPos },
+      end: { x: currentX, y: currentY },
+      thickness: 1,
+      color: rgb(0, 0, 0),
+    });
+    if (j < colWidthTemplate2.length) {
+      currentX += colWidthTemplate2[j];
+    }
+  }
+
+  // Desenha headers
+  let headerY = yPos - 20;
+  let headerX = xStart;
+  headers.forEach((header, col) => {
+    const lines = header.split('\n');
+    const colWidth = colWidthTemplate2[col];
+    let startY = headerY - 5;
+    
+    lines.forEach((line, idx) => {
+      const textWidth = font.widthOfTextAtSize(line, 9);
+      const textX = headerX + (colWidth - textWidth) / 2;
+      const textY = startY - idx * 10;
+      page.drawText(line, {
+        x: textX,
+        y: textY,
+        size: 9,
+        font,
+        color: rgb(0, 0, 0),
+      });
+    });
+    headerX += colWidth;
+  });
+
+  // Desenha dados das atividades
+  let dataY = yPos - rowHeights[0];
+  for (let row = 0; row < safeAtividades.length; row++) {
+    let dataX = xStart;
+    for (let col = 0; col < safeAtividades[row].length; col++) {
+      const lines = wrappedAtividades[row][col];
+      let textY = dataY - 4;
+      
+      for (let l = 0; l < lines.length; l++) {
+        if (lines[l] && typeof lines[l] === 'string') {
+          page.drawText(lines[l], {
+            x: dataX + 2,
+            y: textY - l * lineHeight,
+            size: fontSize,
+            font,
+            color: rgb(0, 0, 0),
+          });
+        }
+      }
+      dataX += colWidthTemplate2[col];
+    }
+    dataY -= rowHeights[row + 1];
+  }
+
+  // Desenha indicadores
+  let indicadoresY = dataY - 20;
+  page.drawText("Indicadores de monitorização do processo", { 
+    x: xStart, 
+    y: indicadoresY, 
+    size: 11, 
+    font,
+    color: rgb(0, 0, 0),
+  });
+  
+  indicadoresY -= 20;
+  safeIndicadores.forEach((indicador, idx) => {
+    const text = indicador.toString();
+    const lines = wrapText(text, font, fontSize, 550);
+    
+    lines.forEach((line, lineIdx) => {
+      page.drawText(`${idx + 1}. ${lineIdx === 0 ? line : '   ' + line}`, {
+        x: xStart,
+        y: indicadoresY - lineIdx * lineHeight,
+        size: fontSize,
+        font,
+        color: rgb(0, 0, 0),
+      });
+    });
+    indicadoresY -= (lines.length * lineHeight + 10);
+  });
+
+  return await pdfDoc.save();
+}
+
 // Função principal para gerar PDF não editável
 export async function generateNonEditablePdf(data, headers, dataObs) {
   const { pdfDoc, page: firstPage, font } = await createBasePdf();
+
+  // Validações de entrada
+  const safeData = Array.isArray(data) && data.length > 0 ? data : [['', '', '', '', '']];
+  const safeHeaders = Array.isArray(headers) && headers.length > 0 ? headers : ['', '', '', '', ''];
+  const safeDataObs = Array.isArray(dataObs) && dataObs.length > 0 ? dataObs : [['']];
+  
+  console.log("generateNonEditablePdf - dados recebidos:");
+  console.log("data:", safeData);
+  console.log("headers:", safeHeaders);
+  console.log("dataObs:", safeDataObs);
 
   // Calcule a altura real da tabela de observações
   const fontSize = 6;
   const maxWidth = obsColWidth[0] - 8;
   const lineHeight = fontSize + 2;
-  const safeDataObs = Array.from({ length: 5 }, (_, i) =>
-    Array.isArray(dataObs) && Array.isArray(dataObs[i]) ? dataObs[i] : [""]
+  const obsDataForHeight = Array.from({ length: Math.max(5, safeDataObs.length) }, (_, i) =>
+    Array.isArray(safeDataObs[i]) ? safeDataObs[i] : [""]
   );
-  const rowHeightsObs = safeDataObs.map(row => {
-    const text = row[0] || '';
+  const rowHeightsObs = obsDataForHeight.map(row => {
+    const text = (row[0] || '').toString();
     const lines = wrapText(text, font, fontSize, maxWidth);
-    return Math.max(obsRowHeight, lines.length * lineHeight + 16);
+    const height = Math.max(obsRowHeight, lines.length * lineHeight + 16);
+    return isNaN(height) ? obsRowHeight : height;
   });
-  const obsTableHeightReal = rowHeightsObs.reduce((a, b) => a + b, 0);
+  const obsTableHeightReal = rowHeightsObs.reduce((a, b) => (isNaN(a) ? 0 : a) + (isNaN(b) ? 0 : b), 0);
 
   // Desenha tabela de observações na primeira página
-  drawObsTable(firstPage, font, dataObs);
+  drawObsTable(firstPage, font, safeDataObs);
 
   // --- Quebra de texto e altura dinâmica das linhas ---
   const maxWidths = colWidths.map(w => w - 8);
 
   // Calcula as linhas quebradas e alturas de cada linha
-  const wrappedData = data.map(row =>
-    row.map((cell, col) => wrapText(cell || "", font, fontSize, maxWidths[col]))
+  const wrappedData = safeData.map(row =>
+    row.map((cell, col) => {
+      const cellText = (cell || '').toString();
+      const maxWidth = maxWidths[col] || 100;
+      return wrapText(cellText, font, fontSize, maxWidth);
+    })
   );
   const rowHeightsDynamic = wrappedData.map(
-    row =>
-      Math.max(
-        ...row.map(lines => lines.length * lineHeight + 16),
-        50
-      )
+    row => {
+      const heights = row.map(lines => {
+        const height = lines.length * lineHeight + 16;
+        return isNaN(height) ? 50 : height;
+      });
+      const maxHeight = Math.max(...heights, 50);
+      return isNaN(maxHeight) ? 50 : maxHeight;
+    }
   );
   rowHeightsDynamic.unshift(50); // header
+  
+  console.log("rowHeightsDynamic calculado:", rowHeightsDynamic);
 
   // Parâmetros de página
   const totalWidth = colWidths.reduce((a, b) => a + b, 0);
@@ -241,9 +425,9 @@ export async function generateNonEditablePdf(data, headers, dataObs) {
   // Função para desenhar headers
   function drawTableHeaders(page, y, headerHeight) {
     let xPos = xStart;
-    headers.forEach((header, col) => {
+    safeHeaders.forEach((header, col) => {
       const lines = (header || "").split('\n');
-      const colWidth = colWidths[col];
+      const colWidth = colWidths[col] || 100;
       const totalTextHeight = lines.length * 12;
       let startY = y - ((headerHeight - totalTextHeight) / 2) - fontSize;
       lines.forEach((line, idx) => {
@@ -258,7 +442,7 @@ export async function generateNonEditablePdf(data, headers, dataObs) {
           color: rgb(0, 0, 0),
         });
       });
-      xPos += colWidths[col];
+      xPos += colWidths[col] || 100;
     });
   }
 
@@ -298,7 +482,7 @@ export async function generateNonEditablePdf(data, headers, dataObs) {
   }
 
   // Desenha a tabela principal, quebrando para nova página se necessário
-  while (rowIndex < data.length) {
+  while (rowIndex < safeData.length) {
     // Calcular espaço disponível nesta página
     let availableHeight;
     if (isFirstPage) {
@@ -312,7 +496,7 @@ export async function generateNonEditablePdf(data, headers, dataObs) {
     let rowsThisPage = 0;
     let heightSum = isFirstPage ? rowHeightsDynamic[0] : 0; // header só na primeira página
     while (
-      rowIndex + rowsThisPage < data.length &&
+      rowIndex + rowsThisPage < safeData.length &&
       heightSum + rowHeightsDynamic[rowIndex + rowsThisPage + 1] <= availableHeight
     ) {
       heightSum += rowHeightsDynamic[rowIndex + rowsThisPage + 1];
@@ -333,18 +517,37 @@ export async function generateNonEditablePdf(data, headers, dataObs) {
     for (let i = 0; i < rowsToDraw; i++) {
       let xPos = xStart;
       const row = rowIndex + i;
-      for (let col = 0; col < data[row].length; col++) {
+      
+      // Validação adicional para garantir que os dados existem
+      if (!safeData[row] || !Array.isArray(safeData[row])) {
+        console.warn(`Linha ${row} não encontrada ou não é array:`, safeData[row]);
+        continue;
+      }
+      
+      if (!wrappedData[row] || !Array.isArray(wrappedData[row])) {
+        console.warn(`wrappedData linha ${row} não encontrada ou não é array:`, wrappedData[row]);
+        continue;
+      }
+      
+      for (let col = 0; col < safeData[row].length; col++) {
         const lines = wrappedData[row][col];
+        if (!Array.isArray(lines)) {
+          console.warn(`lines não é array para row ${row}, col ${col}:`, lines);
+          continue;
+        }
+        
         let textY = yData - 8;
         for (let l = 0; l < lines.length; l++) {
-          page.drawText(lines[l], {
-            x: xPos + 4,
-            y: textY - l * lineHeight,
-            size: fontSize,
-            font,
-            color: rgb(0, 0, 0),
-            maxWidth: maxWidths[col],
-          });
+          if (lines[l] && typeof lines[l] === 'string') {
+            page.drawText(lines[l], {
+              x: xPos + 4,
+              y: textY - l * lineHeight,
+              size: fontSize,
+              font,
+              color: rgb(0, 0, 0),
+              maxWidth: maxWidths[col] || 100,
+            });
+          }
         }
         xPos += colWidths[col];
       }
@@ -354,7 +557,7 @@ export async function generateNonEditablePdf(data, headers, dataObs) {
     rowIndex += rowsToDraw;
 
     // Se ainda há linhas, cria nova página e continua
-    if (rowIndex < data.length) {
+    if (rowIndex < safeData.length) {
       page = pdfDoc.addPage(pageSize);
       yPos = yStart;
       isFirstPage = false;

@@ -115,47 +115,35 @@ const tabelasTemplate2 = [
 
 export default function TablePageUnified() {
   const { filename } = useParams();
-  console.log("Path Params filename:", filename);
   const location = useLocation();
 
-  console.log("TablePageUnified renderizou");
-  console.log("filename do useParams:", filename);
-  console.log("location:", location);
 
   const originalFilename =
     location?.state?.originalFilename
       ? location.state.originalFilename
       : decodeURIComponent(filename || "").replace(/__/g, '/').replace(/-/g, ' ');
 
-  console.log("originalFilename:", originalFilename);
 
   // Extrai só o nome do ficheiro (após o último '__')
   const fileNameOnly = filename ? filename.split('__').pop() : "";
-  console.log("fileNameOnly extraído:", fileNameOnly);
 
   // Escolhe o template conforme o filename
   let template, isTemplate2 = false;
-  if (/^\d[-_]/.test(fileNameOnly)) { 
+  if (/^\d{2}/.test(fileNameOnly)) { // Arquivos que começam com 2 dígitos são Template 1
+    template = tabelas;
+  } else if (/^\d/.test(fileNameOnly)) { // Arquivos que começam com 1 dígito são Template 2
     template = tabelasTemplate2;
     isTemplate2 = true;
-    console.log("Template selecionado: tabelasTemplate2");
-  } else if (/^\d{2}[-_]/.test(fileNameOnly)) { 
-    template = tabelas;
-    console.log("Template selecionado: tabelas");
   } else {
-    template = tabelas; // fallback
-    console.log("Template selecionado: tabelas (fallback)");
+    template = tabelas; // fallback para Template 1
   }
-  console.log("isTemplate2:", isTemplate2);
 
   // Estado das tabelas
   const [tableData, setTableData] = useState(() => {
     const initial = template.reduce((acc, t) => ({ ...acc, [t.key]: Array.from({ length: t.rows }, () => Array(t.cols).fill("")) }), {});
-    console.log("Estado inicial tableData:", initial);
     return initial;
   });
   const [mainFieldNames, setMainFieldNames] = useState(() => {
-    console.log("mainFieldNames inicial:", template[1].fieldNames);
     return [...template[1].fieldNames];
   });
 
@@ -173,8 +161,6 @@ const [objetivoProcesso, setObjetivoProcesso] = useState("");
 const [servicosEntrada, setServicosEntrada] = useState("");
 const [servicoSaida, setServicoSaida] = useState("");
 
-console.log("Service de Entrada:", servicosEntrada);
-console.log("Service de Saída:", servicoSaida);
 
 
   // Handlers para Template2
@@ -193,13 +179,50 @@ console.log("Service de Saída:", servicoSaida);
     });
   };
 
+  // Função para atualizar donoProcesso no backend
+  const updateDonoProcessoBackend = async (newDonoProcesso) => {
+    try {
+      // Extrai o nome do processo (antes do primeiro "/")
+      const nomeProcesso = originalFilename.split('/')[0];
+      console.log("Atualizando donoProcesso no backend:", { originalFilename, nomeProcesso, newDonoProcesso });
+      
+      const response = await fetch("http://localhost:8080/files/update-dono-processo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          filename: nomeProcesso,
+          donoProcesso: newDonoProcesso 
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erro ao atualizar donoProcesso no backend");
+      }
+
+      const result = await response.json();
+      console.log("donoProcesso atualizado com sucesso:", result);
+      return true;
+    } catch (error) {
+      console.error("Erro ao atualizar donoProcesso:", error);
+      return false;
+    }
+  };
+
+  // Função personalizada para setDonoProcesso que também atualiza o backend
+  const handleSetDonoProcesso = async (newDonoProcesso) => {
+    // Atualiza o estado local
+    setDonoProcesso(newDonoProcesso);
+    
+    // Atualiza no backend
+    await updateDonoProcessoBackend(newDonoProcesso);
+  };
+
   // Reinicializa estado quando o template muda
   useEffect(() => {
     const initial = template.reduce((acc, t) => ({
       ...acc,
       [t.key]: Array.from({ length: t.rows }, () => Array(t.cols).fill(""))
     }), {});
-    console.log("useEffect [template] disparado. Novo estado tableData:", initial);
     setTableData(initial);
     setMainFieldNames([...template[1].fieldNames]);
     // Reinicializa também os estados extra do Template2
@@ -220,14 +243,11 @@ console.log("Service de Saída:", servicoSaida);
 
   // Buscar dados do PDF selecionado (opcional, pode remover se não usar)
   useEffect(() => {
-    console.log("useEffect [filename, originalFilename] disparado");
     if (!filename) {
-      console.log("filename não existe, abortando fetch.");
       return;
     }
 
     let currentTemplate = template;
-    console.log("Template usado no fetch:", currentTemplate);
 
     fetch("http://localhost:8080/files/pdf-form-data", {
       method: "POST",
@@ -235,20 +255,15 @@ console.log("Service de Saída:", servicoSaida);
       body: JSON.stringify({ filename: originalFilename }),
     })
       .then(res => {
-        console.log("Resposta do backend:", res);
         if (!res.ok) throw new Error("Erro no backend ou ficheiro não encontrado");
         return res.json();
       })
       .then(formData => {
-        console.log("formData recebido:", formData);
         let mainFields, rowNumbers, maxRow, newMainFieldNames;
         if (currentTemplate === tabelas) {
           mainFields = Object.keys(formData).filter(f => /^table2_r\d+_c\d+$/.test(f));
-          console.log("mainFields (tabelas):", mainFields);
           rowNumbers = mainFields.map(f => parseInt(f.match(/^table2_r(\d+)_c\d+$/)[1], 10));
-          console.log("rowNumbers (tabelas):", rowNumbers);
           maxRow = Math.max(...rowNumbers, 1);
-          console.log("maxRow (tabelas):", maxRow);
           newMainFieldNames = [];
           for (let row = 2; row <= maxRow; row++) {
             const rowFields = [];
@@ -259,11 +274,8 @@ console.log("Service de Saída:", servicoSaida);
           }
         } else {
           mainFields = Object.keys(formData).filter(f => /^t2_table2_r\d+_c\d+$/.test(f));
-          console.log("mainFields (tabelasTemplate2):", mainFields);
           rowNumbers = mainFields.map(f => parseInt(f.match(/^t2_table2_r(\d+)_c\d+$/)[1], 10));
-          console.log("rowNumbers (tabelasTemplate2):", rowNumbers);
           maxRow = Math.max(...rowNumbers, 2);
-          console.log("maxRow (tabelasTemplate2):", maxRow);
           newMainFieldNames = [];
           for (let row = 2; row <= maxRow; row++) {
             const rowFields = [];
@@ -274,7 +286,6 @@ console.log("Service de Saída:", servicoSaida);
           }
         }
 
-        console.log("newMainFieldNames:", newMainFieldNames);
 
         setMainFieldNames(newMainFieldNames);
 
@@ -290,7 +301,6 @@ console.log("Service de Saída:", servicoSaida);
                 )
               : Array.from({ length: currentTemplate[0].rows }, () => Array(currentTemplate[0].cols).fill(""))
           };
-          console.log("Novo estado tableData após fetch:", newState);
           return newState;
         });
 
@@ -344,22 +354,18 @@ console.log("Service de Saída:", servicoSaida);
         }
       })
       .catch(err => {
-        console.error("ERRO AO BUSCAR PDF:", err);
       });
   }, [filename, originalFilename]);
 
   // Função para adicionar uma linha à tabela principal (apenas para template 1)
   const handleAddRow = () => {
-    console.log("handleAddRow chamado");
     if (template === tabelas) {
       const newRowIdx = mainFieldNames.length + 2;
       const newFieldRow = Array.from({ length: tabelas[1].cols }, (_, colIdx) =>
         `table2_r${newRowIdx}_c${colIdx + 1}`
       );
-      console.log("Nova linha a adicionar:", newFieldRow);
       setMainFieldNames(prev => {
         const novo = [...prev, newFieldRow];
-        console.log("mainFieldNames após adicionar linha:", novo);
         return novo;
       });
       setTableData(prev => {
@@ -367,7 +373,6 @@ console.log("Service de Saída:", servicoSaida);
           ...prev,
           main: [...prev.main, Array(tabelas[1].cols).fill("")]
         };
-        console.log("tableData após adicionar linha:", novo);
         return novo;
       });
     }
@@ -379,18 +384,13 @@ console.log("Service de Saída:", servicoSaida);
       mainTableHtml: mainTableRef.current ? mainTableRef.current.outerHTML : "",
       obsTableHtml: obsTableRef.current ? obsTableRef.current.outerHTML : ""
     };
-    console.log("getTablesHtml chamado:", obj);
     return obj;
   };
 
   // Logs do estado atual a cada render
-  console.log("tableData atual:", tableData);
-  console.log("mainFieldNames atual:", mainFieldNames);
 
 
 
-  console.log("Service de Entrada:", servicosEntrada);
-  console.log("Service de Saída:", servicoSaida);
 
   return (
     <div>
@@ -408,7 +408,7 @@ console.log("Service de Saída:", servicoSaida);
             setServicoSaida={setServicoSaida}
             indicadores={indicadores}
             donoProcesso={donoProcesso}
-            setDonoProcesso={setDonoProcesso}
+            setDonoProcesso={handleSetDonoProcesso}
             objetivoProcesso={objetivoProcesso}
             setObjetivoProcesso={setObjetivoProcesso}
             handleAtividadesChange={handleAtividadesChange}
