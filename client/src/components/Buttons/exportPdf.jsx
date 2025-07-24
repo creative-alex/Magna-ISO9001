@@ -15,7 +15,8 @@ export default function ExportPdfButton({
   fieldNames,
   exportRef,
   servicosEntrada,
-  servicoSaida
+  servicoSaida,
+  onSaveSuccess // Novo prop para callback após guardar
 }) {
   // Função para preparar os dados para envio ao backend
   const getMainTableFormData = () => {
@@ -95,6 +96,11 @@ export default function ExportPdfButton({
       method: "POST",
       body: formData,
     });
+
+    // Chama o callback para indicar que foi guardado com sucesso
+    if (onSaveSuccess) {
+      onSaveSuccess();
+    }
   };
 
   // Função para pré-visualizar o PDF editável
@@ -138,7 +144,7 @@ export default function ExportPdfButton({
 
   return (
     <button onClick={handleSendToBackend}>
-      Preview PDF Editável
+      Guardar Mudanças
     </button>
   );
 }

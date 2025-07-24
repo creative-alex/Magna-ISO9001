@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { useParams, useLocation } from "react-router-dom";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
 import TabelaPdf from "../pages/tableDisplay";
 import EditableTable from "../components/EditableTable";
 import ExportPdfButton from "../components/Buttons/exportPdf";
@@ -116,6 +116,7 @@ const tabelasTemplate2 = [
 export default function TablePageUnified() {
   const { filename } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
 
 
   const originalFilename =
@@ -161,6 +162,74 @@ const [objetivoProcesso, setObjetivoProcesso] = useState("");
 const [servicosEntrada, setServicosEntrada] = useState("");
 const [servicoSaida, setServicoSaida] = useState("");
 
+// Estado para rastrear se há mudanças não guardadas
+const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+// Effect para prevenir saída da página com mudanças não guardadas
+useEffect(() => {
+  const handleBeforeUnload = (e) => {
+    if (hasUnsavedChanges) {
+      e.preventDefault();
+      e.returnValue = 'Tem alterações não guardadas. Tem a certeza que quer sair?';
+      return 'Tem alterações não guardadas. Tem a certeza que quer sair?';
+    }
+  };
+
+  window.addEventListener('beforeunload', handleBeforeUnload);
+  
+  return () => {
+    window.removeEventListener('beforeunload', handleBeforeUnload);
+  };
+}, [hasUnsavedChanges]);
+
+// Effect separado para interceptar o botão voltar do browser
+useEffect(() => {
+  let isBlocking = false;
+
+  const setupBlocker = () => {
+    if (hasUnsavedChanges && !isBlocking) {
+      isBlocking = true;
+      // Adiciona um estado "guardião" ao histórico
+      window.history.pushState({ blocker: true }, '', window.location.href);
+    } else if (!hasUnsavedChanges && isBlocking) {
+      isBlocking = false;
+      // Remove o estado guardião se não há mudanças
+      if (window.history.state?.blocker) {
+        window.history.back();
+      }
+    }
+  };
+
+  const handlePopState = (event) => {
+    if (hasUnsavedChanges && event.state?.blocker) {
+      // Interceptou o botão voltar
+      const shouldLeave = window.confirm('Tem alterações não guardadas. Tem a certeza que quer sair?');
+      
+      if (shouldLeave) {
+        // Utilizador quer sair - limpa o estado e navega
+        setHasUnsavedChanges(false);
+        isBlocking = false;
+        // Navega para trás (salta o estado blocker)
+        window.history.go(-2);
+      } else {
+        // Utilizador quer ficar - reestabelece o blocker
+        window.history.pushState({ blocker: true }, '', window.location.href);
+      }
+    }
+  };
+
+  setupBlocker();
+  window.addEventListener('popstate', handlePopState);
+
+  return () => {
+    window.removeEventListener('popstate', handlePopState);
+    // Limpa o estado blocker se existir
+    if (isBlocking && window.history.state?.blocker) {
+      window.history.back();
+    }
+  };
+}, [hasUnsavedChanges]);
+
 
 
   // Handlers para Template2
@@ -170,6 +239,7 @@ const [servicoSaida, setServicoSaida] = useState("");
       novo[rowIdx][colIdx] = value;
       return novo;
     });
+    setHasUnsavedChanges(true);
   };
   const handleIndicadoresChange = (rowIdx, value) => {
     setIndicadores(prev => {
@@ -177,6 +247,7 @@ const [servicoSaida, setServicoSaida] = useState("");
       novo[rowIdx][0] = value;
       return novo;
     });
+    setHasUnsavedChanges(true);
   };
 
   // Função para atualizar donoProcesso no backend
@@ -190,7 +261,7 @@ const [servicoSaida, setServicoSaida] = useState("");
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          filename: nomeProcesso,
+          processId: nomeProcesso,
           donoProcesso: newDonoProcesso 
         }),
       });
@@ -212,9 +283,26 @@ const [servicoSaida, setServicoSaida] = useState("");
   const handleSetDonoProcesso = async (newDonoProcesso) => {
     // Atualiza o estado local
     setDonoProcesso(newDonoProcesso);
+    setHasUnsavedChanges(true);
     
     // Atualiza no backend
     await updateDonoProcessoBackend(newDonoProcesso);
+  };
+
+  // Wrappers para outros setters que marcam mudanças
+  const handleSetObjetivoProcesso = (value) => {
+    setObjetivoProcesso(value);
+    setHasUnsavedChanges(true);
+  };
+
+  const handleSetServicosEntrada = (value) => {
+    setServicosEntrada(value);
+    setHasUnsavedChanges(true);
+  };
+
+  const handleSetServicoSaida = (value) => {
+    setServicoSaida(value);
+    setHasUnsavedChanges(true);
   };
 
   // Reinicializa estado quando o template muda
@@ -235,6 +323,8 @@ const [servicoSaida, setServicoSaida] = useState("");
     setObjetivoProcesso("");
     setServicosEntrada("");
     setServicoSaida("");
+    // Reset do estado de mudanças não guardadas
+    setHasUnsavedChanges(false);
   }, [template]);
 
   // Refs para exportação/preview
@@ -352,6 +442,9 @@ const [servicoSaida, setServicoSaida] = useState("");
           setServicosEntrada(formData.servicos_entrada || "");
           setServicoSaida(formData.servico_saida || "");
         }
+
+        // Reset do estado de mudanças após carregar dados
+        setHasUnsavedChanges(false);
       })
       .catch(err => {
       });
@@ -375,6 +468,7 @@ const [servicoSaida, setServicoSaida] = useState("");
         };
         return novo;
       });
+      setHasUnsavedChanges(true);
     }
   };
 
@@ -403,14 +497,14 @@ const [servicoSaida, setServicoSaida] = useState("");
             dataObs={tableData.obs}
             atividades={atividades}
             servicosEntrada={servicosEntrada}
-            setServicosEntrada={setServicosEntrada}
+            setServicosEntrada={handleSetServicosEntrada}
             servicoSaida={servicoSaida}
-            setServicoSaida={setServicoSaida}
+            setServicoSaida={handleSetServicoSaida}
             indicadores={indicadores}
             donoProcesso={donoProcesso}
             setDonoProcesso={handleSetDonoProcesso}
             objetivoProcesso={objetivoProcesso}
-            setObjetivoProcesso={setObjetivoProcesso}
+            setObjetivoProcesso={handleSetObjetivoProcesso}
             handleAtividadesChange={handleAtividadesChange}
             handleIndicadoresChange={handleIndicadoresChange}
             handleChange={
@@ -420,6 +514,7 @@ const [servicoSaida, setServicoSaida] = useState("");
                   newData[rowIdx][colIdx] = value;
                   return { ...prev, main: newData };
                 });
+                setHasUnsavedChanges(true);
               }
             }           
           />
@@ -436,6 +531,7 @@ const [servicoSaida, setServicoSaida] = useState("");
             pathFilename={originalFilename}
             servicosEntrada={servicosEntrada}
             servicoSaida={servicoSaida}
+            onSaveSuccess={() => setHasUnsavedChanges(false)}
           />
           <PreviewPdfButton getTablesHtml={getTablesHtml} />
         </>
@@ -450,6 +546,7 @@ const [servicoSaida, setServicoSaida] = useState("");
                   newData[rowIdx][colIdx] = value;
                   return { ...prev, obs: newData };
                 });
+                setHasUnsavedChanges(true);
               }}
               headersHtml={template[0].headers}
             />
@@ -463,6 +560,7 @@ const [servicoSaida, setServicoSaida] = useState("");
                   newData[rowIdx][colIdx] = value;
                   return { ...prev, main: newData };
                 });
+                setHasUnsavedChanges(true);
               }}
               headersHtml={template[1].headers}
             />
@@ -482,6 +580,7 @@ const [servicoSaida, setServicoSaida] = useState("");
             servicosEntrada={servicosEntrada}
             servicoSaida={servicoSaida}
             fieldNames={mainFieldNames}
+            onSaveSuccess={() => setHasUnsavedChanges(false)}
           />
           <PreviewPdfButton getTablesHtml={getTablesHtml} />
         </>

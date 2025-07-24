@@ -220,29 +220,31 @@ const downloadPdf = async (req, res) => {
 const updateDonoProcesso = async (req, res) => {
   try {
     console.log("updateDonoProcesso chamado");
-    const { filename, donoProcesso } = req.body;
+    const { processId, donoProcesso } = req.body;
     
-    if (!filename || donoProcesso === undefined) {
-      return res.status(400).json({ error: "filename e donoProcesso são obrigatórios" });
+    if (!processId || donoProcesso === undefined) {
+      return res.status(400).json({ error: "processId e donoProcesso são obrigatórios" });
     }
 
-    console.log("Atualizando donoProcesso:", { filename, donoProcesso });
+    console.log("Atualizando donoProcesso:", { processId, donoProcesso });
 
     // Acessa a coleção processos no Firestore
     const db = admin.firestore();
     const processosRef = db.collection('processos');
 
-    // Busca o documento pelo filename
-    const querySnapshot = await processosRef.where('filename', '==', filename).get();
+    // Busca o documento diretamente pelo ID
+    console.log("Procurando documento com ID:", processId);
     
-    if (querySnapshot.empty) {
-      console.log("Documento não encontrado para o filename:", filename);
+    const docRef = processosRef.doc(processId);
+    const docSnapshot = await docRef.get();
+    
+    if (!docSnapshot.exists) {
+      console.log("Documento não encontrado para o ID:", processId);
       return res.status(404).json({ error: "Processo não encontrado" });
     }
 
-    // Atualiza o primeiro documento encontrado
-    const doc = querySnapshot.docs[0];
-    await doc.ref.update({
+    // Atualiza o documento encontrado
+    await docRef.update({
       donoProcesso: donoProcesso,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -256,6 +258,32 @@ const updateDonoProcesso = async (req, res) => {
   }
 };
 
+const getProcessOwners = async (req, res) => {
+  try {
+    console.log("getProcessOwners chamado");
+    
+    // Acessa a coleção processos no Firestore
+    const db = admin.firestore();
+    const processosRef = db.collection('processos');
+    
+    // Busca todos os documentos
+    const snapshot = await processosRef.get();
+    
+    const owners = {};
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      owners[doc.id] = data.donoProcesso || null;
+    });
+    
+    console.log("Donos dos processos:", owners);
+    res.json(owners);
+    
+  } catch (error) {
+    console.error("Erro ao buscar donos dos processos:", error);
+    res.status(500).json({ error: "Erro interno do servidor", details: error.message });
+  }
+};
+
 module.exports = {
   uploadPdf,
   listPdfs,
@@ -264,4 +292,5 @@ module.exports = {
   getPdf,
   downloadPdf,
   updateDonoProcesso,
+  getProcessOwners,
 };

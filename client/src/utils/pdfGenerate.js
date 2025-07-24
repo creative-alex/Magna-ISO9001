@@ -364,10 +364,6 @@ export async function generateNonEditablePdf(data, headers, dataObs) {
   const safeHeaders = Array.isArray(headers) && headers.length > 0 ? headers : ['', '', '', '', ''];
   const safeDataObs = Array.isArray(dataObs) && dataObs.length > 0 ? dataObs : [['']];
   
-  console.log("generateNonEditablePdf - dados recebidos:");
-  console.log("data:", safeData);
-  console.log("headers:", safeHeaders);
-  console.log("dataObs:", safeDataObs);
 
   // Calcule a altura real da tabela de observações
   const fontSize = 6;
@@ -410,7 +406,6 @@ export async function generateNonEditablePdf(data, headers, dataObs) {
   );
   rowHeightsDynamic.unshift(50); // header
   
-  console.log("rowHeightsDynamic calculado:", rowHeightsDynamic);
 
   // Parâmetros de página
   const totalWidth = colWidths.reduce((a, b) => a + b, 0);
