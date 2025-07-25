@@ -35,9 +35,17 @@ export async function generateEditablePdfTemplate1(data, headers, dataObs, heade
   const { pdfDoc, page, font } = await createBasePdf();
   const form = pdfDoc.getForm();
 
+  // Validate and ensure data is an array
+  const safeData = Array.isArray(data) ? data : [];
+  const safeHeaders = Array.isArray(headers) ? headers : [];
+
   // Use obsRows dinâmico
   const obsRows = getObsRows(dataObs);
   const obsTableHeightReal = drawObsTable(page, font, dataObs);
+  
+  console.log("obsRows:", obsRows);
+  console.log("obsTableHeightReal:", obsTableHeightReal);
+  console.log("data.length:", safeData.length);
 
   let yObs = yStart;
   const fontSize = 8;
@@ -71,20 +79,20 @@ export async function generateEditablePdfTemplate1(data, headers, dataObs, heade
   }
 
   // Gere dinamicamente os rowHeights para a tabela principal
-  const rowHeights = Array(data.length + 1).fill(50); // +1 para o header
+  const rowHeights = Array(safeData.length + 1).fill(50); // +1 para o header
 
   // Desenha tabela principal
-  drawTableLines(page, obsTableHeightReal - (obsRowHeight * obsRows), undefined, rowHeights);
-  drawHeaders(page, headers, font, obsTableHeightReal - (obsRowHeight * obsRows), undefined, rowHeights);
+  drawTableLines(page, obsTableHeightReal, undefined, rowHeights);
+  drawHeaders(page, safeHeaders, font, obsTableHeightReal, undefined, rowHeights);
 
   let yPos = yStart - obsTableHeightReal - spaceBetweenTables - rowHeights[0];
-  for (let row = 0; row < data.length; row++) {
+  for (let row = 0; row < safeData.length; row++) {
     let xPos = xStart;
     for (let col = 0; col < 5; col++) {
       const fieldName = `table2_r${row + 2}_c${col + 1}`;
       const textField = form.createTextField(fieldName);
       textField.enableMultiline();
-      textField.setText(data[row][col]);
+      textField.setText(safeData[row] && safeData[row][col] ? safeData[row][col] : "");
       textField.addToPage(page, {
         x: xPos + 2,
         y: yPos - rowHeights[row + 1] + 2,
@@ -233,17 +241,19 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
   const wrappedAtividades = safeAtividades.map(row =>
     row.map((cell, col) => {
       const cellText = (cell || '').toString();
-      return wrapText(cellText, font, fontSize, maxWidths[col] || 80);
+      const maxWidth = maxWidths[col] || 80;
+      return wrapText(cellText, font, fontSize, maxWidth);
     })
   );
   
   const rowHeights = wrappedAtividades.map(row => {
     const heights = row.map(lines => {
+      if (!Array.isArray(lines) || lines.length === 0) return 30;
       const height = lines.length * lineHeight + 8;
-      return isNaN(height) ? 30 : height;
+      return Math.max(30, height);
     });
     const maxHeight = Math.max(...heights, 30);
-    return isNaN(maxHeight) ? 30 : maxHeight;
+    return Math.max(30, maxHeight);
   });
   rowHeights.unshift(40); // header height
 
@@ -278,18 +288,21 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
     }
   }
 
-  // Desenha headers
-  let headerY = yPos - 20;
+  // Desenha headers com melhor alinhamento
+  let headerY = yPos - 25;
   let headerX = xStart;
   headers.forEach((header, col) => {
     const lines = header.split('\n');
     const colWidth = colWidthTemplate2[col];
-    let startY = headerY - 5;
+    
+    // Calcula a altura total do header para centralizar verticalmente
+    const totalHeaderHeight = lines.length * 11;
+    let startY = headerY - 5 + (totalHeaderHeight / 2);
     
     lines.forEach((line, idx) => {
       const textWidth = font.widthOfTextAtSize(line, 9);
       const textX = headerX + (colWidth - textWidth) / 2;
-      const textY = startY - idx * 10;
+      const textY = startY - idx * 11;
       page.drawText(line, {
         x: textX,
         y: textY,
@@ -326,7 +339,9 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
   }
 
   // Desenha indicadores
-  let indicadoresY = dataY - 20;
+  let indicadoresY = dataY - 30;
+  
+  // Título da seção de indicadores
   page.drawText("Indicadores de monitorização do processo", { 
     x: xStart, 
     y: indicadoresY, 
@@ -335,21 +350,49 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
     color: rgb(0, 0, 0),
   });
   
-  indicadoresY -= 20;
+  indicadoresY -= 25;
+  
+  // Desenha uma caixa para os indicadores
+  const indicadoresHeight = Math.max(60, safeIndicadores.length * 40);
+  page.drawRectangle({
+    x: xStart,
+    y: indicadoresY - indicadoresHeight,
+    width: 540,
+    height: indicadoresHeight,
+    borderColor: rgb(0, 0, 0),
+    borderWidth: 1,
+  });
+  
+  let currentIndicadorY = indicadoresY - 15;
   safeIndicadores.forEach((indicador, idx) => {
-    const text = indicador.toString();
-    const lines = wrapText(text, font, fontSize, 550);
-    
-    lines.forEach((line, lineIdx) => {
-      page.drawText(`${idx + 1}. ${lineIdx === 0 ? line : '   ' + line}`, {
-        x: xStart,
-        y: indicadoresY - lineIdx * lineHeight,
+    const text = (indicador || '').toString();
+    if (text.trim()) {
+      const lines = wrapText(text, font, fontSize, 520);
+      
+      const bulletPoint = `${idx + 1}. `;
+      page.drawText(bulletPoint, {
+        x: xStart + 10,
+        y: currentIndicadorY,
         size: fontSize,
         font,
         color: rgb(0, 0, 0),
       });
-    });
-    indicadoresY -= (lines.length * lineHeight + 10);
+      
+      const bulletWidth = font.widthOfTextAtSize(bulletPoint, fontSize);
+      
+      lines.forEach((line, lineIdx) => {
+        page.drawText(line, {
+          x: xStart + 10 + (lineIdx === 0 ? bulletWidth : bulletWidth),
+          y: currentIndicadorY - lineIdx * lineHeight,
+          size: fontSize,
+          font,
+          color: rgb(0, 0, 0),
+        });
+      });
+      currentIndicadorY -= (lines.length * lineHeight + 8);
+    } else {
+      currentIndicadorY -= 20; // Espaço para indicador vazio
+    }
   });
 
   return await pdfDoc.save();
@@ -610,14 +653,14 @@ export async function generateNonEditablePdfFromHtml(mainTableHtml, obsTableHtml
 
 // Adicione esta função utilitária
 export function drawProcessHeaderTable(page, font, yPos, donoProcesso, objetivoProcesso, servicosEntrada, servicoSaida) {
-  // Larguras das colunas
-  const totalWidth = 500;
-  const leftColWidth = 180;
+  // Larguras das colunas ajustadas
+  const totalWidth = 540;
+  const leftColWidth = 200;
   const rightColWidth = totalWidth - leftColWidth;
-  const rowHeight = 32;
-  const headerHeight = 28;
-  const entradaSaidaHeight = 24;
-  const contentHeight = 110;
+  const rowHeight = 35;
+  const headerHeight = 30;
+  const entradaSaidaHeight = 25;
+  const contentHeight = 120;
 
   // DONO DO PROCESSO
   page.drawRectangle({
@@ -637,20 +680,30 @@ export function drawProcessHeaderTable(page, font, yPos, donoProcesso, objetivoP
     borderColor: rgb(0, 0, 0),
     borderWidth: 1,
   });
-  page.drawText('DONO DO PROCESSO\n(nomeado):', {
+  page.drawText('DONO DO PROCESSO', {
     x: xStart + 8,
-    y: yPos - 18,
-    size: 11,
+    y: yPos - 12,
+    size: 10,
     font,
     color: rgb(0, 0, 0),
-    fontWeight: 'bold',
   });
-  page.drawText(donoProcesso || '', {
-    x: xStart + leftColWidth + 8,
-    y: yPos - 18,
-    size: 11,
+  page.drawText('(nomeado):', {
+    x: xStart + 8,
+    y: yPos - 24,
+    size: 10,
     font,
     color: rgb(0, 0, 0),
+  });
+  
+  const donoWrapped = wrapText(donoProcesso || '', font, 10, rightColWidth - 16);
+  donoWrapped.forEach((line, idx) => {
+    page.drawText(line, {
+      x: xStart + leftColWidth + 8,
+      y: yPos - 15 - (idx * 12),
+      size: 10,
+      font,
+      color: rgb(0, 0, 0),
+    });
   });
 
   // OBJETIVO DO PROCESSO
@@ -673,19 +726,21 @@ export function drawProcessHeaderTable(page, font, yPos, donoProcesso, objetivoP
   });
   page.drawText('OBJETIVO DO PROCESSO:', {
     x: xStart + 8,
-    y: yPos - headerHeight - 18,
-    size: 11,
+    y: yPos - headerHeight - 20,
+    size: 10,
     font,
     color: rgb(0, 0, 0),
-    fontWeight: 'bold',
   });
-  page.drawText(objetivoProcesso || '', {
-    x: xStart + leftColWidth + 8,
-    y: yPos - headerHeight - 18,
-    size: 11,
-    font,
-    color: rgb(0, 0, 0),
-    maxWidth: rightColWidth - 16,
+  
+  const objetivoWrapped = wrapText(objetivoProcesso || '', font, 10, rightColWidth - 16);
+  objetivoWrapped.forEach((line, idx) => {
+    page.drawText(line, {
+      x: xStart + leftColWidth + 8,
+      y: yPos - headerHeight - 15 - (idx * 12),
+      size: 10,
+      font,
+      color: rgb(0, 0, 0),
+    });
   });
 
   // SERVIÇOS DE ENTRADAS / SAÍDA - Cabeçalho
@@ -709,19 +764,17 @@ export function drawProcessHeaderTable(page, font, yPos, donoProcesso, objetivoP
   });
   page.drawText('SERVIÇOS DE ENTRADAS', {
     x: xStart + 8,
-    y: yPos - headerHeight - rowHeight - 14,
-    size: 11,
+    y: yPos - headerHeight - rowHeight - 16,
+    size: 10,
     font,
     color: rgb(0, 0, 0),
-    fontWeight: 'bold',
   });
   page.drawText('SERVIÇO DE SAÍDA', {
     x: xStart + leftColWidth + 8,
-    y: yPos - headerHeight - rowHeight - 14,
-    size: 11,
+    y: yPos - headerHeight - rowHeight - 16,
+    size: 10,
     font,
     color: rgb(0, 0, 0),
-    fontWeight: 'bold',
   });
 
   // SERVIÇOS DE ENTRADAS / SAÍDA - Conteúdo
@@ -742,35 +795,39 @@ export function drawProcessHeaderTable(page, font, yPos, donoProcesso, objetivoP
     borderWidth: 1,
   });
 
-  // Texto dos serviços (ajuste wrapText conforme necessário)
-  let fontSize = 10;
-  let entradaLines = (servicosEntrada || '').split('\n');
-  let saidaLines = (servicoSaida || '').split('\n');
-  let entradaY = yPos - headerHeight - rowHeight - entradaSaidaHeight - 18;
+  // Texto dos serviços com quebra de linha adequada
+  let fontSize = 9;
+  
+  const entradaWrapped = wrapText(servicosEntrada || '', font, fontSize, leftColWidth - 16);
+  const saidaWrapped = wrapText(servicoSaida || '', font, fontSize, rightColWidth - 16);
+  
+  let entradaY = yPos - headerHeight - rowHeight - entradaSaidaHeight - 15;
   let saidaY = entradaY;
-  entradaLines.forEach(line => {
-    page.drawText(line, {
-      x: xStart + 8,
-      y: entradaY,
-      size: fontSize,
-      font,
-      color: rgb(0, 0, 0),
-      maxWidth: leftColWidth - 16,
-    });
-    entradaY -= 14;
+  
+  entradaWrapped.forEach((line, idx) => {
+    if (entradaY - (idx * 12) > yPos - headerHeight - rowHeight - entradaSaidaHeight - contentHeight + 5) {
+      page.drawText(line, {
+        x: xStart + 8,
+        y: entradaY - (idx * 12),
+        size: fontSize,
+        font,
+        color: rgb(0, 0, 0),
+      });
+    }
   });
-  saidaLines.forEach(line => {
-    page.drawText(line, {
-      x: xStart + leftColWidth + 8,
-      y: saidaY,
-      size: fontSize,
-      font,
-      color: rgb(0, 0, 0),
-      maxWidth: rightColWidth - 16,
-    });
-    saidaY -= 14;
+  
+  saidaWrapped.forEach((line, idx) => {
+    if (saidaY - (idx * 12) > yPos - headerHeight - rowHeight - entradaSaidaHeight - contentHeight + 5) {
+      page.drawText(line, {
+        x: xStart + leftColWidth + 8,
+        y: saidaY - (idx * 12),
+        size: fontSize,
+        font,
+        color: rgb(0, 0, 0),
+      });
+    }
   });
 
   // Retorne a nova posição Y para continuar desenhando abaixo
-  return yPos - headerHeight - rowHeight - entradaSaidaHeight - contentHeight - 20;
+  return yPos - headerHeight - rowHeight - entradaSaidaHeight - contentHeight - 25;
 }

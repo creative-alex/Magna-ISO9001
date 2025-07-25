@@ -111,13 +111,13 @@ export default function Template2({
     </tr>
   </thead>
   <tbody>
-    {(indicadores || []).map((row, rowIdx) => (
+    {(indicadores || []).map((indicador, rowIdx) => (
       <tr key={rowIdx}>
         <td>
           <textarea
             className="tabela-indicadores-textarea"
             style={{ minHeight: 30 }}
-            value={row[0]}
+            value={indicador}
             onChange={e => handleIndicadoresChange(rowIdx, e.target.value)}
           />
         </td>

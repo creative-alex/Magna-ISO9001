@@ -67,6 +67,21 @@ export default function ExportPdfButton({
       servicoSaida
     });
 
+    // Fazer download local do PDF editável
+    const blob = new Blob([editablePdfBytes], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    
+    // Criar um elemento de link temporário para fazer download
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = pathFilename ? pathFilename.replace(/\//g, '_') + '_editavel.pdf' : 'documento_editavel.pdf';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Liberar a URL do objeto
+    URL.revokeObjectURL(url);
+
     const formData = new FormData();
     formData.append("file", new Blob([editablePdfBytes], { type: "application/pdf" }), filename);
     formData.append("folders", JSON.stringify(folders));

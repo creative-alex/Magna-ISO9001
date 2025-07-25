@@ -83,6 +83,7 @@ code {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  font-size: 12px;
 }
 
 .file-name {
@@ -203,18 +204,45 @@ code {
   background: #f7fafc;
   border-radius: 8px;
   box-shadow: 0 1px 6px #0001;
+  table-layout: fixed;
 }
 
 .tabela-atividades th,
 .tabela-atividades td {
   border: 1px solid #d6dbe3;
   padding: 8px 6px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .tabela-atividades th {
   background: #e9f2fb;
   color: #2d3a5a;
   font-weight: 500;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* Larguras específicas para as colunas do Template 2 */
+.tabela-atividades th:nth-child(1),
+.tabela-atividades td:nth-child(1) {
+  width: 25%;
+}
+
+.tabela-atividades th:nth-child(2),
+.tabela-atividades td:nth-child(2) {
+  width: 20%;
+}
+
+.tabela-atividades th:nth-child(3),
+.tabela-atividades td:nth-child(3),
+.tabela-atividades th:nth-child(4),
+.tabela-atividades td:nth-child(4),
+.tabela-atividades th:nth-child(5),
+.tabela-atividades td:nth-child(5),
+.tabela-atividades th:nth-child(6),
+.tabela-atividades td:nth-child(6) {
+  width: 13.75%;
 }
 
 .tabela-indicadores {
@@ -248,6 +276,16 @@ code {
   padding: 6px;
   font-size: 0.98rem;
   background: #fff;
+  font-family: inherit;
+  line-height: 1.4;
+}
+
+.tabela-processo textarea:focus,
+.tabela-indicadores textarea:focus,
+.tabela-atividades input[type="text"]:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
 }
 
 .tabela-atividades input[type="text"] {
@@ -257,4 +295,8 @@ code {
   padding: 5px;
   font-size: 0.97rem;
   background: #fff;
+  min-height: 24px;
+  resize: none;
+  overflow: hidden;
+  word-wrap: break-word;
 }

@@ -6,8 +6,8 @@ export const obsColWidth = [500];
 export const obsRowHeight = 25;
 export const spaceBetweenTables = 30;
 
-// Template 2
-export const colWidthTemplate2 = [80, 80, 80, 80, 80, 80];
+// Template 2 - Larguras ajustadas para melhor distribuição do conteúdo
+export const colWidthTemplate2 = [120, 100, 80, 80, 80, 80];
 
 // Função para obter o número de linhas da tabela de observações
 export function getObsRows(dataObs) {
@@ -80,25 +80,41 @@ export function drawObsTable(page, font, dataObs) {
 }
 
 // Função para desenhar as linhas da tabela principal
-export function drawTableLines(page, yOffset = 0, yOrigin = null, rowHeights = []) {
+export function drawTableLines(page, obsTableHeight, yOrigin = null, rowHeights = []) {
+  // Validate inputs to prevent NaN
+  if (!Array.isArray(rowHeights) || rowHeights.length === 0) {
+    rowHeights = [50]; // Default height
+  }
+  
+  const safeObsTableHeight = typeof obsTableHeight === 'number' && !isNaN(obsTableHeight) ? obsTableHeight : 0;
   const totalWidth = colWidths.reduce((a, b) => a + b, 0);
-  let yPos = yOrigin !== null ? yOrigin : yStart - drawObsTable.lastTableHeight - spaceBetweenTables - yOffset;
+  let yPos = yOrigin !== null ? yOrigin : yStart - safeObsTableHeight - spaceBetweenTables;
+  
+  console.log("drawTableLines - obsTableHeight:", safeObsTableHeight);
+  console.log("drawTableLines - yPos start:", yPos);
+  console.log("drawTableLines - rowHeights:", rowHeights);
 
   for (let i = 0; i <= rowHeights.length; i++) {
+    const currentY = yPos - (rowHeights.slice(0, i).reduce((a, b) => a + (b || 0), 0));
+    console.log(`Drawing horizontal line ${i} at y: ${currentY}`);
     page.drawLine({
-      start: { x: xStart, y: yPos },
-      end: { x: xStart + totalWidth, y: yPos },
+      start: { x: xStart, y: currentY },
+      end: { x: xStart + totalWidth, y: currentY },
       thickness: 1,
       color: rgb(0, 0, 0),
     });
-    yPos -= rowHeights[i] || 0;
   }
 
   let xPos = xStart;
+  const startY = yOrigin !== null ? yOrigin : yStart - safeObsTableHeight - spaceBetweenTables;
+  const endY = startY - rowHeights.reduce((a, b) => a + (b || 0), 0);
+  
+  console.log("drawTableLines - vertical lines startY:", startY, "endY:", endY);
+  
   for (let j = 0; j <= colWidths.length; j++) {
     page.drawLine({
-      start: { x: xPos, y: yOrigin !== null ? yOrigin : yStart - drawObsTable.lastTableHeight - spaceBetweenTables - yOffset },
-      end: { x: xPos, y: (yOrigin !== null ? yOrigin : yStart - drawObsTable.lastTableHeight - spaceBetweenTables - yOffset) - rowHeights.reduce((a, b) => a + b, 0) },
+      start: { x: xPos, y: startY },
+      end: { x: xPos, y: endY },
       thickness: 1,
       color: rgb(0, 0, 0),
     });
@@ -107,14 +123,21 @@ export function drawTableLines(page, yOffset = 0, yOrigin = null, rowHeights = [
 }
 
 // Função para desenhar os cabeçalhos da tabela principal
-export function drawHeaders(page, headers, font, yOffset = 0, yOrigin = null, rowHeights = []) {
+export function drawHeaders(page, headers, font, obsTableHeight, yOrigin = null, rowHeights = []) {
+  // Validate inputs
+  const safeHeaders = Array.isArray(headers) ? headers : [];
+  const safeRowHeights = Array.isArray(rowHeights) && rowHeights.length > 0 ? rowHeights : [50];
+  const safeObsTableHeight = typeof obsTableHeight === 'number' && !isNaN(obsTableHeight) ? obsTableHeight : 0;
+  
   let xPos = xStart;
-  const yHeaders = yOrigin !== null ? yOrigin : yStart - drawObsTable.lastTableHeight - spaceBetweenTables - yOffset;
-  const headerHeight = rowHeights[0];
+  const yHeaders = yOrigin !== null ? yOrigin : yStart - safeObsTableHeight - spaceBetweenTables;
+  const headerHeight = safeRowHeights[0] || 50;
 
-  headers.forEach((header, col) => {
+  console.log("drawHeaders - yHeaders:", yHeaders, "headerHeight:", headerHeight);
+
+  safeHeaders.forEach((header, col) => {
     const lines = header.split('\n');
-    const colWidth = colWidths[col];
+    const colWidth = colWidths[col] || 100; // Default width if undefined
     const fontSize = 10;
     const lineHeight = 12;
     const totalTextHeight = lines.length * lineHeight;
@@ -134,7 +157,7 @@ export function drawHeaders(page, headers, font, yOffset = 0, yOrigin = null, ro
       });
     });
 
-    xPos += colWidths[col];
+    xPos += colWidths[col] || 100;
   });
 }
 

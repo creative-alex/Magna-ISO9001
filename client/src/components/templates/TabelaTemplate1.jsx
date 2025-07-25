@@ -21,7 +21,6 @@ export default function Template1({
     <>
       <EditableTable data={dataObs} onChange={handleChangeObs} headersHtml={headersHtmlObs} />
       <EditableTable data={data} onChange={handleChange} headersHtml={headersHtml} />
-
     </>
   );
 }
