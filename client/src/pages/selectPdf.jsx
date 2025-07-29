@@ -326,6 +326,19 @@ export default function SelecionarPdf() {
       />
       <div className="pdf-panel">
         <div className="panel-title">Índice</div>
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+          <button className="createUser-button" onClick={() => navigate('/create-user')}>+ Utilizador</button>
+          {isAdmin && (
+            <button 
+              className="createUser-button" 
+              onClick={() => navigate('/create-process')}
+              style={{ backgroundColor: '#28a745' }}
+            >
+              + Processo
+            </button>
+          )}
+        </div>
+
         <FolderStructure 
           nodes={filteredTree} 
           onSelectFile={handleSelectFile} 

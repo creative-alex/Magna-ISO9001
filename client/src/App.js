@@ -1,9 +1,12 @@
 import React, { useContext } from "react";
-import Login from './features/Auth/login';
+import Login from './components/Auth/login';
 import { Routes, Route, useNavigate } from "react-router-dom";
 import SelecionarPdf from "./pages/selectPdf";
 import TablePage from "./components/tabelaPDF"; 
+import CreateProcess from "./pages/createProcess";
+import Register from "./components/Auth/register";
 import { UserContext } from "./context/userContext";
+import createUser from "./components/Auth/register"
 import './App.css';
 
 function App() {
@@ -25,6 +28,8 @@ function App() {
         <Route path="/superadmin" element={<SelecionarPdf />} />
         <Route path="/superadmin/:filename" element={<TablePage />} />
         <Route path="/table/:filename" element={<TablePage />} />
+        <Route path="/create-process" element={<CreateProcess />} />
+        <Route path="/create-user" element={<Register />} />
       </Routes>
   );
 };
