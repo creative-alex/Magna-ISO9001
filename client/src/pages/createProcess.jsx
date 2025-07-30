@@ -137,7 +137,7 @@ export default function CreateProcess() {
       }
 
       // 5. Redirecionar para a lista de PDFs
-      navigate('/superadmin');
+      navigate('/file');
       
     } catch (error) {
       console.error('Erro ao criar processo:', error);
@@ -385,7 +385,7 @@ export default function CreateProcess() {
       <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
         <button
           type="button"
-          onClick={() => navigate('/superadmin')}
+          onClick={() => navigate('/file')}
           style={{ 
             padding: '12px 24px', 
             backgroundColor: '#6c757d', 

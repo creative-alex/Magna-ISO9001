@@ -1,6 +1,9 @@
 import React, { useEffect, useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { UserContext } from "../context/userContext";
+import userAddIcon from "../user_add.ico";
+import fileAddIcon from "../file_add.ico";
+import downloadIcon from "../download.ico";
 import "../index.css";
 
 // Função recursiva para filtrar nodes por nome
@@ -61,7 +64,6 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
               className={`folder-header ${expandedFolder === folder.name ? 'active' : ''}`}
               onClick={() => toggleFolder(folder.name)}
             >
-              <span className="arrow">{expandedFolder === folder.name ? '▾' : '▸'}</span>
               <span className="folder-name">
                 {folder.name}
               </span>
@@ -87,17 +89,18 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
         const hasAccess = canAccessProcess(filePath);
         
         return (
-          <div key={file.name} className="file">
+          <div 
+            key={file.name} 
+            className={`file ${hasAccess ? 'file-clickable' : ''}`}
+            onClick={hasAccess ? () => onSelectFile(filePath) : undefined}
+            style={{ cursor: hasAccess ? 'pointer' : 'default' }}
+          >
             <span className="file-name">{file.name}</span>
             <div className="file-actions">
-              {hasAccess ? (
-                <button onClick={() => onSelectFile(filePath)}>👁️</button>
-              ) : (
-                <button></button>
-              )}
               <button
-                onClick={async () => {
-                    try {
+                onClick={async (e) => {
+                  e.stopPropagation(); // Evita trigger do onClick do div pai
+                  try {
                       const filePath = [...currentPath, file.name].join("/");
                       
                       // 1. Primeiro, carrega os dados do PDF
@@ -272,7 +275,7 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
                       alert("Erro ao gerar preview do PDF. Tente novamente.");
                     }
                   }}
-                >⬇️</button>
+                ><img src={downloadIcon} alt="Baixar PDF" style={{ width: '16px', height: '16px' }} /></button>
             </div>
           </div>
         );
@@ -308,7 +311,7 @@ export default function SelecionarPdf() {
   const handleSelectFile = (filePath) => {
     // Substitui espaços por '-', barras por '__'
     const formattedPath = filePath.replace(/\s/g, '-').replace(/\//g, '__');
-    navigate(`/superadmin/${formattedPath}`, { state: { originalFilename: filePath } });
+    navigate(`/file/${formattedPath}`, { state: { originalFilename: filePath } });
   };
 
   // Filtra a árvore conforme o termo de busca
@@ -316,29 +319,27 @@ export default function SelecionarPdf() {
 
   return (
     <div className="pdf-container">
-      <h2 className="title">Titulo Titulado</h2>
+      <h2 className="title">SISTEMA ISO 9001</h2>
       <input
         type="text"
-        placeholder="Buscar arquivo ou pasta..."
+        placeholder="Encontrar arquivo ou pasta..."
         value={searchTerm}
         onChange={e => setSearchTerm(e.target.value)}
-        style={{ marginBottom: "1rem", width: "100%", padding: "0.5rem" }}
       />
       <div className="pdf-panel">
+       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
         <div className="panel-title">Índice</div>
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-          <button className="createUser-button" onClick={() => navigate('/create-user')}>+ Utilizador</button>
-          {isAdmin && (
-            <button 
-              className="createUser-button" 
-              onClick={() => navigate('/create-process')}
-              style={{ backgroundColor: '#28a745' }}
-            >
-              + Processo
+        {isAdmin && (
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button className="createUser-button" onClick={() => navigate('/create-user')}>
+              <img src={userAddIcon} alt="Adicionar Utilizador" style={{ width: '16px', height: '16px', marginRight: '5px' }} />
             </button>
-          )}
-        </div>
-
+            <button className="createUser-button" onClick={() => navigate('/create-process')}>
+              <img src={fileAddIcon} alt="Adicionar Processo" style={{ width: '16px', height: '16px', marginRight: '5px' }} />
+            </button>
+          </div>
+        )}
+      </div>
         <FolderStructure 
           nodes={filteredTree} 
           onSelectFile={handleSelectFile} 

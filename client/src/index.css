@@ -1,237 +1,619 @@
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  min-height: 100vh;          
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 20px;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
-}
-
-
-.pdf-container {
+.pdf-container, .template2-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
   padding: 40px;
-  font-family: Arial, sans-serif;
-  background-color: #f5f8fc;
+  width: 80vw;
+  max-width: 900px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+  margin: 20px;
 }
 
 .title {
-  text-align: center;
-  font-size: 24px;
-  font-weight: bold;
+  font-size: 2.2rem;
+  font-weight: 600;
+  color: #2c5aa0;
   margin-bottom: 30px;
-  color: #0f1e54;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-bottom: 3px solid #e6f2ff;
+  padding-bottom: 15px;
+  width: 100%;
+}
+
+.pdf-container input {
+  margin: 20px 0 30px 0;
+  padding: 15px 20px;
+  border: 2px solid ;
+  border-radius: 8px;
+  width: 100%;
+  height: 6svh;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+  color: #495057;
+}
+
+.pdf-container input:focus {
+  outline: none;
+  border-color: #2c5aa0;
+  box-shadow: 0 0 0 3px rgba(44, 90, 160, 0.15);
+  background: white;
 }
 
 .pdf-panel {
-  background-color: white;
+  width: 100%;
+  background: #ffffff;
   border-radius: 8px;
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.1);
-  padding: 20px;
-  max-width: 800px;
-  margin: 0 auto;
+  padding: 30px;
+  border: 1px solid #e6e6e6;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-sizing: border-box;
 }
 
 .panel-title {
-  font-weight: bold;
-  font-size: 18px;
-  margin-bottom: 15px;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #2c5aa0;
+  margin-bottom: 25px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.createUser-button {
+  background-color: transparent;
+  border: none;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.createUser-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(44, 90, 160, 0.4);
 }
 
 .folder-structure {
-  padding-left: 10px;
+  width: 100%;
 }
 
 .folder {
   margin-bottom: 8px;
+  border-color: #ced4da;
 }
 
 .folder-header {
-  cursor: pointer;
-  background-color: #e9f0f8;
-  padding: 10px;
-  border-radius: 4px;
-  font-weight: bold;
-  color: #0f1e54;
   display: flex;
   align-items: center;
+  padding: 15px 20px;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 600;
+  font-size: 15px;
+  height: 3vh;
+  margin-bottom: 2px;
+  position: relative;
 }
 
-.folder-header.active {
-  background-color: #d1e4f7;
+.folder-header:hover {
+  background: #99ccff;
+  border-color: #66b3ff;
+  transform: none;
+}
+
+.folder-header.active .arrow {
+  transform: rotate(90deg);
 }
 
 .folder-name {
-  margin-left: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .folder-content {
-  margin-left: 20px;
-  margin-top: 5px;
+  margin-left: 0;
+  margin-top: 0;
+  border-left: none;
+  padding-left: 0;
 }
 
 .file {
-  background-color: #f7f9fc;
-  border: 1px solid #dce3ee;
-  padding: 8px 12px;
-  border-radius: 4px;
-  margin: 4px 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 12px;
-}
-
-.file-name {
-  color: #213d77;
-}
-
-.file-actions button {
-  margin-left: 5px;
-  cursor: pointer;
-  border: none;
-  background: none;
-  font-size: 16px;
-}
-
-
-/* Container geral para centrar e limitar a largura */
-.editable-table-container {
-  max-width: 960px;
-  margin: 40px auto;
-  padding: 0 24px;
-}
-
-/* Tabela principal */
-.editable-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
-  font-family: 'Inter', 'Segoe UI', Tahoma, sans-serif;
-  background-color: #fff;
-  border: 1px solid #e5e7eb;
-}
-
-/* Cabeçalho da tabela */
-.editable-table-header {
-  background-color: #f9fafb;
-  color: #111827;
-  font-weight: 600;
-  font-size: 14px;
-  text-align: left;
-  padding: 16px;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-/* Linhas da tabela */
-.editable-table-row {
-  background-color: #ffffff;
-  transition: background-color 0.2s ease;
-}
-.editable-table-row:nth-child(even) {
-  background-color: #f8fafc;
-}
-.editable-table-row:hover {
-  background-color: #eef2f7;
-}
-
-/* Células com textarea */
-.editable-table-cell {
-  position: relative;
-  padding: 0;
-  border-bottom: 1px solid #e5e7eb;
-  vertical-align: top;
-}
-
-/* Textarea ocupa 100% da célula */
-.editable-table-textarea {
-  width: 100%;
-  height: 100%;
-  min-height: 60px;
-  padding: 12px 14px;
-  font-size: 14px;
-  font-family: inherit;
-  border: none;
-  outline: none;
-  background-color: transparent;
-  box-sizing: border-box;
-  resize: vertical;
+  padding: 12px 20px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  margin-top: 10px;
+  margin-bottom: 10px;
   transition: all 0.2s ease;
 }
 
-/* Quando em foco, estiliza de forma limpa */
-.editable-table-textarea:focus {
-  background-color: #fff;
-  box-shadow: inset 0 0 0 2px #3b82f6;
-  border-radius: 6px;
+.file:hover {
+  background: #f0f8ff;
+  border-color: #cce5ff;
+  transform: none;
 }
 
-
-.tabela-processo {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 24px;
-  background: #f9f9fb;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px #0001;
+.file-clickable {
+  cursor: pointer !important;
 }
 
-.tabela-processo th,
-.tabela-processo td {
-  border: 1px solid #e0e0e0;
-  padding: 10px 8px;
+.file-clickable:hover {
+  background: #e6f3ff !important;
+  border-color: #99ccff !important;
+  box-shadow: 0 2px 8px rgba(44, 90, 160, 0.15);
 }
 
-.tabela-processo th {
-  background: #e5e9f7;
-  color: #2d3a5a;
+.file-clickable .file-name {
+  color: #2c5aa0;
+  transition: color 0.3s ease;
+}
+
+.file-clickable:hover .file-name {
+  color: #1e3a5f;
   font-weight: 600;
-  font-size: 1rem;
 }
 
-.tabela-atividades {
+.file:not(.file-clickable) {
+  cursor: default;
+}
+
+.file-name {
+  font-size: 14px;
+  color: #333333;
+  font-weight: 500;
+  flex-grow: 1;
+  margin-right: 15px;
+  word-break: break-word;
+}
+
+.file-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.file-actions button {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 16px;
+  min-width: 40px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.file-actions button:hover {
+  background: #e2e6ea;
+  transform: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.file-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.3;
+  background: #f8f9fa;
+}
+
+.file-actions button:disabled:hover {
+  background: #f8f9fa;
+  box-shadow: none;
+  transform: none;
+}
+
+.file-actions button:nth-child(1):hover {
+  background: #cce5ff;
+  border-color: #99ccff;
+}
+
+.file-actions button:nth-child(2):hover {
+  background: #d4edda;
+  border-color: #a3cfbb;
+}
+
+.file-actions button:active {
+  transform: none;
+}
+
+/* Estilos adicionais para simular a interface da imagem */
+.folder-header::after {
+  content: "";
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid #2c5aa0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform 0.2s ease;
+}
+
+.folder-header.active::after {
+  transform: translateY(-50%) rotate(90deg);
+}
+
+.file::before {
+  content: "";
+  width: 4px;
+  height: 4px;
+  background: #999;
+  border-radius: 50%;
+  margin-right: 12px;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+/* Hierarquia visual como na imagem */
+.folder-content .folder-header {
+  margin-left: 20px;
+  margin-top: 10px;
+  color: #2c5aa0;
+}
+
+.folder-content .folder-content .folder-header {
+  background: #e6f2ff;
+  margin-left: 40px;
+}
+
+.folder-content .file {
+  margin-left: 20px;
+}
+
+.folder-content .folder-content .file {
+  margin-left: 40px;
+  background: #fafcff;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  body {
+    padding: 10px;
+  }
+  
+  .pdf-container {
+    width: 95vw;
+    padding: 20px;
+    margin: 10px;
+    border-radius: 8px;
+  }
+  
+  .title {
+    font-size: 1.6rem;
+    margin-bottom: 20px;
+  }
+  
+  .pdf-panel {
+    padding: 20px;
+  }
+  
+  .panel-title {
+    font-size: 1.2rem;
+  }
+  
+  .createUser-button {
+    padding: 8px 16px;
+    font-size: 12px;
+  }
+  
+  /* Responsividade específica para tabela de atividades */
+  .tabela-atividades {
+    font-size: 12px;
+  }
+  
+  .tabela-atividades th,
+  .tabela-atividades td {
+    padding: 8px 10px;
+    min-width: 120px;
+  }
+  
+  .tabela-atividades-input {
+    font-size: 12px;
+    padding: 8px 10px;
+    min-height: 35px;
+  }
+  
+  .folder-content .folder-header {
+    margin-left: 10px;
+  }
+  
+  .folder-content .folder-content .folder-header {
+    margin-left: 20px;
+  }
+  
+  .folder-header {
+    padding: 12px 15px;
+    font-size: 14px;
+  }
+  
+  .file {
+    padding: 10px 15px;
+    min-height: 45px;
+  }
+  
+  .file-name {
+    font-size: 13px;
+    margin-right: 10px;
+  }
+  
+  .file-actions {
+    gap: 6px;
+  }
+  
+  .file-actions button {
+    min-width: 36px;
+    height: 32px;
+    font-size: 14px;
+    padding: 6px 8px;
+  }
+  
+  .folder-content .file {
+    margin-left: 10px;
+  }
+  
+  .folder-content .folder-content .file {
+    margin-left: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  body {
+    padding: 5px;
+  }
+  
+  .pdf-container {
+    width: 100vw;
+    margin: 0;
+    border-radius: 0;
+    padding: 15px;
+    min-height: 100vh;
+    box-sizing: border-box;
+  }
+  
+  .title {
+    font-size: 1.4rem;
+    margin-bottom: 15px;
+    letter-spacing: 0.5px;
+  }
+  
+  .pdf-container input {
+    font-size: 16px; /* Evita zoom no iOS */
+    padding: 12px 15px;
+    margin: 15px 0 20px 0;
+  }
+  
+  .pdf-panel {
+    padding: 15px;
+  }
+  
+  .panel-title {
+    font-size: 1.1rem;
+  }
+  
+  .createUser-button {
+    font-size: 11px;
+    padding: 6px 12px;
+  }
+  
+  /* Tabela de atividades em mobile - layout empilhado */
+  .tabela-atividades {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .tabela-atividades thead {
+    display: none; /* Esconde cabeçalhos em mobile */
+  }
+  
+  .tabela-atividades tbody,
+  .tabela-atividades tr,
+  .tabela-atividades td {
+    display: block;
+    width: 100%;
+  }
+  
+  .tabela-atividades tr {
+    border: 1px solid #e1e7f0;
+    margin-bottom: 15px;
+    padding: 10px;
+    border-radius: 6px;
+    background: #fff;
+  }
+  
+  .tabela-atividades td {
+    border: none;
+    padding: 8px 0;
+    position: relative;
+    min-width: auto;
+  }
+  
+  .tabela-atividades td:before {
+    content: attr(data-label);
+    position: absolute;
+    left: 0;
+    top: 8px;
+    width: 100%;
+    font-weight: 600;
+    color: #2c5aa0;
+    font-size: 11px;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+  
+  .tabela-atividades-input {
+    margin-top: 20px;
+    font-size: 14px;
+    min-height: 40px;
+  }
+  
+  .folder-header {
+    font-size: 13px;
+    padding: 10px 12px;
+  }
+  
+  .folder-content .folder-header,
+  .folder-content .folder-content .folder-header {
+    margin-left: 0;
+  }
+  
+  .file {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px 15px;
+    min-height: auto;
+  }
+  
+  .file-name {
+    width: 100%;
+    margin-right: 0;
+    margin-bottom: 5px;
+    font-size: 12px;
+  }
+  
+  .file-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  
+  .folder-content .file,
+  .folder-content .folder-content .file {
+    margin-left: 0;
+  }
+  
+  .file::before {
+    display: none; /* Remove bullet points em mobile */
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* Estilo Base para Todas as Tabelas */
+.tabela-processo,
+.tabela-atividades,
+.tabela-indicadores {
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 24px;
-  background: #f7fafc;
-  border-radius: 8px;
-  box-shadow: 0 1px 6px #0001;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
   table-layout: fixed;
 }
 
+/* Container responsivo para tabela de atividades */
+.tabela-atividades {
+  display: block;
+  max-width: 100%;
+  white-space: normal;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Corrige layout interno da tabela de atividades */
+.tabela-atividades thead,
+.tabela-atividades tbody,
+.tabela-atividades tr {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+}
+
+/* Cabeçalhos */
+.tabela-processo th,
 .tabela-atividades th,
-.tabela-atividades td {
-  border: 1px solid #d6dbe3;
-  padding: 8px 6px;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
+.tabela-indicadores th {
+  background-color: #2c5aa0;
+  color: #fff;
+  padding: 12px 16px;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 13px;
+  border: none;
+  letter-spacing: 0.3px;
+  text-align: left;
+  white-space: normal;
 }
 
+/* Cabeçalhos específicos da tabela de atividades - permite quebra de linha */
 .tabela-atividades th {
-  background: #e9f2fb;
-  color: #2d3a5a;
-  font-weight: 500;
-  font-size: 0.9rem;
-  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  box-sizing: border-box;
+  word-wrap: break-word;
 }
 
-/* Larguras específicas para as colunas do Template 2 */
+
+/* Larguras específicas para colunas da tabela de atividades */
 .tabela-atividades th:nth-child(1),
 .tabela-atividades td:nth-child(1) {
   width: 25%;
+  min-width: 200px;
 }
 
 .tabela-atividades th:nth-child(2),
 .tabela-atividades td:nth-child(2) {
-  width: 20%;
+  width: 25%;
+  min-width: 200px;
 }
 
 .tabela-atividades th:nth-child(3),
@@ -242,61 +624,268 @@ code {
 .tabela-atividades td:nth-child(5),
 .tabela-atividades th:nth-child(6),
 .tabela-atividades td:nth-child(6) {
-  width: 13.75%;
+  width: 12.5%;
+  min-width: 150px;
 }
 
-.tabela-indicadores {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 24px;
-  background: #f9f9fb;
-  border-radius: 8px;
-  box-shadow: 0 1px 6px #0001;
-}
-
-.tabela-indicadores th,
+/* Células */
+.tabela-processo td,
+.tabela-atividades td,
 .tabela-indicadores td {
-  border: 1px solid #e0e0e0;
-  padding: 10px 8px;
+  background-color: #fff;
+  padding: 10px 14px;
+  border: 1px solid #e1e7f0;
+  vertical-align: top;
+  font-size: 14px;
 }
 
-.tabela-indicadores th {
-  background: #e5e9f7;
-  color: #2d3a5a;
-  font-weight: 600;
-}
-
-.tabela-processo textarea,
-.tabela-indicadores textarea {
+/* Textareas e Inputs - Estilo comum */
+.tabela-processo-textarea,
+.tabela-indicadores-textarea,
+.tabela-atividades-input {
   width: 100%;
-  min-height: 40px;
-  resize: vertical;
+  border: 1px solid #ced4da;
   border-radius: 4px;
-  border: 1px solid #b0b8c1;
-  padding: 6px;
-  font-size: 0.98rem;
-  background: #fff;
+  padding: 10px 12px;
   font-family: inherit;
-  line-height: 1.4;
-}
-
-.tabela-processo textarea:focus,
-.tabela-indicadores textarea:focus,
-.tabela-atividades input[type="text"]:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
-}
-
-.tabela-atividades input[type="text"] {
-  width: 100%;
-  border-radius: 4px;
-  border: 1px solid #b0b8c1;
-  padding: 5px;
-  font-size: 0.97rem;
-  background: #fff;
-  min-height: 24px;
-  resize: none;
+  font-size: 14px;
+  color: #333;
+  background: #f9f9f9;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  resize: vertical;
+  box-sizing: border-box;
   overflow: hidden;
   word-wrap: break-word;
 }
+
+/* Estilos específicos para inputs da tabela de atividades */
+.tabela-atividades-input {
+  min-height: 40px;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.tabela-atividades td {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.tabela-processo-textarea:focus,
+.tabela-indicadores-textarea:focus,
+.tabela-atividades-input:focus {
+  outline: none;
+  border-color: #2c5aa0;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(44, 90, 160, 0.1);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ===== ESTILOS PARA EDITABLE TABLE (TEMPLATE 1) ===== */
+
+.editable-table-container {
+  width: 100%;
+  margin-bottom: 30px;
+  overflow-x: auto;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: white;
+}
+
+.editable-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: white;
+  table-layout: auto;
+  min-width: 600px;
+}
+
+.editable-table-header {
+  background: linear-gradient(135deg, #2c5aa0 0%, #1e3f73 100%);
+  color: white;
+  padding: 16px 20px;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 13px;
+  letter-spacing: 0.8px;
+  border: none;
+  position: relative;
+  text-align: center;
+  border-bottom: 3px solid #1e3f73;
+  box-shadow: inset 0 -2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.editable-table-header:first-child {
+  border-top-left-radius: 8px;
+}
+
+.editable-table-header:last-child {
+  border-top-right-radius: 8px;
+}
+
+.editable-table-header div {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 4px;
+  height: 100%;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.2s ease;
+}
+
+.editable-table-header div:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.editable-table-row {
+  transition: background-color 0.2s ease;
+  border-bottom: 1px solid #e8eef7;
+}
+
+.editable-table-row:hover {
+  background: #f8fafe;
+}
+
+.editable-table-row:nth-child(even) {
+  background: #fafcff;
+}
+
+.editable-table-row:nth-child(even):hover {
+  background: #f5f9fe;
+}
+
+.editable-table-cell {
+  padding: 0;
+  border: 1px solid #e1e7f0;
+  vertical-align: top;
+  background: inherit;
+  position: relative;
+}
+
+.editable-table-textarea {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 14px 18px;
+  font-family: inherit;
+  font-size: 14px;
+  color: #2d3748;
+  line-height: 1.5;
+  resize: none;
+  overflow: hidden;
+  min-height: 50px;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.editable-table-textarea:focus {
+  outline: none;
+  background: white;
+  box-shadow: inset 0 0 0 2px #2c5aa0;
+  border-radius: 4px;
+  margin: 2px;
+  padding: 12px 16px;
+}
+
+.editable-table-textarea::placeholder {
+  color: #a0aec0;
+  font-style: italic;
+}
+
+/* Responsividade para Editable Table */
+@media (max-width: 768px) {
+  .editable-table-container {
+    margin-bottom: 20px;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+  
+  .editable-table {
+    min-width: 500px;
+  }
+  
+  .editable-table-header {
+    padding: 12px 15px;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+  }
+  
+  .editable-table-textarea {
+    padding: 12px 15px;
+    font-size: 13px;
+    min-height: 45px;
+  }
+  
+  .editable-table-textarea:focus {
+    padding: 10px 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .editable-table-container {
+    margin-bottom: 15px;
+    border-radius: 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .editable-table {
+    min-width: 400px;
+    font-size: 13px;
+  }
+  
+  .editable-table-header {
+    padding: 10px 12px;
+    font-size: 11px;
+    letter-spacing: 0.3px;
+  }
+  
+  .editable-table-textarea {
+    padding: 10px 12px;
+    font-size: 12px;
+    min-height: 40px;
+    line-height: 1.4;
+  }
+  
+  .editable-table-textarea:focus {
+    padding: 8px 10px;
+    margin: 1px;
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

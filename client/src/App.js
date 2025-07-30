@@ -18,15 +18,15 @@ function App() {
     setUsername(userData.nome);
     setUserEmail(userData.email);
 
-    navigate("/superadmin");
+    navigate("/file");
   };
 
   return (
       <Routes>
         <Route path="/" element={<Login onLoginSuccess={handleLoginSuccess} />} />
         <Route path="/home" element={<SelecionarPdf />} />
-        <Route path="/superadmin" element={<SelecionarPdf />} />
-        <Route path="/superadmin/:filename" element={<TablePage />} />
+        <Route path="/file" element={<SelecionarPdf />} />
+        <Route path="/file/:filename" element={<TablePage />} />
         <Route path="/table/:filename" element={<TablePage />} />
         <Route path="/create-process" element={<CreateProcess />} />
         <Route path="/create-user" element={<Register />} />

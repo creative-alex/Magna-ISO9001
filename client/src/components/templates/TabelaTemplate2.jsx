@@ -1,5 +1,6 @@
 import React from "react";
 import ExportPdfButton from "../Buttons/exportPdf";
+import "../../index.css"; 
 
 
 export default function Template2({
@@ -22,7 +23,7 @@ export default function Template2({
   setServicoSaida,
 }) {
   return (
-    <>
+    <div className="template2-container">
     {/* Tabela principal */}
 <table className="tabela-processo">
   <thead>
@@ -33,6 +34,7 @@ export default function Template2({
           className="tabela-processo-textarea"
           value={donoProcesso}
           onChange={e => setDonoProcesso(e.target.value)}
+          placeholder="Digite o nome do responsável pelo processo..."
         />
       </td>
     </tr>
@@ -43,6 +45,7 @@ export default function Template2({
           className="tabela-processo-textarea"
           value={objetivoProcesso}
           onChange={e => setObjetivoProcesso(e.target.value)}
+          placeholder="Descreva o objetivo principal do processo..."
         />
       </td>
     </tr>
@@ -59,6 +62,7 @@ export default function Template2({
           style={{ minHeight: 120 }}
           value={servicosEntrada}
           onChange={e => setServicosEntrada(e.target.value)}
+          placeholder="Descreva os serviços de entrada necessários..."
         />
       </td>
       <td colSpan={3} style={{ verticalAlign: "top" }}>
@@ -67,6 +71,7 @@ export default function Template2({
           style={{ minHeight: 120 }}
           value={servicoSaida}
           onChange={e => setServicoSaida(e.target.value)}
+          placeholder="Descreva o serviço de saída resultante..."
         />
       </td>
     </tr>
@@ -88,16 +93,27 @@ export default function Template2({
   <tbody>
     {atividades.map((row, rowIdx) => (
       <tr key={rowIdx}>
-        {row.map((cell, colIdx) => (
-          <td key={colIdx}>
-            <input
-              type="text"
-              className="tabela-atividades-input"
-              value={cell}
-              onChange={e => handleAtividadesChange(rowIdx, colIdx, e.target.value)}
-            />
-          </td>
-        ))}
+        {row.map((cell, colIdx) => {
+          const labels = [
+            'Principais Atividades',
+            'Procedimentos Associados', 
+            'Requisitos ISO 9001',
+            'Requisitos DGERT',
+            'Requisitos EQAVET',
+            'Requisitos CQCQ'
+          ];
+          return (
+            <td key={colIdx} data-label={labels[colIdx]}>
+              <input
+                type="text"
+                className="tabela-atividades-input"
+                value={cell}
+                onChange={e => handleAtividadesChange(rowIdx, colIdx, e.target.value)}
+                placeholder={`${colIdx === 0 ? 'Atividade' : colIdx === 1 ? 'Procedimento' : 'Requisito'}...`}
+              />
+            </td>
+          );
+        })}
       </tr>
     ))}
   </tbody>
@@ -116,9 +132,10 @@ export default function Template2({
         <td>
           <textarea
             className="tabela-indicadores-textarea"
-            style={{ minHeight: 30 }}
+            style={{ minHeight: 60 }}
             value={indicador}
             onChange={e => handleIndicadoresChange(rowIdx, e.target.value)}
+            placeholder="Descreva o indicador de monitorização..."
           />
         </td>
       </tr>
@@ -126,6 +143,6 @@ export default function Template2({
   </tbody>
 </table>
 
-    </>
+    </div>
   );
 }

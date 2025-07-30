@@ -488,7 +488,6 @@ useEffect(() => {
 
   return (
     <div>
-      <h2>{originalFilename || "Template 2"}</h2>
       {isTemplate2 ? (
         <>
           <TabelaPdf
