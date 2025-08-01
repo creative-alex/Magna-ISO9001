@@ -284,6 +284,39 @@ const getProcessOwners = async (req, res) => {
   }
 };
 
+const deletePdf = async (req, res) => {
+  try {
+    console.log("deletePdf chamado");
+    const { filename } = req.body;
+    
+    if (!filename) {
+      console.log("Filename não fornecido");
+      return res.status(400).json({ error: "Filename é obrigatório" });
+    }
+    
+    console.log("Tentando eliminar ficheiro:", filename);
+    
+    // Verifica se o arquivo existe
+    const file = bucket.file(filename);
+    const [exists] = await file.exists();
+    
+    if (!exists) {
+      console.log("Arquivo não encontrado:", filename);
+      return res.status(404).json({ error: "Arquivo não encontrado" });
+    }
+    
+    // Elimina o arquivo
+    await file.delete();
+    console.log("Arquivo eliminado com sucesso:", filename);
+    
+    res.json({ success: true, message: "Ficheiro eliminado com sucesso" });
+    
+  } catch (error) {
+    console.error("Erro ao eliminar ficheiro:", error);
+    res.status(500).json({ error: "Erro interno do servidor", details: error.message });
+  }
+};
+
 module.exports = {
   uploadPdf,
   listPdfs,
@@ -293,4 +326,5 @@ module.exports = {
   downloadPdf,
   updateDonoProcesso,
   getProcessOwners,
+  deletePdf,
 };

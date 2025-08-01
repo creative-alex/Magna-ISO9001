@@ -257,7 +257,7 @@ useEffect(() => {
       const nomeProcesso = originalFilename.split('/')[0];
       console.log("Atualizando donoProcesso no backend:", { originalFilename, nomeProcesso, newDonoProcesso });
       
-      const response = await fetch("http://localhost:8080/files/update-dono-processo", {
+      const response = await fetch("http://192.168.1.219:8080/files/update-dono-processo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
@@ -339,7 +339,7 @@ useEffect(() => {
 
     let currentTemplate = template;
 
-    fetch("http://localhost:8080/files/pdf-form-data", {
+    fetch("http://192.168.1.219:8080/files/pdf-form-data", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ filename: originalFilename }),

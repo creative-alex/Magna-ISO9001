@@ -34,7 +34,7 @@ const Login = ({onLoginSuccess}) => {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
             const token = await user.getIdToken();
-            const response = await fetch("http://localhost:8080/users/verifyTokenAndGetUserInfo", {
+            const response = await fetch("http://192.168.1.219:8080/users/verifyTokenAndGetUserInfo", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -63,33 +63,35 @@ const Login = ({onLoginSuccess}) => {
 
     return (
         <>
-            <div className="login-container">
-                <h2>Login</h2>
-                {error && <p className="error">{error}</p>}
-                <form onSubmit={handleSubmit}>
-                    <div>
-                        <label>Email:</label>
-                        <input
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label>Senha:</label>
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                        />
-                    </div>
-                    <button type="submit" disabled={loading}>
-                        {loading ? "Carregando..." : "Entrar"}
-                    </button>
-                </form>
-            </div>
+            <div className="auth-container">
+    <h2 className="auth-title">Login</h2>
+    <form onSubmit={handleSubmit} className="auth-form">
+        <div className="auth-field">
+            <label className="auth-label">Email:</label>
+            <input
+                type="email"
+                className="auth-input"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+            />
+        </div>
+        <div className="auth-field">
+            <label className="auth-label">Senha:</label>
+            <input
+                type="password"
+                className="auth-input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+            />
+        </div>
+        <button type="submit" className="auth-button" disabled={loading}>
+            {loading ? "Carregando..." : "Entrar"}
+        </button>
+    </form>
+</div>
+
             <ToastContainer />
         </>
 

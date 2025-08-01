@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserContext } from '../context/userContext';
 import { generateEditablePdfTemplate2 } from '../utils/pdfGenerate';
@@ -10,6 +10,7 @@ export default function CreateProcess() {
   // Estados para os dados do processo
   const [processName, setProcessName] = useState('');
   const [processFolder, setProcessFolder] = useState('');
+  const [nextProcessNumber, setNextProcessNumber] = useState(null);
   const [donoProcesso, setDonoProcesso] = useState('');
   const [objetivoProcesso, setObjetivoProcesso] = useState('');
   const [servicosEntrada, setServicosEntrada] = useState('');
@@ -23,6 +24,43 @@ export default function CreateProcess() {
   const [indicadores, setIndicadores] = useState(['']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Buscar o próximo número de processo quando o componente carregar
+  useEffect(() => {
+    const fetchNextProcessNumber = async () => {
+      try {
+        // Buscar a lista de donos de processos para determinar quantos processos existem
+        const response = await fetch('http://192.168.1.219:8080/files/process-owners');
+        if (response.ok) {
+          const processOwners = await response.json();
+          
+          // Extrair números dos processos existentes
+          const processNumbers = Object.keys(processOwners)
+            .filter(processName => processName.startsWith('PROCESSO '))
+            .map(processName => {
+              const match = processName.match(/^PROCESSO (\d+):/);
+              return match ? parseInt(match[1], 10) : -1;
+            })
+            .filter(num => num >= 0);
+          
+          // Determinar o próximo número
+          const nextNumber = processNumbers.length > 0 
+            ? Math.max(...processNumbers) + 1 
+            : 0;
+          
+          setNextProcessNumber(nextNumber);
+        } else {
+          // Se não conseguir buscar, assume que é o processo 0
+          setNextProcessNumber(0);
+        }
+      } catch (error) {
+        console.warn('Erro ao buscar próximo número de processo:', error);
+        setNextProcessNumber(0);
+      }
+    };
+
+    fetchNextProcessNumber();
+  }, []);
 
   // Função para atualizar atividades
   const handleAtividadesChange = (rowIdx, colIdx, value) => {
@@ -62,13 +100,13 @@ export default function CreateProcess() {
       return;
     }
 
-    if (!processFolder.trim()) {
-      setError('Nome da pasta é obrigatório');
+    if (!donoProcesso.trim()) {
+      setError('Dono do processo é obrigatório');
       return;
     }
 
-    if (!donoProcesso.trim()) {
-      setError('Dono do processo é obrigatório');
+    if (nextProcessNumber === null) {
+      setError('Aguarde o carregamento do número do processo...');
       return;
     }
 
@@ -76,7 +114,10 @@ export default function CreateProcess() {
     setError('');
 
     try {
-      // 1. Criar o PDF com Template 2
+      // 1. Criar o nome completo do processo com numeração
+      const fullProcessName = `PROCESSO ${nextProcessNumber}: ${processName.trim()}`;
+      
+      // 2. Criar o PDF com Template 2
       console.log('Gerando PDF Template 2...');
       const pdfBytes = await generateEditablePdfTemplate2({
         atividades,
@@ -87,12 +128,12 @@ export default function CreateProcess() {
         servicoSaida
       });
 
-      // 2. Preparar dados para envio
+      // 3. Preparar dados para envio
       const formData = new FormData();
       
       // Nome do ficheiro (Template 2 usa numeração com 1 dígito)
-      const fileName = `1-${processName.trim()}.pdf`;
-      const folderPath = processFolder.trim();
+      const fileName = `1-${fullProcessName}.pdf`;
+      const folderPath = fullProcessName; // Usar o nome completo como pasta
       
       // Criar blob do PDF
       const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
@@ -111,7 +152,7 @@ export default function CreateProcess() {
       console.log('Enviando dados para o backend...');
 
       // 3. Enviar para o backend
-      const response = await fetch('http://localhost:8080/files/upload-pdf', {
+      const response = await fetch('http://192.168.1.219:8080/files/upload-pdf', {
         method: 'POST',
         body: formData
       });
@@ -124,11 +165,11 @@ export default function CreateProcess() {
       
       // 4. Atualizar dono do processo no Firestore
       try {
-        await fetch('http://localhost:8080/files/update-dono-processo', {
+        await fetch('http://192.168.1.219:8080/files/update-dono-processo', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            processId: folderPath,
+            processId: fullProcessName,
             donoProcesso: donoProcesso
           })
         });
@@ -149,7 +190,8 @@ export default function CreateProcess() {
 
   return (
     <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
-      <h2>Criar Novo Processo (Template 2)</h2>
+      <h2>Criar Novo Processo</h2>
+      
       
       {error && (
         <div style={{ 
@@ -163,31 +205,11 @@ export default function CreateProcess() {
         </div>
       )}
 
-      <div style={{ marginBottom: '20px' }}>
-        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-          Nome do Processo:
-        </label>
-        <input
-          type="text"
-          value={processFolder}
-          onChange={(e) => setProcessFolder(e.target.value)}
-          placeholder="Ex: RH, Vendas, Produção..."
-          style={{ 
-            width: '100%', 
-            padding: '8px', 
-            border: '1px solid #ccc', 
-            borderRadius: '4px',
-            fontSize: '14px'
-          }}
-        />
-        <small style={{ color: '#666' }}>
-          Esta será a pasta principal onde o processo será guardado
-        </small>
-      </div>
+    
 
       <div style={{ marginBottom: '20px' }}>
         <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-          Nome da Matriz:
+          Nome do Processo:
         </label>
         <input
           type="text"
@@ -203,7 +225,10 @@ export default function CreateProcess() {
           }}
         />
         <small style={{ color: '#666' }}>
-          Nome do ficheiro será: 1-{processName}.pdf
+          {nextProcessNumber !== null 
+            ? `Nome completo será: PROCESSO ${nextProcessNumber}: ${processName || '[Nome do Processo]'}`
+            : 'Aguardando carregamento do número...'
+          }
         </small>
       </div>
 

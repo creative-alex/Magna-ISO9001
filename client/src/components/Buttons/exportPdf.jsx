@@ -107,7 +107,7 @@ export default function ExportPdfButton({
       console.log("Template 2 - Enviando servico_saida:", servicoSaida);
     }
 
-    await fetch("http://localhost:8080/files/upload-pdf", {
+    await fetch("http://192.168.1.219:8080/files/upload-pdf", {
       method: "POST",
       body: formData,
     });

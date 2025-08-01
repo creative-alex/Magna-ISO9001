@@ -11,6 +11,7 @@ const { listPdfsTree } = require("../controllers/filesController");
 const { downloadPdf } = require("../controllers/filesController");
 const { updateDonoProcesso } = require("../controllers/filesController");
 const { getProcessOwners } = require("../controllers/filesController");
+const { deletePdf } = require("../controllers/filesController");
 
 router.post("/get-pdf", getPdf);
 router.get('/list-pdfs-tree', listPdfsTree);
@@ -20,4 +21,5 @@ router.post('/pdf-form-data', getPdfFormData);
 router.post('/download', downloadPdf);
 router.post('/update-dono-processo', updateDonoProcesso);
 router.get('/process-owners', getProcessOwners);
+router.post('/delete', deletePdf);
 module.exports = router;

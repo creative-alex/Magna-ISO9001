@@ -6,7 +6,7 @@ import TablePage from "./components/tabelaPDF";
 import CreateProcess from "./pages/createProcess";
 import Register from "./components/Auth/register";
 import { UserContext } from "./context/userContext";
-import createUser from "./components/Auth/register"
+import NewTable from "./pages/newTable"
 import './App.css';
 
 function App() {
@@ -30,6 +30,8 @@ function App() {
         <Route path="/table/:filename" element={<TablePage />} />
         <Route path="/create-process" element={<CreateProcess />} />
         <Route path="/create-user" element={<Register />} />
+        <Route path="/processamento" element={<NewTable />} />
+        <Route path="/newtable" element={<NewTable />} />
       </Routes>
   );
 };

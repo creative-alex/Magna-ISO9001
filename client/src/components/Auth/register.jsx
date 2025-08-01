@@ -61,7 +61,7 @@ const Register = () => {
       };
 
       // Guardar no backend
-      const response = await fetch('http://localhost:8080/users/createUser', {
+      const response = await fetch('http://192.168.1.219:8080/users/createUser', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
