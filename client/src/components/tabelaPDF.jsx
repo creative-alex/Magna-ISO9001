@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import TabelaPdf from "../pages/tableDisplay";
-import EditableTable from "../components/EditableTable";
+import Template1 from "./templates/TabelaTemplate1";
 import ExportPdfButton from "../components/Buttons/exportPdf";
 import PreviewPdfButton from "../components/Buttons/previewPDF";
 
@@ -250,6 +250,62 @@ useEffect(() => {
     setHasUnsavedChanges(true);
   };
 
+  // Funções para manipulação de linhas das atividades
+  const handleMoveAtividadeUp = (rowIdx) => {
+    if (rowIdx > 0) {
+      setAtividades(prev => {
+        const newAtividades = [...prev];
+        const [movedRow] = newAtividades.splice(rowIdx, 1);
+        newAtividades.splice(rowIdx - 1, 0, movedRow);
+        return newAtividades;
+      });
+      setHasUnsavedChanges(true);
+    }
+  };
+
+  const handleMoveAtividadeDown = (rowIdx) => {
+    if (rowIdx < atividades.length - 1) {
+      setAtividades(prev => {
+        const newAtividades = [...prev];
+        const [movedRow] = newAtividades.splice(rowIdx, 1);
+        newAtividades.splice(rowIdx + 1, 0, movedRow);
+        return newAtividades;
+      });
+      setHasUnsavedChanges(true);
+    }
+  };
+
+  const handleInsertAtividadeAbove = (rowIdx) => {
+    const newRow = ["", "", "", "", "", ""];
+    setAtividades(prev => {
+      const newAtividades = [...prev];
+      newAtividades.splice(rowIdx, 0, newRow);
+      return newAtividades;
+    });
+    setHasUnsavedChanges(true);
+  };
+
+  const handleInsertAtividadeBelow = (rowIdx) => {
+    const newRow = ["", "", "", "", "", ""];
+    setAtividades(prev => {
+      const newAtividades = [...prev];
+      newAtividades.splice(rowIdx + 1, 0, newRow);
+      return newAtividades;
+    });
+    setHasUnsavedChanges(true);
+  };
+
+  const handleDeleteAtividade = (rowIdx) => {
+    if (atividades.length > 1) {
+      setAtividades(prev => {
+        const newAtividades = [...prev];
+        newAtividades.splice(rowIdx, 1);
+        return newAtividades;
+      });
+      setHasUnsavedChanges(true);
+    }
+  };
+
   // Função para atualizar donoProcesso no backend
   const updateDonoProcessoBackend = async (newDonoProcesso) => {
     try {
@@ -472,13 +528,149 @@ useEffect(() => {
     }
   };
 
+  // Função para adicionar linha em posição específica
+  const handleAddRowAt = (position, newRow, isMainTable = true) => {
+    if (template === tabelas) {
+      const tableKey = isMainTable ? 'main' : 'obs';
+      
+      setTableData(prev => {
+        const newData = [...prev[tableKey]];
+        newData.splice(position, 0, newRow);
+        return { ...prev, [tableKey]: newData };
+      });
+
+      if (isMainTable) {
+        setMainFieldNames(prev => {
+          const newFieldNames = [...prev];
+          const newRowIdx = position + 2;
+          const newFieldRow = Array.from({ length: tabelas[1].cols }, (_, colIdx) =>
+            `table2_r${newRowIdx}_c${colIdx + 1}`
+          );
+          newFieldNames.splice(position, 0, newFieldRow);
+          return newFieldNames;
+        });
+      }
+      
+      setHasUnsavedChanges(true);
+    }
+  };
+
+  // Função para deletar linha
+  const handleDeleteRowAt = (rowIdx, isMainTable = true) => {
+    if (template === tabelas) {
+      const tableKey = isMainTable ? 'main' : 'obs';
+      
+      setTableData(prev => {
+        const newData = [...prev[tableKey]];
+        if (newData.length > 1) {
+          newData.splice(rowIdx, 1);
+        }
+        return { ...prev, [tableKey]: newData };
+      });
+
+      if (isMainTable) {
+        setMainFieldNames(prev => {
+          const newFieldNames = [...prev];
+          if (newFieldNames.length > 1) {
+            newFieldNames.splice(rowIdx, 1);
+          }
+          return newFieldNames;
+        });
+      }
+      
+      setHasUnsavedChanges(true);
+    }
+  };
+
+  // Função para mover linha
+  const handleMoveRowAt = (fromIdx, toIdx, isMainTable = true) => {
+    if (template === tabelas) {
+      const tableKey = isMainTable ? 'main' : 'obs';
+      
+      setTableData(prev => {
+        const newData = [...prev[tableKey]];
+        const [movedRow] = newData.splice(fromIdx, 1);
+        newData.splice(toIdx, 0, movedRow);
+        return { ...prev, [tableKey]: newData };
+      });
+
+      if (isMainTable) {
+        setMainFieldNames(prev => {
+          const newFieldNames = [...prev];
+          const [movedFieldRow] = newFieldNames.splice(fromIdx, 1);
+          newFieldNames.splice(toIdx, 0, movedFieldRow);
+          return newFieldNames;
+        });
+      }
+      
+      setHasUnsavedChanges(true);
+    }
+  };
+
+  // Funções específicas para mover linhas para cima/baixo
+  const handleMoveRowUp = (rowIdx, isMainTable = true) => {
+    if (rowIdx > 0) {
+      handleMoveRowAt(rowIdx, rowIdx - 1, isMainTable);
+    }
+  };
+
+  const handleMoveRowDown = (rowIdx, isMainTable = true) => {
+    const tableKey = isMainTable ? 'main' : 'obs';
+    const tableLength = tableData[tableKey].length;
+    if (rowIdx < tableLength - 1) {
+      handleMoveRowAt(rowIdx, rowIdx + 1, isMainTable);
+    }
+  };
+
+  // Funções específicas para inserir linhas acima/abaixo
+  const handleInsertRowAbove = (rowIdx, isMainTable = true) => {
+    const newRow = isMainTable ? ["", "", "", "", ""] : [""];
+    handleAddRowAt(rowIdx, newRow, isMainTable);
+  };
+
+  const handleInsertRowBelow = (rowIdx, isMainTable = true) => {
+    const newRow = isMainTable ? ["", "", "", "", ""] : [""];
+    handleAddRowAt(rowIdx + 1, newRow, isMainTable);
+  };
+
   // Função para exportação/preview
   const getTablesHtml = () => {
-    const obj = {
-      mainTableHtml: mainTableRef.current ? mainTableRef.current.outerHTML : "",
-      obsTableHtml: obsTableRef.current ? obsTableRef.current.outerHTML : ""
+    let mainTableHtml = "";
+    let obsTableHtml = "";
+
+    if (mainTableRef.current) {
+      // Clone da tabela principal para remover a coluna de ações
+      const mainTableClone = mainTableRef.current.cloneNode(true);
+      
+      // Remove a coluna "Ações" do cabeçalho (última coluna)
+      const headerRow = mainTableClone.querySelector('thead tr');
+      if (headerRow) {
+        const lastHeaderCell = headerRow.lastElementChild;
+        if (lastHeaderCell && lastHeaderCell.textContent.includes('Ações')) {
+          lastHeaderCell.remove();
+        }
+      }
+      
+      // Remove a coluna "Ações" de todas as linhas do corpo (última coluna)
+      const bodyRows = mainTableClone.querySelectorAll('tbody tr');
+      bodyRows.forEach(row => {
+        const lastCell = row.lastElementChild;
+        if (lastCell) {
+          lastCell.remove();
+        }
+      });
+      
+      mainTableHtml = mainTableClone.outerHTML;
+    }
+
+    if (obsTableRef.current) {
+      obsTableHtml = obsTableRef.current.outerHTML;
+    }
+
+    return {
+      mainTableHtml,
+      obsTableHtml
     };
-    return obj;
   };
 
   // Logs do estado atual a cada render
@@ -506,6 +698,11 @@ useEffect(() => {
             setObjetivoProcesso={handleSetObjetivoProcesso}
             handleAtividadesChange={handleAtividadesChange}
             handleIndicadoresChange={handleIndicadoresChange}
+            onMoveAtividadeUp={handleMoveAtividadeUp}
+            onMoveAtividadeDown={handleMoveAtividadeDown}
+            onInsertAtividadeAbove={handleInsertAtividadeAbove}
+            onInsertAtividadeBelow={handleInsertAtividadeBelow}
+            onDeleteAtividade={handleDeleteAtividade}
             handleChange={
               (rowIdx, colIdx, value) => {
                 setTableData(prev => {
@@ -535,54 +732,52 @@ useEffect(() => {
           <PreviewPdfButton getTablesHtml={getTablesHtml} />
         </>
       ) : (
-        <>
-          <div ref={obsTableRef}>
-            <EditableTable
-              data={tableData.obs}
-              onChange={(rowIdx, colIdx, value) => {
-                setTableData(prev => {
-                  const newData = prev.obs.map(row => [...row]);
-                  newData[rowIdx][colIdx] = value;
-                  return { ...prev, obs: newData };
-                });
-                setHasUnsavedChanges(true);
-              }}
-              headersHtml={template[0].headers}
-            />
-          </div>
-          <div ref={mainTableRef}>
-            <EditableTable
-              data={tableData.main}
-              onChange={(rowIdx, colIdx, value) => {
-                setTableData(prev => {
-                  const newData = prev.main.map(row => [...row]);
-                  newData[rowIdx][colIdx] = value;
-                  return { ...prev, main: newData };
-                });
-                setHasUnsavedChanges(true);
-              }}
-              headersHtml={template[1].headers}
-            />
-          </div>
-          <button onClick={handleAddRow}>+</button>          
-          <ExportPdfButton
-            templateType={isTemplate2 ? 2 : 1}
-            data={tableData.main}
-            headers={template[1].headers}
-            dataObs={tableData.obs}
-            headersObs={template[0].headers}
-            atividades={atividades}
-            donoProcesso={donoProcesso}
-            objetivoProcesso={objetivoProcesso}
-            indicadores={indicadores}
-            pathFilename={originalFilename}
-            servicosEntrada={servicosEntrada}
-            servicoSaida={servicoSaida}
-            fieldNames={mainFieldNames}
-            onSaveSuccess={() => setHasUnsavedChanges(false)}
-          />
-          <PreviewPdfButton getTablesHtml={getTablesHtml} />
-        </>
+        <Template1
+          data={tableData.main}
+          dataObs={tableData.obs}
+          handleChange={(rowIdx, colIdx, value) => {
+            setTableData(prev => {
+              const newData = prev.main.map(row => [...row]);
+              newData[rowIdx][colIdx] = value;
+              return { ...prev, main: newData };
+            });
+            setHasUnsavedChanges(true);
+          }}
+          handleChangeObs={(rowIdx, colIdx, value) => {
+            setTableData(prev => {
+              const newData = prev.obs.map(row => [...row]);
+              newData[rowIdx][colIdx] = value;
+              return { ...prev, obs: newData };
+            });
+            setHasUnsavedChanges(true);
+          }}
+          headers={template[1].headers}
+          headersObs={template[0].headers}
+          headersHtml={template[1].headers}
+          headersHtmlObs={template[0].headers}
+          templateType={1}
+          servicosEntrada={servicosEntrada}
+          servicoSaida={servicoSaida}
+          setServicosEntrada={handleSetServicosEntrada}
+          setServicoSaida={handleSetServicoSaida}
+          onMoveRowUp={(rowIdx) => handleMoveRowUp(rowIdx, true)}
+          onMoveRowDown={(rowIdx) => handleMoveRowDown(rowIdx, true)}
+          onInsertRowAbove={(rowIdx) => handleInsertRowAbove(rowIdx, true)}
+          onInsertRowBelow={(rowIdx) => handleInsertRowBelow(rowIdx, true)}
+          onDeleteRow={(rowIdx) => handleDeleteRowAt(rowIdx, true)}
+          onAddRowObs={(rowIdx) => handleInsertRowBelow(rowIdx, false)}
+          onDeleteRowObs={(rowIdx) => handleDeleteRowAt(rowIdx, false)}
+          atividades={atividades}
+          donoProcesso={donoProcesso}
+          objetivoProcesso={objetivoProcesso}
+          indicadores={indicadores}
+          pathFilename={originalFilename}
+          fieldNames={mainFieldNames}
+          onSaveSuccess={() => setHasUnsavedChanges(false)}
+          getTablesHtml={getTablesHtml}
+          obsTableRef={obsTableRef}
+          mainTableRef={mainTableRef}
+        />
       )}
     </div>
   );

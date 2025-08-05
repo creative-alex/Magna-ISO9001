@@ -2,24 +2,6 @@ import React from "react";
 import Template1 from "../components/templates/TabelaTemplate1";
 import Template2 from "../components/templates/TabelaTemplate2";
 
-// Configuração do template 1
-const headersObs1 = ["Observações"];
-const headersHtmlObs1 = [<>Observações</>];
-const headers1 = [
-  'Fluxo\ndas Ações',
-  'Descrição',
-  'Responsável',
-  'Documentos\nAssociados',
-  'Instruções\nde Trabalho'
-];
-const headersHtml1 = [
-  <>Fluxo<br />das Ações</>,
-  <>Descrição</>,
-  <>Responsável</>,
-  <>Documentos<br />Associados</>,
-  <>Instruções<br />de Trabalho</>
-];
-
 export default function TabelaPdf({
   templateType = 1,
   data,
@@ -41,8 +23,45 @@ export default function TabelaPdf({
   setServicosEntrada,
   servicoSaida,
   setServicoSaida,
+  // Novas props opcionais para manipulação de linhas
+  onMoveRowUp,
+  onMoveRowDown,
+  onInsertRowAbove,
+  onInsertRowBelow,
+  onDeleteRow,
+  onAddRowObs,
+  onDeleteRowObs,
+  // Props adicionais
+  pathFilename = "",
+  fieldNames = [],
+  onSaveSuccess,
+  getTablesHtml,
+  obsTableRef,
+  mainTableRef,
+  // Novas props para manipulação de atividades no Template2
+  onMoveAtividadeUp,
+  onMoveAtividadeDown,
+  onInsertAtividadeAbove,
+  onInsertAtividadeBelow,
+  onDeleteAtividade,
 }) {
   const isTemplate2 = templateType === 2;
+
+  // Funções de fallback para quando as props não forem fornecidas
+  const handleMoveRowUp = onMoveRowUp || (() => {});
+  const handleMoveRowDown = onMoveRowDown || (() => {});
+  const handleInsertRowAbove = onInsertRowAbove || (() => {});
+  const handleInsertRowBelow = onInsertRowBelow || (() => {});
+  const handleDeleteRow = onDeleteRow || (() => {});
+  const handleAddRowObs = onAddRowObs || (() => {});
+  const handleDeleteRowObs = onDeleteRowObs || (() => {});
+
+  // Funções de fallback para atividades
+  const handleMoveAtividadeUp = onMoveAtividadeUp || (() => {});
+  const handleMoveAtividadeDown = onMoveAtividadeDown || (() => {});
+  const handleInsertAtividadeAbove = onInsertAtividadeAbove || (() => {});
+  const handleInsertAtividadeBelow = onInsertAtividadeBelow || (() => {});
+  const handleDeleteAtividade = onDeleteAtividade || (() => {});
 
  return (
     <div>
@@ -65,6 +84,11 @@ export default function TabelaPdf({
           setServicosEntrada={setServicosEntrada}
           servicoSaida={servicoSaida}
           setServicoSaida={setServicoSaida}
+          onMoveAtividadeUp={handleMoveAtividadeUp}
+          onMoveAtividadeDown={handleMoveAtividadeDown}
+          onInsertAtividadeAbove={handleInsertAtividadeAbove}
+          onInsertAtividadeBelow={handleInsertAtividadeBelow}
+          onDeleteAtividade={handleDeleteAtividade}
         />
       ) : (
         <Template1
@@ -72,15 +96,28 @@ export default function TabelaPdf({
           dataObs={dataObs}
           handleChange={handleChangeMain}
           handleChangeObs={handleChangeObs}
-          headers={headers}
-          headersObs={headersObs}
-          headersHtml={headersHtml1}
-          headersHtmlObs={headersHtmlObs1}
           templateType={templateType}
           servicosEntrada={servicosEntrada}
           servicoSaida={servicoSaida}
           setServicosEntrada={setServicosEntrada}
           setServicoSaida={setServicoSaida}
+          onMoveRowUp={handleMoveRowUp}
+          onMoveRowDown={handleMoveRowDown}
+          onInsertRowAbove={handleInsertRowAbove}
+          onInsertRowBelow={handleInsertRowBelow}
+          onDeleteRow={handleDeleteRow}
+          onAddRowObs={handleAddRowObs}
+          onDeleteRowObs={handleDeleteRowObs}
+          atividades={atividades}
+          donoProcesso={donoProcesso}
+          objetivoProcesso={objetivoProcesso}
+          indicadores={indicadores}
+          pathFilename={pathFilename}
+          fieldNames={fieldNames}
+          onSaveSuccess={onSaveSuccess}
+          getTablesHtml={getTablesHtml}
+          obsTableRef={obsTableRef}
+          mainTableRef={mainTableRef}
         />
       )}
     </div>

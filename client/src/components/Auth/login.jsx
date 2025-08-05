@@ -87,7 +87,7 @@ const Login = ({onLoginSuccess}) => {
             />
         </div>
         <button type="submit" className="auth-button" disabled={loading}>
-            {loading ? "Carregando..." : "Entrar"}
+            {loading ? "A entrar..." : "Entrar"}
         </button>
     </form>
 </div>

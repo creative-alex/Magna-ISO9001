@@ -98,6 +98,7 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
       {files.map(file => {
         const filePath = [...currentPath, file.name].join("/");
         const hasAccess = canAccessProcess(filePath);
+        const displayName = file.name.endsWith('.pdf') ? file.name.slice(0, -4) : file.name;
         
         return (
           <div 
@@ -106,7 +107,7 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
             onClick={hasAccess ? () => onSelectFile(filePath) : undefined}
             style={{ cursor: hasAccess ? 'pointer' : 'default' }}
           >
-            <span className="file-name">{file.name}</span>
+            <span className="file-name">{displayName}</span>
             <div className="file-actions">
               <PdfPreviewButton file={file} currentPath={currentPath} />
               {isAdmin && (
@@ -126,8 +127,8 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
 
 export default function SelecionarPdf() {
   const [pdfTree, setPdfTree] = useState([]);
-  const [searchTerm, setSearchTerm] = useState(""); // Novo estado para busca
-  const [processOwners, setProcessOwners] = useState({}); // Donos dos processos
+  const [searchTerm, setSearchTerm] = useState(""); 
+  const [processOwners, setProcessOwners] = useState({}); 
   const navigate = useNavigate();
   const { username } = useContext(UserContext);
 

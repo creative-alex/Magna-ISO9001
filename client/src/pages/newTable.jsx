@@ -242,7 +242,7 @@ export default function NewTable() {
       
       // Nome do ficheiro com numeração sequencial de 2 dígitos
       const formattedNumber = nextTableNumber.toString().padStart(2, '0');
-      const fileName = `${formattedNumber}-${processName.trim()}.pdf`;
+      const fileName = `${formattedNumber} ${processName.trim()}.pdf`;
       const folderPath = processFolder.trim();
       
       // Criar blob do PDF
@@ -284,12 +284,7 @@ export default function NewTable() {
 
   return (
     <div style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto' }}>
-      <h2>Criar Nova Tabela (Template 1)</h2>
-      <p style={{ color: '#666', marginBottom: '20px' }}>
-        As tabelas são numeradas sequencialmente baseadas nos ficheiros existentes em cada processo. 
-        Exemplo: Se PROCESSO 1 já tem ficheiros 1, 10-18, o próximo será 19.
-      </p>
-      
+      <h2>Criar Nova Tabela (Template 1)</h2>      
       {error && (
         <div style={{ 
           color: 'red', 
@@ -301,62 +296,10 @@ export default function NewTable() {
           {error}
         </div>
       )}
-
-      {/* Número da Tabela */}
+    
       <div style={{ marginBottom: '20px' }}>
         <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-          Número da Tabela:
-        </label>
-        <div style={{
-          padding: '8px',
-          border: '1px solid #ccc',
-          borderRadius: '4px',
-          backgroundColor: '#f8f9fa',
-          fontSize: '14px',
-          color: '#495057'
-        }}>
-          {nextTableNumber !== null ? nextTableNumber.toString().padStart(2, '0') : 
-           processFolder ? 'Carregando...' : 'Selecione uma pasta primeiro'}
-        </div>
-        <small style={{ color: '#666' }}>
-          {processFolder 
-            ? 'Número gerado baseado nas tabelas existentes nesta pasta'
-            : 'O número será determinado após selecionar a pasta'
-          }
-        </small>
-      </div>
-
-      {/* Dados básicos */}
-      <div style={{ marginBottom: '20px' }}>
-        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-          Nome da Pasta:
-        </label>
-        <input
-          type="text"
-          value={processFolder}
-          onChange={(e) => setProcessFolder(e.target.value)}
-          placeholder="Ex: RH, Vendas, Produção..."
-          style={{ 
-            width: '100%', 
-            padding: '8px', 
-            border: '1px solid #ccc', 
-            borderRadius: '4px',
-            fontSize: '14px',
-            backgroundColor: location.state?.preselectedFolder ? '#f0f8ff' : 'white'
-          }}
-          readOnly={!!location.state?.preselectedFolder}
-        />
-        <small style={{ color: '#666' }}>
-          {location.state?.preselectedFolder 
-            ? 'Pasta pré-selecionada. A tabela será criada nesta pasta.'
-            : 'Esta será a pasta principal onde a tabela será guardada'
-          }
-        </small>
-      </div>
-
-      <div style={{ marginBottom: '20px' }}>
-        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-          Nome da Matriz:
+          Nome do Processamento:
         </label>
         <input
           type="text"
@@ -373,7 +316,7 @@ export default function NewTable() {
         />
         <small style={{ color: '#666' }}>
           {nextTableNumber !== null && processFolder
-            ? `Nome do ficheiro será: ${nextTableNumber.toString().padStart(2, '0')}-${processName || '[Nome da Matriz]'}.pdf`
+            ? `Nome do ficheiro será: ${nextTableNumber.toString().padStart(2, '0')} ${processName || '[Nome da Matriz]'}.pdf`
             : processFolder 
               ? 'Aguardando carregamento do número...'
               : 'Selecione uma pasta para ver o nome do ficheiro'
@@ -589,7 +532,7 @@ export default function NewTable() {
             fontSize: '16px'
           }}
         >
-          {loading ? 'Criando...' : 'Criar Tabela'}
+          {loading ? 'A criar...' : 'Criar Tabela'}
         </button>
       </div>
     </div>

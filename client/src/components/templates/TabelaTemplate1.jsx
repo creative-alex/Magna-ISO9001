@@ -1,26 +1,426 @@
-import React from "react";
-import EditableTable from "../EditableTable";
+import React, { useRef, useEffect } from "react";
 import ExportPdfButton from "../Buttons/exportPdf";
+import PreviewPdfButton from "../Buttons/previewPDF";
+import "./styleTemplates.css";
 
 export default function Template1({ 
-  data, 
-  dataObs, 
+  data = [["", "", "", "", ""]],
+  dataObs = [[""]],
   handleChange, 
   handleChangeObs, 
-  headers, 
-  headersObs, 
-  headersHtml, 
-  headersHtmlObs,
   templateType = 1,
   servicosEntrada = "",
   servicoSaida = "",
   setServicosEntrada,
-  setServicoSaida
+  setServicoSaida,
+  // Props para ExportPdfButton
+  atividades,
+  donoProcesso,
+  objetivoProcesso,
+  indicadores,
+  pathFilename,
+  fieldNames,
+  onSaveSuccess,
+  // Props para PreviewPdfButton
+  getTablesHtml,
+  // Refs para as tabelas
+  obsTableRef,
+  mainTableRef,
+  // Funções para manipulação de linhas
+  onMoveRowUp,
+  onMoveRowDown,
+  onInsertRowAbove,
+  onInsertRowBelow,
+  onDeleteRow,
+  onAddRowObs,
+  onDeleteRowObs
 }) {
+  const textAreaRefs = useRef({});
+
+  // Função para redimensionar textarea automaticamente
+  const handleTextareaResize = (e) => {
+    e.target.style.height = 'auto';
+    e.target.style.height = `${e.target.scrollHeight}px`;
+  };
+
+  // Redimensiona todos os textareas quando os dados mudam
+  useEffect(() => {
+    Object.values(textAreaRefs.current).forEach(textarea => {
+      if (textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = `${textarea.scrollHeight}px`;
+      }
+    });
+  }, [data, dataObs]);
+
   return (
     <>
-      <EditableTable data={dataObs} onChange={handleChangeObs} headersHtml={headersHtmlObs} />
-      <EditableTable data={data} onChange={handleChange} headersHtml={headersHtml} />
+      {/* Tabela de Observações */}
+      <div ref={obsTableRef} className="primeira-tabela">
+        <table className="editable-table tabela-observacoes" border="1" cellPadding={4}>
+          <thead>
+            <tr>
+              <th className="editable-table-header">Seções do Documento</th>
+            </tr>
+          </thead>
+          <tbody>
+            {/* Objetivos */}
+            <tr className="editable-table-row">
+              <td className="editable-table-cell">
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ 
+                    fontWeight: 'bold', 
+                    padding: '5px 0', 
+                    borderBottom: '1px solid #ddd', 
+                    marginBottom: '5px',
+                    background: '#f8f9fa'
+                  }}>
+                    1. Objetivos:
+                  </div>
+                  <textarea
+                    ref={el => textAreaRefs.current[`obj-0-0`] = el}
+                    className="editable-table-textarea tabela-observacoes-textarea"
+                    style={{ minHeight: 80, width: '100%', resize: 'vertical', border: 'none' }}
+                    value={dataObs[0] ? dataObs[0][0] : ''}
+                    onChange={e => handleChangeObs(0, 0, e.target.value)}
+                    onInput={handleTextareaResize}
+                    placeholder="Digite os objetivos do documento..."
+                  />
+                </div>
+              </td>
+            </tr>
+            
+            {/* Campo de Aplicação */}
+            <tr className="editable-table-row">
+              <td className="editable-table-cell">
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ 
+                    fontWeight: 'bold', 
+                    padding: '5px 0', 
+                    borderBottom: '1px solid #ddd', 
+                    marginBottom: '5px',
+                    background: '#f8f9fa'
+                  }}>
+                    2. Campo de Aplicação:
+                  </div>
+                  <textarea
+                    ref={el => textAreaRefs.current[`campo-1-0`] = el}
+                    className="editable-table-textarea tabela-observacoes-textarea"
+                    style={{ minHeight: 80, width: '100%', resize: 'vertical', border: 'none' }}
+                    value={dataObs[1] ? dataObs[1][0] : ''}
+                    onChange={e => handleChangeObs(1, 0, e.target.value)}
+                    onInput={handleTextareaResize}
+                    placeholder="Digite o campo de aplicação..."
+                  />
+                </div>
+              </td>
+            </tr>
+
+            {/* Definições */}
+            <tr className="editable-table-row">
+              <td className="editable-table-cell">
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ 
+                    fontWeight: 'bold', 
+                    padding: '5px 0', 
+                    borderBottom: '1px solid #ddd', 
+                    marginBottom: '5px',
+                    background: '#f8f9fa'
+                  }}>
+                    3. Definições:
+                  </div>
+                  <textarea
+                    ref={el => textAreaRefs.current[`def-2-0`] = el}
+                    className="editable-table-textarea tabela-observacoes-textarea"
+                    style={{ minHeight: 80, width: '100%', resize: 'vertical', border: 'none' }}
+                    value={dataObs[2] ? dataObs[2][0] : ''}
+                    onChange={e => handleChangeObs(2, 0, e.target.value)} 
+                    onInput={handleTextareaResize}
+                    placeholder="Digite as definições relevantes..."
+                  />
+                </div>
+              </td>
+            </tr>
+
+            {/* Abreviaturas */}
+            <tr className="editable-table-row">
+              <td className="editable-table-cell">
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <div>
+                    4. Abreviaturas:
+                  </div>
+                  <textarea
+                    ref={el => textAreaRefs.current[`abrev-3-0`] = el}
+                    className="editable-table-textarea tabela-observacoes-textarea"
+                    style={{ minHeight: 80, width: '100%', resize: 'vertical', border: 'none' }}
+                    value={dataObs[3] ? dataObs[3][0] : ''}
+                    onChange={e => handleChangeObs(3, 0, e.target.value)}
+                    onInput={handleTextareaResize}
+                    placeholder="Digite as abreviaturas utilizadas..."
+                  />
+                </div>
+              </td>
+            </tr>
+
+            {/* Observações */}
+            <tr className="editable-table-row">
+              <td className="editable-table-cell">
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <div>
+                    5. Observações:
+                  </div>
+                  <textarea
+                    ref={el => textAreaRefs.current[`obs-4-0`] = el}
+                    className="editable-table-textarea tabela-observacoes-textarea"
+                    style={{ minHeight: 80, width: '100%', resize: 'vertical', border: 'none' }}
+                    value={dataObs[4] ? dataObs[4][0] : ''}
+                    onChange={e => handleChangeObs(4, 0, e.target.value)}
+                    onInput={handleTextareaResize}
+                    placeholder="Digite observações adicionais..."
+                  />
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* Tabela Principal */}
+      <div ref={mainTableRef} className="segunda-tabela">
+        <table className="editable-table tabela-principal" border="1" cellPadding={4}>
+          <thead>
+            <tr>
+              <th className="editable-table-header" style={{ width: '100px' }}>Fluxo<br />das Ações</th>
+              <th className="editable-table-header" style={{ width: '700px' }}>Descrição</th>
+              <th className="editable-table-header" style={{ width: '80px' }}>Responsável</th>
+              <th className="editable-table-header" style={{ width: '60px' }}>Documentos<br />Associados</th>
+              <th className="editable-table-header" style={{ width: '60px' }}>Instruções<br />de Trabalho</th>
+              <th className="editable-table-header" style={{ width: '50px' }}>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((row, rowIdx) => (
+              <tr key={rowIdx} className="editable-table-row">
+                {row.map((cell, colIdx) => (
+                  <td key={colIdx} className="editable-table-cell">
+                    <textarea
+                      ref={el => textAreaRefs.current[`main-${rowIdx}-${colIdx}`] = el}
+                      className="editable-table-textarea tabela-principal-textarea"
+                      style={{ 
+                        minHeight: colIdx === 1 ? 80 : 60, // Descrição tem altura maior
+                        width: '100%',
+                        resize: 'vertical'
+                      }}
+                      value={cell}
+                      onChange={e => handleChange(rowIdx, colIdx, e.target.value)}
+                      onInput={handleTextareaResize}
+                      placeholder={
+                        colIdx === 0 ? 'Fluxo' :
+                        colIdx === 1 ? 'Descrição' :
+                        colIdx === 2 ? 'Responsável' :
+                        colIdx === 3 ? 'Documentos' :
+                        'Instruções'
+                      }
+                    />
+                  </td>
+                ))}
+                <td className="editable-table-cell">
+                  <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center', 
+                    gap: '2px', 
+                    padding: '2px',
+                    width: '100%'
+                  }}>
+                    <button 
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        opacity: rowIdx === 0 ? 0.3 : 0.7,
+                        transition: 'all 0.15s ease',
+                        padding: '2px',
+                        borderRadius: '3px',
+                        width: '20px',
+                        height: '20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                      onClick={() => onMoveRowUp && onMoveRowUp(rowIdx)}
+                      disabled={rowIdx === 0}
+                      title="Mover para cima"
+                      onMouseEnter={(e) => {
+                        if (!e.target.disabled) {
+                          e.target.style.opacity = '1';
+                          e.target.style.background = 'rgba(0, 0, 0, 0.05)';
+                          e.target.style.transform = 'scale(1.1)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.opacity = rowIdx === 0 ? '0.3' : '0.7';
+                        e.target.style.background = 'transparent';
+                        e.target.style.transform = 'scale(1)';
+                      }}
+                    >
+                      ⬆️
+                    </button>
+                    <button 
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        opacity: rowIdx === data.length - 1 ? 0.3 : 0.7,
+                        transition: 'all 0.15s ease',
+                        padding: '2px',
+                        borderRadius: '3px',
+                        width: '20px',
+                        height: '20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                      onClick={() => onMoveRowDown && onMoveRowDown(rowIdx)}
+                      disabled={rowIdx === data.length - 1}
+                      title="Mover para baixo"
+                      onMouseEnter={(e) => {
+                        if (!e.target.disabled) {
+                          e.target.style.opacity = '1';
+                          e.target.style.background = 'rgba(0, 0, 0, 0.05)';
+                          e.target.style.transform = 'scale(1.1)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.opacity = rowIdx === data.length - 1 ? '0.3' : '0.7';
+                        e.target.style.background = 'transparent';
+                        e.target.style.transform = 'scale(1)';
+                      }}
+                    >
+                      ⬇️
+                    </button>
+                    <button 
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        opacity: 0.7,
+                        transition: 'all 0.15s ease',
+                        padding: '2px',
+                        borderRadius: '3px',
+                        width: '20px',
+                        height: '20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                      onClick={() => onInsertRowAbove && onInsertRowAbove(rowIdx)}
+                      title="Inserir linha acima"
+                      onMouseEnter={(e) => {
+                        e.target.style.opacity = '1';
+                        e.target.style.background = 'rgba(0, 0, 0, 0.05)';
+                        e.target.style.transform = 'scale(1.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.opacity = '0.7';
+                        e.target.style.background = 'transparent';
+                        e.target.style.transform = 'scale(1)';
+                      }}
+                    >
+                      ➕
+                    </button>
+                    <button 
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        opacity: 0.7,
+                        transition: 'all 0.15s ease',
+                        padding: '2px',
+                        borderRadius: '3px',
+                        width: '20px',
+                        height: '20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                      onClick={() => onInsertRowBelow && onInsertRowBelow(rowIdx)}
+                      title="Inserir linha abaixo"
+                      onMouseEnter={(e) => {
+                        e.target.style.opacity = '1';
+                        e.target.style.background = 'rgba(0, 0, 0, 0.05)';
+                        e.target.style.transform = 'scale(1.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.opacity = '0.7';
+                        e.target.style.background = 'transparent';
+                        e.target.style.transform = 'scale(1)';
+                      }}
+                    >
+                      ➕
+                    </button>
+                    {data.length > 1 && (
+                      <button 
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          opacity: 0.7,
+                          transition: 'all 0.15s ease',
+                          padding: '2px',
+                          borderRadius: '3px',
+                          width: '20px',
+                          height: '20px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        onClick={() => onDeleteRow && onDeleteRow(rowIdx)}
+                        title="Deletar linha"
+                        onMouseEnter={(e) => {
+                          e.target.style.opacity = '1';
+                          e.target.style.background = 'rgba(255, 0, 0, 0.1)';
+                          e.target.style.transform = 'scale(1.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.opacity = '0.7';
+                          e.target.style.background = 'transparent';
+                          e.target.style.transform = 'scale(1)';
+                        }}
+                      >
+                        🗑️
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <ExportPdfButton
+        templateType={templateType}
+        data={data}
+        headers={['Fluxo\ndas Ações', 'Descrição', 'Responsável', 'Documentos\nAssociados', 'Instruções\nde Trabalho']}
+        dataObs={dataObs}
+        headersObs={['Observações']}
+        atividades={atividades}
+        donoProcesso={donoProcesso}
+        objetivoProcesso={objetivoProcesso}
+        indicadores={indicadores}
+        pathFilename={pathFilename}
+        servicosEntrada={servicosEntrada}
+        servicoSaida={servicoSaida}
+        fieldNames={fieldNames}
+        onSaveSuccess={onSaveSuccess}
+      />
+      <PreviewPdfButton getTablesHtml={getTablesHtml} />
     </>
   );
 }

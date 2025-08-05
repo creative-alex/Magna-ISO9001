@@ -438,7 +438,7 @@ export default function CreateProcess() {
             fontSize: '16px'
           }}
         >
-          {loading ? 'Criando...' : 'Criar Processo'}
+          {loading ? 'A criar...' : 'Criar Processo'}
         </button>
       </div>
     </div>

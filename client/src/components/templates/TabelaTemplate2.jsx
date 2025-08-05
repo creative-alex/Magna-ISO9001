@@ -1,6 +1,6 @@
 import React from "react";
 import ExportPdfButton from "../Buttons/exportPdf";
-import "../../index.css"; 
+import "./styleTemplates.css"; 
 
 
 export default function Template2({
@@ -21,6 +21,12 @@ export default function Template2({
   setServicosEntrada,
   servicoSaida = "",
   setServicoSaida,
+  // Funções para manipulação de linhas das atividades
+  onMoveAtividadeUp,
+  onMoveAtividadeDown,
+  onInsertAtividadeAbove,
+  onInsertAtividadeBelow,
+  onDeleteAtividade,
 }) {
   return (
     <div className="template2-container">
@@ -88,6 +94,7 @@ export default function Template2({
       <th>Requisitos DGERT</th>
       <th>Requisitos EQAVET</th>
       <th>Requisitos CQCQ</th>
+      <th>Ações</th>
     </tr>
   </thead>
   <tbody>
@@ -114,6 +121,180 @@ export default function Template2({
             </td>
           );
         })}
+        <td>
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            gap: '2px', 
+            padding: '2px',
+            width: '100%'
+          }}>
+            <button 
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '14px',
+                opacity: rowIdx === 0 ? 0.3 : 0.7,
+                transition: 'all 0.15s ease',
+                padding: '2px',
+                borderRadius: '3px',
+                width: '20px',
+                height: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              onClick={() => onMoveAtividadeUp && onMoveAtividadeUp(rowIdx)}
+              disabled={rowIdx === 0}
+              title="Mover para cima"
+              onMouseEnter={(e) => {
+                if (!e.target.disabled) {
+                  e.target.style.opacity = '1';
+                  e.target.style.background = 'rgba(0, 0, 0, 0.05)';
+                  e.target.style.transform = 'scale(1.1)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.opacity = rowIdx === 0 ? '0.3' : '0.7';
+                e.target.style.background = 'transparent';
+                e.target.style.transform = 'scale(1)';
+              }}
+            >
+              ⬆️
+            </button>
+            <button 
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '14px',
+                opacity: rowIdx === atividades.length - 1 ? 0.3 : 0.7,
+                transition: 'all 0.15s ease',
+                padding: '2px',
+                borderRadius: '3px',
+                width: '20px',
+                height: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              onClick={() => onMoveAtividadeDown && onMoveAtividadeDown(rowIdx)}
+              disabled={rowIdx === atividades.length - 1}
+              title="Mover para baixo"
+              onMouseEnter={(e) => {
+                if (!e.target.disabled) {
+                  e.target.style.opacity = '1';
+                  e.target.style.background = 'rgba(0, 0, 0, 0.05)';
+                  e.target.style.transform = 'scale(1.1)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.opacity = rowIdx === atividades.length - 1 ? '0.3' : '0.7';
+                e.target.style.background = 'transparent';
+                e.target.style.transform = 'scale(1)';
+              }}
+            >
+              ⬇️
+            </button>
+            <button 
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '12px',
+                opacity: 0.7,
+                transition: 'all 0.15s ease',
+                padding: '2px',
+                borderRadius: '3px',
+                width: '20px',
+                height: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              onClick={() => onInsertAtividadeAbove && onInsertAtividadeAbove(rowIdx)}
+              title="Inserir linha acima"
+              onMouseEnter={(e) => {
+                e.target.style.opacity = '1';
+                e.target.style.background = 'rgba(0, 0, 0, 0.05)';
+                e.target.style.transform = 'scale(1.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.opacity = '0.7';
+                e.target.style.background = 'transparent';
+                e.target.style.transform = 'scale(1)';
+              }}
+            >
+              ➕
+            </button>
+            <button 
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '12px',
+                opacity: 0.7,
+                transition: 'all 0.15s ease',
+                padding: '2px',
+                borderRadius: '3px',
+                width: '20px',
+                height: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              onClick={() => onInsertAtividadeBelow && onInsertAtividadeBelow(rowIdx)}
+              title="Inserir linha abaixo"
+              onMouseEnter={(e) => {
+                e.target.style.opacity = '1';
+                e.target.style.background = 'rgba(0, 0, 0, 0.05)';
+                e.target.style.transform = 'scale(1.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.opacity = '0.7';
+                e.target.style.background = 'transparent';
+                e.target.style.transform = 'scale(1)';
+              }}
+            >
+              ➕
+            </button>
+            {atividades.length > 1 && (
+              <button 
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  opacity: 0.7,
+                  transition: 'all 0.15s ease',
+                  padding: '2px',
+                  borderRadius: '3px',
+                  width: '20px',
+                  height: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                onClick={() => onDeleteAtividade && onDeleteAtividade(rowIdx)}
+                title="Deletar linha"
+                onMouseEnter={(e) => {
+                  e.target.style.opacity = '1';
+                  e.target.style.background = 'rgba(255, 0, 0, 0.1)';
+                  e.target.style.transform = 'scale(1.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.opacity = '0.7';
+                  e.target.style.background = 'transparent';
+                  e.target.style.transform = 'scale(1)';
+                }}
+              >
+                🗑️
+              </button>
+            )}
+          </div>
+        </td>
       </tr>
     ))}
   </tbody>
