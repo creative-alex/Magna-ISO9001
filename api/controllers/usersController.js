@@ -132,7 +132,45 @@ const createUser = async (req, res) => {
   }
 };
 
+const getAllUsers = async (req, res) => {
+  try {
+    console.log("getAllUsers chamado");
+    
+    // Acessa a coleção users no Firestore
+    const db = admin.firestore();
+    const usersRef = db.collection('users');
+    
+    // Busca todos os documentos da coleção users
+    const snapshot = await usersRef.get();
+    
+    if (snapshot.empty) {
+      console.log("Nenhum usuário encontrado");
+      return res.json([]);
+    }
+    
+    const users = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      // Filtrar SuperAdmins da lista
+      if (data.role !== "SuperAdmin" && data.role !== "superadmin") {
+        users.push({
+          id: doc.id,
+          nome: data.nome || data.name || data.displayName || 'Nome não disponível',
+          email: data.email || 'Email não disponível'
+        });
+      }
+    });
+    
+    console.log("Usuários encontrados (excluindo SuperAdmins):", users.length);
+    res.json(users);
+    
+  } catch (error) {
+    console.error("Erro ao buscar usuários:", error);
+    res.status(500).json({ error: "Erro interno do servidor", details: error.message });
+  }
+};
+
 
 module.exports = {
-  verifyTokenAndGetUserInfo, createUser
+  verifyTokenAndGetUserInfo, createUser, getAllUsers
 };

@@ -12,6 +12,7 @@ export default function TabelaPdf({
   headers,
   headersObs,
   donoProcesso,
+  donoProcessoOriginal,
   setDonoProcesso,
   objetivoProcesso,
   setObjetivoProcesso,
@@ -44,6 +45,7 @@ export default function TabelaPdf({
   onInsertAtividadeAbove,
   onInsertAtividadeBelow,
   onDeleteAtividade,
+  funcionarios = [], // Nova prop para funcionários
 }) {
   const isTemplate2 = templateType === 2;
 
@@ -73,6 +75,7 @@ export default function TabelaPdf({
           headers={headers}
           headersObs={headersObs}
           donoProcesso={donoProcesso}
+          donoProcessoOriginal={donoProcessoOriginal}
           setDonoProcesso={setDonoProcesso}
           objetivoProcesso={objetivoProcesso}
           setObjetivoProcesso={setObjetivoProcesso}
@@ -84,6 +87,8 @@ export default function TabelaPdf({
           setServicosEntrada={setServicosEntrada}
           servicoSaida={servicoSaida}
           setServicoSaida={setServicoSaida}
+          funcionarios={funcionarios}
+          getTablesHtml={getTablesHtml}
           onMoveAtividadeUp={handleMoveAtividadeUp}
           onMoveAtividadeDown={handleMoveAtividadeDown}
           onInsertAtividadeAbove={handleInsertAtividadeAbove}

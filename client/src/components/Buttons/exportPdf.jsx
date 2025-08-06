@@ -9,6 +9,7 @@ export default function ExportPdfButton({
   headersObs,
   atividades,
   donoProcesso,
+  donoProcessoOriginal,
   objetivoProcesso,
   indicadores,
   pathFilename,
@@ -111,6 +112,29 @@ export default function ExportPdfButton({
       method: "POST",
       body: formData,
     });
+
+    // Se o dono do processo foi alterado (apenas para Template2), atualizar no backend
+    if (templateType === 2 && donoProcesso !== donoProcessoOriginal) {
+      try {
+        console.log("Atualizando dono do processo:", donoProcesso);
+        const processId = pathFilename; // Usando o filename como processId
+        
+        await fetch("http://192.168.1.219:8080/files/update-dono-processo", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            processId: processId,
+            donoProcesso: donoProcesso
+          }),
+        });
+        
+        console.log("Dono do processo atualizado com sucesso!");
+      } catch (error) {
+        console.error("Erro ao atualizar dono do processo:", error);
+      }
+    }
 
     // Chama o callback para indicar que foi guardado com sucesso
     if (onSaveSuccess) {

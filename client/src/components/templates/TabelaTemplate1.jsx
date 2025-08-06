@@ -66,119 +66,88 @@ export default function Template1({
           <tbody>
             {/* Objetivos */}
             <tr className="editable-table-row">
+              <th className="section-header">1. Objetivos:</th>
+            </tr>
+            <tr className="editable-table-row">
               <td className="editable-table-cell">
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ 
-                    fontWeight: 'bold', 
-                    padding: '5px 0', 
-                    borderBottom: '1px solid #ddd', 
-                    marginBottom: '5px',
-                    background: '#f8f9fa'
-                  }}>
-                    1. Objetivos:
-                  </div>
-                  <textarea
-                    ref={el => textAreaRefs.current[`obj-0-0`] = el}
-                    className="editable-table-textarea tabela-observacoes-textarea"
-                    style={{ minHeight: 80, width: '100%', resize: 'vertical', border: 'none' }}
-                    value={dataObs[0] ? dataObs[0][0] : ''}
-                    onChange={e => handleChangeObs(0, 0, e.target.value)}
-                    onInput={handleTextareaResize}
-                    placeholder="Digite os objetivos do documento..."
-                  />
-                </div>
+                <textarea
+                  ref={el => textAreaRefs.current[`obj-0-0`] = el}
+                  className="editable-table-textarea tabela-observacoes-textarea"
+                  style={{ minHeight: 80, width: '100%', resize: 'vertical', border: 'none' }}
+                  value={dataObs[0] ? dataObs[0][0] : ''}
+                  onChange={e => handleChangeObs(0, 0, e.target.value)}
+                  onInput={handleTextareaResize}
+                  placeholder="Digite os objetivos do documento..."
+                />
               </td>
             </tr>
             
             {/* Campo de Aplicação */}
             <tr className="editable-table-row">
+              <th className="section-header">2. Campo de Aplicação:</th>
+            </tr>
+            <tr className="editable-table-row">
               <td className="editable-table-cell">
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ 
-                    fontWeight: 'bold', 
-                    padding: '5px 0', 
-                    borderBottom: '1px solid #ddd', 
-                    marginBottom: '5px',
-                    background: '#f8f9fa'
-                  }}>
-                    2. Campo de Aplicação:
-                  </div>
-                  <textarea
-                    ref={el => textAreaRefs.current[`campo-1-0`] = el}
-                    className="editable-table-textarea tabela-observacoes-textarea"
-                    style={{ minHeight: 80, width: '100%', resize: 'vertical', border: 'none' }}
-                    value={dataObs[1] ? dataObs[1][0] : ''}
-                    onChange={e => handleChangeObs(1, 0, e.target.value)}
-                    onInput={handleTextareaResize}
-                    placeholder="Digite o campo de aplicação..."
-                  />
-                </div>
+                <textarea
+                  ref={el => textAreaRefs.current[`campo-1-0`] = el}
+                  className="editable-table-textarea tabela-observacoes-textarea"
+                  style={{ minHeight: 80, width: '100%', resize: 'vertical', border: 'none' }}
+                  value={dataObs[1] ? dataObs[1][0] : ''}
+                  onChange={e => handleChangeObs(1, 0, e.target.value)}
+                  onInput={handleTextareaResize}
+                  placeholder="Digite o campo de aplicação..."
+                />
               </td>
             </tr>
 
             {/* Definições */}
             <tr className="editable-table-row">
+              <th className="section-header">3. Definições:</th>
+            </tr>
+            <tr className="editable-table-row">
               <td className="editable-table-cell">
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ 
-                    fontWeight: 'bold', 
-                    padding: '5px 0', 
-                    borderBottom: '1px solid #ddd', 
-                    marginBottom: '5px',
-                    background: '#f8f9fa'
-                  }}>
-                    3. Definições:
-                  </div>
-                  <textarea
-                    ref={el => textAreaRefs.current[`def-2-0`] = el}
-                    className="editable-table-textarea tabela-observacoes-textarea"
-                    style={{ minHeight: 80, width: '100%', resize: 'vertical', border: 'none' }}
-                    value={dataObs[2] ? dataObs[2][0] : ''}
-                    onChange={e => handleChangeObs(2, 0, e.target.value)} 
-                    onInput={handleTextareaResize}
-                    placeholder="Digite as definições relevantes..."
-                  />
-                </div>
+                <textarea
+                  ref={el => textAreaRefs.current[`def-2-0`] = el}
+                  className="editable-table-textarea tabela-observacoes-textarea"
+                  value={dataObs[2] ? dataObs[2][0] : ''}
+                  onChange={e => handleChangeObs(2, 0, e.target.value)} 
+                  onInput={handleTextareaResize}
+                  placeholder="Digite as definições relevantes..."
+                />
               </td>
             </tr>
 
             {/* Abreviaturas */}
             <tr className="editable-table-row">
+              <th className="section-header">4. Abreviaturas:</th>
+            </tr>
+            <tr className="editable-table-row">
               <td className="editable-table-cell">
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div>
-                    4. Abreviaturas:
-                  </div>
-                  <textarea
-                    ref={el => textAreaRefs.current[`abrev-3-0`] = el}
-                    className="editable-table-textarea tabela-observacoes-textarea"
-                    style={{ minHeight: 80, width: '100%', resize: 'vertical', border: 'none' }}
-                    value={dataObs[3] ? dataObs[3][0] : ''}
-                    onChange={e => handleChangeObs(3, 0, e.target.value)}
-                    onInput={handleTextareaResize}
-                    placeholder="Digite as abreviaturas utilizadas..."
-                  />
-                </div>
+                <textarea
+                  ref={el => textAreaRefs.current[`abrev-3-0`] = el}
+                  className="editable-table-textarea tabela-observacoes-textarea"
+                  value={dataObs[3] ? dataObs[3][0] : ''}
+                  onChange={e => handleChangeObs(3, 0, e.target.value)}
+                  onInput={handleTextareaResize}
+                  placeholder="Digite as abreviaturas utilizadas..."
+                />
               </td>
             </tr>
 
             {/* Observações */}
             <tr className="editable-table-row">
+              <th className="section-header">5. Observações:</th>
+            </tr>
+            <tr className="editable-table-row">
               <td className="editable-table-cell">
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div>
-                    5. Observações:
-                  </div>
-                  <textarea
-                    ref={el => textAreaRefs.current[`obs-4-0`] = el}
-                    className="editable-table-textarea tabela-observacoes-textarea"
-                    style={{ minHeight: 80, width: '100%', resize: 'vertical', border: 'none' }}
-                    value={dataObs[4] ? dataObs[4][0] : ''}
-                    onChange={e => handleChangeObs(4, 0, e.target.value)}
-                    onInput={handleTextareaResize}
-                    placeholder="Digite observações adicionais..."
-                  />
-                </div>
+                <textarea
+                  ref={el => textAreaRefs.current[`obs-4-0`] = el}
+                  className="editable-table-textarea tabela-observacoes-textarea"
+                  value={dataObs[4] ? dataObs[4][0] : ''}
+                  onChange={e => handleChangeObs(4, 0, e.target.value)}
+                  onInput={handleTextareaResize}
+                  placeholder="Digite observações adicionais..."
+                />
               </td>
             </tr>
           </tbody>
@@ -190,8 +159,8 @@ export default function Template1({
         <table className="editable-table tabela-principal" border="1" cellPadding={4}>
           <thead>
             <tr>
-              <th className="editable-table-header" style={{ width: '100px' }}>Fluxo<br />das Ações</th>
-              <th className="editable-table-header" style={{ width: '700px' }}>Descrição</th>
+              <th className="editable-table-header" style={{ width: '90px' }}>Fluxo<br />das Ações</th>
+              <th className="editable-table-header" style={{ width: '1000px' }}>Descrição</th>
               <th className="editable-table-header" style={{ width: '80px' }}>Responsável</th>
               <th className="editable-table-header" style={{ width: '60px' }}>Documentos<br />Associados</th>
               <th className="editable-table-header" style={{ width: '60px' }}>Instruções<br />de Trabalho</th>
@@ -205,12 +174,7 @@ export default function Template1({
                   <td key={colIdx} className="editable-table-cell">
                     <textarea
                       ref={el => textAreaRefs.current[`main-${rowIdx}-${colIdx}`] = el}
-                      className="editable-table-textarea tabela-principal-textarea"
-                      style={{ 
-                        minHeight: colIdx === 1 ? 80 : 60, // Descrição tem altura maior
-                        width: '100%',
-                        resize: 'vertical'
-                      }}
+                      className="editable-table-textarea tabela-principal-textarea"                      
                       value={cell}
                       onChange={e => handleChange(rowIdx, colIdx, e.target.value)}
                       onInput={handleTextareaResize}
@@ -225,30 +189,9 @@ export default function Template1({
                   </td>
                 ))}
                 <td className="editable-table-cell">
-                  <div style={{ 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    alignItems: 'center', 
-                    gap: '2px', 
-                    padding: '2px',
-                    width: '100%'
-                  }}>
+                  <div>
                     <button 
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        opacity: rowIdx === 0 ? 0.3 : 0.7,
-                        transition: 'all 0.15s ease',
-                        padding: '2px',
-                        borderRadius: '3px',
-                        width: '20px',
-                        height: '20px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
+                      className="action-button"
                       onClick={() => onMoveRowUp && onMoveRowUp(rowIdx)}
                       disabled={rowIdx === 0}
                       title="Mover para cima"
@@ -267,22 +210,8 @@ export default function Template1({
                     >
                       ⬆️
                     </button>
-                    <button 
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        opacity: rowIdx === data.length - 1 ? 0.3 : 0.7,
-                        transition: 'all 0.15s ease',
-                        padding: '2px',
-                        borderRadius: '3px',
-                        width: '20px',
-                        height: '20px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
+                    <button
+                      className="action-button"
                       onClick={() => onMoveRowDown && onMoveRowDown(rowIdx)}
                       disabled={rowIdx === data.length - 1}
                       title="Mover para baixo"
@@ -301,22 +230,8 @@ export default function Template1({
                     >
                       ⬇️
                     </button>
-                    <button 
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        opacity: 0.7,
-                        transition: 'all 0.15s ease',
-                        padding: '2px',
-                        borderRadius: '3px',
-                        width: '20px',
-                        height: '20px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
+                    <button
+                      className="action-button"
                       onClick={() => onInsertRowAbove && onInsertRowAbove(rowIdx)}
                       title="Inserir linha acima"
                       onMouseEnter={(e) => {
@@ -332,22 +247,8 @@ export default function Template1({
                     >
                       ➕
                     </button>
-                    <button 
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        opacity: 0.7,
-                        transition: 'all 0.15s ease',
-                        padding: '2px',
-                        borderRadius: '3px',
-                        width: '20px',
-                        height: '20px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
+                    <button
+                      className="action-button"
                       onClick={() => onInsertRowBelow && onInsertRowBelow(rowIdx)}
                       title="Inserir linha abaixo"
                       onMouseEnter={(e) => {
@@ -365,21 +266,7 @@ export default function Template1({
                     </button>
                     {data.length > 1 && (
                       <button 
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          opacity: 0.7,
-                          transition: 'all 0.15s ease',
-                          padding: '2px',
-                          borderRadius: '3px',
-                          width: '20px',
-                          height: '20px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
+                        className="action-button"
                         onClick={() => onDeleteRow && onDeleteRow(rowIdx)}
                         title="Deletar linha"
                         onMouseEnter={(e) => {

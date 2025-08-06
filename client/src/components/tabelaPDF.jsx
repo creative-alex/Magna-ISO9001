@@ -158,9 +158,30 @@ const [indicadores, setIndicadores] = useState([
   [""],
 ]);
 const [donoProcesso, setDonoProcesso] = useState("");
+const [donoProcessoOriginal, setDonoProcessoOriginal] = useState("");
 const [objetivoProcesso, setObjetivoProcesso] = useState("");
 const [servicosEntrada, setServicosEntrada] = useState("");
 const [servicoSaida, setServicoSaida] = useState("");
+const [funcionarios, setFuncionarios] = useState([]);
+
+// Carregar funcionários do backend
+useEffect(() => {
+  const carregarFuncionarios = async () => {
+    try {
+      const response = await fetch("http://192.168.1.219:8080/users/getAllUsers");
+      if (!response.ok) {
+        throw new Error("Erro ao carregar funcionários");
+      }
+      const funcionariosData = await response.json();
+      setFuncionarios(funcionariosData);
+    } catch (error) {
+      console.error("Erro ao carregar funcionários:", error);
+      setFuncionarios([]); // Array vazio em caso de erro
+    }
+  };
+
+  carregarFuncionarios();
+}, []);
 
 // Estado para rastrear se há mudanças não guardadas
 const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -452,7 +473,9 @@ useEffect(() => {
 
         // Atualiza os estados extra do Template2
         if (currentTemplate === tabelasTemplate2) {
-          setDonoProcesso(formData.dono_processo || "");
+          const donoProcessoValue = formData.dono_processo || "";
+          setDonoProcesso(donoProcessoValue);
+          setDonoProcessoOriginal(donoProcessoValue); // Definir valor original
           setObjetivoProcesso(formData.objetivo_processo || "");
           setAtividades([
             [
@@ -693,9 +716,11 @@ useEffect(() => {
             setServicoSaida={handleSetServicoSaida}
             indicadores={indicadores}
             donoProcesso={donoProcesso}
+            donoProcessoOriginal={donoProcessoOriginal}
             setDonoProcesso={handleSetDonoProcesso}
             objetivoProcesso={objetivoProcesso}
             setObjetivoProcesso={handleSetObjetivoProcesso}
+            funcionarios={funcionarios} 
             handleAtividadesChange={handleAtividadesChange}
             handleIndicadoresChange={handleIndicadoresChange}
             onMoveAtividadeUp={handleMoveAtividadeUp}
@@ -722,14 +747,17 @@ useEffect(() => {
             headersObs={template[0].headers}
             atividades={atividades}
             donoProcesso={donoProcesso}
+            donoProcessoOriginal={donoProcessoOriginal}
             objetivoProcesso={objetivoProcesso}
             indicadores={indicadores}
             pathFilename={originalFilename}
             servicosEntrada={servicosEntrada}
             servicoSaida={servicoSaida}
-            onSaveSuccess={() => setHasUnsavedChanges(false)}
+            onSaveSuccess={() => {
+              setHasUnsavedChanges(false);
+              setDonoProcessoOriginal(donoProcesso); // Atualizar valor original após salvar
+            }}
           />
-          <PreviewPdfButton getTablesHtml={getTablesHtml} />
         </>
       ) : (
         <Template1

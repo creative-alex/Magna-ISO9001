@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { verifyTokenAndGetUserInfo } = require('../controllers/usersController'); 
+const { verifyTokenAndGetUserInfo, getAllUsers } = require('../controllers/usersController');
 
 
 router.post("/verifyTokenAndGetUserInfo", verifyTokenAndGetUserInfo);
+router.get("/getAllUsers", getAllUsers);
 
 
 module.exports = router;

@@ -196,6 +196,24 @@
   font-style: italic;
 }
 
+.action-button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  font-size: 16px;
+  color: #2c5aa0;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.section-header {
+  font-weight: bold;
+  padding: 5px;
+  background: #f8f9fa;
+  border: 1px solid #ddd;
+  text-align: left;
+}
+
 /* ===== ESTILOS PARA TEMPLATE 2 ===== */
 
 /* Estilo Base para Todas as Tabelas do Template 2 */
