@@ -68,16 +68,60 @@
 }
 
 /* ===== ESTILOS PARA EDITABLE TABLE (TEMPLATE 1) ===== */
-.primeira-tabela {
+
+/* Larguras específicas para colunas da tabela principal */
+.editable-table .col-fluxo {
+  width: 90px;
+  min-width: 90px;
+}
+
+.editable-table .col-descricao {
+  width: 1000px;
+  min-width: 300px;
+}
+
+.editable-table .col-responsavel {
+  width: 80px;
+  min-width: 80px;
+}
+
+.editable-table .col-documentos {
+  width: 60px;
+  min-width: 60px;
+}
+
+.editable-table .col-instrucoes {
+  width: 60px;
+  min-width: 60px;
+}
+
+.editable-table .col-acoes {
+  width: 50px;
+  min-width: 50px;
+}
+
+/* Containers de tabelas */
+.primeira-tabela,
+.segunda-tabela,
+.tabela-processo,
+.tabela-atividades,
+.tabela-indicadores {
   margin-bottom: 20px;
   border-radius: 6px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-.segunda-tabela {
-  margin-bottom: 20px;
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+/* Estilos específicos para Template 2 */
+.tabela-processo,
+.tabela-atividades,
+.tabela-indicadores {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  table-layout: fixed;
+  margin-bottom: 24px;
 }
 
 .editable-table {
@@ -89,23 +133,40 @@
   min-width: 600px;
 }
 
+.editable-table tr {
+  height: auto;
+}
+
 .editable-table:nth-child(2) {
  background-color: pink;
 }
 
-.editable-table-header {
-  background: #2c5aa0;
-  color: white;
-  padding: 16px 20px;
-  font-weight: 700;
+/* Cabeçalhos - Estilo unificado para Template 1 e 2 */
+.editable-table-header,
+.tabela-processo th,
+.tabela-atividades th,
+.tabela-indicadores th {
+  background-color: #2c5aa0;
+  color: #fff;
+  padding: 12px 16px;
+  font-weight: 600;
   text-transform: uppercase;
   font-size: 13px;
-  letter-spacing: 0.8px;
   border: none;
-  position: relative;
+  letter-spacing: 0.3px;
+  text-align: left;
+  white-space: normal;
+}
+
+/* Estilos específicos apenas para editable-table-header */
+.editable-table-header {
+  padding: 16px 20px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
   text-align: center;
   border-bottom: 3px solid #1e3f73;
   box-shadow: inset 0 -2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
 }
 
 .editable-table-header:first-child {
@@ -148,16 +209,29 @@
   background: #f5f9fe;
 }
 
-.editable-table-cell {
-  padding: 0;
+/* Células - Estilo unificado */
+.editable-table-cell,
+.tabela-processo td,
+.tabela-atividades td,
+.tabela-indicadores td {
   border: 1px solid #e1e7f0;
   vertical-align: top;
+  background-color: #fff;
+  font-size: 14px;
+}
+
+/* Estilos específicos para editable-table-cell */
+.editable-table-cell {
+  padding: 0;
   background: inherit;
   position: relative;
+  height: auto;
+  overflow: visible;
 }
 
 .editable-table-textarea {
   width: 100%;
+  height: auto;
   border: none;
   background: transparent;
   padding: 14px 18px;
@@ -165,21 +239,27 @@
   font-size: 14px;
   color: #2d3748;
   line-height: 1.5;
-  resize: none;
+  resize: vertical;
   overflow: hidden;
   min-height: 50px;
+  max-height: none;
   box-sizing: border-box;
   transition: all 0.2s ease;
+  display: block;
+  word-wrap: break-word;
+  white-space: pre-wrap;
 }
 
 .tabela-observacoes-textarea {
   /* Específico para textarea da tabela de observações */
   min-height: 80px;
+  resize: vertical;
 }
 
 .tabela-principal-textarea {
   /* Específico para textarea da tabela principal */
   min-height: 60px;
+  resize: vertical;
 }
 
 .editable-table-textarea:focus {
@@ -216,20 +296,6 @@
 
 /* ===== ESTILOS PARA TEMPLATE 2 ===== */
 
-/* Estilo Base para Todas as Tabelas do Template 2 */
-.tabela-processo,
-.tabela-atividades,
-.tabela-indicadores {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 24px;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  border-radius: 6px;
-  overflow: hidden;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-  table-layout: fixed;
-}
-
 /* Container responsivo para tabela de atividades */
 .tabela-atividades {
   display: block;
@@ -247,27 +313,10 @@
   table-layout: fixed;
 }
 
-/* Cabeçalhos */
-.tabela-processo th,
-.tabela-atividades th,
-.tabela-indicadores th {
-  background-color: #2c5aa0;
-  color: #fff;
-  padding: 12px 16px;
-  font-weight: 600;
-  text-transform: uppercase;
-  font-size: 13px;
-  border: none;
-  letter-spacing: 0.3px;
-  text-align: left;
-  white-space: normal;
-}
-
-/* Cabeçalhos específicos da tabela de atividades - permite quebra de linha */
+/* Cabeçalhos específicos da tabela de atividades */
 .tabela-atividades th {
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: normal;
   box-sizing: border-box;
   word-wrap: break-word;
 }
@@ -276,7 +325,6 @@
 .tabela-atividades th:nth-child(1),
 .tabela-atividades td:nth-child(1) {
   width: 25%;
-  min-width: 200px;
 }
 
 .tabela-atividades th:nth-child(2),
@@ -293,61 +341,52 @@
 .tabela-atividades td:nth-child(5),
 .tabela-atividades th:nth-child(6),
 .tabela-atividades td:nth-child(6) {
-  width: 12.5%;
+  width: 10%;
   min-width: 150px;
 }
 
 /* Coluna de Ações da tabela de atividades */
 .tabela-atividades th:nth-child(7),
 .tabela-atividades td:nth-child(7) {
-  width: 60px;
-  min-width: 60px;
-  text-align: center;
+  width: 10%;
+
 }
 
-/* Células */
-.tabela-processo td,
-.tabela-atividades td,
-.tabela-indicadores td {
-  background-color: #fff;
-  padding: 10px 14px;
-  border: 1px solid #e1e7f0;
-  vertical-align: top;
-  font-size: 14px;
-}
-
-/* Textareas e Inputs - Estilo comum */
+/* Textareas e Inputs - Estilo base unificado */
+.editable-table-textarea,
 .tabela-processo-textarea,
 .tabela-indicadores-textarea,
 .tabela-atividades-input {
   width: 100%;
-  border: 1px solid #ced4da;
+  border: transparent;
   border-radius: 4px;
-  padding: 10px 12px;
+  padding: 10px 0px;
   font-family: inherit;
   font-size: 14px;
   color: #333;
-  background: #f9f9f9;
+  background: transparent;
   transition: border-color 0.2s ease, background 0.2s ease;
-  resize: vertical;
+  resize: none !important;
   box-sizing: border-box;
-  overflow: hidden;
+  overflow-y: hidden;
   word-wrap: break-word;
-}
-
-/* Estilos específicos para inputs da tabela de atividades */
-.tabela-atividades-input {
   min-height: 40px;
-  max-width: 100%;
-  white-space: normal;
-  overflow-wrap: break-word;
+  line-height: 1.4;
 }
 
-.tabela-atividades td {
-  word-wrap: break-word;
-  overflow-wrap: break-word;
+.editable-table-textarea {
+  background: transparent;
+  border: none;
+  padding: 14px 18px;
+  color: #2d3748;
+  line-height: 1.5;
+  max-height: none;
+  display: block;
+  white-space: pre-wrap;
 }
 
+/* Focus state unificado para textareas e inputs */
+.editable-table-textarea:focus,
 .tabela-processo-textarea:focus,
 .tabela-indicadores-textarea:focus,
 .tabela-atividades-input:focus {
@@ -355,6 +394,32 @@
   border-color: #2c5aa0;
   background: #fff;
   box-shadow: 0 0 0 2px rgba(44, 90, 160, 0.1);
+}
+
+/* Focus específico para editable-table-textarea */
+.editable-table-textarea:focus {
+  box-shadow: inset 0 0 0 2px #2c5aa0;
+  border-radius: 4px;
+  margin: 2px;
+  padding: 12px 16px;
+}
+
+/* Estilos específicos para inputs da tabela de atividades */
+.tabela-atividades-input {
+  min-height: 40px;
+  max-width: 100%;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  resize: none !important;
+  overflow-y: hidden;
+  line-height: 1.4;
+  font-family: inherit;
+  vertical-align: top;
+}
+
+.tabela-atividades td {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 /* ===== RESPONSIVIDADE ===== */
@@ -506,4 +571,169 @@
     font-size: 14px;
     min-height: 40px;
   }
+}
+
+/* ===== CLASSES ESPECÍFICAS PARA TEMPLATE 2 ===== */
+
+/* Container relativo para select */
+.select-container {
+  position: relative;
+}
+
+/* Select do dono do processo */
+.tabela-processo-select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  background-color: white;
+  cursor: pointer;
+}
+
+.tabela-processo-select.altered {
+  border: 2px solid #ffc107;
+  background-color: #fff3cd;
+}
+
+/* Badge de alteração */
+.alteration-badge {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: #ffc107;
+  color: #856404;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  pointer-events: none;
+  font-weight: bold;
+}
+
+/* Tamanhos específicos de textareas */
+.tabela-observacoes-textarea {
+  min-height: 80px;
+}
+
+.tabela-principal-textarea {
+  min-height: 60px;
+}
+
+.tabela-processo-textarea.large {
+  min-height: 120px;
+}
+
+.tabela-indicadores-textarea.medium {
+  min-height: 60px;
+}
+
+/* Container de ações da tabela atividades */
+.actions-container {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  min-width: 80px;
+}
+
+/* Células de ações */
+.actions-cell {
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* Botões de ação */
+.action-btn {
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+  padding: 4px 6px;
+  border-radius: 4px;
+  min-width: 28px;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid;
+}
+
+/* Botão mover (neutro) */
+.action-btn.move {
+  background: #f8f9fa;
+  border-color: #dee2e6;
+}
+
+.action-btn.move:disabled {
+  opacity: 0.4;
+}
+
+.action-btn.move:not(:disabled):hover {
+  background: #e9ecef;
+}
+
+.action-btn.move.up:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.action-btn.move.down:not(:disabled):hover {
+  transform: translateY(1px);
+}
+
+.action-btn.move:not(:disabled):not(:hover) {
+  transform: translateY(0);
+}
+
+/* Botão inserir (verde) */
+.action-btn.insert {
+  background: #d4edda;
+  border-color: #c3e6cb;
+  color: #155724;
+}
+
+.action-btn.insert:hover {
+  background: #c3e6cb;
+  transform: scale(1.05);
+}
+
+.action-btn.insert:not(:hover) {
+  transform: scale(1);
+}
+
+/* Botão deletar (vermelho) */
+.action-btn.delete {
+  background: #f8d7da;
+  border-color: #f5c6cb;
+  color: #721c24;
+}
+
+.action-btn.delete:hover {
+  background: #f5c6cb;
+  transform: scale(1.05);
+}
+
+.action-btn.delete:not(:hover) {
+  transform: scale(1);
+}
+
+/* Alinhamentos específicos */
+.tabela-processo .header-left,
+.tabela-processo .cell-left {
+  text-align: left;
+}
+
+.tabela-processo .header-center,
+.tabela-indicadores .header-center {
+  text-align: center;
+}
+
+.tabela-processo .cell-top {
+  vertical-align: top;
+}
+
+/* Textarea específico da tabela indicadores */
+.tabela-indicadores-textarea.medium {
+  min-height: 60px;
 }

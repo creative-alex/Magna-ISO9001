@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import ExportPdfButton from "../Buttons/exportPdf";
 import PreviewPdfButton from "../Buttons/previewPDF";
 import "./styleTemplates.css"; 
@@ -10,7 +10,7 @@ export default function Template2({
   handleIndicadoresChange,
   donoProcesso = "",
   setDonoProcesso,
-  donoProcessoOriginal = "", // Novo prop para valor original
+  donoProcessoOriginal = "",
   objetivoProcesso = "",
   setObjetivoProcesso,
   atividades = [["", "", "", "", "", ""], 
@@ -22,18 +22,36 @@ export default function Template2({
   setServicosEntrada,
   servicoSaida = "",
   setServicoSaida,
-  funcionarios = [], // Nova prop para lista de funcionários
-  // Props para PreviewPdfButton
+  funcionarios = [], 
   getTablesHtml,
-  // Funções para manipulação de linhas das atividades
   onMoveAtividadeUp,
   onMoveAtividadeDown,
   onInsertAtividadeAbove,
   onInsertAtividadeBelow,
   onDeleteAtividade,
 }) {
+  // Refs para textareas auto-resize
+  const textAreaRefs = useRef({});
+
   // Verifica se o dono do processo foi alterado
   const donoProcessoAlterado = donoProcesso !== donoProcessoOriginal;
+
+  // Função para redimensionar textarea automaticamente
+  const handleTextareaResize = (e) => {
+    const textarea = e.target;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.max(textarea.scrollHeight, 40)}px`;
+  };
+
+  // Redimensiona textareas quando dados mudam
+  useEffect(() => {
+    Object.values(textAreaRefs.current).forEach(textarea => {
+      if (textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = `${Math.max(textarea.scrollHeight, 40)}px`;
+      }
+    });
+  }, [atividades, servicosEntrada, servicoSaida, objetivoProcesso, indicadores]);
 
   return (
     <div className="template2-container">
@@ -41,22 +59,13 @@ export default function Template2({
 <table className="tabela-processo">
   <thead>
     <tr>
-      <th colSpan={2} style={{ textAlign: "left" }}>DONO DO PROCESSO<br/>(nomeado):</th>
-      <td colSpan={4} style={{ textAlign: "left" }}>
-        <div style={{ position: 'relative' }}>
+      <th colSpan={2} className="header-left">DONO DO PROCESSO<br/>(nomeado):</th>
+      <td colSpan={4} className="cell-left">
+        <div className="select-container">
           <select
-            className="tabela-processo-select"
+            className={`tabela-processo-select ${donoProcessoAlterado ? 'altered' : ''}`}
             value={donoProcesso}
             onChange={e => setDonoProcesso(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '8px',
-              border: donoProcessoAlterado ? '2px solid #ffc107' : '1px solid #ddd',
-              borderRadius: '4px',
-              fontSize: '14px',
-              backgroundColor: donoProcessoAlterado ? '#fff3cd' : 'white',
-              cursor: 'pointer'
-            }}
           >
             <option value="">Selecione um funcionário...</option>
             {funcionarios.map((funcionario) => (
@@ -66,19 +75,7 @@ export default function Template2({
             ))}
           </select>
           {donoProcessoAlterado && (
-            <div style={{
-              position: 'absolute',
-              right: '8px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              backgroundColor: '#ffc107',
-              color: '#856404',
-              fontSize: '12px',
-              padding: '2px 6px',
-              borderRadius: '3px',
-              pointerEvents: 'none',
-              fontWeight: 'bold'
-            }}>
+            <div className="alteration-badge">
               Alterado
             </div>
           )}
@@ -86,39 +83,46 @@ export default function Template2({
       </td>
     </tr>
     <tr>
-      <th colSpan={2} style={{ textAlign: "left" }}>OBJETIVO DO PROCESSO:</th>
-      <td colSpan={4} style={{ textAlign: "left" }}>
+      <th colSpan={2} className="header-left">OBJETIVO DO PROCESSO:</th>
+      <td colSpan={4} className="cell-left">
         <textarea
+          ref={(el) => textAreaRefs.current['objetivo-processo'] = el}
           className="tabela-processo-textarea"
           value={objetivoProcesso}
           onChange={e => setObjetivoProcesso(e.target.value)}
+          onInput={handleTextareaResize}
           placeholder="Descreva o objetivo principal do processo..."
+          style={{ resize: 'none' }}
         />
       </td>
     </tr>
     <tr>
-      <th colSpan={3} style={{ textAlign: "center" }}>SERVIÇOS DE ENTRADAS</th>
-      <th colSpan={3} style={{ textAlign: "center" }}>SERVIÇO DE SAÍDA</th>
+      <th colSpan={3} className="header-center">SERVIÇOS DE ENTRADAS</th>
+      <th colSpan={3} className="header-center">SERVIÇO DE SAÍDA</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td colSpan={3} style={{ verticalAlign: "top" }}>
+      <td colSpan={3} className="cell-top">
         <textarea
-          className="tabela-processo-textarea"
-          style={{ minHeight: 120 }}
+          ref={(el) => textAreaRefs.current['servicos-entrada'] = el}
+          className="tabela-processo-textarea large"
           value={servicosEntrada}
           onChange={e => setServicosEntrada(e.target.value)}
+          onInput={handleTextareaResize}
           placeholder="Descreva os serviços de entrada necessários..."
+          style={{ resize: 'none' }}
         />
       </td>
-      <td colSpan={3} style={{ verticalAlign: "top" }}>
+      <td colSpan={3} className="cell-top">
         <textarea
-          className="tabela-processo-textarea"
-          style={{ minHeight: 120 }}
+          ref={(el) => textAreaRefs.current['servico-saida'] = el}
+          className="tabela-processo-textarea large"
           value={servicoSaida}
           onChange={e => setServicoSaida(e.target.value)}
+          onInput={handleTextareaResize}
           placeholder="Descreva o serviço de saída resultante..."
+          style={{ resize: 'none' }}
         />
       </td>
     </tr>
@@ -129,13 +133,13 @@ export default function Template2({
 <table className="tabela-atividades">
   <thead>
     <tr>
-      <th style={{ minWidth: '150px' }}>Principais Atividades</th>
-      <th style={{ minWidth: '150px' }}>Procedimentos Associados</th>
-      <th style={{ minWidth: '120px' }}>Requisitos ISO 9001</th>
-      <th style={{ minWidth: '120px' }}>Requisitos DGERT</th>
-      <th style={{ minWidth: '120px' }}>Requisitos EQAVET</th>
-      <th style={{ minWidth: '120px' }}>Requisitos CQCQ</th>
-      <th style={{ minWidth: '80px', textAlign: 'center' }}>Ações</th>
+      <th>Principais Atividades</th>
+      <th>Procedimentos Associados</th>
+      <th>Requisitos ISO 9001</th>
+      <th>Requisitos DGERT</th>
+      <th>Requisitos EQAVET</th>
+      <th>Requisitos CQCQ</th>
+      <th>Ações</th>
     </tr>
   </thead>
   <tbody>
@@ -151,188 +155,60 @@ export default function Template2({
             'Requisitos CQCQ'
           ];
           return (
-            <td key={colIdx} data-label={labels[colIdx]} style={{ padding: '8px' }}>
-              <input
-                type="text"
-                className="tabela-atividades-input"
+            <td key={colIdx} data-label={labels[colIdx]}>
+              <textarea
+                ref={(el) => textAreaRefs.current[`atividade-${rowIdx}-${colIdx}`] = el}
+                className="tabela-atividades-input custom"
                 value={cell}
                 onChange={e => handleAtividadesChange(rowIdx, colIdx, e.target.value)}
+                onInput={handleTextareaResize}
                 placeholder={`${colIdx === 0 ? 'Atividade' : colIdx === 1 ? 'Procedimento' : 'Requisito'}...`}
-                style={{
-                  width: '100%',
-                  padding: '6px',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  fontSize: '14px',
-                  minHeight: '32px'
-                }}
+                style={{ resize: 'none' }}
               />
             </td>
           );
         })}
-        <td style={{ padding: '8px', textAlign: 'center', verticalAlign: 'middle' }}>
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            justifyContent: 'center',
-            alignItems: 'center',
-            gap: '4px',
-            minWidth: '80px'
-          }}>
+        <td className="actions-cell">
+          <div className="actions-container">
             <button 
-              style={{
-                background: '#f8f9fa',
-                border: '1px solid #dee2e6',
-                cursor: 'pointer',
-                fontSize: '12px',
-                opacity: rowIdx === 0 ? 0.4 : 1,
-                transition: 'all 0.2s ease',
-                padding: '4px 6px',
-                borderRadius: '4px',
-                minWidth: '28px',
-                minHeight: '28px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
+              className={`action-btn move up ${rowIdx === 0 ? 'disabled' : ''}`}
               onClick={() => onMoveAtividadeUp && onMoveAtividadeUp(rowIdx)}
               disabled={rowIdx === 0}
               title="Mover para cima"
-              onMouseEnter={(e) => {
-                if (!e.target.disabled) {
-                  e.target.style.background = '#e9ecef';
-                  e.target.style.transform = 'translateY(-1px)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = '#f8f9fa';
-                e.target.style.transform = 'translateY(0)';
-              }}
             >
               ↑
             </button>
             
             <button 
-              style={{
-                background: '#f8f9fa',
-                border: '1px solid #dee2e6',
-                cursor: 'pointer',
-                fontSize: '12px',
-                opacity: rowIdx === atividades.length - 1 ? 0.4 : 1,
-                transition: 'all 0.2s ease',
-                padding: '4px 6px',
-                borderRadius: '4px',
-                minWidth: '28px',
-                minHeight: '28px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
+              className={`action-btn move down ${rowIdx === atividades.length - 1 ? 'disabled' : ''}`}
               onClick={() => onMoveAtividadeDown && onMoveAtividadeDown(rowIdx)}
               disabled={rowIdx === atividades.length - 1}
               title="Mover para baixo"
-              onMouseEnter={(e) => {
-                if (!e.target.disabled) {
-                  e.target.style.background = '#e9ecef';
-                  e.target.style.transform = 'translateY(1px)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = '#f8f9fa';
-                e.target.style.transform = 'translateY(0)';
-              }}
             >
               ↓
             </button>
             
             <button 
-              style={{
-                background: '#d4edda',
-                border: '1px solid #c3e6cb',
-                cursor: 'pointer',
-                fontSize: '12px',
-                transition: 'all 0.2s ease',
-                padding: '4px 6px',
-                borderRadius: '4px',
-                minWidth: '28px',
-                minHeight: '28px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#155724'
-              }}
+              className="action-btn insert"
               onClick={() => onInsertAtividadeAbove && onInsertAtividadeAbove(rowIdx)}
               title="Inserir linha acima"
-              onMouseEnter={(e) => {
-                e.target.style.background = '#c3e6cb';
-                e.target.style.transform = 'scale(1.05)';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = '#d4edda';
-                e.target.style.transform = 'scale(1)';
-              }}
             >
               +
             </button>
             
             <button 
-              style={{
-                background: '#d4edda',
-                border: '1px solid #c3e6cb',
-                cursor: 'pointer',
-                fontSize: '12px',
-                transition: 'all 0.2s ease',
-                padding: '4px 6px',
-                borderRadius: '4px',
-                minWidth: '28px',
-                minHeight: '28px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#155724'
-              }}
+              className="action-btn insert"
               onClick={() => onInsertAtividadeBelow && onInsertAtividadeBelow(rowIdx)}
               title="Inserir linha abaixo"
-              onMouseEnter={(e) => {
-                e.target.style.background = '#c3e6cb';
-                e.target.style.transform = 'scale(1.05)';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = '#d4edda';
-                e.target.style.transform = 'scale(1)';
-              }}
             >
               +
             </button>
             
             {atividades.length > 1 && (
               <button 
-                style={{
-                  background: '#f8d7da',
-                  border: '1px solid #f5c6cb',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  transition: 'all 0.2s ease',
-                  padding: '4px 6px',
-                  borderRadius: '4px',
-                  minWidth: '28px',
-                  minHeight: '28px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#721c24'
-                }}
+                className="action-btn delete"
                 onClick={() => onDeleteAtividade && onDeleteAtividade(rowIdx)}
                 title="Deletar linha"
-                onMouseEnter={(e) => {
-                  e.target.style.background = '#f5c6cb';
-                  e.target.style.transform = 'scale(1.05)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.background = '#f8d7da';
-                  e.target.style.transform = 'scale(1)';
-                }}
               >
                 ×
               </button>
@@ -348,7 +224,7 @@ export default function Template2({
 <table className="tabela-indicadores">
   <thead>
     <tr>
-      <th style={{ textAlign: "center" }}>Indicadores de monitorização do processo</th>
+      <th className="header-center">Indicadores de monitorização do processo</th>
     </tr>
   </thead>
   <tbody>
@@ -356,11 +232,13 @@ export default function Template2({
       <tr key={rowIdx}>
         <td>
           <textarea
-            className="tabela-indicadores-textarea"
-            style={{ minHeight: 60 }}
+            ref={(el) => textAreaRefs.current[`indicador-${rowIdx}`] = el}
+            className="tabela-indicadores-textarea medium"
             value={indicador}
             onChange={e => handleIndicadoresChange(rowIdx, e.target.value)}
+            onInput={handleTextareaResize}
             placeholder="Descreva o indicador de monitorização..."
+            style={{ resize: 'none' }}
           />
         </td>
       </tr>

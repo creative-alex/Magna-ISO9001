@@ -31,8 +31,72 @@ function filterTree(nodes, searchTerm) {
 function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners, currentUser, isAdmin, onDelete }) {
   const [expandedFolder, setExpandedFolder] = useState(null);
 
-  const folders = nodes.filter(n => n.type === "folder");
-  const files = nodes.filter(n => n.type === "file");
+  // Função para ordenar nós: arquivos primeiro, depois pastas "Informação documentada" correspondentes
+  const sortNodes = (nodes) => {
+    const folders = nodes.filter(n => n.type === "folder");
+    const files = nodes.filter(n => n.type === "file");
+    
+    // Função para extrair número de um nome
+    const extractNumber = (name) => {
+      // Primeiro tenta encontrar número no início
+      let match = name.match(/^(\d+)/);
+      if (match) return match[1];
+      
+      // Se não encontrar no início, procura por "procedimento XX" ou similar
+      match = name.match(/procedimento\s+(\d+)/i);
+      if (match) return match[1];
+      
+      // Procura qualquer número no nome
+      match = name.match(/(\d+)/);
+      if (match) return match[1];
+      
+      return 'other';
+    };
+    
+    // Cria grupos baseados nos números (ex: "00", "01", etc.)
+    const groups = new Map();
+    
+    // Adiciona arquivos aos grupos
+    files.forEach(file => {
+      const number = extractNumber(file.name);
+      if (!groups.has(number)) {
+        groups.set(number, { files: [], folders: [] });
+      }
+      groups.get(number).files.push(file);
+    });
+    
+    // Adiciona pastas aos grupos
+    folders.forEach(folder => {
+      const number = extractNumber(folder.name);
+      if (!groups.has(number)) {
+        groups.set(number, { files: [], folders: [] });
+      }
+      groups.get(number).folders.push(folder);
+    });
+    
+    // Ordena os grupos numericamente
+    const sortedGroups = Array.from(groups.entries()).sort((a, b) => {
+      if (a[0] === 'other') return 1;
+      if (b[0] === 'other') return -1;
+      return parseInt(a[0]) - parseInt(b[0]);
+    });
+    
+    // Constrói a lista final: para cada grupo, arquivos primeiro, depois pastas
+    const result = [];
+    sortedGroups.forEach(([number, group]) => {
+      // Ordena arquivos dentro do grupo
+      group.files.sort((a, b) => a.name.localeCompare(b.name));
+      result.push(...group.files);
+      
+      // Ordena pastas dentro do grupo
+      group.folders.sort((a, b) => a.name.localeCompare(b.name));
+      result.push(...group.folders);
+    });
+    
+    return result;
+  };
+
+  const sortedNodes = sortNodes(nodes);
 
   const toggleFolder = (folderName) => {
     setExpandedFolder(expandedFolder === folderName ? null : folderName);
@@ -55,71 +119,72 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
 
   return (
     <div className="folder-structure">
-      {folders.map(folder => {
-        // Para pastas de primeiro nível, mostra o dono se existir
-        const isTopLevel = currentPath.length === 0;
-        const folderOwner = isTopLevel ? processOwners[folder.name] : null;
-        
-        return (
-          <div key={folder.name} className="folder">
-            <div
-              className={`folder-header ${expandedFolder === folder.name ? 'active' : ''}`}
-              onClick={() => toggleFolder(folder.name)}
+      {sortedNodes.map(node => {
+        if (node.type === "folder") {
+          // Para pastas de primeiro nível, mostra o dono se existir
+          const isTopLevel = currentPath.length === 0;
+          const folderOwner = isTopLevel ? processOwners[node.name] : null;
+          
+          return (
+            <div key={node.name} className="folder">
+              <div
+                className={`folder-header ${expandedFolder === node.name ? 'active' : ''}`}
+                onClick={() => toggleFolder(node.name)}
+              >
+                <span className="folder-name">
+                  {node.name}
+                </span>
+                <div className="folder-actions" style={{ display: 'flex', alignItems: 'center' }}>
+                  {canAccessProcess([...currentPath, node.name].join("/")) ? (
+                    <CreateTableButton
+                      folderName={node.name}
+                      currentPath={currentPath}
+                    />
+                  ) : null}
+                </div>
+              </div>
+            {expandedFolder === node.name && (
+              <div className="folder-content">
+                <FolderStructure
+                  nodes={node.children || []}
+                  onSelectFile={onSelectFile}
+                  currentPath={[...currentPath, node.name]}
+                  processOwners={processOwners}
+                  currentUser={currentUser}
+                  isAdmin={isAdmin}
+                  onDelete={onDelete}
+                />
+              </div>
+            )}
+          </div>
+          );
+        } else {
+          // node.type === "file"
+          const filePath = [...currentPath, node.name].join("/");
+          const hasAccess = canAccessProcess(filePath);
+          const displayName = node.name.endsWith('.pdf') ? node.name.slice(0, -4) : node.name;
+          
+          return (
+            <div 
+              key={node.name} 
+              className={`file ${hasAccess ? 'file-clickable' : ''}`}
+              onClick={hasAccess ? () => onSelectFile(filePath) : undefined}
+              style={{ cursor: hasAccess ? 'pointer' : 'default' }}
             >
-              <span className="folder-name">
-                {folder.name}
-              </span>
-              <div className="folder-actions" style={{ display: 'flex', alignItems: 'center' }}>
-                {canAccessProcess([...currentPath, folder.name].join("/")) ? (
-                  <CreateTableButton
-                    folderName={folder.name}
-                    currentPath={currentPath}
+              <span className="file-name">{displayName}</span>
+              <div className="file-actions">
+                <PdfPreviewButton file={node} currentPath={currentPath} />
+                {isAdmin && (
+                  <DeleteButton 
+                    file={node} 
+                    currentPath={currentPath} 
+                    onDelete={onDelete} 
                   />
-                ) : null}
+                )}
               </div>
             </div>
-          {expandedFolder === folder.name && (
-            <div className="folder-content">
-              <FolderStructure
-                nodes={folder.children || []}
-                onSelectFile={onSelectFile}
-                currentPath={[...currentPath, folder.name]}
-                processOwners={processOwners}
-                currentUser={currentUser}
-                isAdmin={isAdmin}
-                onDelete={onDelete}
-              />
-            </div>
-          )}
-        </div>
-        );
-      })}
-
-      {files.map(file => {
-        const filePath = [...currentPath, file.name].join("/");
-        const hasAccess = canAccessProcess(filePath);
-        const displayName = file.name.endsWith('.pdf') ? file.name.slice(0, -4) : file.name;
-        
-        return (
-          <div 
-            key={file.name} 
-            className={`file ${hasAccess ? 'file-clickable' : ''}`}
-            onClick={hasAccess ? () => onSelectFile(filePath) : undefined}
-            style={{ cursor: hasAccess ? 'pointer' : 'default' }}
-          >
-            <span className="file-name">{displayName}</span>
-            <div className="file-actions">
-              <PdfPreviewButton file={file} currentPath={currentPath} />
-              {isAdmin && (
-                <DeleteButton 
-                  file={file} 
-                  currentPath={currentPath} 
-                  onDelete={onDelete} 
-                />
-              )}
-            </div>
-          </div>
-        );
+          );
+        }
       })}
     </div>
   );

@@ -39,8 +39,11 @@ export default function Template1({
 
   // Função para redimensionar textarea automaticamente
   const handleTextareaResize = (e) => {
-    e.target.style.height = 'auto';
-    e.target.style.height = `${e.target.scrollHeight}px`;
+    const textarea = e.target;
+    // Reset height to auto to get proper scrollHeight
+    textarea.style.height = 'auto';
+    // Set height to match content
+    textarea.style.height = `${Math.max(textarea.scrollHeight, 50)}px`;
   };
 
   // Redimensiona todos os textareas quando os dados mudam
@@ -48,7 +51,7 @@ export default function Template1({
     Object.values(textAreaRefs.current).forEach(textarea => {
       if (textarea) {
         textarea.style.height = 'auto';
-        textarea.style.height = `${textarea.scrollHeight}px`;
+        textarea.style.height = `${Math.max(textarea.scrollHeight, 50)}px`;
       }
     });
   }, [data, dataObs]);
@@ -73,7 +76,6 @@ export default function Template1({
                 <textarea
                   ref={el => textAreaRefs.current[`obj-0-0`] = el}
                   className="editable-table-textarea tabela-observacoes-textarea"
-                  style={{ minHeight: 80, width: '100%', resize: 'vertical', border: 'none' }}
                   value={dataObs[0] ? dataObs[0][0] : ''}
                   onChange={e => handleChangeObs(0, 0, e.target.value)}
                   onInput={handleTextareaResize}
@@ -91,7 +93,6 @@ export default function Template1({
                 <textarea
                   ref={el => textAreaRefs.current[`campo-1-0`] = el}
                   className="editable-table-textarea tabela-observacoes-textarea"
-                  style={{ minHeight: 80, width: '100%', resize: 'vertical', border: 'none' }}
                   value={dataObs[1] ? dataObs[1][0] : ''}
                   onChange={e => handleChangeObs(1, 0, e.target.value)}
                   onInput={handleTextareaResize}
@@ -159,12 +160,12 @@ export default function Template1({
         <table className="editable-table tabela-principal" border="1" cellPadding={4}>
           <thead>
             <tr>
-              <th className="editable-table-header" style={{ width: '90px' }}>Fluxo<br />das Ações</th>
-              <th className="editable-table-header" style={{ width: '1000px' }}>Descrição</th>
-              <th className="editable-table-header" style={{ width: '80px' }}>Responsável</th>
-              <th className="editable-table-header" style={{ width: '60px' }}>Documentos<br />Associados</th>
-              <th className="editable-table-header" style={{ width: '60px' }}>Instruções<br />de Trabalho</th>
-              <th className="editable-table-header" style={{ width: '50px' }}>Ações</th>
+              <th className="editable-table-header col-fluxo">Fluxo<br />das Ações</th>
+              <th className="editable-table-header col-descricao">Descrição</th>
+              <th className="editable-table-header col-responsavel">Responsável</th>
+              <th className="editable-table-header col-documentos">Documentos<br />Associados</th>
+              <th className="editable-table-header col-instrucoes">Instruções<br />de Trabalho</th>
+              <th className="editable-table-header col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>

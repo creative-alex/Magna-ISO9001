@@ -296,22 +296,23 @@ body {
 
 /* Hierarquia visual como na imagem */
 .folder-content .folder-header {
-  margin-left: 20px;
+  margin-left: 50px;
   margin-top: 10px;
   color: #2c5aa0;
+  height: 2.3vh;
 }
 
 .folder-content .folder-content .folder-header {
   background: #e6f2ff;
-  margin-left: 40px;
+  margin-left: 60px;
 }
 
 .folder-content .file {
-  margin-left: 20px;
+  margin-left: 30px;
 }
 
 .folder-content .folder-content .file {
-  margin-left: 40px;
+  margin-left: 60px;
   background: #fafcff;
 }
 
@@ -327,11 +328,11 @@ body {
   }
   
   .folder-content .folder-header {
-    margin-left: 10px;
+    margin-left: 15px;
   }
   
   .folder-content .folder-content .folder-header {
-    margin-left: 20px;
+    margin-left: 30px;
   }
   
   .folder-header {
