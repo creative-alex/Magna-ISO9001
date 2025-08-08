@@ -219,8 +219,13 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
   console.log("servicosEntrada:", safeServicosEntrada);
   console.log("servicoSaida:", safeServicoSaida);
 
-  // Usar a função utilitária para desenhar a tabela de cabeçalho do processo
-  let yPos = drawProcessHeaderTable(page, font, yStart, safeDonoProcesso, safeObjetivoProcesso, safeServicosEntrada, safeServicoSaida);
+  // Calcula posição centralizada para as tabelas
+  const pageWidth = pageSize[0];
+  const tableWidth = 540;
+  const xStartCentered = (pageWidth - tableWidth) / 2;
+
+  // Usar a função utilitária para desenhar a tabela de cabeçalho do processo (centralizada)
+  let yPos = drawProcessHeaderTableCentered(page, font, yStart, safeDonoProcesso, safeObjetivoProcesso, safeServicosEntrada, safeServicoSaida, xStartCentered);
 
   // Headers da tabela de atividades
   const headers = [
@@ -257,15 +262,15 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
   });
   rowHeights.unshift(40); // header height
 
-  // Desenha grid da tabela de atividades
+  // Desenha grid da tabela de atividades (centralizado)
   const totalWidth = colWidthTemplate2.reduce((a, b) => a + b, 0);
   let currentY = yPos;
   
   // Desenha linhas horizontais
   for (let i = 0; i <= safeAtividades.length + 1; i++) {
     page.drawLine({
-      start: { x: xStart, y: currentY },
-      end: { x: xStart + totalWidth, y: currentY },
+      start: { x: xStartCentered, y: currentY },
+      end: { x: xStartCentered + totalWidth, y: currentY },
       thickness: 1,
       color: rgb(0, 0, 0),
     });
@@ -275,7 +280,7 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
   }
 
   // Desenha linhas verticais
-  let currentX = xStart;
+  let currentX = xStartCentered;
   for (let j = 0; j <= colWidthTemplate2.length; j++) {
     page.drawLine({
       start: { x: currentX, y: yPos },
@@ -290,7 +295,7 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
 
   // Desenha headers com melhor alinhamento
   let headerY = yPos - 25;
-  let headerX = xStart;
+  let headerX = xStartCentered;
   headers.forEach((header, col) => {
     const lines = header.split('\n');
     const colWidth = colWidthTemplate2[col];
@@ -317,7 +322,7 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
   // Desenha dados das atividades
   let dataY = yPos - rowHeights[0];
   for (let row = 0; row < safeAtividades.length; row++) {
-    let dataX = xStart;
+    let dataX = xStartCentered;
     for (let col = 0; col < safeAtividades[row].length; col++) {
       const lines = wrappedAtividades[row][col];
       let textY = dataY - 4;
@@ -338,60 +343,68 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
     dataY -= rowHeights[row + 1];
   }
 
-  // Desenha indicadores
+  // Desenha indicadores (centralizado)
   let indicadoresY = dataY - 30;
-  
-  // Título da seção de indicadores
-  page.drawText("Indicadores de monitorização do processo", { 
-    x: xStart, 
-    y: indicadoresY, 
-    size: 11, 
-    font,
-    color: rgb(0, 0, 0),
-  });
   
   indicadoresY -= 25;
   
-  // Desenha uma caixa para os indicadores
-  const indicadoresHeight = Math.max(60, safeIndicadores.length * 40);
+  // Desenha header da tabela de indicadores
+  const indicadorHeaderHeight = 25;
   page.drawRectangle({
-    x: xStart,
-    y: indicadoresY - indicadoresHeight,
+    x: xStartCentered,
+    y: indicadoresY - indicadorHeaderHeight,
     width: 540,
-    height: indicadoresHeight,
+    height: indicadorHeaderHeight,
+    color: rgb(0.9, 0.9, 0.9),
     borderColor: rgb(0, 0, 0),
     borderWidth: 1,
   });
   
-  let currentIndicadorY = indicadoresY - 15;
-  safeIndicadores.forEach((indicador, idx) => {
-    const text = (indicador || '').toString();
-    if (text.trim()) {
+  page.drawText("Indicadores de monitorização do processo", {
+    x: xStartCentered + 10,
+    y: indicadoresY - 15,
+    size: 10,
+    font,
+    color: rgb(0, 0, 0),
+  });
+  
+  indicadoresY -= indicadorHeaderHeight;
+  
+  // Processa cada indicador como uma linha separada
+  const processedIndicadores = safeIndicadores.filter(ind => ind && ind.toString().trim());
+  
+  processedIndicadores.forEach((indicador, idx) => {
+    const text = indicador.toString().trim();
+    if (text) {
+      // Quebra o texto em linhas que cabem na largura disponível
       const lines = wrapText(text, font, fontSize, 520);
       
-      const bulletPoint = `${idx + 1}. `;
-      page.drawText(bulletPoint, {
-        x: xStart + 10,
-        y: currentIndicadorY,
-        size: fontSize,
-        font,
-        color: rgb(0, 0, 0),
+      // Calcula altura necessária para este indicador
+      const indicadorHeight = Math.max(25, lines.length * lineHeight + 10);
+      
+      // Desenha a célula do indicador
+      page.drawRectangle({
+        x: xStartCentered,
+        y: indicadoresY - indicadorHeight,
+        width: 540,
+        height: indicadorHeight,
+        borderColor: rgb(0, 0, 0),
+        borderWidth: 1,
       });
       
-      const bulletWidth = font.widthOfTextAtSize(bulletPoint, fontSize);
-      
+      // Desenha o texto do indicador
+      let textY = indicadoresY - 15;
       lines.forEach((line, lineIdx) => {
         page.drawText(line, {
-          x: xStart + 10 + (lineIdx === 0 ? bulletWidth : bulletWidth),
-          y: currentIndicadorY - lineIdx * lineHeight,
+          x: xStartCentered + 10,
+          y: textY - (lineIdx * lineHeight),
           size: fontSize,
           font,
           color: rgb(0, 0, 0),
         });
       });
-      currentIndicadorY -= (lines.length * lineHeight + 8);
-    } else {
-      currentIndicadorY -= 20; // Espaço para indicador vazio
+      
+      indicadoresY -= indicadorHeight;
     }
   });
 
@@ -820,6 +833,187 @@ export function drawProcessHeaderTable(page, font, yPos, donoProcesso, objetivoP
     if (saidaY - (idx * 12) > yPos - headerHeight - rowHeight - entradaSaidaHeight - contentHeight + 5) {
       page.drawText(line, {
         x: xStart + leftColWidth + 8,
+        y: saidaY - (idx * 12),
+        size: fontSize,
+        font,
+        color: rgb(0, 0, 0),
+      });
+    }
+  });
+
+  // Retorne a nova posição Y para continuar desenhando abaixo
+  return yPos - headerHeight - rowHeight - entradaSaidaHeight - contentHeight - 25;
+}
+
+// Função centralizada para o header do processo
+export function drawProcessHeaderTableCentered(page, font, yPos, donoProcesso, objetivoProcesso, servicosEntrada, servicoSaida, xStartCentered) {
+  // Larguras das colunas ajustadas
+  const totalWidth = 540;
+  const leftColWidth = 200;
+  const rightColWidth = totalWidth - leftColWidth;
+  const rowHeight = 35;
+  const headerHeight = 30;
+  const entradaSaidaHeight = 25;
+  const contentHeight = 120;
+
+  // DONO DO PROCESSO
+  page.drawRectangle({
+    x: xStartCentered,
+    y: yPos - headerHeight,
+    width: leftColWidth,
+    height: headerHeight,
+    color: rgb(0.85, 0.85, 0.85),
+    borderColor: rgb(0, 0, 0),
+    borderWidth: 1,
+  });
+  page.drawRectangle({
+    x: xStartCentered + leftColWidth,
+    y: yPos - headerHeight,
+    width: rightColWidth,
+    height: headerHeight,
+    borderColor: rgb(0, 0, 0),
+    borderWidth: 1,
+  });
+  page.drawText('DONO DO PROCESSO', {
+    x: xStartCentered + 8,
+    y: yPos - 12,
+    size: 10,
+    font,
+    color: rgb(0, 0, 0),
+  });
+  page.drawText('(nomeado):', {
+    x: xStartCentered + 8,
+    y: yPos - 24,
+    size: 10,
+    font,
+    color: rgb(0, 0, 0),
+  });
+  
+  const donoWrapped = wrapText(donoProcesso || '', font, 10, rightColWidth - 16);
+  donoWrapped.forEach((line, idx) => {
+    page.drawText(line, {
+      x: xStartCentered + leftColWidth + 8,
+      y: yPos - 15 - (idx * 12),
+      size: 10,
+      font,
+      color: rgb(0, 0, 0),
+    });
+  });
+
+  // OBJETIVO DO PROCESSO
+  page.drawRectangle({
+    x: xStartCentered,
+    y: yPos - headerHeight - rowHeight,
+    width: leftColWidth,
+    height: rowHeight,
+    color: rgb(0.85, 0.85, 0.85),
+    borderColor: rgb(0, 0, 0),
+    borderWidth: 1,
+  });
+  page.drawRectangle({
+    x: xStartCentered + leftColWidth,
+    y: yPos - headerHeight - rowHeight,
+    width: rightColWidth,
+    height: rowHeight,
+    borderColor: rgb(0, 0, 0),
+    borderWidth: 1,
+  });
+  page.drawText('OBJETIVO DO PROCESSO:', {
+    x: xStartCentered + 8,
+    y: yPos - headerHeight - 20,
+    size: 10,
+    font,
+    color: rgb(0, 0, 0),
+  });
+  
+  const objetivoWrapped = wrapText(objetivoProcesso || '', font, 10, rightColWidth - 16);
+  objetivoWrapped.forEach((line, idx) => {
+    page.drawText(line, {
+      x: xStartCentered + leftColWidth + 8,
+      y: yPos - headerHeight - 15 - (idx * 12),
+      size: 10,
+      font,
+      color: rgb(0, 0, 0),
+    });
+  });
+
+  // SERVIÇOS DE ENTRADAS / SAÍDA - Cabeçalho
+  page.drawRectangle({
+    x: xStartCentered,
+    y: yPos - headerHeight - rowHeight - entradaSaidaHeight,
+    width: leftColWidth,
+    height: entradaSaidaHeight,
+    color: rgb(0.85, 0.85, 0.85),
+    borderColor: rgb(0, 0, 0),
+    borderWidth: 1,
+  });
+  page.drawRectangle({
+    x: xStartCentered + leftColWidth,
+    y: yPos - headerHeight - rowHeight - entradaSaidaHeight,
+    width: rightColWidth,
+    height: entradaSaidaHeight,
+    color: rgb(0.85, 0.85, 0.85),
+    borderColor: rgb(0, 0, 0),
+    borderWidth: 1,
+  });
+  page.drawText('SERVIÇOS DE ENTRADAS', {
+    x: xStartCentered + 8,
+    y: yPos - headerHeight - rowHeight - 16,
+    size: 10,
+    font,
+    color: rgb(0, 0, 0),
+  });
+  page.drawText('SERVIÇO DE SAÍDA', {
+    x: xStartCentered + leftColWidth + 8,
+    y: yPos - headerHeight - rowHeight - 16,
+    size: 10,
+    font,
+    color: rgb(0, 0, 0),
+  });
+
+  // SERVIÇOS DE ENTRADAS / SAÍDA - Conteúdo
+  page.drawRectangle({
+    x: xStartCentered,
+    y: yPos - headerHeight - rowHeight - entradaSaidaHeight - contentHeight,
+    width: leftColWidth,
+    height: contentHeight,
+    borderColor: rgb(0, 0, 0),
+    borderWidth: 1,
+  });
+  page.drawRectangle({
+    x: xStartCentered + leftColWidth,
+    y: yPos - headerHeight - rowHeight - entradaSaidaHeight - contentHeight,
+    width: rightColWidth,
+    height: contentHeight,
+    borderColor: rgb(0, 0, 0),
+    borderWidth: 1,
+  });
+
+  // Texto dos serviços com quebra de linha adequada
+  let fontSize = 9;
+  
+  const entradaWrapped = wrapText(servicosEntrada || '', font, fontSize, leftColWidth - 16);
+  const saidaWrapped = wrapText(servicoSaida || '', font, fontSize, rightColWidth - 16);
+  
+  let entradaY = yPos - headerHeight - rowHeight - entradaSaidaHeight - 15;
+  let saidaY = entradaY;
+  
+  entradaWrapped.forEach((line, idx) => {
+    if (entradaY - (idx * 12) > yPos - headerHeight - rowHeight - entradaSaidaHeight - contentHeight + 5) {
+      page.drawText(line, {
+        x: xStartCentered + 8,
+        y: entradaY - (idx * 12),
+        size: fontSize,
+        font,
+        color: rgb(0, 0, 0),
+      });
+    }
+  });
+  
+  saidaWrapped.forEach((line, idx) => {
+    if (saidaY - (idx * 12) > yPos - headerHeight - rowHeight - entradaSaidaHeight - contentHeight + 5) {
+      page.drawText(line, {
+        x: xStartCentered + leftColWidth + 8,
         y: saidaY - (idx * 12),
         size: fontSize,
         font,

@@ -36,6 +36,104 @@ export default function Template2({
   // Verifica se o dono do processo foi alterado
   const donoProcessoAlterado = donoProcesso !== donoProcessoOriginal;
 
+  // Função para gerar HTML das tabelas para PDF
+  const generateTablesHtml = () => {
+    // Escapa caracteres especiais no HTML
+    const escapeHtml = (text) => {
+      if (!text || typeof text !== 'string') return '';
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+        .replace(/\n/g, '<br>');
+    };
+
+    const mainTableHtml = `
+      <style>
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 20px;
+          font-family: Arial, sans-serif;
+          font-size: 11px;
+        }
+        th, td {
+          border: 1px solid #000;
+          padding: 6px 8px;
+          text-align: left;
+          vertical-align: top;
+          word-wrap: break-word;
+        }
+        th {
+          background-color: #f0f0f0;
+          font-weight: bold;
+        }
+        .center { text-align: center; }
+        .left { text-align: left; }
+        h3 {
+          font-family: Arial, sans-serif;
+          font-size: 14px;
+          margin: 15px 0 10px 0;
+        }
+      </style>
+      
+      <h3>PROCESSO</h3>
+      <table>
+        <tr>
+          <th colspan="2" style="width: 30%;">DONO DO PROCESSO (nomeado):</th>
+          <td colspan="4">${escapeHtml(donoProcesso)}</td>
+        </tr>
+        <tr>
+          <th colspan="2">OBJETIVO DO PROCESSO:</th>
+          <td colspan="4">${escapeHtml(objetivoProcesso)}</td>
+        </tr>
+        <tr>
+          <th colspan="3" class="center">SERVIÇOS DE ENTRADAS</th>
+          <th colspan="3" class="center">SERVIÇO DE SAÍDA</th>
+        </tr>
+        <tr>
+          <td colspan="3" style="height: 80px;">${escapeHtml(servicosEntrada)}</td>
+          <td colspan="3" style="height: 80px;">${escapeHtml(servicoSaida)}</td>
+        </tr>
+      </table>
+
+      <h3>PRINCIPAIS ATIVIDADES</h3>
+      <table>
+        <tr>
+          <th style="width: 20%;">Principais Atividades</th>
+          <th style="width: 15%;">Procedimentos Associados</th>
+          <th style="width: 15%;">Requisitos ISO 9001</th>
+          <th style="width: 15%;">Requisitos DGERT</th>
+          <th style="width: 15%;">Requisitos EQAVET</th>
+          <th style="width: 20%;">Requisitos CQCQ</th>
+        </tr>
+        ${(atividades || []).map(row => `
+          <tr>
+            ${(row || []).map(cell => `<td>${escapeHtml(cell)}</td>`).join('')}
+          </tr>
+        `).join('')}
+      </table>
+    `;
+
+    const obsTableHtml = `
+      <h3>INDICADORES DE MONITORIZAÇÃO</h3>
+      <table>
+        <tr>
+          <th class="center">Indicadores de monitorização do processo</th>
+        </tr>
+        ${(indicadores || []).map(indicador => `
+          <tr>
+            <td>${escapeHtml(indicador)}</td>
+          </tr>
+        `).join('')}
+      </table>
+    `;
+
+    return { mainTableHtml, obsTableHtml };
+  };
+
   // Função para redimensionar textarea automaticamente
   const handleTextareaResize = (e) => {
     const textarea = e.target;
@@ -246,7 +344,15 @@ export default function Template2({
   </tbody>
 </table>
 
-      <PreviewPdfButton getTablesHtml={getTablesHtml} />
+      <PreviewPdfButton 
+        templateType={2}
+        atividades={atividades}
+        donoProcesso={donoProcesso}
+        objetivoProcesso={objetivoProcesso}
+        indicadores={indicadores}
+        servicosEntrada={servicosEntrada}
+        servicoSaida={servicoSaida}
+      />
     </div>
   );
 }
