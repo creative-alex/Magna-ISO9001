@@ -115,7 +115,6 @@ const Register = () => {
   return (
     <div className="login-container">
       <h2>Criar Nova Conta</h2>
-      <p>Registe-se para aceder ao sistema ISO 9001</p>
       
       {message && <p className="error">{message}</p>}
       

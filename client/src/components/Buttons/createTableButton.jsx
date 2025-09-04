@@ -24,12 +24,12 @@ export default function CreateTableButton({ folderName, currentPath = [] }) {
     <button
       onClick={handleCreateTable}
       className="create-table-btn"
-      title="Criar novo processo"
+      title="Criar novo processamento"
     >
         <img 
             src={newFileIcon} 
             alt="Criar Tabela" 
-            style={{ width: '16pxs', height: '16px' }} 
+            style={{ width: '16px', height: '16px' }} 
         />
     </button>
   );

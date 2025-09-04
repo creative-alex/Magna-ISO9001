@@ -96,8 +96,8 @@ const getPdfFormData = async (req, res) => {
   }
 };
 
-// Recebe dois arrays: pdfPaths (caminhos dos PDFs) e folderPaths (caminhos das pastas)
-function buildTree(pdfPaths, folderPaths = []) {
+// Recebe um array: filePaths (caminhos dos ficheiros)
+function buildTree(filePaths, folderPaths = []) {
   console.log("buildTree chamado");
   const root = [];
 
@@ -119,44 +119,44 @@ function buildTree(pdfPaths, folderPaths = []) {
   }
   console.log("Pastas adicionadas com sucesso.");
 
-  console.log("Adicionando arquivos PDF...");
-  for (const path of pdfPaths) {
-    console.log("Processando arquivo:", path);
+  console.log("Adicionando ficheiros...");
+  for (const path of filePaths) {
+    console.log("Processando ficheiro:", path);
     const parts = path.split("/");
     let current = root;
     for (let i = 0; i < parts.length; i++) {
       const name = parts[i];
-      const isFile = name.endsWith(".pdf") && i === parts.length - 1;
+      const isFile = i === parts.length - 1; // Último elemento é sempre um ficheiro
       let node = current.find(n => n.name === name && (isFile ? n.type === "file" : n.type === "folder"));
       if (!node) {
         node = isFile
           ? { name, type: "file", path }
           : { name, type: "folder", children: [] };
         current.push(node);
-        console.log(isFile ? "Arquivo adicionado:" : "Pasta adicionada:", name);
+        console.log(isFile ? "Ficheiro adicionado:" : "Pasta adicionada:", name);
       }
       if (!isFile) current = node.children;
     }
   }
-  console.log("Arquivos PDF adicionados com sucesso.");
+  console.log("Ficheiros adicionados com sucesso.");
 
   console.log("Árvore construída:", JSON.stringify(root, null, 2));
   return root;
 }
 
-const listPdfsTree = async (req, res) => {
+const listFilesTree = async (req, res) => {
   try {
-    console.log("listPdfsTree chamado");
+    console.log("listFilesTree chamado");
     const [files] = await bucket.getFiles();
-    const pdfPaths = files
-      .filter(f => f.name.endsWith(".pdf"))
+    const filePaths = files
+      .filter(f => !f.name.endsWith("/")) // Remove pastas vazias
       .map(f => f.name);
-    console.log("PDFs encontrados:", pdfPaths);
-    const tree = buildTree(pdfPaths);
+    console.log("Ficheiros encontrados:", filePaths);
+    const tree = buildTree(filePaths);
     res.json(tree);
   } catch (err) {
-    console.error("Erro em listPdfsTree:", err);
-    res.status(500).send("Erro ao listar PDFs: " + err.message);
+    console.error("Erro em listFilesTree:", err);
+    res.status(500).send("Erro ao listar ficheiros: " + err.message);
   }
 };
 
@@ -170,17 +170,29 @@ const getPdf = async (req, res) => {
       return res.status(400).send("Path não fornecido");
     }
 
-    console.log("Baixando PDF...");
+    console.log("Verificando se o arquivo existe:", path);
     const file = bucket.file(path);
-    const [buffer] = await file.download();
-    console.log("PDF baixado com sucesso:", path);
+    const [exists] = await file.exists();
+    if (!exists) {
+      console.log("Arquivo não encontrado:", path);
+      return res.status(404).send("Arquivo não encontrado");
+    }
 
-    res.setHeader("Content-Type", "application/pdf");
+    console.log("Baixando arquivo...");
+    const [buffer] = await file.download();
+    const [metadata] = await file.getMetadata();
+    console.log("Arquivo baixado com sucesso:", path);
+    console.log("Tipo de conteúdo:", metadata.contentType);
+
+    // Define o tipo de conteúdo baseado no metadata
+    const contentType = metadata.contentType || 'application/octet-stream';
+    
+    res.setHeader("Content-Type", contentType);
     res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(path.split('/').pop())}"`);
     res.send(buffer);
   } catch (err) {
-    console.error("Erro ao buscar PDF:", err);
-    res.status(500).send("Erro ao buscar PDF: " + err.message);
+    console.error("Erro ao buscar arquivo:", err);
+    res.status(500).send("Erro ao buscar arquivo: " + err.message);
   }
 };
 
@@ -204,16 +216,22 @@ const downloadPdf = async (req, res) => {
 
     console.log("Fazendo download do arquivo:", path);
     const [buffer] = await file.download();
+    const [metadata] = await file.getMetadata();
     console.log("Download concluído, tamanho do buffer:", buffer.length);
+    console.log("Metadata do arquivo:", metadata.contentType);
     
     // Define o nome do arquivo para download
     const filename = path.split('/').pop();
-    res.setHeader('Content-Type', 'application/pdf');
+    
+    // Define o tipo de conteúdo baseado no metadata ou na extensão
+    const contentType = metadata.contentType || 'application/octet-stream';
+    
+    res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(buffer);
   } catch (err) {
-    console.error("Erro ao fazer download do PDF:", err);
-    res.status(500).send("Erro ao fazer download do PDF: " + err.message);
+    console.error("Erro ao fazer download do arquivo:", err);
+    res.status(500).send("Erro ao fazer download do arquivo: " + err.message);
   }
 };
 
@@ -317,16 +335,136 @@ const deletePdf = async (req, res) => {
   }
 };
 
+// Nova função para listar documentos de uma pasta específica
+const listDocumentsInFolder = async (req, res) => {
+  try {
+    console.log("listDocumentsInFolder chamado");
+    const { folderPath } = req.body;
+    
+    if (!folderPath) {
+      console.log("FolderPath não fornecido");
+      return res.status(400).json({ error: "folderPath é obrigatório" });
+    }
+    
+    console.log("Buscando documentos na pasta:", folderPath);
+    
+    // Lista todos os arquivos no bucket
+    const [files] = await bucket.getFiles();
+    
+    // Primeiro tenta o caminho exato
+    let documentsInFolder = files
+      .filter(file => {
+        const filePath = file.name;
+        return filePath.startsWith(folderPath + '/') && filePath.endsWith('.pdf');
+      })
+      .map(file => {
+        const fileName = file.name.replace(folderPath + '/', '');
+        return fileName.replace('.pdf', '');
+      });
+    
+    // Se não encontrou documentos, tenta variações do nome da pasta
+    if (documentsInFolder.length === 0) {
+      const variations = [
+        // Variações com espaços diferentes (o padrão real tem 2 espaços)
+        folderPath.replace('Informação Documentada  Procedimento', 'Informacao Documentada  Procedimento'),
+        folderPath.replace('Informação Documentada  Procedimento', 'INFORMAÇÃO DOCUMENTADA  PROCEDIMENTO'),
+        folderPath.replace('Informação Documentada  Procedimento', 'informação documentada  procedimento'),
+        folderPath.replace('Informação Documentada  Procedimento', 'Informação documentada  procedimento'),
+        folderPath.replace('Informação Documentada  Procedimento', 'informacao documentada  procedimento'),
+        // Variações com 1 espaço (caso alguém tenha criado assim)
+        folderPath.replace('Informação Documentada  Procedimento', 'Informação Documentada Procedimento'),
+        folderPath.replace('Informação Documentada  Procedimento', 'Informacao Documentada Procedimento'),
+        folderPath.replace('Informação Documentada  Procedimento', 'INFORMAÇÃO DOCUMENTADA PROCEDIMENTO'),
+        folderPath.replace('Informação Documentada  Procedimento', 'informação documentada procedimento'),
+        folderPath.replace('Informação Documentada  Procedimento', 'Informação documentada procedimento'),
+        folderPath.replace('Informação Documentada  Procedimento', 'informacao documentada procedimento'),
+        // Fallback para formatos antigos
+        folderPath.replace('Informação Documentada  Procedimento', 'informação documentada'),
+        folderPath.replace('Informação Documentada  Procedimento', 'Informação documentada'),
+        folderPath.replace('Informação Documentada  Procedimento', 'informacao documentada')
+      ];
+      
+      for (const variation of variations) {
+        console.log("Tentando variação:", variation);
+        const docs = files
+          .filter(file => {
+            const filePath = file.name;
+            return filePath.startsWith(variation + '/') && filePath.endsWith('.pdf');
+          })
+          .map(file => {
+            const fileName = file.name.replace(variation + '/', '');
+            return fileName.replace('.pdf', '');
+          });
+        
+        if (docs.length > 0) {
+          documentsInFolder = docs;
+          console.log("Encontrou documentos na variação:", variation);
+          break;
+        }
+      }
+    }
+    
+    console.log("Documentos encontrados:", documentsInFolder);
+    res.json(documentsInFolder);
+    
+  } catch (error) {
+    console.error("Erro ao listar documentos na pasta:", error);
+    res.status(500).json({ error: "Erro interno do servidor", details: error.message });
+  }
+};
 
+const uploadDocument = async (req, res) => {
+  try {
+    console.log("uploadDocument chamado");
+    console.log("Verificando req.file...");
+    if (!req.file) {
+      console.log("Nenhum ficheiro enviado.");
+      return res.status(400).json({ error: "Nenhum ficheiro enviado." });
+    }
+
+    console.log("Ficheiro recebido:", req.file.originalname);
+    console.log("Tipo de ficheiro:", req.file.mimetype);
+    console.log("Tamanho:", req.file.size);
+
+    const folderPath = req.body.folderPath || '';
+    const filename = req.file.originalname;
+    const filePath = folderPath + filename;
+    
+    console.log("Caminho completo do ficheiro:", filePath);
+
+    const blob = bucket.file(filePath);
+    console.log("Blob criado, iniciando upload...");
+
+    // Upload do ficheiro
+    await blob.save(req.file.buffer, {
+      metadata: {
+        contentType: req.file.mimetype,
+      },
+    });
+
+    console.log("Ficheiro enviado com sucesso:", filePath);
+    res.json({ 
+      message: "Ficheiro enviado com sucesso!", 
+      filename: filename,
+      path: filePath 
+    });
+
+  } catch (err) {
+    console.error("Erro no upload do documento:", err);
+    res.status(500).json({ error: "Erro no upload: " + err.message });
+  }
+};
 
 module.exports = {
   uploadPdf,
+  uploadDocument,
   listPdfs,
   getPdfFormData,
-  listPdfsTree,
+  listFilesTree,
   getPdf,
   downloadPdf,
   updateDonoProcesso,
   getProcessOwners,
   deletePdf,
+  listDocumentsInFolder,
 };

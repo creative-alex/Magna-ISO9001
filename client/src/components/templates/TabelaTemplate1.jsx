@@ -1,6 +1,9 @@
 import React, { useRef, useEffect } from "react";
 import ExportPdfButton from "../Buttons/exportPdf";
 import PreviewPdfButton from "../Buttons/previewPDF";
+import DocumentosAssociados from "../DocumentosAssociados";
+import InstrucoesTrabalho from "../InstrucoesTrabalho";
+import useRowContextMenu from "../ContextMenu/useRowContextMenu";
 import "./styleTemplates.css";
 
 export default function Template1({ 
@@ -13,6 +16,7 @@ export default function Template1({
   servicoSaida = "",
   setServicosEntrada,
   setServicoSaida,
+  originalFilename, // Nova prop para identificar o arquivo atual
   // Props para ExportPdfButton
   atividades,
   donoProcesso,
@@ -36,6 +40,16 @@ export default function Template1({
   onDeleteRowObs
 }) {
   const textAreaRefs = useRef({});
+
+  // Hook único para o context menu
+  const contextMenu = useRowContextMenu({
+    totalRows: data.length,
+    onMoveRowUp,
+    onMoveRowDown,
+    onInsertRowAbove,
+    onInsertRowBelow,
+    onDeleteRow
+  });
 
   // Função para redimensionar textarea automaticamente
   const handleTextareaResize = (e) => {
@@ -163,152 +177,80 @@ export default function Template1({
               <th className="editable-table-header col-fluxo">Fluxo<br />das Ações</th>
               <th className="editable-table-header col-descricao">Descrição</th>
               <th className="editable-table-header col-responsavel">Responsável</th>
-              <th className="editable-table-header col-documentos">Documentos<br />Associados</th>
-              <th className="editable-table-header col-instrucoes">Instruções<br />de Trabalho</th>
-              <th className="editable-table-header col-acoes">Ações</th>
+              <th className="editable-table-header col-documentos">Documentos<br/>Associados</th>
+              <th className="editable-table-header col-instrucoes">Instruções<br/>de Trabalho</th>
             </tr>
           </thead>
           <tbody>
             {data.map((row, rowIdx) => (
-              <tr key={rowIdx} className="editable-table-row">
+              <tr 
+                key={rowIdx} 
+                className="editable-table-row"
+                onContextMenu={(e) => contextMenu.handleContextMenuEvent(e, rowIdx)}
+              >
                 {row.map((cell, colIdx) => (
                   <td key={colIdx} className="editable-table-cell">
-                    <textarea
-                      ref={el => textAreaRefs.current[`main-${rowIdx}-${colIdx}`] = el}
-                      className="editable-table-textarea tabela-principal-textarea"                      
-                      value={cell}
-                      onChange={e => handleChange(rowIdx, colIdx, e.target.value)}
-                      onInput={handleTextareaResize}
-                      placeholder={
-                        colIdx === 0 ? 'Fluxo' :
-                        colIdx === 1 ? 'Descrição' :
-                        colIdx === 2 ? 'Responsável' :
-                        colIdx === 3 ? 'Documentos' :
-                        'Instruções'
-                      }
-                    />
+                    {colIdx === 3 ? (
+                      // Coluna de Documentos Associados - usa componente especial
+                      <DocumentosAssociados
+                        currentValue={cell}
+                        onChange={(value) => handleChange(rowIdx, colIdx, value)}
+                        originalFilename={originalFilename}
+                      />
+                    ) : colIdx === 4 ? (
+                      // Coluna de Instruções de trabalho procedimento - usa componente especial
+                      <InstrucoesTrabalho
+                        currentValue={cell}
+                        onChange={(value) => handleChange(rowIdx, colIdx, value)}
+                        originalFilename={originalFilename}
+                      />
+                    ) : (
+                      // Outras colunas - usa textarea normal
+                      <textarea
+                        ref={el => textAreaRefs.current[`main-${rowIdx}-${colIdx}`] = el}
+                        className="editable-table-textarea tabela-principal-textarea"                      
+                        value={cell}
+                        onChange={e => handleChange(rowIdx, colIdx, e.target.value)}
+                        onInput={handleTextareaResize}
+                        placeholder={
+                          colIdx === 0 ? 'Fluxo' :
+                          colIdx === 1 ? 'Descrição' :
+                          colIdx === 2 ? 'Responsável' :
+                          colIdx === 3 ? 'Documentos' :
+                          'Instruções'
+                        }
+                      />
+                    )}
                   </td>
                 ))}
-                <td className="editable-table-cell">
-                  <div>
-                    <button 
-                      className="action-button"
-                      onClick={() => onMoveRowUp && onMoveRowUp(rowIdx)}
-                      disabled={rowIdx === 0}
-                      title="Mover para cima"
-                      onMouseEnter={(e) => {
-                        if (!e.target.disabled) {
-                          e.target.style.opacity = '1';
-                          e.target.style.background = 'rgba(0, 0, 0, 0.05)';
-                          e.target.style.transform = 'scale(1.1)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.opacity = rowIdx === 0 ? '0.3' : '0.7';
-                        e.target.style.background = 'transparent';
-                        e.target.style.transform = 'scale(1)';
-                      }}
-                    >
-                      ⬆️
-                    </button>
-                    <button
-                      className="action-button"
-                      onClick={() => onMoveRowDown && onMoveRowDown(rowIdx)}
-                      disabled={rowIdx === data.length - 1}
-                      title="Mover para baixo"
-                      onMouseEnter={(e) => {
-                        if (!e.target.disabled) {
-                          e.target.style.opacity = '1';
-                          e.target.style.background = 'rgba(0, 0, 0, 0.05)';
-                          e.target.style.transform = 'scale(1.1)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.opacity = rowIdx === data.length - 1 ? '0.3' : '0.7';
-                        e.target.style.background = 'transparent';
-                        e.target.style.transform = 'scale(1)';
-                      }}
-                    >
-                      ⬇️
-                    </button>
-                    <button
-                      className="action-button"
-                      onClick={() => onInsertRowAbove && onInsertRowAbove(rowIdx)}
-                      title="Inserir linha acima"
-                      onMouseEnter={(e) => {
-                        e.target.style.opacity = '1';
-                        e.target.style.background = 'rgba(0, 0, 0, 0.05)';
-                        e.target.style.transform = 'scale(1.1)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.opacity = '0.7';
-                        e.target.style.background = 'transparent';
-                        e.target.style.transform = 'scale(1)';
-                      }}
-                    >
-                      ➕
-                    </button>
-                    <button
-                      className="action-button"
-                      onClick={() => onInsertRowBelow && onInsertRowBelow(rowIdx)}
-                      title="Inserir linha abaixo"
-                      onMouseEnter={(e) => {
-                        e.target.style.opacity = '1';
-                        e.target.style.background = 'rgba(0, 0, 0, 0.05)';
-                        e.target.style.transform = 'scale(1.1)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.opacity = '0.7';
-                        e.target.style.background = 'transparent';
-                        e.target.style.transform = 'scale(1)';
-                      }}
-                    >
-                      ➕
-                    </button>
-                    {data.length > 1 && (
-                      <button 
-                        className="action-button"
-                        onClick={() => onDeleteRow && onDeleteRow(rowIdx)}
-                        title="Deletar linha"
-                        onMouseEnter={(e) => {
-                          e.target.style.opacity = '1';
-                          e.target.style.background = 'rgba(255, 0, 0, 0.1)';
-                          e.target.style.transform = 'scale(1.1)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.target.style.opacity = '0.7';
-                          e.target.style.background = 'transparent';
-                          e.target.style.transform = 'scale(1)';
-                        }}
-                      >
-                        🗑️
-                      </button>
-                    )}
-                  </div>
-                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      <ExportPdfButton
-        templateType={templateType}
-        data={data}
-        headers={['Fluxo\ndas Ações', 'Descrição', 'Responsável', 'Documentos\nAssociados', 'Instruções\nde Trabalho']}
-        dataObs={dataObs}
-        headersObs={['Observações']}
-        atividades={atividades}
-        donoProcesso={donoProcesso}
-        objetivoProcesso={objetivoProcesso}
-        indicadores={indicadores}
-        pathFilename={pathFilename}
-        servicosEntrada={servicosEntrada}
-        servicoSaida={servicoSaida}
-        fieldNames={fieldNames}
-        onSaveSuccess={onSaveSuccess}
-      />
-      <PreviewPdfButton getTablesHtml={getTablesHtml} />
+      {/* Renderizar o context menu fora da tabela */}
+      {contextMenu.contextMenu}
+
+      <div className="action-buttons-container">
+        <ExportPdfButton
+          templateType={templateType}
+          data={data}
+          headers={['Fluxo\ndas Ações', 'Descrição', 'Responsável', 'Documentos\nAssociados', 'Instruções\nde Trabalho']}
+          dataObs={dataObs}
+          headersObs={['Observações']}
+          atividades={atividades}
+          donoProcesso={donoProcesso}
+          objetivoProcesso={objetivoProcesso}
+          indicadores={indicadores}
+          pathFilename={pathFilename}
+          servicosEntrada={servicosEntrada}
+          servicoSaida={servicoSaida}
+          fieldNames={fieldNames}
+          onSaveSuccess={onSaveSuccess}
+        />
+        <PreviewPdfButton getTablesHtml={getTablesHtml} />
+      </div>
     </>
   );
 }

@@ -1,6 +1,7 @@
 import { createBasePdf, wrapText, pageSize, xStart, yStart } from './pdfBase';
 import { drawTableLines, drawHeaders, drawObsTable, getObsRows, colWidths, obsColWidth, obsRowHeight, spaceBetweenTables, drawTemplate2Table, colWidthTemplate2 } from './pdfTables';
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { drawObsTableWithHeaders } from './pdfObsTable';
+import { PDFDocument, StandardFonts, rgb, PDFName, PDFArray, PDFDict } from 'pdf-lib';
 
 // Função principal para gerar PDF editável
 export async function generateEditablePdf({
@@ -48,7 +49,7 @@ export async function generateEditablePdfTemplate1(data, headers, dataObs, heade
   console.log("data.length:", safeData.length);
 
   let yObs = yStart;
-  const fontSize = 8;
+  const fontSize = 2;
   const maxWidth = obsColWidth[0] - 8;
   const lineHeight = fontSize + 2;
   const safeDataObs = Array.from({ length: obsRows }, (_, i) =>
@@ -82,8 +83,51 @@ export async function generateEditablePdfTemplate1(data, headers, dataObs, heade
   const rowHeights = Array(safeData.length + 1).fill(50); // +1 para o header
 
   // Desenha tabela principal
+  // Primeiro desenha as linhas da tabela
   drawTableLines(page, obsTableHeightReal, undefined, rowHeights);
-  drawHeaders(page, safeHeaders, font, obsTableHeightReal, undefined, rowHeights);
+  
+  // DEPOIS desenha os headers com fundo cinza por cima (igual Template 2)
+  let xPos = xStart;
+  const yHeaders = yStart - obsTableHeightReal - spaceBetweenTables;
+  const headerHeight = rowHeights[0] || 50;
+  
+  safeHeaders.forEach((header, col) => {
+    const colWidth = colWidths[col] || 100;
+    
+    // Quadrado cinza do header (igual Template 2)
+    page.drawRectangle({
+      x: xPos,
+      y: yHeaders - headerHeight,
+      width: colWidth,
+      height: headerHeight,
+      color: rgb(0.7, 0.7, 0.7),
+      borderColor: rgb(0, 0, 0),
+      borderWidth: 1,
+    });
+    
+    // Texto do header
+    const lines = header.split('\n');
+    const fontSize = 8;
+    const lineHeight = 10;
+    const totalTextHeight = lines.length * lineHeight;
+    let startY = yHeaders - ((headerHeight - totalTextHeight) / 2) - fontSize;
+
+    lines.forEach((line, idx) => {
+      const textWidth = font.widthOfTextAtSize(line, fontSize);
+      const textX = xPos + (colWidth - textWidth) / 2;
+      const textY = startY - idx * lineHeight;
+
+      page.drawText(line, {
+        x: textX,
+        y: textY,
+        size: fontSize,
+        font,
+        color: rgb(0, 0, 0),
+      });
+    });
+
+    xPos += colWidth;
+  });
 
   let yPos = yStart - obsTableHeightReal - spaceBetweenTables - rowHeights[0];
   for (let row = 0; row < safeData.length; row++) {
@@ -226,6 +270,8 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
 
   // Usar a função utilitária para desenhar a tabela de cabeçalho do processo (centralizada)
   let yPos = drawProcessHeaderTableCentered(page, font, yStart, safeDonoProcesso, safeObjetivoProcesso, safeServicosEntrada, safeServicoSaida, xStartCentered);
+  
+  console.log("yPos após header:", yPos); // Debug
 
   // Headers da tabela de atividades
   const headers = [
@@ -237,155 +283,130 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
     "Requisitos\nCQCQ"
   ];
 
-  // Desenha tabela de atividades
-  const fontSize = 8;
-  const lineHeight = fontSize + 2;
-  
-  // Calcula altura das linhas dinamicamente
-  const maxWidths = colWidthTemplate2.map(w => w - 8);
-  const wrappedAtividades = safeAtividades.map(row =>
-    row.map((cell, col) => {
-      const cellText = (cell || '').toString();
-      const maxWidth = maxWidths[col] || 80;
-      return wrapText(cellText, font, fontSize, maxWidth);
-    })
-  );
-  
-  const rowHeights = wrappedAtividades.map(row => {
-    const heights = row.map(lines => {
-      if (!Array.isArray(lines) || lines.length === 0) return 30;
-      const height = lines.length * lineHeight + 8;
-      return Math.max(30, height);
-    });
-    const maxHeight = Math.max(...heights, 30);
-    return Math.max(30, maxHeight);
-  });
-  rowHeights.unshift(40); // header height
+  // Desenha tabela de atividades (versão customizada para centralizada)
+  const baseRowHeight = 25;
+  let yPos2 = yPos - 30;
 
-  // Desenha grid da tabela de atividades (centralizado)
-  const totalWidth = colWidthTemplate2.reduce((a, b) => a + b, 0);
-  let currentY = yPos;
-  
-  // Desenha linhas horizontais
-  for (let i = 0; i <= safeAtividades.length + 1; i++) {
-    page.drawLine({
-      start: { x: xStartCentered, y: currentY },
-      end: { x: xStartCentered + totalWidth, y: currentY },
-      thickness: 1,
-      color: rgb(0, 0, 0),
+  // Calcula altura dinâmica para cada linha com base no conteúdo
+  const getRowHeight = (rowData) => {
+    let maxLines = 1;
+    rowData.forEach((cellText, colIdx) => {
+      const wrappedLines = wrapText(cellText || '', font, 8, colWidthTemplate2[colIdx] - 8);
+      maxLines = Math.max(maxLines, wrappedLines.length);
     });
-    if (i < rowHeights.length) {
-      currentY -= rowHeights[i];
-    }
-  }
+    return Math.max(baseRowHeight, maxLines * 10 + 10);
+  };
 
-  // Desenha linhas verticais
-  let currentX = xStartCentered;
-  for (let j = 0; j <= colWidthTemplate2.length; j++) {
-    page.drawLine({
-      start: { x: currentX, y: yPos },
-      end: { x: currentX, y: currentY },
-      thickness: 1,
-      color: rgb(0, 0, 0),
+  // Calcula alturas de todas as linhas
+  const rowHeights = safeAtividades.map(row => getRowHeight(row));
+  const headerHeight = 35;
+
+  // Desenha cabeçalhos com fundo cinza
+  let xPos = xStartCentered;
+  headers.forEach((header, idx) => {
+    // Desenha fundo do cabeçalho
+    page.drawRectangle({
+      x: xPos,
+      y: yPos2 - headerHeight,
+      width: colWidthTemplate2[idx],
+      height: headerHeight,
+      color: rgb(0.7, 0.7, 0.7),
+      borderColor: rgb(0, 0, 0),
+      borderWidth: 1,
     });
-    if (j < colWidthTemplate2.length) {
-      currentX += colWidthTemplate2[j];
-    }
-  }
-
-  // Desenha headers com melhor alinhamento
-  let headerY = yPos - 25;
-  let headerX = xStartCentered;
-  headers.forEach((header, col) => {
-    const lines = header.split('\n');
-    const colWidth = colWidthTemplate2[col];
     
-    // Calcula a altura total do header para centralizar verticalmente
-    const totalHeaderHeight = lines.length * 11;
-    let startY = headerY - 5 + (totalHeaderHeight / 2);
-    
-    lines.forEach((line, idx) => {
-      const textWidth = font.widthOfTextAtSize(line, 9);
-      const textX = headerX + (colWidth - textWidth) / 2;
-      const textY = startY - idx * 11;
-      page.drawText(line, {
-        x: textX,
-        y: textY,
-        size: 9,
+    // Desenha texto do cabeçalho com quebra de linha
+    const headerLines = header.split('\n');
+    headerLines.forEach((line, lineIdx) => {
+      page.drawText(line, { 
+        x: xPos + 4, 
+        y: yPos2 - 12 - (lineIdx * 10), 
+        size: 9, 
         font,
         color: rgb(0, 0, 0),
       });
     });
-    headerX += colWidth;
+    xPos += colWidthTemplate2[idx];
   });
 
-  // Desenha dados das atividades
-  let dataY = yPos - rowHeights[0];
+  // Desenha dados das atividades linha por linha
+  let currentY = yPos2 - headerHeight;
+  
   for (let row = 0; row < safeAtividades.length; row++) {
+    const rowHeight = rowHeights[row];
     let dataX = xStartCentered;
+    
+    // Desenha as células da linha
     for (let col = 0; col < safeAtividades[row].length; col++) {
-      const lines = wrappedAtividades[row][col];
-      let textY = dataY - 4;
+      // Desenha retângulo da célula
+      page.drawRectangle({
+        x: dataX,
+        y: currentY - rowHeight,
+        width: colWidthTemplate2[col],
+        height: rowHeight,
+        borderColor: rgb(0, 0, 0),
+        borderWidth: 1,
+      });
       
-      for (let l = 0; l < lines.length; l++) {
-        if (lines[l] && typeof lines[l] === 'string') {
-          page.drawText(lines[l], {
-            x: dataX + 2,
-            y: textY - l * lineHeight,
-            size: fontSize,
+      // Processa e desenha o texto com quebra de linha
+      const cellText = safeAtividades[row][col] || '';
+      const wrappedLines = wrapText(cellText, font, 8, colWidthTemplate2[col] - 8);
+      
+      wrappedLines.forEach((line, lineIdx) => {
+        if (lineIdx < 8) { // Limita a 8 linhas por célula
+          page.drawText(line, {
+            x: dataX + 4,
+            y: currentY - 15 - (lineIdx * 10),
+            size: 8,
             font,
             color: rgb(0, 0, 0),
           });
         }
-      }
+      });
+      
       dataX += colWidthTemplate2[col];
     }
-    dataY -= rowHeights[row + 1];
+    currentY -= rowHeight;
   }
 
-  // Desenha indicadores (centralizado)
-  let indicadoresY = dataY - 30;
+  yPos = currentY;
+
+  // Desenha indicadores
+  yPos -= 50;
   
-  indicadoresY -= 25;
-  
-  // Desenha header da tabela de indicadores
-  const indicadorHeaderHeight = 25;
+  // Header da tabela de indicadores
   page.drawRectangle({
     x: xStartCentered,
-    y: indicadoresY - indicadorHeaderHeight,
+    y: yPos - 25,
     width: 540,
-    height: indicadorHeaderHeight,
-    color: rgb(0.9, 0.9, 0.9),
+    height: 25,
+    color: rgb(0.7, 0.7, 0.7),
     borderColor: rgb(0, 0, 0),
     borderWidth: 1,
   });
   
   page.drawText("Indicadores de monitorização do processo", {
     x: xStartCentered + 10,
-    y: indicadoresY - 15,
+    y: yPos - 15,
     size: 10,
     font,
     color: rgb(0, 0, 0),
   });
   
-  indicadoresY -= indicadorHeaderHeight;
+  yPos -= 25;
   
-  // Processa cada indicador como uma linha separada
-  const processedIndicadores = safeIndicadores.filter(ind => ind && ind.toString().trim());
-  
+  // Desenha indicadores com altura dinâmica
+  const processedIndicadores = safeIndicadores.slice(0, 10); // Limita a 10 indicadores
   processedIndicadores.forEach((indicador, idx) => {
-    const text = indicador.toString().trim();
-    if (text) {
-      // Quebra o texto em linhas que cabem na largura disponível
-      const lines = wrapText(text, font, fontSize, 520);
-      
-      // Calcula altura necessária para este indicador
-      const indicadorHeight = Math.max(25, lines.length * lineHeight + 10);
+    const text = (indicador || '').toString().trim();
+    if (text && text !== 'testestesteste' && !text.includes('teste')) { // Filtro de segurança
+      const lines = wrapText(text, font, 9, 520);
+      const indicadorHeight = Math.max(30, lines.length * 12 + 15);
       
       // Desenha a célula do indicador
       page.drawRectangle({
         x: xStartCentered,
-        y: indicadoresY - indicadorHeight,
+        y: yPos - indicadorHeight,
         width: 540,
         height: indicadorHeight,
         borderColor: rgb(0, 0, 0),
@@ -393,18 +414,18 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
       });
       
       // Desenha o texto do indicador
-      let textY = indicadoresY - 15;
-      lines.forEach((line, lineIdx) => {
+      let textY = yPos - 15;
+      lines.slice(0, 10).forEach((line, lineIdx) => { // Limita a 10 linhas por indicador
         page.drawText(line, {
           x: xStartCentered + 10,
-          y: textY - (lineIdx * lineHeight),
-          size: fontSize,
+          y: textY - (lineIdx * 12),
+          size: 9,
           font,
           color: rgb(0, 0, 0),
         });
       });
       
-      indicadoresY -= indicadorHeight;
+      yPos -= indicadorHeight;
     }
   });
 
@@ -436,18 +457,36 @@ export async function generateNonEditablePdf(data, headers, dataObs) {
   });
   const obsTableHeightReal = rowHeightsObs.reduce((a, b) => (isNaN(a) ? 0 : a) + (isNaN(b) ? 0 : b), 0);
 
-  // Desenha tabela de observações na primeira página
-  drawObsTable(firstPage, font, safeDataObs);
+  // Desenha tabela de observações na primeira página COM headers cinza
+  drawObsTableWithHeaders(firstPage, font, safeDataObs);
 
   // --- Quebra de texto e altura dinâmica das linhas ---
   const maxWidths = colWidths.map(w => w - 8);
+
+  // Função para remover emojis e caracteres Unicode que não são suportados pela fonte padrão
+  function removeEmojis(text) {
+    // Remove emojis e outros caracteres Unicode não suportados
+    return text.replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '');
+  }
 
   // Calcula as linhas quebradas e alturas de cada linha
   const wrappedData = safeData.map(row =>
     row.map((cell, col) => {
       const cellText = (cell || '').toString();
+      
+      // Se é um link de vídeo, usa título + URL para calcular quebras
+      let textForWrapping = cellText;
+      if (cellText.startsWith('[VIDEO]') && cellText.includes('||')) {
+        const parts = cellText.split('||');
+        const title = parts[0].replace('[VIDEO] ', '').trim();
+        const url = parts[1];
+        textForWrapping = `${title} (${url})`; // Formato final que será exibido
+      } else {
+        textForWrapping = removeEmojis(cellText); // Remove emojis de texto normal
+      }
+      
       const maxWidth = maxWidths[col] || 100;
-      return wrapText(cellText, font, fontSize, maxWidth);
+      return wrapText(textForWrapping, font, fontSize, maxWidth);
     })
   );
   const rowHeightsDynamic = wrappedData.map(
@@ -475,20 +514,34 @@ export async function generateNonEditablePdf(data, headers, dataObs) {
 
   // Função para desenhar headers
   function drawTableHeaders(page, y, headerHeight) {
+    const headerFontSize = 8; // Tamanho da fonte específico para os cabeçalhos
+    const headerLineHeight = 11;
     let xPos = xStart;
     safeHeaders.forEach((header, col) => {
-      const lines = (header || "").split('\n');
       const colWidth = colWidths[col] || 100;
-      const totalTextHeight = lines.length * 12;
-      let startY = y - ((headerHeight - totalTextHeight) / 2) - fontSize;
+      
+      // Desenha fundo cinza do header
+      page.drawRectangle({
+        x: xPos,
+        y: y - headerHeight,
+        width: colWidth,
+        height: headerHeight,
+        color: rgb(0.7, 0.7, 0.7),
+        borderColor: rgb(0, 0, 0),
+        borderWidth: 1,
+      });
+      
+      const lines = (header || "").split('\n');
+      const totalTextHeight = lines.length * headerLineHeight;
+      let startY = y - ((headerHeight - totalTextHeight) / 2) - headerFontSize;
       lines.forEach((line, idx) => {
-        const textWidth = font.widthOfTextAtSize(line, 10);
+        const textWidth = font.widthOfTextAtSize(line, headerFontSize);
         const textX = xPos + (colWidth - textWidth) / 2;
-        const textY = startY - idx * 12;
+        const textY = startY - idx * headerLineHeight;
         page.drawText(line, {
           x: textX,
           y: textY,
-          size: 10,
+          size: headerFontSize,
           font,
           color: rgb(0, 0, 0),
         });
@@ -587,17 +640,99 @@ export async function generateNonEditablePdf(data, headers, dataObs) {
           continue;
         }
         
+        // Verifica se é um link de vídeo UMA VEZ por célula
+        const originalCellText = safeData[row][col] || '';
+        const isVideoLink = originalCellText.startsWith('[VIDEO]') && originalCellText.includes('||');
+        
         let textY = yData - 8;
-        for (let l = 0; l < lines.length; l++) {
-          if (lines[l] && typeof lines[l] === 'string') {
-            page.drawText(lines[l], {
-              x: xPos + 4,
-              y: textY - l * lineHeight,
-              size: fontSize,
-              font,
-              color: rgb(0, 0, 0),
-              maxWidth: maxWidths[col] || 100,
+        
+        if (isVideoLink) {
+          // Para links de vídeo, desenha apenas o título
+          const parts = originalCellText.split('||');
+          const title = parts[0].replace('[VIDEO] ', '').trim();
+          const url = parts[1] || ''; // Extrai a URL
+          
+          // Desenha apenas o título limpo como link
+          const textWidth = font.widthOfTextAtSize(title, fontSize);
+          
+          // Desenha o texto em azul para indicar que é um link
+          page.drawText(title, {
+            x: xPos + 4,
+            y: textY,
+            size: fontSize,
+            font,
+            color: rgb(0, 0, 1), // Azul para links
+            maxWidth: maxWidths[col] || 100,
+          });
+          
+          // Adiciona sublinhado para indicar visualmente que é um link
+          const underlineY = textY - 2;
+          page.drawLine({
+            start: { x: xPos + 4, y: underlineY },
+            end: { x: xPos + 4 + Math.min(textWidth, maxWidths[col] || 100), y: underlineY },
+            thickness: 0.5,
+            color: rgb(0, 0, 1),
+          });
+          
+          // Tenta criar anotação de link clicável usando API do pdf-lib
+          try {
+            // Cria uma anotação de link usando a API correta do pdf-lib
+            const linkRect = [
+              xPos + 4,
+              textY - 4,
+              xPos + 4 + Math.min(textWidth, maxWidths[col] || 100),
+              textY + fontSize + 2
+            ];
+            
+            // Cria o dicionário da anotação
+            const linkAnnot = pdfDoc.context.obj({
+              Type: 'Annot',
+              Subtype: 'Link',
+              Rect: linkRect,
+              A: {
+                Type: 'Action',
+                S: 'URI',
+                URI: url
+              },
+              Border: [0, 0, 0],
+              F: 4
             });
+            
+            // Adiciona a anotação à página
+            const pageRef = page.ref;
+            const pageDict = pdfDoc.context.lookup(pageRef);
+            
+            // Obtém ou cria array de anotações
+            let annotsRef = pageDict.get(PDFName.of('Annots'));
+            if (!annotsRef) {
+              const annotsArray = pdfDoc.context.obj([linkAnnot]);
+              pageDict.set(PDFName.of('Annots'), annotsArray);
+            } else {
+              const annotsArray = pdfDoc.context.lookup(annotsRef);
+              if (annotsArray instanceof PDFArray) {
+                annotsArray.push(linkAnnot);
+              }
+            }
+            
+            console.log(`✅ Link clicável criado: "${title}" -> ${url}`);
+          } catch (error) {
+            console.warn('⚠️ Falha ao criar link clicável, mantendo apenas visual:', error);
+            console.log(`📝 URL do vídeo: ${url}`);
+          }
+        } else {
+          // Para texto normal, processa todas as linhas
+          for (let l = 0; l < lines.length; l++) {
+            if (lines[l] && typeof lines[l] === 'string') {
+              const cleanText = removeEmojis(lines[l]);
+              page.drawText(cleanText, {
+                x: xPos + 4,
+                y: textY - l * lineHeight,
+                size: fontSize,
+                font,
+                color: rgb(0, 0, 0),
+                maxWidth: maxWidths[col] || 100,
+              });
+            }
           }
         }
         xPos += colWidths[col];
@@ -681,7 +816,7 @@ export function drawProcessHeaderTable(page, font, yPos, donoProcesso, objetivoP
     y: yPos - headerHeight,
     width: leftColWidth,
     height: headerHeight,
-    color: rgb(0.85, 0.85, 0.85),
+    color: rgb(0.7, 0.7, 0.7),
     borderColor: rgb(0, 0, 0),
     borderWidth: 1,
   });
@@ -725,7 +860,7 @@ export function drawProcessHeaderTable(page, font, yPos, donoProcesso, objetivoP
     y: yPos - headerHeight - rowHeight,
     width: leftColWidth,
     height: rowHeight,
-    color: rgb(0.85, 0.85, 0.85),
+    color: rgb(0.7, 0.7, 0.7),
     borderColor: rgb(0, 0, 0),
     borderWidth: 1,
   });
@@ -762,7 +897,7 @@ export function drawProcessHeaderTable(page, font, yPos, donoProcesso, objetivoP
     y: yPos - headerHeight - rowHeight - entradaSaidaHeight,
     width: leftColWidth,
     height: entradaSaidaHeight,
-    color: rgb(0.85, 0.85, 0.85),
+    color: rgb(0.7, 0.7, 0.7),
     borderColor: rgb(0, 0, 0),
     borderWidth: 1,
   });
@@ -771,7 +906,7 @@ export function drawProcessHeaderTable(page, font, yPos, donoProcesso, objetivoP
     y: yPos - headerHeight - rowHeight - entradaSaidaHeight,
     width: rightColWidth,
     height: entradaSaidaHeight,
-    color: rgb(0.85, 0.85, 0.85),
+    color: rgb(0.7, 0.7, 0.7),
     borderColor: rgb(0, 0, 0),
     borderWidth: 1,
   });
@@ -862,7 +997,7 @@ export function drawProcessHeaderTableCentered(page, font, yPos, donoProcesso, o
     y: yPos - headerHeight,
     width: leftColWidth,
     height: headerHeight,
-    color: rgb(0.85, 0.85, 0.85),
+    color: rgb(0.7, 0.7, 0.7),
     borderColor: rgb(0, 0, 0),
     borderWidth: 1,
   });
@@ -906,7 +1041,7 @@ export function drawProcessHeaderTableCentered(page, font, yPos, donoProcesso, o
     y: yPos - headerHeight - rowHeight,
     width: leftColWidth,
     height: rowHeight,
-    color: rgb(0.85, 0.85, 0.85),
+    color: rgb(0.7, 0.7, 0.7),
     borderColor: rgb(0, 0, 0),
     borderWidth: 1,
   });
@@ -943,7 +1078,7 @@ export function drawProcessHeaderTableCentered(page, font, yPos, donoProcesso, o
     y: yPos - headerHeight - rowHeight - entradaSaidaHeight,
     width: leftColWidth,
     height: entradaSaidaHeight,
-    color: rgb(0.85, 0.85, 0.85),
+    color: rgb(0.7, 0.7, 0.7),
     borderColor: rgb(0, 0, 0),
     borderWidth: 1,
   });
@@ -952,7 +1087,7 @@ export function drawProcessHeaderTableCentered(page, font, yPos, donoProcesso, o
     y: yPos - headerHeight - rowHeight - entradaSaidaHeight,
     width: rightColWidth,
     height: entradaSaidaHeight,
-    color: rgb(0.85, 0.85, 0.85),
+    color: rgb(0.7, 0.7, 0.7),
     borderColor: rgb(0, 0, 0),
     borderWidth: 1,
   });

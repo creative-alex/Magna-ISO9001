@@ -8,22 +8,30 @@
   justify-content: flex-start;
   padding: 40px;
   width: 80vw;
-  max-width: 900px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
   margin: 20px;
+}
+
+.header{
+  justify-content: space-between;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .title {
   font-size: 2.2rem;
-  font-weight: 600;
-  color: #2c5aa0;
+  font-weight: 700;
+  color: #1f2937;
+  border-bottom: 2px solid #e5e7eb;
   margin-bottom: 30px;
   text-align: center;
   text-transform: uppercase;
   letter-spacing: 1px;
-  border-bottom: 3px solid #e6f2ff;
   padding-bottom: 15px;
   width: 100%;
 }
@@ -31,20 +39,21 @@
 .pdf-container input {
   margin: 20px 0 30px 0;
   padding: 15px 20px;
-  border: 2px solid ;
+  border: 2px solid #e5e7eb;
   border-radius: 8px;
   width: 100%;
   height: 6svh;
   font-size: 16px;
   transition: all 0.3s ease;
   box-sizing: border-box;
-  color: #495057;
+  color: #374151;
+  background: #ffffff;
 }
 
 .pdf-container input:focus {
   outline: none;
-  border-color: #2c5aa0;
-  box-shadow: 0 0 0 3px rgba(44, 90, 160, 0.15);
+  border-color: #C8932F;
+  box-shadow: 0 0 0 3px rgba(200, 147, 47, 0.1);
   background: white;
 }
 
@@ -53,15 +62,15 @@
   background: #ffffff;
   border-radius: 8px;
   padding: 30px;
-  border: 1px solid #e6e6e6;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   box-sizing: border-box;
 }
 
 .panel-title {
   font-size: 1.4rem;
   font-weight: 600;
-  color: #2c5aa0;
+  color: #1f2937;
   margin-bottom: 25px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -86,7 +95,7 @@
 }
 
 .editable-table .col-documentos {
-  width: 60px;
+  width: 75px;
   min-width: 60px;
 }
 
@@ -108,7 +117,8 @@
 .tabela-indicadores {
   margin-bottom: 20px;
   border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e5e7eb;
 }
 
 /* Estilos específicos para Template 2 */
@@ -122,6 +132,7 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
   table-layout: fixed;
   margin-bottom: 24px;
+  background: #ffffff;
 }
 
 .editable-table {
@@ -146,7 +157,7 @@
 .tabela-processo th,
 .tabela-atividades th,
 .tabela-indicadores th {
-  background-color: #2c5aa0;
+  background-color: #C8932F;
   color: #fff;
   padding: 12px 16px;
   font-weight: 600;
@@ -164,7 +175,7 @@
   font-weight: 700;
   letter-spacing: 0.8px;
   text-align: center;
-  border-bottom: 3px solid #1e3f73;
+  border-bottom: 3px solid #b8832a;
   box-shadow: inset 0 -2px 4px rgba(0, 0, 0, 0.1);
   position: relative;
 }
@@ -194,19 +205,19 @@
 
 .editable-table-row {
   transition: background-color 0.2s ease;
-  border-bottom: 1px solid #e8eef7;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .editable-table-row:hover {
-  background: #f8fafe;
+  background: #f9fafb;
 }
 
 .editable-table-row:nth-child(even) {
-  background: #fafcff;
+  background: #fafbfc;
 }
 
 .editable-table-row:nth-child(even):hover {
-  background: #f5f9fe;
+  background: #f3f4f6;
 }
 
 /* Células - Estilo unificado */
@@ -214,7 +225,7 @@
 .tabela-processo td,
 .tabela-atividades td,
 .tabela-indicadores td {
-  border: 1px solid #e1e7f0;
+  border: 1px solid #e5e7eb;
   vertical-align: top;
   background-color: #fff;
   font-size: 14px;
@@ -237,7 +248,7 @@
   padding: 14px 18px;
   font-family: inherit;
   font-size: 14px;
-  color: #2d3748;
+  color: #374151;
   line-height: 1.5;
   resize: vertical;
   overflow: hidden;
@@ -265,14 +276,14 @@
 .editable-table-textarea:focus {
   outline: none;
   background: white;
-  box-shadow: inset 0 0 0 2px #2c5aa0;
+  box-shadow: inset 0 0 0 2px #C8932F;
   border-radius: 4px;
   margin: 2px;
   padding: 12px 16px;
 }
 
 .editable-table-textarea::placeholder {
-  color: #a0aec0;
+  color: #9ca3af;
   font-style: italic;
 }
 
@@ -282,15 +293,20 @@
   cursor: pointer;
   padding: 8px;
   font-size: 16px;
-  color: #2c5aa0;
+  color: #C8932F;
   transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.action-button:hover {
+  color: #b8832a;
+  transform: translateY(-1px);
 }
 
 .section-header {
   font-weight: bold;
   padding: 5px;
-  background: #f8f9fa;
-  border: 1px solid #ddd;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
   text-align: left;
 }
 
@@ -363,7 +379,7 @@
   padding: 10px 0px;
   font-family: inherit;
   font-size: 14px;
-  color: #333;
+  color: #374151;
   background: transparent;
   transition: border-color 0.2s ease, background 0.2s ease;
   resize: none !important;
@@ -378,7 +394,7 @@
   background: transparent;
   border: none;
   padding: 14px 18px;
-  color: #2d3748;
+  color: #374151;
   line-height: 1.5;
   max-height: none;
   display: block;
@@ -391,14 +407,14 @@
 .tabela-indicadores-textarea:focus,
 .tabela-atividades-input:focus {
   outline: none;
-  border-color: #2c5aa0;
+  border-color: #C8932F;
   background: #fff;
-  box-shadow: 0 0 0 2px rgba(44, 90, 160, 0.1);
+  box-shadow: 0 0 0 2px rgba(200, 147, 47, 0.1);
 }
 
 /* Focus específico para editable-table-textarea */
 .editable-table-textarea:focus {
-  box-shadow: inset 0 0 0 2px #2c5aa0;
+  box-shadow: inset 0 0 0 2px #C8932F;
   border-radius: 4px;
   margin: 2px;
   padding: 12px 16px;
@@ -539,7 +555,7 @@
   }
   
   .tabela-atividades tr {
-    border: 1px solid #e1e7f0;
+    border: 1px solid #e5e7eb;
     margin-bottom: 15px;
     padding: 10px;
     border-radius: 6px;
@@ -560,7 +576,7 @@
     top: 8px;
     width: 100%;
     font-weight: 600;
-    color: #2c5aa0;
+    color: #C8932F;
     font-size: 11px;
     text-transform: uppercase;
     margin-bottom: 5px;

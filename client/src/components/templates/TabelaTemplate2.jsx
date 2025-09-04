@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from "react";
 import ExportPdfButton from "../Buttons/exportPdf";
 import PreviewPdfButton from "../Buttons/previewPDF";
+import useRowContextMenu from "../ContextMenu/useRowContextMenu";
 import "./styleTemplates.css"; 
 
 export default function Template2({
@@ -29,9 +30,22 @@ export default function Template2({
   onInsertAtividadeAbove,
   onInsertAtividadeBelow,
   onDeleteAtividade,
+  // Props adicionais para ExportPdfButton
+  pathFilename = "",
+  onSaveSuccess,
 }) {
   // Refs para textareas auto-resize
   const textAreaRefs = useRef({});
+
+  // Hook único para o context menu
+  const contextMenu = useRowContextMenu({
+    totalRows: atividades.length,
+    onMoveRowUp: onMoveAtividadeUp,
+    onMoveRowDown: onMoveAtividadeDown,
+    onInsertRowAbove: onInsertAtividadeAbove,
+    onInsertRowBelow: onInsertAtividadeBelow,
+    onDeleteRow: onDeleteAtividade
+  });
 
   // Verifica se o dono do processo foi alterado
   const donoProcessoAlterado = donoProcesso !== donoProcessoOriginal;
@@ -237,12 +251,14 @@ export default function Template2({
       <th>Requisitos DGERT</th>
       <th>Requisitos EQAVET</th>
       <th>Requisitos CQCQ</th>
-      <th>Ações</th>
     </tr>
   </thead>
   <tbody>
     {atividades.map((row, rowIdx) => (
-      <tr key={rowIdx}>
+      <tr 
+        key={rowIdx}
+        onContextMenu={(e) => contextMenu.handleContextMenuEvent(e, rowIdx)}
+      >
         {row.map((cell, colIdx) => {
           const labels = [
             'Principais Atividades',
@@ -266,57 +282,13 @@ export default function Template2({
             </td>
           );
         })}
-        <td className="actions-cell">
-          <div className="actions-container">
-            <button 
-              className={`action-btn move up ${rowIdx === 0 ? 'disabled' : ''}`}
-              onClick={() => onMoveAtividadeUp && onMoveAtividadeUp(rowIdx)}
-              disabled={rowIdx === 0}
-              title="Mover para cima"
-            >
-              ↑
-            </button>
-            
-            <button 
-              className={`action-btn move down ${rowIdx === atividades.length - 1 ? 'disabled' : ''}`}
-              onClick={() => onMoveAtividadeDown && onMoveAtividadeDown(rowIdx)}
-              disabled={rowIdx === atividades.length - 1}
-              title="Mover para baixo"
-            >
-              ↓
-            </button>
-            
-            <button 
-              className="action-btn insert"
-              onClick={() => onInsertAtividadeAbove && onInsertAtividadeAbove(rowIdx)}
-              title="Inserir linha acima"
-            >
-              +
-            </button>
-            
-            <button 
-              className="action-btn insert"
-              onClick={() => onInsertAtividadeBelow && onInsertAtividadeBelow(rowIdx)}
-              title="Inserir linha abaixo"
-            >
-              +
-            </button>
-            
-            {atividades.length > 1 && (
-              <button 
-                className="action-btn delete"
-                onClick={() => onDeleteAtividade && onDeleteAtividade(rowIdx)}
-                title="Deletar linha"
-              >
-                ×
-              </button>
-            )}
-          </div>
-        </td>
       </tr>
     ))}
   </tbody>
 </table>
+
+{/* Renderizar o context menu fora da tabela */}
+{contextMenu.contextMenu}
 
 {/* Tabela Indicadores de monitorização do processo */}
 <table className="tabela-indicadores">
@@ -344,15 +316,33 @@ export default function Template2({
   </tbody>
 </table>
 
-      <PreviewPdfButton 
-        templateType={2}
-        atividades={atividades}
-        donoProcesso={donoProcesso}
-        objetivoProcesso={objetivoProcesso}
-        indicadores={indicadores}
-        servicosEntrada={servicosEntrada}
-        servicoSaida={servicoSaida}
-      />
+      <div className="action-buttons-container">
+        <ExportPdfButton
+          templateType={2}
+          data={data}
+          headers={[]}
+          dataObs={[]}
+          headersObs={[]}
+          atividades={atividades}
+          donoProcesso={donoProcesso}
+          donoProcessoOriginal={donoProcessoOriginal}
+          objetivoProcesso={objetivoProcesso}
+          indicadores={indicadores}
+          pathFilename={pathFilename}
+          servicosEntrada={servicosEntrada}
+          servicoSaida={servicoSaida}
+          onSaveSuccess={onSaveSuccess}
+        />
+        <PreviewPdfButton 
+          templateType={2}
+          atividades={atividades}
+          donoProcesso={donoProcesso}
+          objetivoProcesso={objetivoProcesso}
+          indicadores={indicadores}
+          servicosEntrada={servicosEntrada}
+          servicoSaida={servicoSaida}
+        />
+      </div>
     </div>
   );
 }

@@ -41,7 +41,7 @@ export default function PreviewPdfButton({
   };
 
   return (
-    <button onClick={handlePreviewNonEditable}>
+    <button className="preview-button" onClick={handlePreviewNonEditable}>
       Preview
     </button>
   );

@@ -39,7 +39,7 @@ export default function TabelaPdf({
   getTablesHtml,
   obsTableRef,
   mainTableRef,
-  // Novas props para manipulação de atividades no Template2
+  // Novas props para manipulação de atividades no Template
   onMoveAtividadeUp,
   onMoveAtividadeDown,
   onInsertAtividadeAbove,
@@ -94,6 +94,8 @@ export default function TabelaPdf({
           onInsertAtividadeAbove={handleInsertAtividadeAbove}
           onInsertAtividadeBelow={handleInsertAtividadeBelow}
           onDeleteAtividade={handleDeleteAtividade}
+          pathFilename={pathFilename}
+          onSaveSuccess={onSaveSuccess}
         />
       ) : (
         <Template1

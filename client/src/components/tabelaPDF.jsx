@@ -422,7 +422,14 @@ useEffect(() => {
       body: JSON.stringify({ filename: originalFilename }),
     })
       .then(res => {
-        if (!res.ok) throw new Error("Erro no backend ou ficheiro não encontrado");
+        if (!res.ok) {
+          if (res.status === 503) {
+            throw new Error("Serviço temporariamente indisponível. Tente novamente mais tarde.");
+          } else if (res.status === 404) {
+            throw new Error("Ficheiro não encontrado");
+          }
+          throw new Error("Erro no backend ou ficheiro não encontrado");
+        }
         return res.json();
       })
       .then(formData => {
@@ -526,6 +533,15 @@ useEffect(() => {
         setHasUnsavedChanges(false);
       })
       .catch(err => {
+        console.error("Erro ao carregar dados do PDF:", err);
+        // Show user-friendly error message
+        if (err.message.includes("temporariamente indisponível")) {
+          alert("Serviço temporariamente indisponível. Os dados não foram carregados, mas pode continuar a trabalhar com dados em branco.");
+        } else if (err.message.includes("não encontrado")) {
+          console.log("Ficheiro não encontrado - continuando com dados em branco");
+        } else {
+          console.log("Erro ao carregar dados - continuando com dados em branco");
+        }
       });
   }, [filename, originalFilename]);
 
@@ -676,11 +692,26 @@ useEffect(() => {
       
       // Remove a coluna "Ações" de todas as linhas do corpo (última coluna)
       const bodyRows = mainTableClone.querySelectorAll('tbody tr');
-      bodyRows.forEach(row => {
+      bodyRows.forEach((row, rowIdx) => {
         const lastCell = row.lastElementChild;
         if (lastCell) {
           lastCell.remove();
         }
+        
+        // Substitui o conteúdo das células dos componentes especiais pelos valores reais
+        const cells = row.querySelectorAll('td');
+        cells.forEach((cell, colIdx) => {
+          // Coluna 3 - Documentos Associados
+          if (colIdx === 3) {
+            const value = tableData.main[rowIdx] ? tableData.main[rowIdx][colIdx] : '';
+            cell.innerHTML = value.split('\n').join('<br>');
+          }
+          // Coluna 4 - Instruções de trabalho procedimento  
+          else if (colIdx === 4) {
+            const value = tableData.main[rowIdx] ? tableData.main[rowIdx][colIdx] : '';
+            cell.innerHTML = value.split('\n').join('<br>');
+          }
+        });
       });
       
       mainTableHtml = mainTableClone.outerHTML;
@@ -728,6 +759,11 @@ useEffect(() => {
             onInsertAtividadeAbove={handleInsertAtividadeAbove}
             onInsertAtividadeBelow={handleInsertAtividadeBelow}
             onDeleteAtividade={handleDeleteAtividade}
+            pathFilename={originalFilename}
+            onSaveSuccess={() => {
+              setHasUnsavedChanges(false);
+              setDonoProcessoOriginal(donoProcesso);
+            }}
             handleChange={
               (rowIdx, colIdx, value) => {
                 setTableData(prev => {
@@ -739,30 +775,12 @@ useEffect(() => {
               }
             }           
           />
-          <ExportPdfButton
-            templateType={isTemplate2 ? 2 : 1}
-            data={tableData.main}
-            headers={template[1].headers}
-            dataObs={tableData.obs}
-            headersObs={template[0].headers}
-            atividades={atividades}
-            donoProcesso={donoProcesso}
-            donoProcessoOriginal={donoProcessoOriginal}
-            objetivoProcesso={objetivoProcesso}
-            indicadores={indicadores}
-            pathFilename={originalFilename}
-            servicosEntrada={servicosEntrada}
-            servicoSaida={servicoSaida}
-            onSaveSuccess={() => {
-              setHasUnsavedChanges(false);
-              setDonoProcessoOriginal(donoProcesso); // Atualizar valor original após salvar
-            }}
-          />
         </>
       ) : (
         <Template1
           data={tableData.main}
           dataObs={tableData.obs}
+          originalFilename={originalFilename}
           handleChange={(rowIdx, colIdx, value) => {
             setTableData(prev => {
               const newData = prev.main.map(row => [...row]);

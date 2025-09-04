@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { UserContext } from "../context/userContext";
-import PdfPreviewButton from "../components/Buttons/pdfPreviewButton";
+import FilePreviewButton from "../components/Buttons/pdfPreviewButton";
 import AddUserButton from "../components/Buttons/addUserButton";
 import AddProcessButton from "../components/Buttons/addProcessButton";
 import DeleteButton from "../components/Buttons/delete";
 import CreateTableButton from "../components/Buttons/createTableButton";
+import Logo from "../logo.svg"
 import "../index.css";
 
 // Função recursiva para filtrar nodes por nome
@@ -135,7 +136,7 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
                   {node.name}
                 </span>
                 <div className="folder-actions" style={{ display: 'flex', alignItems: 'center' }}>
-                  {canAccessProcess([...currentPath, node.name].join("/")) ? (
+                  {canAccessProcess([...currentPath, node.name].join("/")) && currentPath.length === 0 ? (
                     <CreateTableButton
                       folderName={node.name}
                       currentPath={currentPath}
@@ -162,6 +163,8 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
           // node.type === "file"
           const filePath = [...currentPath, node.name].join("/");
           const hasAccess = canAccessProcess(filePath);
+          
+          // Remove a extensão apenas para PDFs para manter compatibilidade
           const displayName = node.name.endsWith('.pdf') ? node.name.slice(0, -4) : node.name;
           
           return (
@@ -173,7 +176,7 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
             >
               <span className="file-name">{displayName}</span>
               <div className="file-actions">
-                <PdfPreviewButton file={node} currentPath={currentPath} />
+                <FilePreviewButton file={node} currentPath={currentPath} />
                 {isAdmin && (
                   <DeleteButton 
                     file={node} 
@@ -191,7 +194,7 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
 }
 
 export default function SelecionarPdf() {
-  const [pdfTree, setPdfTree] = useState([]);
+  const [fileTree, setFileTree] = useState([]);
   const [searchTerm, setSearchTerm] = useState(""); 
   const [processOwners, setProcessOwners] = useState({}); 
   const navigate = useNavigate();
@@ -201,11 +204,11 @@ export default function SelecionarPdf() {
   const isAdmin = username === "superadmin" || username === "SuperAdmin";
 
   useEffect(() => {
-    // Busca a árvore de PDFs
-    fetch("http://192.168.1.219:8080/files/list-pdfs-tree")
+    // Busca a árvore de ficheiros
+    fetch("http://192.168.1.219:8080/files/list-files-tree")
       .then(res => res.json())
-      .then(setPdfTree)
-      .catch(() => setPdfTree([]));
+      .then(setFileTree)
+      .catch(() => setFileTree([]));
 
     // Busca os donos dos processos
     fetch("http://192.168.1.219:8080/files/process-owners")
@@ -214,12 +217,12 @@ export default function SelecionarPdf() {
       .catch(() => setProcessOwners({}));
   }, []);
 
-  // Função para recarregar a árvore de PDFs após eliminação
-  const reloadPdfTree = () => {
-    fetch("http://192.168.1.219:8080/files/list-pdfs-tree")
+  // Função para recarregar a árvore de ficheiros após eliminação
+  const reloadFileTree = () => {
+    fetch("http://192.168.1.219:8080/files/list-files-tree")
       .then(res => res.json())
-      .then(setPdfTree)
-      .catch(() => setPdfTree([]));
+      .then(setFileTree)
+      .catch(() => setFileTree([]));
   };
 
   const handleSelectFile = (filePath) => {
@@ -229,22 +232,25 @@ export default function SelecionarPdf() {
   };
 
   // Filtra a árvore conforme o termo de busca
-  const filteredTree = filterTree(pdfTree, searchTerm);
+  const filteredTree = filterTree(fileTree, searchTerm);
 
   return (
-    <div className="pdf-container">
-      <h2 className="title">SISTEMA ISO 9001</h2>
+    <div className="file-container">
+      <div className="header">
+        <img src={Logo} alt="Logo" className="logo" />
+        <h2 className="title">Magna ISO90001</h2>
+      </div>
       <input
         type="text"
         placeholder="Encontrar arquivo ou pasta..."
         value={searchTerm}
         onChange={e => setSearchTerm(e.target.value)}
       />
-      <div className="pdf-panel">
-       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+      <div className="file-panel">
+       <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
         <div className="panel-title">Índice</div>
         {isAdmin && (
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div className="admin-buttons" style={{ display: 'flex', gap: '10px' }}>
             <AddUserButton />
             <AddProcessButton />
           </div>
@@ -256,7 +262,7 @@ export default function SelecionarPdf() {
           processOwners={processOwners}
           currentUser={username}
           isAdmin={isAdmin}
-          onDelete={reloadPdfTree}
+          onDelete={reloadFileTree}
         />
       </div>
     </div>

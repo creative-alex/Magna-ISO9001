@@ -28,8 +28,8 @@ export default function NewTable() {
   useEffect(() => {
     const fetchNextTableNumber = async () => {
       try {
-        // Buscar a árvore de PDFs para contar tabelas existentes
-        const response = await fetch('http://192.168.1.219:8080/files/list-pdfs-tree');
+        // Buscar a árvore de ficheiros para contar tabelas existentes
+        const response = await fetch('http://192.168.1.219:8080/files/list-files-tree');
         if (response.ok) {
           const pdfTree = await response.json();
           
@@ -436,7 +436,7 @@ export default function NewTable() {
                 <th style={{ border: '1px solid #ccc', padding: '8px', minWidth: '200px' }}>Descrição</th>
                 <th style={{ border: '1px solid #ccc', padding: '8px', minWidth: '120px' }}>Responsável</th>
                 <th style={{ border: '1px solid #ccc', padding: '8px', minWidth: '150px' }}>Documentos Associados</th>
-                <th style={{ border: '1px solid #ccc', padding: '8px', minWidth: '150px' }}>Instruções de Trabalho</th>
+                <th style={{ border: '1px solid #ccc', padding: '8px', minWidth: '150px' }}>Instruções de trabalho</th>
                 <th style={{ border: '1px solid #ccc', padding: '8px', width: '80px' }}>Ações</th>
               </tr>
             </thead>

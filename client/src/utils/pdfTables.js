@@ -1,7 +1,7 @@
 import { rgb } from 'pdf-lib';
 import { xStart, yStart, wrapText } from './pdfBase';
 
-export const colWidths = [150, 140, 70, 70, 70];
+export const colWidths = [90, 260, 50, 50, 50];
 export const obsColWidth = [500];
 export const obsRowHeight = 25;
 export const spaceBetweenTables = 30;
@@ -94,7 +94,8 @@ export function drawTableLines(page, obsTableHeight, yOrigin = null, rowHeights 
   console.log("drawTableLines - yPos start:", yPos);
   console.log("drawTableLines - rowHeights:", rowHeights);
 
-  for (let i = 0; i <= rowHeights.length; i++) {
+  // Desenha linhas horizontais (excluindo a primeira linha do header)
+  for (let i = 1; i <= rowHeights.length; i++) {
     const currentY = yPos - (rowHeights.slice(0, i).reduce((a, b) => a + (b || 0), 0));
     console.log(`Drawing horizontal line ${i} at y: ${currentY}`);
     page.drawLine({
@@ -105,15 +106,18 @@ export function drawTableLines(page, obsTableHeight, yOrigin = null, rowHeights 
     });
   }
 
+  // Desenha linhas verticais apenas para o corpo da tabela (abaixo do header)
   let xPos = xStart;
   const startY = yOrigin !== null ? yOrigin : yStart - safeObsTableHeight - spaceBetweenTables;
+  const headerHeight = rowHeights[0] || 50;
+  const bodyStartY = startY - headerHeight; // Inicia abaixo do header
   const endY = startY - rowHeights.reduce((a, b) => a + (b || 0), 0);
   
-  console.log("drawTableLines - vertical lines startY:", startY, "endY:", endY);
+  console.log("drawTableLines - vertical lines bodyStartY:", bodyStartY, "endY:", endY);
   
   for (let j = 0; j <= colWidths.length; j++) {
     page.drawLine({
-      start: { x: xPos, y: startY },
+      start: { x: xPos, y: bodyStartY },
       end: { x: xPos, y: endY },
       thickness: 1,
       color: rgb(0, 0, 0),
@@ -136,10 +140,22 @@ export function drawHeaders(page, headers, font, obsTableHeight, yOrigin = null,
   console.log("drawHeaders - yHeaders:", yHeaders, "headerHeight:", headerHeight);
 
   safeHeaders.forEach((header, col) => {
-    const lines = header.split('\n');
     const colWidth = colWidths[col] || 100; // Default width if undefined
-    const fontSize = 10;
-    const lineHeight = 12;
+    
+    // Desenha o fundo cinza do header com bordas (igual ao Template 2)
+    page.drawRectangle({
+      x: xPos,
+      y: yHeaders - headerHeight,
+      width: colWidth,
+      height: headerHeight,
+      color: rgb(0.7, 0.7, 0.7),
+      borderColor: rgb(0, 0, 0),
+      borderWidth: 1,
+    });
+    
+    const lines = header.split('\n');
+    const fontSize = 8;
+    const lineHeight = 10;
     const totalTextHeight = lines.length * lineHeight;
     let startY = yHeaders - ((headerHeight - totalTextHeight) / 2) - fontSize;
 
