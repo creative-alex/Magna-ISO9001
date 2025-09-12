@@ -1,5 +1,6 @@
 import React, { useContext } from "react";
 import Login from './components/Auth/login';
+import ProtectedRoute from './components/Auth/ProtectedRoute';
 import { Routes, Route, useNavigate } from "react-router-dom";
 import SelecionarPdf from "./pages/selectPdf";
 import TablePage from "./components/tabelaPDF"; 
@@ -7,31 +8,105 @@ import CreateProcess from "./pages/createProcess";
 import Register from "./components/Auth/register";
 import { UserContext } from "./context/userContext";
 import NewTable from "./pages/newTable"
+import FirstLogin from "./components/Auth/firstLogin";
 import './App.css';
 
 function App() {
   const navigate = useNavigate();
-  const { setUsername, setUserEmail } = useContext(UserContext);
+  const { setUsername, setUserEmail, setUserRole, isAuthenticated } = useContext(UserContext);
 
   const handleLoginSuccess = (userData) => {
-    
     setUsername(userData.nome);
     setUserEmail(userData.email);
-
+    setUserRole(userData.role);
     navigate("/file");
   };
 
   return (
       <Routes>
-        <Route path="/" element={<Login onLoginSuccess={handleLoginSuccess} />} />
-        <Route path="/home" element={<SelecionarPdf />} />
-        <Route path="/file" element={<SelecionarPdf />} />
-        <Route path="/file/:filename" element={<TablePage />} />
-        <Route path="/table/:filename" element={<TablePage />} />
-        <Route path="/create-process" element={<CreateProcess />} />
-        <Route path="/create-user" element={<Register />} />
-        <Route path="/processamento" element={<NewTable />} />
-        <Route path="/newtable" element={<NewTable />} />
+        {/* Rota pública de login */}
+        <Route 
+          path="/" 
+          element={
+            isAuthenticated ? 
+              <SelecionarPdf /> : 
+              <Login onLoginSuccess={handleLoginSuccess} />
+          } 
+        />
+        
+        {/* Rotas protegidas */}
+        <Route 
+          path="/home" 
+          element={
+            <ProtectedRoute>
+              <SelecionarPdf />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/file" 
+          element={
+            <ProtectedRoute>
+              <SelecionarPdf />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/file/:filename" 
+          element={
+            <ProtectedRoute>
+              <TablePage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/table/:filename" 
+          element={
+            <ProtectedRoute>
+              <TablePage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/create-process" 
+          element={
+            <ProtectedRoute>
+              <CreateProcess />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/create-user" 
+          element={
+            <ProtectedRoute>
+              <Register />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/processamento" 
+          element={
+            <ProtectedRoute>
+              <NewTable />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/newtable" 
+          element={
+            <ProtectedRoute>
+              <NewTable />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/first-login"
+          element={
+            <ProtectedRoute>
+              <FirstLogin />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
   );
 };

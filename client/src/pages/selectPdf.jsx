@@ -198,10 +198,18 @@ export default function SelecionarPdf() {
   const [searchTerm, setSearchTerm] = useState(""); 
   const [processOwners, setProcessOwners] = useState({}); 
   const navigate = useNavigate();
-  const { username } = useContext(UserContext);
+  const { username, logout } = useContext(UserContext);
 
   // Verifica se é SuperAdmin
   const isAdmin = username === "superadmin" || username === "SuperAdmin";
+
+  // Função para fazer logout
+  const handleLogout = async () => {
+    if (window.confirm("Tem certeza que deseja sair?")) {
+      await logout();
+      navigate("/", { replace: true });
+    }
+  };
 
   useEffect(() => {
     // Busca a árvore de ficheiros
@@ -249,12 +257,35 @@ export default function SelecionarPdf() {
       <div className="file-panel">
        <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
         <div className="panel-title">Índice</div>
-        {isAdmin && (
-          <div className="admin-buttons" style={{ display: 'flex', gap: '10px' }}>
-            <AddUserButton />
-            <AddProcessButton />
-          </div>
-        )}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {username && (
+            <span style={{ fontSize: '14px', color: '#666' }}>
+              Olá, {username}
+            </span>
+          )}
+          {isAdmin && (
+            <div className="admin-buttons" style={{ display: 'flex', gap: '10px' }}>
+              <AddUserButton />
+              <AddProcessButton />
+            </div>
+          )}
+          <button 
+            onClick={handleLogout}
+            style={{
+              padding: '8px 12px',
+              backgroundColor: '#dc3545',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+            onMouseOver={(e) => e.target.style.backgroundColor = '#c82333'}
+            onMouseOut={(e) => e.target.style.backgroundColor = '#dc3545'}
+          >
+            Sair
+          </button>
+        </div>
       </div>
         <FolderStructure 
           nodes={filteredTree} 

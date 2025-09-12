@@ -1,7 +1,7 @@
 /* ===== ESTILOS PARA TEMPLATE 1 E TEMPLATE 2 ===== */
 
 /* ===== CONTAINER GERAL DOS TEMPLATES ===== */
-.pdf-container, .template2-container {
+.pdf-container, .template2-container, .template1-container {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -100,8 +100,8 @@
 }
 
 .editable-table .col-instrucoes {
-  width: 60px;
-  min-width: 60px;
+  width: 70px;
+  min-width: 70px;
 }
 
 .editable-table .col-acoes {
@@ -148,10 +148,6 @@
   height: auto;
 }
 
-.editable-table:nth-child(2) {
- background-color: pink;
-}
-
 /* Cabeçalhos - Estilo unificado para Template 1 e 2 */
 .editable-table-header,
 .tabela-processo th,
@@ -178,15 +174,9 @@
   border-bottom: 3px solid #b8832a;
   box-shadow: inset 0 -2px 4px rgba(0, 0, 0, 0.1);
   position: relative;
+  font-size: 11px;
 }
 
-.editable-table-header:first-child {
-  border-top-left-radius: 8px;
-}
-
-.editable-table-header:last-child {
-  border-top-right-radius: 8px;
-}
 
 .editable-table-header div {
   position: absolute;

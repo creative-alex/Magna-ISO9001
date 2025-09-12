@@ -55,7 +55,7 @@ const Register = () => {
       const newUser = { 
         nome, 
         email, 
-        role: 'User', // Auto-registo sempre como 'User'
+        role: 'User', 
         uid: user.uid,
         isFirstLogin: true
       };

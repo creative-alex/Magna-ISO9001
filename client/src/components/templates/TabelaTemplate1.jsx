@@ -71,7 +71,7 @@ export default function Template1({
   }, [data, dataObs]);
 
   return (
-    <>
+    <div className="template1-container">
       {/* Tabela de Observações */}
       <div ref={obsTableRef} className="primeira-tabela">
         <table className="editable-table tabela-observacoes" border="1" cellPadding={4}>
@@ -251,6 +251,6 @@ export default function Template1({
         />
         <PreviewPdfButton getTablesHtml={getTablesHtml} />
       </div>
-    </>
+    </div>
   );
 }

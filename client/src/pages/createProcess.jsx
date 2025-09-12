@@ -21,7 +21,7 @@ export default function CreateProcess() {
     ['', '', '', '', '', ''],
     ['', '', '', '', '', '']
   ]);
-  const [indicadores, setIndicadores] = useState(['']);
+  const [indicadores, setIndicadores] = useState(['', '']); // Começar com 2 campos vazios
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -89,6 +89,18 @@ export default function CreateProcess() {
   const removeIndicadorRow = (index) => {
     if (indicadores.length > 1) {
       setIndicadores(prev => prev.filter((_, i) => i !== index));
+    }
+  };
+
+  // Função para adicionar nova linha de atividades
+  const addAtividadeRow = () => {
+    setAtividades(prev => [...prev, ['', '', '', '', '', '']]);
+  };
+
+  // Função para remover linha de atividades
+  const removeAtividadeRow = (index) => {
+    if (atividades.length > 1) {
+      setAtividades(prev => prev.filter((_, i) => i !== index));
     }
   };
 
@@ -327,6 +339,7 @@ export default function CreateProcess() {
                 <th style={{ border: '1px solid #ccc', padding: '8px' }}>Output</th>
                 <th style={{ border: '1px solid #ccc', padding: '8px' }}>Método</th>
                 <th style={{ border: '1px solid #ccc', padding: '8px' }}>Requisitos CQCQ</th>
+                <th style={{ border: '1px solid #ccc', padding: '8px', width: '80px' }}>Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -347,10 +360,45 @@ export default function CreateProcess() {
                       />
                     </td>
                   ))}
+                  <td style={{ border: '1px solid #ccc', padding: '4px', textAlign: 'center' }}>
+                    {atividades.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeAtividadeRow(rowIdx)}
+                        style={{ 
+                          padding: '4px 8px', 
+                          backgroundColor: '#dc3545', 
+                          color: 'white', 
+                          border: 'none', 
+                          borderRadius: '3px',
+                          cursor: 'pointer',
+                          fontSize: '12px'
+                        }}
+                      >
+                        X
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+        <div style={{ marginTop: '10px' }}>
+          <button
+            type="button"
+            onClick={addAtividadeRow}
+            style={{ 
+              padding: '8px 16px', 
+              backgroundColor: '#28a745', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Adicionar Atividade
+          </button>
         </div>
       </div>
 
