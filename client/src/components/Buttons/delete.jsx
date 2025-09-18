@@ -24,7 +24,7 @@ const DeleteButton = ({ file, currentPath, onDelete }) => {
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ filename: filePath }),
+                body: JSON.stringify({ filename: encodeURIComponent(filePath) }),
             });
 
             if (!response.ok) {

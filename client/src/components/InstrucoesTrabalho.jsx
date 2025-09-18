@@ -372,7 +372,7 @@ const InstrucoesTrabalho = ({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ path: fullPath }),
+        body: JSON.stringify({ path: encodeURIComponent(fullPath) }),
       });
 
       if (response.ok) {
@@ -417,7 +417,7 @@ const InstrucoesTrabalho = ({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ path: fullPath }),
+        body: JSON.stringify({ path: encodeURIComponent(fullPath) }),
       });
 
       if (response.ok) {

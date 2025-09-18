@@ -45,6 +45,12 @@ export default function TabelaPdf({
   onInsertAtividadeAbove,
   onInsertAtividadeBelow,
   onDeleteAtividade,
+  // Novas props para manipulação de indicadores no Template2
+  onMoveIndicadorUp,
+  onMoveIndicadorDown,
+  onInsertIndicadorAbove,
+  onInsertIndicadorBelow,
+  onDeleteIndicador,
   funcionarios = [], // Nova prop para funcionários
 }) {
   const isTemplate2 = templateType === 2;
@@ -65,8 +71,17 @@ export default function TabelaPdf({
   const handleInsertAtividadeBelow = onInsertAtividadeBelow || (() => {});
   const handleDeleteAtividade = onDeleteAtividade || (() => {});
 
+  // Funções de fallback para indicadores
+  const handleMoveIndicadorUp = onMoveIndicadorUp || (() => {});
+  const handleMoveIndicadorDown = onMoveIndicadorDown || (() => {});
+  const handleInsertIndicadorAbove = onInsertIndicadorAbove || (() => {});
+  const handleInsertIndicadorBelow = onInsertIndicadorBelow || (() => {});
+  const handleDeleteIndicador = onDeleteIndicador || (() => {});
+
  return (
     <div>
+      {console.log("🔍 tableDisplay - pathFilename que vai ser passado:", pathFilename)}
+
       {isTemplate2 ? (
         <Template2
           data={data}
@@ -94,6 +109,11 @@ export default function TabelaPdf({
           onInsertAtividadeAbove={handleInsertAtividadeAbove}
           onInsertAtividadeBelow={handleInsertAtividadeBelow}
           onDeleteAtividade={handleDeleteAtividade}
+          onMoveIndicadorUp={handleMoveIndicadorUp}
+          onMoveIndicadorDown={handleMoveIndicadorDown}
+          onInsertIndicadorAbove={handleInsertIndicadorAbove}
+          onInsertIndicadorBelow={handleInsertIndicadorBelow}
+          onDeleteIndicador={handleDeleteIndicador}
           pathFilename={pathFilename}
           onSaveSuccess={onSaveSuccess}
         />

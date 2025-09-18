@@ -155,7 +155,7 @@ const [atividades, setAtividades] = useState([
   ["", "", "", "", "", ""]
 ]);
 const [indicadores, setIndicadores] = useState([
-  [""],
+  "", "", ""
 ]);
 const [donoProcesso, setDonoProcesso] = useState("");
 const [donoProcessoOriginal, setDonoProcessoOriginal] = useState("");
@@ -264,8 +264,8 @@ useEffect(() => {
   };
   const handleIndicadoresChange = (rowIdx, value) => {
     setIndicadores(prev => {
-      const novo = prev.map(row => [...row]);
-      novo[rowIdx][0] = value;
+      const novo = [...prev];
+      novo[rowIdx] = value;
       return novo;
     });
     setHasUnsavedChanges(true);
@@ -322,6 +322,60 @@ useEffect(() => {
         const newAtividades = [...prev];
         newAtividades.splice(rowIdx, 1);
         return newAtividades;
+      });
+      setHasUnsavedChanges(true);
+    }
+  };
+
+  // Funções para manipulação de indicadores
+  const handleMoveIndicadorUp = (rowIdx) => {
+    if (rowIdx > 0) {
+      setIndicadores(prev => {
+        const newIndicadores = [...prev];
+        const [movedItem] = newIndicadores.splice(rowIdx, 1);
+        newIndicadores.splice(rowIdx - 1, 0, movedItem);
+        return newIndicadores;
+      });
+      setHasUnsavedChanges(true);
+    }
+  };
+
+  const handleMoveIndicadorDown = (rowIdx) => {
+    if (rowIdx < indicadores.length - 1) {
+      setIndicadores(prev => {
+        const newIndicadores = [...prev];
+        const [movedItem] = newIndicadores.splice(rowIdx, 1);
+        newIndicadores.splice(rowIdx + 1, 0, movedItem);
+        return newIndicadores;
+      });
+      setHasUnsavedChanges(true);
+    }
+  };
+
+  const handleInsertIndicadorAbove = (rowIdx) => {
+    setIndicadores(prev => {
+      const newIndicadores = [...prev];
+      newIndicadores.splice(rowIdx, 0, "");
+      return newIndicadores;
+    });
+    setHasUnsavedChanges(true);
+  };
+
+  const handleInsertIndicadorBelow = (rowIdx) => {
+    setIndicadores(prev => {
+      const newIndicadores = [...prev];
+      newIndicadores.splice(rowIdx + 1, 0, "");
+      return newIndicadores;
+    });
+    setHasUnsavedChanges(true);
+  };
+
+  const handleDeleteIndicador = (rowIdx) => {
+    if (indicadores.length > 1) {
+      setIndicadores(prev => {
+        const newIndicadores = [...prev];
+        newIndicadores.splice(rowIdx, 1);
+        return newIndicadores;
       });
       setHasUnsavedChanges(true);
     }
@@ -395,7 +449,7 @@ useEffect(() => {
                    ["", "", "", "", "", ""],
                    ["", "", "", "", "", ""],
                    ["", "", "", "", "", ""]]);
-    setIndicadores([[""]]);
+    setIndicadores(["", "", ""]);
     setDonoProcesso("");
     setObjetivoProcesso("");
     setServicosEntrada("");
@@ -419,7 +473,7 @@ useEffect(() => {
     fetch("http://192.168.1.219:8080/files/pdf-form-data", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filename: originalFilename }),
+      body: JSON.stringify({ filename: encodeURIComponent(originalFilename) }),
     })
       .then(res => {
         if (!res.ok) {
@@ -519,7 +573,9 @@ useEffect(() => {
             ],
           ]);
           setIndicadores([
-            [formData.indicadores_r1 || ""]
+            formData.indicadores_r1 || "",
+            formData.indicadores_r2 || "",
+            formData.indicadores_r3 || ""
           ]);
           setServicosEntrada(formData.servicos_entrada || "");
           setServicoSaida(formData.servico_saida || "");
@@ -759,6 +815,11 @@ useEffect(() => {
             onInsertAtividadeAbove={handleInsertAtividadeAbove}
             onInsertAtividadeBelow={handleInsertAtividadeBelow}
             onDeleteAtividade={handleDeleteAtividade}
+            onMoveIndicadorUp={handleMoveIndicadorUp}
+            onMoveIndicadorDown={handleMoveIndicadorDown}
+            onInsertIndicadorAbove={handleInsertIndicadorAbove}
+            onInsertIndicadorBelow={handleInsertIndicadorBelow}
+            onDeleteIndicador={handleDeleteIndicador}
             pathFilename={originalFilename}
             onSaveSuccess={() => {
               setHasUnsavedChanges(false);

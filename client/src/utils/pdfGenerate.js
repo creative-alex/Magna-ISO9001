@@ -15,8 +15,12 @@ export async function generateEditablePdf({
   objetivoProcesso,
   indicadores,
   servicosEntrada,
-  servicoSaida
+  servicoSaida,
+  imageBytes = null, // Novo parâmetro para imagem
+  pathFilename = "" // Novo parâmetro para caminho do ficheiro
 }) {
+    console.log("🎯 generateEditablePdf recebeu pathFilename:", pathFilename); 
+
   if (templateType === 2) {
     return await generateEditablePdfTemplate2({
       atividades,
@@ -25,16 +29,21 @@ export async function generateEditablePdf({
       indicadores,
       servicosEntrada,
       servicoSaida,
+      title,
+      imageBytes,
+      pathFilename
     });
   } else {
-    return await generateEditablePdfTemplate1(data, headers, dataObs, headersObs);
+    return await generateEditablePdfTemplate1(data, headers, dataObs, headersObs, title, imageBytes, pathFilename);
   }
 }
 
+
 // Renomeie a função antiga para Template1
-export async function generateEditablePdfTemplate1(data, headers, dataObs, headersObs) {
-  const { pdfDoc, page, font } = await createBasePdf();
+export async function generateEditablePdfTemplate1(data, headers, dataObs, headersObs, title = "Procedimento", imageBytes = null, pathFilename = "") {
+  const { pdfDoc, page, font } = await createBasePdf(title, imageBytes, pathFilename);
   const form = pdfDoc.getForm();
+  console.log("🎯 generateEditablePdf recebeu pathFilename:", pathFilename); 
 
   // Validate and ensure data is an array
   const safeData = Array.isArray(data) ? data : [];
@@ -158,8 +167,8 @@ export async function generateEditablePdfTemplate1(data, headers, dataObs, heade
 
 // Implemente a função para Template2 conforme sugerido antes
 
-export async function generateEditablePdfTemplate2({ atividades, donoProcesso, objetivoProcesso, indicadores, servicosEntrada, servicoSaida }) {
-  const { pdfDoc, page, font } = await createBasePdf();
+export async function generateEditablePdfTemplate2({ atividades, donoProcesso, objetivoProcesso, indicadores, servicosEntrada, servicoSaida, title = "Procedimento", imageBytes = null, pathFilename = "" }) {
+  const { pdfDoc, page, font } = await createBasePdf(title, imageBytes, pathFilename);
   const form = pdfDoc.getForm();
 
   console.log("Template2 - servicosEntrada recebido:", servicosEntrada);
@@ -231,21 +240,23 @@ export async function generateEditablePdfTemplate2({ atividades, donoProcesso, o
   let indicadoresY = camposY - 32;
   page.drawText("Indicadores de monitorização do processo", { x: xStart, y: indicadoresY, size: 12, font });
   indicadoresY -= 22;
-  for (let row = 0; row < indicadores.length; row++) {
-    const fieldName = `indicadores_r${row + 1}`;
+  
+  // Criar os 3 campos de indicadores
+  const indicadorFields = ['indicadores_r1', 'indicadores_r2', 'indicadores_r3'];
+  indicadorFields.forEach((fieldName) => {
     const textField = form.createTextField(fieldName);
     textField.enableMultiline();
-    textField.setText(indicadores[row][0] || "");
+    textField.setText(indicadores[fieldName] || "");
     textField.addToPage(page, { x: xStart, y: indicadoresY, width: 550, height: 28 });
     indicadoresY -= 32;
-  }
+  });
 
   return await pdfDoc.save();
 }
 
 // Função para gerar PDF não editável do Template 2
-export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, objetivoProcesso, indicadores, servicosEntrada, servicoSaida) {
-  const { pdfDoc, page, font } = await createBasePdf();
+export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, objetivoProcesso, indicadores, servicosEntrada, servicoSaida, title = "Procedimento", imageBytes = null, pathFilename = "") {
+  const { pdfDoc, page, font } = await createBasePdf(title, imageBytes, pathFilename);
 
   // Validações de entrada
   const safeAtividades = Array.isArray(atividades) && atividades.length > 0 ? atividades : [['', '', '', '', '', '']];
@@ -433,8 +444,8 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
 }
 
 // Função principal para gerar PDF não editável
-export async function generateNonEditablePdf(data, headers, dataObs) {
-  const { pdfDoc, page: firstPage, font } = await createBasePdf();
+export async function generateNonEditablePdf(data, headers, dataObs, title = "Procedimento", imageBytes = null, pathFilename = "") {
+  const { pdfDoc, page: firstPage, font } = await createBasePdf(title, imageBytes, pathFilename);
 
   // Validações de entrada
   const safeData = Array.isArray(data) && data.length > 0 ? data : [['', '', '', '', '']];
@@ -758,7 +769,7 @@ export async function generateNonEditablePdf(data, headers, dataObs) {
  * @param {string} obsTableHtml
  * @returns {Promise<Uint8Array>}
  */
-export async function generateNonEditablePdfFromHtml(mainTableHtml, obsTableHtml) {
+export async function generateNonEditablePdfFromHtml(mainTableHtml, obsTableHtml, title = "Procedimento", imageBytes = null, pathFilename = "") {
   const parser = new DOMParser();
   // Função para extrair texto de uma célula, convertendo <br> em \n
   function getCellTextWithBreaks(cell) {
@@ -796,7 +807,7 @@ export async function generateNonEditablePdfFromHtml(mainTableHtml, obsTableHtml
   const headersObs = obsTableArr[0] || [];
   const dataObs = obsTableArr.slice(1);
 
-  return await generateNonEditablePdf(data, headers, dataObs, headersObs);
+  return await generateNonEditablePdf(data, headers, dataObs, title, imageBytes, pathFilename);
 }
 
 // Adicione esta função utilitária

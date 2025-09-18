@@ -21,7 +21,12 @@ export default function CreateProcess() {
     ['', '', '', '', '', ''],
     ['', '', '', '', '', '']
   ]);
-  const [indicadores, setIndicadores] = useState(['', '']); // Começar com 2 campos vazios
+  const [indicadores, setIndicadores] = useState({
+    indicadores_r1: '',
+    indicadores_r2: '',
+    indicadores_r3: ''
+  }); // Objeto com 3 campos de indicadores
+  const [users, setUsers] = useState([]); // Lista de usuários para o dropdown
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -41,16 +46,34 @@ export default function CreateProcess() {
               const match = processName.match(/^PROCESSO (\d+):/);
               return match ? parseInt(match[1], 10) : -1;
             })
-            .filter(num => num >= 0);
+            .filter(num => num >= 0)
+            .sort((a, b) => a - b); // Ordenar para encontrar gaps
           
-          // Determinar o próximo número
-          const nextNumber = processNumbers.length > 0 
-            ? Math.max(...processNumbers) + 1 
-            : 0;
+          console.log('Números de processos existentes:', processNumbers);
           
+          // Determinar o próximo número disponível
+          let nextNumber = 0;
+          if (processNumbers.length === 0) {
+            nextNumber = 0;
+          } else {
+            // Procurar o primeiro gap na sequência ou o próximo número
+            for (let i = 0; i < processNumbers.length; i++) {
+              if (processNumbers[i] !== i) {
+                nextNumber = i;
+                break;
+              }
+            }
+            // Se não há gaps, usar o próximo número na sequência
+            if (nextNumber === 0 && processNumbers[0] === 0) {
+              nextNumber = processNumbers.length;
+            }
+          }
+          
+          console.log('Próximo número de processo será:', nextNumber);
           setNextProcessNumber(nextNumber);
         } else {
           // Se não conseguir buscar, assume que é o processo 0
+          console.warn('Erro ao buscar processos existentes, usando número 0');
           setNextProcessNumber(0);
         }
       } catch (error) {
@@ -60,6 +83,25 @@ export default function CreateProcess() {
     };
 
     fetchNextProcessNumber();
+  }, []);
+
+  // Buscar lista de usuários quando o componente carregar
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch('http://192.168.1.219:8080/users/getAllUsers');
+        if (response.ok) {
+          const usersData = await response.json();
+          setUsers(usersData);
+        } else {
+          console.warn('Erro ao buscar usuários:', response.statusText);
+        }
+      } catch (error) {
+        console.warn('Erro ao buscar usuários:', error);
+      }
+    };
+
+    fetchUsers();
   }, []);
 
   // Função para atualizar atividades
@@ -72,24 +114,11 @@ export default function CreateProcess() {
   };
 
   // Função para atualizar indicadores
-  const handleIndicadoresChange = (rowIdx, value) => {
-    setIndicadores(prev => {
-      const novo = [...prev];
-      novo[rowIdx] = value;
-      return novo;
-    });
-  };
-
-  // Função para adicionar nova linha de indicadores
-  const addIndicadorRow = () => {
-    setIndicadores(prev => [...prev, '']);
-  };
-
-  // Função para remover linha de indicadores
-  const removeIndicadorRow = (index) => {
-    if (indicadores.length > 1) {
-      setIndicadores(prev => prev.filter((_, i) => i !== index));
-    }
+  const handleIndicadoresChange = (field, value) => {
+    setIndicadores(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   // Função para adicionar nova linha de atividades
@@ -159,36 +188,55 @@ export default function CreateProcess() {
       formData.append('objetivoProcesso', objetivoProcesso);
       formData.append('servicos_entrada', servicosEntrada);
       formData.append('servico_saida', servicoSaida);
-      formData.append('indicadores', JSON.stringify(indicadores));
+      formData.append('indicadores_r1', indicadores.indicadores_r1);
+      formData.append('indicadores_r2', indicadores.indicadores_r2);
+      formData.append('indicadores_r3', indicadores.indicadores_r3);
 
       console.log('Enviando dados para o backend...');
 
-      // 3. Enviar para o backend
-      const response = await fetch('http://192.168.1.219:8080/files/upload-pdf', {
+      // 3. PRIMEIRO: Guardar o PDF
+      const pdfResponse = await fetch('http://192.168.1.219:8080/files/save-pdf', {
         method: 'POST',
         body: formData
       });
 
-      if (!response.ok) {
-        throw new Error('Erro ao criar processo');
+      if (!pdfResponse.ok) {
+        throw new Error('Erro ao guardar PDF');
       }
 
-      console.log('Processo criado com sucesso!');
+      console.log('✅ PDF guardado com sucesso!');
       
-      // 4. Atualizar dono do processo no Firestore
-      try {
-        await fetch('http://192.168.1.219:8080/files/update-dono-processo', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            processId: fullProcessName,
-            donoProcesso: donoProcesso
-          })
-        });
-      } catch (error) {
-        console.warn('Erro ao atualizar dono do processo:', error);
+      // 4. SEGUNDO: Criar o registro na BD
+      console.log('🚀 Criando registro na BD...');
+      const recordResponse = await fetch('http://192.168.1.219:8080/files/create-record', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          processName: fullProcessName,
+          donoProcesso: donoProcesso,
+          objetivoProcesso: objetivoProcesso,
+          servicos_entrada: servicosEntrada,
+          servico_saida: servicoSaida,
+          indicadores_r1: indicadores.indicadores_r1,
+          indicadores_r2: indicadores.indicadores_r2,
+          indicadores_r3: indicadores.indicadores_r3,
+          atividades: atividades
+        })
+      });
+      
+      if (recordResponse.ok) {
+        const recordResult = await recordResponse.json();
+        console.log('✅ REGISTRO CRIADO NA BD COM SUCESSO!');
+        console.log('📍 Path:', recordResult.path);
+        console.log('📊 Dados salvos:', recordResult.data);
+      } else {
+        const errorText = await recordResponse.text();
+        console.error('❌ Erro ao criar registro na BD:', errorText);
+        throw new Error('Erro ao criar registro na BD: ' + errorText);
       }
 
+      console.log('🎯 PROCESSO CRIADO COMPLETAMENTE!');
+      
       // 5. Redirecionar para a lista de PDFs
       navigate('/file');
       
@@ -248,19 +296,25 @@ export default function CreateProcess() {
         <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
           Dono do Processo:
         </label>
-        <input
-          type="text"
+        <select
           value={donoProcesso}
           onChange={(e) => setDonoProcesso(e.target.value)}
-          placeholder="Nome do responsável pelo processo"
           style={{ 
             width: '100%', 
             padding: '8px', 
             border: '1px solid #ccc', 
             borderRadius: '4px',
-            fontSize: '14px'
+            fontSize: '14px',
+            backgroundColor: 'white'
           }}
-        />
+        >
+          <option value="">-</option>
+          {users.map((user) => (
+            <option key={user.id} value={user.nome}>
+              {user.nome}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div style={{ marginBottom: '20px' }}>
@@ -406,53 +460,63 @@ export default function CreateProcess() {
         <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>
           Indicadores:
         </label>
-        {indicadores.map((indicador, index) => (
-          <div key={index} style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-            <input
-              type="text"
-              value={indicador}
-              onChange={(e) => handleIndicadoresChange(index, e.target.value)}
-              placeholder={`Indicador ${index + 1}`}
-              style={{ 
-                flex: 1, 
-                padding: '8px', 
-                border: '1px solid #ccc', 
-                borderRadius: '4px',
-                fontSize: '14px'
-              }}
-            />
-            {indicadores.length > 1 && (
-              <button
-                type="button"
-                onClick={() => removeIndicadorRow(index)}
-                style={{ 
-                  padding: '8px 12px', 
-                  backgroundColor: '#dc3545', 
-                  color: 'white', 
-                  border: 'none', 
-                  borderRadius: '4px',
-                  cursor: 'pointer'
-                }}
-              >
-                Remover
-              </button>
-            )}
-          </div>
-        ))}
-        <button
-          type="button"
-          onClick={addIndicadorRow}
-          style={{ 
-            padding: '8px 16px', 
-            backgroundColor: '#28a745', 
-            color: 'white', 
-            border: 'none', 
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          Adicionar Indicador
-        </button>
+        
+        <div style={{ marginBottom: '10px' }}>
+          <label style={{ display: 'block', marginBottom: '5px', fontSize: '14px', color: '#666' }}>
+            Indicador R1:
+          </label>
+          <input
+            type="text"
+            value={indicadores.indicadores_r1}
+            onChange={(e) => handleIndicadoresChange('indicadores_r1', e.target.value)}
+            placeholder="Primeiro indicador"
+            style={{ 
+              width: '100%', 
+              padding: '8px', 
+              border: '1px solid #ccc', 
+              borderRadius: '4px',
+              fontSize: '14px'
+            }}
+          />
+        </div>
+
+        <div style={{ marginBottom: '10px' }}>
+          <label style={{ display: 'block', marginBottom: '5px', fontSize: '14px', color: '#666' }}>
+            Indicador R2:
+          </label>
+          <input
+            type="text"
+            value={indicadores.indicadores_r2}
+            onChange={(e) => handleIndicadoresChange('indicadores_r2', e.target.value)}
+            placeholder="Segundo indicador"
+            style={{ 
+              width: '100%', 
+              padding: '8px', 
+              border: '1px solid #ccc', 
+              borderRadius: '4px',
+              fontSize: '14px'
+            }}
+          />
+        </div>
+
+        <div style={{ marginBottom: '10px' }}>
+          <label style={{ display: 'block', marginBottom: '5px', fontSize: '14px', color: '#666' }}>
+            Indicador R3:
+          </label>
+          <input
+            type="text"
+            value={indicadores.indicadores_r3}
+            onChange={(e) => handleIndicadoresChange('indicadores_r3', e.target.value)}
+            placeholder="Terceiro indicador"
+            style={{ 
+              width: '100%', 
+              padding: '8px', 
+              border: '1px solid #ccc', 
+              borderRadius: '4px',
+              fontSize: '14px'
+            }}
+          />
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>

@@ -10,6 +10,11 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
+// Endpoint de teste
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', message: 'Servidor funcionando!' });
+});
+
 app.use("/users", userRoute);
 app.use("/files", pdfRoute);
 

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import ExportPdfButton from "../Buttons/exportPdf";
 import PreviewPdfButton from "../Buttons/previewPDF";
 import DocumentosAssociados from "../DocumentosAssociados";
@@ -40,7 +40,7 @@ export default function Template1({
   onDeleteRowObs
 }) {
   const textAreaRefs = useRef({});
-
+  
   // Hook único para o context menu
   const contextMenu = useRowContextMenu({
     totalRows: data.length,
@@ -70,8 +70,13 @@ export default function Template1({
     });
   }, [data, dataObs]);
 
+  console.log("PathFileName:", pathFilename);
+
   return (
     <div className="template1-container">
+      {/* ADICIONAR ESTE LOG PARA DEBUG */}
+      {console.log("🔍 Template1 - pathFilename recebido:", pathFilename)}
+    
       {/* Tabela de Observações */}
       <div ref={obsTableRef} className="primeira-tabela">
         <table className="editable-table tabela-observacoes" border="1" cellPadding={4}>
@@ -243,13 +248,16 @@ export default function Template1({
           donoProcesso={donoProcesso}
           objetivoProcesso={objetivoProcesso}
           indicadores={indicadores}
-          pathFilename={pathFilename}
+          pathFilename={pathFilename}  // ← Este valor está vazio!
           servicosEntrada={servicosEntrada}
           servicoSaida={servicoSaida}
           fieldNames={fieldNames}
           onSaveSuccess={onSaveSuccess}
         />
-        <PreviewPdfButton getTablesHtml={getTablesHtml} />
+        <PreviewPdfButton 
+          getTablesHtml={getTablesHtml} 
+          pathFilename={pathFilename}
+        />
       </div>
     </div>
   );

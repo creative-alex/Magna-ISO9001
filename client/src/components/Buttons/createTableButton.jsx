@@ -24,7 +24,7 @@ export default function CreateTableButton({ folderName, currentPath = [] }) {
     <button
       onClick={handleCreateTable}
       className="create-table-btn"
-      title="Criar novo processamento"
+      title="Criar novo procedimento"
     >
         <img 
             src={newFileIcon} 

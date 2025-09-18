@@ -2,20 +2,19 @@
 const admin = require("firebase-admin");
 const { PDFDocument } = require('pdf-lib');
 
-// Configuração do Firebase (será inicializada no server.js)
+// Importar configuração do Firebase
+require("../db/firebase");
+
+// Configuração do Firebase Storage
 const bucket = admin.storage().bucket();
 
-console.log("pdfController.js carregado, bucket configurado");
 
 const listPdfs = async (req, res) => {
   try {
-    console.log("listPdfs chamado");
     const [files] = await bucket.getFiles();
-    console.log("Arquivos encontrados:", files.map(f => f.name));
     const pdfFiles = files
       .filter(f => f.name.endsWith(".pdf"))
       .map(f => f.name);
-    console.log("PDFs filtrados:", pdfFiles);
     res.json(pdfFiles);
   } catch (err) {
     console.error("Erro em listPdfs:", err);
@@ -25,25 +24,15 @@ const listPdfs = async (req, res) => {
 
 const uploadPdf = async (req, res) => {
   try {
-    console.log("uploadPdf chamado");
-    console.log("req.body:", req.body);
-    console.log("servicos_entrada:", req.body.servicos_entrada);
-    console.log("servico_saida:", req.body.servico_saida);
-    console.log("Verificando req.file...");
     if (!req.file) {
-      console.log("Nenhum ficheiro enviado.");
       return res.status(400).send("Nenhum ficheiro enviado.");
     }
 
-    console.log("Extraindo folders e filename...");
     const folders = req.body.folders ? JSON.parse(req.body.folders) : [];
     const filename = req.body.filename || req.file.originalname;
     const filePath = [...folders, filename].join("/");
-    console.log("filePath construído:", filePath);
 
-    console.log("Criando blob para upload...");
     const blob = bucket.file(filePath);
-    console.log("Blob criado, iniciando upload...");
 
     // Upload direto usando save()
     await blob.save(req.file.buffer, {
@@ -51,7 +40,38 @@ const uploadPdf = async (req, res) => {
         contentType: req.file.mimetype,
       }
     });
-    console.log("PDF guardado com sucesso!");
+
+    // Se é um novo processo (tem donoProcesso no body), criar documento no Firestore
+    if (req.body.donoProcesso && folders.length > 0) {
+      const processName = folders[0]; // O nome da pasta é o nome do processo
+      
+      try {
+        const db = admin.firestore();
+        
+        const processosRef = db.collection('processos');
+        
+        const documentData = {
+          donoProcesso: req.body.donoProcesso,
+          objetivoProcesso: req.body.objetivoProcesso || '',
+          servicos_entrada: req.body.servicos_entrada || '',
+          servico_saida: req.body.servico_saida || '',
+          indicadores_r1: req.body.indicadores_r1 || '',
+          indicadores_r2: req.body.indicadores_r2 || '',
+          indicadores_r3: req.body.indicadores_r3 || '',
+          atividades: req.body.atividades ? JSON.parse(req.body.atividades) : [],
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        };
+        
+        
+        await processosRef.doc(processName).set(documentData);
+        
+        
+      } catch (firestoreError) {
+        // Não falha o upload por causa do Firestore, apenas logga o erro
+      }
+    } else {
+    }
 
     res.status(200).send("PDF guardado com sucesso!");
   } catch (err) {
@@ -62,33 +82,28 @@ const uploadPdf = async (req, res) => {
 
 const getPdfFormData = async (req, res) => {
   try {
-    console.log("getPdfFormData chamado");
     // Lê do body (POST), não do query
     const { filename } = req.body;
-    console.log("Filename recebido:", filename);
+    
     if (!filename) {
-      console.log("Ficheiro não especificado.");
       return res.status(400).send("Ficheiro não especificado.");
     }
 
-    console.log("Baixando PDF...");
-    const file = bucket.file(filename); // Usa o caminho completo
-    const [buffer] = await file.download();
-    console.log("PDF baixado:", filename);
+    // Decodifica o filename caso tenha caracteres especiais
+    const decodedFilename = decodeURIComponent(filename);
 
-    console.log("Carregando PDF com pdf-lib...");
+    const file = bucket.file(decodedFilename); // Usa o caminho completo decodificado
+    const [buffer] = await file.download();
+
     const pdfDoc = await PDFDocument.load(buffer);
     const form = pdfDoc.getForm();
 
-    console.log("Extraindo campos do formulário...");
     const fields = form.getFields();
-    console.log("Campos encontrados:", fields.map(f => f.getName()));
     const data = {};
     fields.forEach(field => {
       data[field.getName()] = field.getText ? field.getText() : "";
     });
 
-    console.log("Dados extraídos:", data);
     res.json(data);
   } catch (err) {
     console.error("Erro em getPdfFormData:", err);
@@ -164,31 +179,35 @@ const getPdf = async (req, res) => {
   try {
     console.log("getPdf chamado");
     const { path } = req.body;
-    console.log("Path recebido:", path);
+    console.log("Path recebido (raw):", path);
     if (!path) {
       console.log("Path não fornecido");
       return res.status(400).send("Path não fornecido");
     }
 
-    console.log("Verificando se o arquivo existe:", path);
-    const file = bucket.file(path);
+    // Decodifica o path caso tenha caracteres especiais
+    const decodedPath = decodeURIComponent(path);
+    console.log("Path decodificado:", decodedPath);
+
+    console.log("Verificando se o arquivo existe:", decodedPath);
+    const file = bucket.file(decodedPath);
     const [exists] = await file.exists();
     if (!exists) {
-      console.log("Arquivo não encontrado:", path);
+      console.log("Arquivo não encontrado:", decodedPath);
       return res.status(404).send("Arquivo não encontrado");
     }
 
     console.log("Baixando arquivo...");
     const [buffer] = await file.download();
     const [metadata] = await file.getMetadata();
-    console.log("Arquivo baixado com sucesso:", path);
+    console.log("Arquivo baixado com sucesso:", decodedPath);
     console.log("Tipo de conteúdo:", metadata.contentType);
 
     // Define o tipo de conteúdo baseado no metadata
     const contentType = metadata.contentType || 'application/octet-stream';
     
     res.setHeader("Content-Type", contentType);
-    res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(path.split('/').pop())}"`);
+    res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(decodedPath.split('/').pop())}"`);
     res.send(buffer);
   } catch (err) {
     console.error("Erro ao buscar arquivo:", err);
@@ -200,28 +219,32 @@ const downloadPdf = async (req, res) => {
   try {
     console.log("downloadPdf chamado");
     const { path } = req.body;
-    console.log("Path recebido para download:", path);
+    console.log("Path recebido para download (raw):", path);
     if (!path) {
       console.log("Path não fornecido");
       return res.status(400).send("Path não fornecido");
     }
 
-    const file = bucket.file(path);
-    console.log("Verificando se o arquivo existe:", path);
+    // Decodifica o path caso tenha caracteres especiais
+    const decodedPath = decodeURIComponent(path);
+    console.log("Path decodificado:", decodedPath);
+
+    const file = bucket.file(decodedPath);
+    console.log("Verificando se o arquivo existe:", decodedPath);
     const [exists] = await file.exists();
     if (!exists) {
-      console.log("Arquivo não encontrado:", path);
+      console.log("Arquivo não encontrado:", decodedPath);
       return res.status(404).send("Arquivo não encontrado");
     }
 
-    console.log("Fazendo download do arquivo:", path);
+    console.log("Fazendo download do arquivo:", decodedPath);
     const [buffer] = await file.download();
     const [metadata] = await file.getMetadata();
     console.log("Download concluído, tamanho do buffer:", buffer.length);
     console.log("Metadata do arquivo:", metadata.contentType);
     
     // Define o nome do arquivo para download
-    const filename = path.split('/').pop();
+    const filename = decodedPath.split('/').pop();
     
     // Define o tipo de conteúdo baseado no metadata ou na extensão
     const contentType = metadata.contentType || 'application/octet-stream';
@@ -312,20 +335,22 @@ const deletePdf = async (req, res) => {
       return res.status(400).json({ error: "Filename é obrigatório" });
     }
     
-    console.log("Tentando eliminar ficheiro:", filename);
+    // Decodifica o filename caso tenha caracteres especiais
+    const decodedFilename = decodeURIComponent(filename);
+    console.log("Tentando eliminar ficheiro:", decodedFilename);
     
     // Verifica se o arquivo existe
-    const file = bucket.file(filename);
+    const file = bucket.file(decodedFilename);
     const [exists] = await file.exists();
     
     if (!exists) {
-      console.log("Arquivo não encontrado:", filename);
+      console.log("Arquivo não encontrado:", decodedFilename);
       return res.status(404).json({ error: "Arquivo não encontrado" });
     }
     
     // Elimina o arquivo
     await file.delete();
-    console.log("Arquivo eliminado com sucesso:", filename);
+    console.log("Arquivo eliminado com sucesso:", decodedFilename);
     
     res.json({ success: true, message: "Ficheiro eliminado com sucesso" });
     

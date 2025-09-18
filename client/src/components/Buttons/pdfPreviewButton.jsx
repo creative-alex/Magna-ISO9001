@@ -7,13 +7,56 @@ const PdfPreviewButton = ({ file, currentPath }) => {
     try {
       const filePath = [...currentPath, file.name].join("/");
       
+      // Se está em subpasta de nível 2 ou mais (currentPath.length > 1), faz download direto
+      // Nível 0: pasta raiz, Nível 1: primeira subpasta, Nível 2+: subpastas dentro de subpastas
+      if (currentPath.length > 1) {
+        console.log("Ficheiro em subpasta profunda (nível 2+) - fazendo download direto:", filePath);
+        
+        // Mostra feedback visual (opcional)
+        const button = e.target.closest('button');
+        const originalTitle = button.title;
+        button.title = 'A descarregar...';
+        button.style.opacity = '0.7';
+        
+        const response = await fetch('http://192.168.1.219:8080/files/download', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ path: encodeURIComponent(filePath) }),
+        });
+
+        // Restaura o estado do botão
+        button.title = originalTitle;
+        button.style.opacity = '1';
+
+        if (response.ok) {
+          const blob = await response.blob();
+          
+          // Cria um link temporário para download
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = file.name;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+        } else {
+          const errorText = await response.text();
+          console.error("Erro ao fazer download:", errorText);
+          alert(`Erro ao fazer download do ficheiro: ${errorText}`);
+        }
+        return;
+      }
+      
       // 1. Primeiro, carrega os dados do PDF
       const formDataResponse = await fetch("http://192.168.1.219:8080/files/pdf-form-data", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ filename: filePath }),
+        body: JSON.stringify({ filename: encodeURIComponent(filePath) }),
       });
       
       if (!formDataResponse.ok) {
@@ -99,7 +142,7 @@ const PdfPreviewButton = ({ file, currentPath }) => {
         window.open(blobUrl, "_blank");
         
       } else {
-        // Template 1 - Processamento existente
+        // Template 1 - Procedimento existente
         // Converte os dados do formulário em formato de tabela
         // Tabela principal (table2_*)
         const mainTableData = [];
@@ -180,7 +223,11 @@ const PdfPreviewButton = ({ file, currentPath }) => {
 
   return (
     <button onClick={handlePreviewClick}>
-      <img src={downloadIcon} alt="Baixar PDF" style={{ width: '16px', height: '16px' }} />
+      <img 
+        src={downloadIcon} 
+        alt={currentPath.length > 1 ? "Download direto" : "Preview PDF"} 
+        style={{ width: '16px', height: '16px' }} 
+      />
     </button>
   );
 };

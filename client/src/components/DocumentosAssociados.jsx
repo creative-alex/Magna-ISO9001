@@ -61,15 +61,16 @@ const DocumentosAssociados = ({
         return;
       }
       
-      // Encontra a subpasta que termina com o mesmo prefixo do ficheiro atual
+      // Encontra a subpasta que segue o padrão "Informação Documentada - Procedimento (prefixo)"
+      const expectedSubfolderName = `Informação Documentada - Procedimento (${filePrefix})`;
       const targetSubfolder = mainFolderNode.children.find(node => 
-        node.type === 'folder' && node.name.endsWith(filePrefix)
+        node.type === 'folder' && node.name === expectedSubfolderName
       );
       
       if (!targetSubfolder || !targetSubfolder.children) {
-        console.log(`❌ Subpasta que termina com "${filePrefix}" não encontrada ou vazia`);
+        console.log(`❌ Subpasta "${expectedSubfolderName}" não encontrada ou vazia`);
         setDocumentosDisponiveis([]);
-        setCurrentFolderPath(`${mainFolder}/${filePrefix}*`);
+        setCurrentFolderPath(`${mainFolder}/${expectedSubfolderName}`);
         return;
       }
       
@@ -156,8 +157,9 @@ const DocumentosAssociados = ({
     const currentFileName = parts[parts.length - 1];
     const filePrefix = currentFileName.split(' ')[0];
     
-    // Busca a subpasta correta
-    const folderPath = `${mainFolder}/${filePrefix}`;
+    // Cria o nome da subpasta no formato correto
+    const subfolderName = `Informação Documentada - Procedimento ${filePrefix}`;
+    const folderPath = `${mainFolder}/${subfolderName}`;
 
     setUploading(true);
     
@@ -236,7 +238,7 @@ const DocumentosAssociados = ({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ path: fullPath }),
+        body: JSON.stringify({ path: encodeURIComponent(fullPath) }),
       });
 
       if (response.ok) {
@@ -281,7 +283,7 @@ const DocumentosAssociados = ({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ path: fullPath }),
+        body: JSON.stringify({ path: encodeURIComponent(fullPath) }),
       });
 
       if (response.ok) {

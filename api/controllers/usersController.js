@@ -34,15 +34,6 @@ const verifyTokenAndGetUserInfo = async (req, res) => {
       isFirstLogin: isSuperAdmin ? false : (userData.isFirstLogin ?? true),
     });
 
-    console.log("RESPOSTA DO SERVIDOR:", {
-      message: 'Token válido',
-      uid: decodedToken.uid,
-      email: decodedToken.email,
-      displayName: userRecord.displayName || userData.nome || 'N/A',
-      role: userData.role || 'user',
-      nome: userData.nome || userRecord.displayName || 'N/A',
-      isFirstLogin: isSuperAdmin ? false : (userData.isFirstLogin ?? true),
-    });
   } catch (error) {
     console.error('Erro ao verificar token e buscar user:', error);
     res.status(401).json({ message: 'Token inválido ou erro ao buscar user' });
@@ -51,7 +42,7 @@ const verifyTokenAndGetUserInfo = async (req, res) => {
 
 const createUser = async (req, res) => {
   try {
-    const { nome, email, entidade, role, temporaryPassword } = req.body;
+    const { nome, email, temporaryPassword } = req.body;
 
     // Validação básica
     if (!nome || !email || !temporaryPassword) {
@@ -161,7 +152,6 @@ const getAllUsers = async (req, res) => {
       }
     });
     
-    console.log("Usuários encontrados (excluindo SuperAdmins):", users.length);
     res.json(users);
     
   } catch (error) {

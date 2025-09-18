@@ -12,6 +12,7 @@ export default function NewTable() {
   const [processName, setProcessName] = useState('');
   const [processFolder, setProcessFolder] = useState('');
   const [nextTableNumber, setNextTableNumber] = useState(null);
+  const [manualPrefix, setManualPrefix] = useState('');
   const [servicosEntrada, setServicosEntrada] = useState('');
   const [servicoSaida, setServicoSaida] = useState('');
   const [loading, setLoading] = useState(false);
@@ -108,6 +109,8 @@ export default function NewTable() {
           
           // Debug: mostrar números encontrados
           console.log(`Processo ${processNumber}: números encontrados:`, tableNumbers.sort((a, b) => a - b));
+          console.log(`Pasta: "${processFolder}"`);
+          console.log(`Total de ficheiros analisados na pasta:`, targetFolder?.children?.length || 0);
           
           // Determinar o próximo número baseado no processo
           let nextNumber;
@@ -116,10 +119,18 @@ export default function NewTable() {
             nextNumber = maxExisting + 1;
           } else {
             // Se não há ficheiros existentes, começar com o número base do processo
-            nextNumber = processNumber === 0 ? 0 : processNumber * 10;
+            if (processNumber === 0) {
+              // Para processos sem numeração específica, começar com 01
+              nextNumber = 1;
+            } else {
+              // Para processos numerados (PROCESSO 1:, PROCESSO 2:, etc.), 
+              // começar com X0 (ex: PROCESSO 3: começa com 30)
+              nextNumber = processNumber * 10;
+            }
           }
           
           console.log(`Próximo número para processo ${processNumber}:`, nextNumber);
+          console.log(`Lógica aplicada: ${tableNumbers.length > 0 ? 'incremento do máximo existente' : 'número base da pasta vazia'}`);
           
           setNextTableNumber(nextNumber);
         } else {
@@ -219,8 +230,8 @@ export default function NewTable() {
       return;
     }
 
-    if (nextTableNumber === null) {
-      setError('Aguarde o carregamento do número da tabela...');
+    if (nextTableNumber === null && !manualPrefix.trim()) {
+      setError('Aguarde o carregamento do número da tabela ou insira um prefixo manual...');
       return;
     }
 
@@ -240,9 +251,14 @@ export default function NewTable() {
       // 2. Preparar dados para envio
       const formData = new FormData();
       
-      // Nome do ficheiro com numeração sequencial de 2 dígitos
-      const formattedNumber = nextTableNumber.toString().padStart(2, '0');
-      const fileName = `${formattedNumber} ${processName.trim()}.pdf`;
+      // Nome do ficheiro - usar prefixo manual se fornecido, senão usar numeração automática
+      let fileName;
+      if (manualPrefix.trim()) {
+        fileName = `${manualPrefix.trim()} ${processName.trim()}.pdf`;
+      } else {
+        const formattedNumber = nextTableNumber.toString().padStart(2, '0');
+        fileName = `${formattedNumber} ${processName.trim()}.pdf`;
+      }
       const folderPath = processFolder.trim();
       
       // Criar blob do PDF
@@ -284,7 +300,7 @@ export default function NewTable() {
 
   return (
     <div style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto' }}>
-      <h2>Criar Nova Tabela (Template 1)</h2>      
+      <h2>Criar novo procedimento</h2>     
       {error && (
         <div style={{ 
           color: 'red', 
@@ -299,7 +315,7 @@ export default function NewTable() {
     
       <div style={{ marginBottom: '20px' }}>
         <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-          Nome do Processamento:
+          Nome do Procedimento:
         </label>
         <input
           type="text"
@@ -315,12 +331,42 @@ export default function NewTable() {
           }}
         />
         <small style={{ color: '#666' }}>
-          {nextTableNumber !== null && processFolder
-            ? `Nome do ficheiro será: ${nextTableNumber.toString().padStart(2, '0')} ${processName || '[Nome da Matriz]'}.pdf`
-            : processFolder 
-              ? 'Aguardando carregamento do número...'
-              : 'Selecione uma pasta para ver o nome do ficheiro'
+          {processFolder
+            ? (() => {
+                let prefix;
+                if (manualPrefix.trim()) {
+                  prefix = manualPrefix.trim();
+                } else if (nextTableNumber !== null) {
+                  prefix = nextTableNumber.toString().padStart(2, '0');
+                } else {
+                  return 'Aguardando carregamento do número...';
+                }
+                return `Nome do ficheiro será: ${prefix} ${processName || '[Nome da Matriz]'}.pdf`;
+              })()
+            : 'Selecione uma pasta para ver o nome do ficheiro'
           }
+        </small>
+      </div>
+
+      <div style={{ marginBottom: '20px' }}>
+        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+          Prefixo do Ficheiro (opcional):
+        </label>
+        <input
+          type="text"
+          value={manualPrefix}
+          onChange={(e) => setManualPrefix(e.target.value)}
+          placeholder="Ex: 01, 02, A1, B2, etc. (deixe vazio para numeração automática)"
+          style={{ 
+            width: '100%', 
+            padding: '8px', 
+            border: '1px solid #ccc', 
+            borderRadius: '4px',
+            fontSize: '14px'
+          }}
+        />
+        <small style={{ color: '#666' }}>
+          Se não especificar, será usado o próximo número disponível automaticamente
         </small>
       </div>
 

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import ExportPdfButton from "../Buttons/exportPdf";
 import PreviewPdfButton from "../Buttons/previewPDF";
 import useRowContextMenu from "../ContextMenu/useRowContextMenu";
@@ -30,21 +30,37 @@ export default function Template2({
   onInsertAtividadeAbove,
   onInsertAtividadeBelow,
   onDeleteAtividade,
+  // Props para manipulação de indicadores
+  onMoveIndicadorUp,
+  onMoveIndicadorDown,
+  onInsertIndicadorAbove,
+  onInsertIndicadorBelow,
+  onDeleteIndicador,
   // Props adicionais para ExportPdfButton
   pathFilename = "",
   onSaveSuccess,
 }) {
   // Refs para textareas auto-resize
   const textAreaRefs = useRef({});
-
-  // Hook único para o context menu
-  const contextMenu = useRowContextMenu({
+  
+  // Hook para o context menu das atividades
+  const contextMenuAtividades = useRowContextMenu({
     totalRows: atividades.length,
     onMoveRowUp: onMoveAtividadeUp,
     onMoveRowDown: onMoveAtividadeDown,
     onInsertRowAbove: onInsertAtividadeAbove,
     onInsertRowBelow: onInsertAtividadeBelow,
     onDeleteRow: onDeleteAtividade
+  });
+
+  // Hook para o context menu dos indicadores (dinâmico)
+  const contextMenuIndicadores = useRowContextMenu({
+    totalRows: Array.isArray(indicadores) ? indicadores.length : 3, // Suporte para array ou objeto
+    onMoveRowUp: onMoveIndicadorUp,
+    onMoveRowDown: onMoveIndicadorDown,
+    onInsertRowAbove: onInsertIndicadorAbove,
+    onInsertRowBelow: onInsertIndicadorBelow,
+    onDeleteRow: onDeleteIndicador
   });
 
   // Verifica se o dono do processo foi alterado
@@ -137,11 +153,24 @@ export default function Template2({
         <tr>
           <th class="center">Indicadores de monitorização do processo</th>
         </tr>
-        ${(indicadores || []).map(indicador => `
-          <tr>
-            <td>${escapeHtml(indicador)}</td>
+        ${Array.isArray(indicadores) ? 
+          // Se for array, renderizar dinamicamente
+          indicadores.map((indicador, idx) => `
+            <tr>
+              <td><strong>Indicador R${idx + 1}:</strong><br>${escapeHtml(indicador || '')}</td>
+            </tr>
+          `).join('') :
+          // Se for objeto, renderizar os 3 campos fixos
+          `<tr>
+            <td><strong>Indicador R1:</strong><br>${escapeHtml(indicadores.indicadores_r1 || '')}</td>
           </tr>
-        `).join('')}
+          <tr>
+            <td><strong>Indicador R2:</strong><br>${escapeHtml(indicadores.indicadores_r2 || '')}</td>
+          </tr>
+          <tr>
+            <td><strong>Indicador R3:</strong><br>${escapeHtml(indicadores.indicadores_r3 || '')}</td>
+          </tr>`
+        }
       </table>
     `;
 
@@ -165,9 +194,12 @@ export default function Template2({
     });
   }, [atividades, servicosEntrada, servicoSaida, objetivoProcesso, indicadores]);
 
+  console.log("PathFileName:", pathFilename);
+
   return (
     <div className="template2-container">
-    {/* Tabela principal */}
+      {/* Configurações do Cabeçalho */}
+      {/* Tabela principal */}
 <table className="tabela-processo">
   <thead>
     <tr>
@@ -257,7 +289,7 @@ export default function Template2({
     {atividades.map((row, rowIdx) => (
       <tr 
         key={rowIdx}
-        onContextMenu={(e) => contextMenu.handleContextMenuEvent(e, rowIdx)}
+        onContextMenu={(e) => contextMenuAtividades.handleContextMenuEvent(e, rowIdx)}
       >
         {row.map((cell, colIdx) => {
           const labels = [
@@ -287,8 +319,9 @@ export default function Template2({
   </tbody>
 </table>
 
-{/* Renderizar o context menu fora da tabela */}
-{contextMenu.contextMenu}
+{/* Renderizar os context menus fora das tabelas */}
+{contextMenuAtividades.contextMenu}
+{contextMenuIndicadores.contextMenu}
 
 {/* Tabela Indicadores de monitorização do processo */}
 <table className="tabela-indicadores">
@@ -298,21 +331,80 @@ export default function Template2({
     </tr>
   </thead>
   <tbody>
-    {(indicadores || []).map((indicador, rowIdx) => (
-      <tr key={rowIdx}>
-        <td>
-          <textarea
-            ref={(el) => textAreaRefs.current[`indicador-${rowIdx}`] = el}
-            className="tabela-indicadores-textarea medium"
-            value={indicador}
-            onChange={e => handleIndicadoresChange(rowIdx, e.target.value)}
-            onInput={handleTextareaResize}
-            placeholder="Descreva o indicador de monitorização..."
-            style={{ resize: 'none' }}
-          />
-        </td>
-      </tr>
-    ))}
+    {/* Suporte para indicadores como array ou objeto */}
+    {Array.isArray(indicadores) ? (
+      // Se for array, renderizar dinamicamente
+      indicadores.map((indicador, rowIdx) => (
+        <tr key={rowIdx} onContextMenu={(e) => contextMenuIndicadores.handleContextMenuEvent(e, rowIdx)}>
+          <td>
+            <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>
+              Indicador R{rowIdx + 1}:
+            </label>
+            <textarea
+              ref={(el) => textAreaRefs.current[`indicador-${rowIdx}`] = el}
+              className="tabela-indicadores-textarea medium"
+              value={indicador || ''}
+              onChange={e => handleIndicadoresChange(rowIdx, e.target.value)}
+              onInput={handleTextareaResize}
+              placeholder={`Indicador ${rowIdx + 1} de monitorização...`}
+              style={{ resize: 'none' }}
+            />
+          </td>
+        </tr>
+      ))
+    ) : (
+      // Se for objeto, renderizar os 3 campos fixos
+      <>
+        <tr onContextMenu={(e) => contextMenuIndicadores.handleContextMenuEvent(e, 0)}>
+          <td>
+            <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>
+              Indicador R1:
+            </label>
+            <textarea
+              ref={(el) => textAreaRefs.current['indicador-r1'] = el}
+              className="tabela-indicadores-textarea medium"
+              value={indicadores.indicadores_r1 || ''}
+              onChange={e => handleIndicadoresChange('indicadores_r1', e.target.value)}
+              onInput={handleTextareaResize}
+              placeholder="Primeiro indicador de monitorização..."
+              style={{ resize: 'none' }}
+            />
+          </td>
+        </tr>
+        <tr onContextMenu={(e) => contextMenuIndicadores.handleContextMenuEvent(e, 1)}>
+          <td>
+            <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>
+              Indicador R2:
+            </label>
+            <textarea
+              ref={(el) => textAreaRefs.current['indicador-r2'] = el}
+              className="tabela-indicadores-textarea medium"
+              value={indicadores.indicadores_r2 || ''}
+              onChange={e => handleIndicadoresChange('indicadores_r2', e.target.value)}
+              onInput={handleTextareaResize}
+              placeholder="Segundo indicador de monitorização..."
+              style={{ resize: 'none' }}
+            />
+          </td>
+        </tr>
+        <tr onContextMenu={(e) => contextMenuIndicadores.handleContextMenuEvent(e, 2)}>
+          <td>
+            <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>
+              Indicador R3:
+            </label>
+            <textarea
+              ref={(el) => textAreaRefs.current['indicador-r3'] = el}
+              className="tabela-indicadores-textarea medium"
+              value={indicadores.indicadores_r3 || ''}
+              onChange={e => handleIndicadoresChange('indicadores_r3', e.target.value)}
+              onInput={handleTextareaResize}
+              placeholder="Terceiro indicador de monitorização..."
+              style={{ resize: 'none' }}
+            />
+          </td>
+        </tr>
+      </>
+    )}
   </tbody>
 </table>
 

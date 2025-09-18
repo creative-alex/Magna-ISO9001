@@ -4,6 +4,7 @@ import { generateNonEditablePdfFromHtml, generateNonEditablePdfTemplate2 } from 
 export default function PreviewPdfButton({ 
   getTablesHtml, 
   templateType = 1,
+  pathFilename, // ← ADICIONAR ESTE PARÂMETRO
   // Props específicas para Template 2
   atividades,
   donoProcesso,
@@ -12,7 +13,28 @@ export default function PreviewPdfButton({
   servicosEntrada,
   servicoSaida
 }) {
+  // Função para carregar automaticamente a imagem PNG da empresa
+  const loadCompanyImage = async () => {
+    try {
+      const response = await fetch('/c_comenius_cor.png');
+      if (response.ok) {
+        const arrayBuffer = await response.arrayBuffer();
+        console.log("✅ Imagem da empresa carregada para preview");
+        return new Uint8Array(arrayBuffer);
+      } else {
+        console.warn("⚠️ Imagem da empresa não encontrada para preview");
+        return null;
+      }
+    } catch (error) {
+      console.error("❌ Erro ao carregar imagem da empresa para preview:", error);
+      return null;
+    }
+  };
+
   const handlePreviewNonEditable = async () => {
+    // Carregar a imagem PNG da empresa
+    const imageBytes = await loadCompanyImage();
+    
     if (templateType === 2) {
       // Usa a função específica do Template 2
       const nonEditablePdfBytes = await generateNonEditablePdfTemplate2(
@@ -21,7 +43,10 @@ export default function PreviewPdfButton({
         objetivoProcesso,
         indicadores,
         servicosEntrada,
-        servicoSaida
+        servicoSaida,
+        "Procedimento",
+        imageBytes,
+        ""
       );
       const blob = new Blob([nonEditablePdfBytes], { type: "application/pdf" });
       const blobUrl = URL.createObjectURL(blob);
@@ -33,7 +58,13 @@ export default function PreviewPdfButton({
         return;
       }
       const { mainTableHtml, obsTableHtml } = getTablesHtml();
-      const nonEditablePdfBytes = await generateNonEditablePdfFromHtml(mainTableHtml, obsTableHtml);
+      const nonEditablePdfBytes = await generateNonEditablePdfFromHtml(
+        mainTableHtml, 
+        obsTableHtml, 
+        "Procedimento", 
+        imageBytes, 
+        pathFilename || ""
+      );
       const blob = new Blob([nonEditablePdfBytes], { type: "application/pdf" });
       const blobUrl = URL.createObjectURL(blob);
       window.open(blobUrl, "_blank");

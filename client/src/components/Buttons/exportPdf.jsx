@@ -19,6 +19,24 @@ export default function ExportPdfButton({
   servicoSaida,
   onSaveSuccess // Novo prop para callback após guardar
 }) {
+  // Função para carregar automaticamente a imagem PNG da empresa
+  const loadCompanyImage = async () => {
+    try {
+      const response = await fetch('/c_comenius_cor.png');
+      if (response.ok) {
+        const arrayBuffer = await response.arrayBuffer();
+        console.log("✅ Imagem da empresa carregada automaticamente");
+        return arrayBuffer;
+      } else {
+        console.warn("⚠️ Imagem da empresa não encontrada");
+        return null;
+      }
+    } catch (error) {
+      console.error("❌ Erro ao carregar imagem da empresa:", error);
+      return null;
+    }
+  };
+
   // Função para preparar os dados para envio ao backend
   const getMainTableFormData = () => {
     const formDataObj = {};
@@ -34,6 +52,10 @@ export default function ExportPdfButton({
 
   // Função para enviar PDF editável para o backend
   const handleSendToBackend = async () => {
+    console.log("🔍 DEBUG - pathFilename recebido:", pathFilename);
+    console.log("🔍 DEBUG - tipo do pathFilename:", typeof pathFilename);
+    console.log("🔍 DEBUG - pathFilename está vazio?", !pathFilename);
+    
     console.log("handleSendToBackend chamado com:");
     console.log("templateType:", templateType);
     console.log("servicosEntrada:", servicosEntrada);
@@ -52,6 +74,17 @@ export default function ExportPdfButton({
     const parts = pathFilename.split("/");
     const filename = parts.pop();
     const folders = parts;
+    
+    console.log("🔍 DEBUG - parts após split:", parts);
+    console.log("🔍 DEBUG - filename:", filename);
+    console.log("🔍 DEBUG - folders:", folders);
+
+    // Carregar automaticamente a imagem PNG da empresa
+    let imageBytes = await loadCompanyImage();
+    if (imageBytes) {
+      imageBytes = new Uint8Array(imageBytes);
+      console.log("✅ Imagem da empresa carregada:", imageBytes.length, "bytes");
+    }
 
     // Passe todos os dados e o templateType
     const editablePdfBytes = await generateEditablePdf({
@@ -65,9 +98,14 @@ export default function ExportPdfButton({
       objetivoProcesso,
       indicadores,
       servicosEntrada,
-      servicoSaida
+      servicoSaida,
+      title: "Procedimento",
+      imageBytes,
+      pathFilename: pathFilename || "SemNome/documento.pdf" // ← FALLBACK se estiver vazio
     });
-
+    
+    console.log("🔍 DEBUG - pathFilename enviado para generateEditablePdf:", pathFilename || "SemNome/documento.pdf");
+    
     const formData = new FormData();
     formData.append("file", new Blob([editablePdfBytes], { type: "application/pdf" }), filename);
     formData.append("folders", JSON.stringify(folders));
@@ -129,6 +167,8 @@ export default function ExportPdfButton({
 
   // Função para pré-visualizar o PDF editável
   const handlePreviewPdf = async () => {
+    console.log("🔍 handlePreviewPdf - pathFilename recebido:", pathFilename);
+    
     const stringHeaders = headers.map(h =>
       typeof h === "string"
         ? h
@@ -138,6 +178,12 @@ export default function ExportPdfButton({
             : h.props.children
           : String(h)
     );
+
+    // Carregar automaticamente a imagem PNG da empresa
+    let imageBytes = await loadCompanyImage();
+    if (imageBytes) {
+      imageBytes = new Uint8Array(imageBytes);
+    }
 
     const editablePdfBytes = await generateEditablePdf({
       templateType,
@@ -150,7 +196,10 @@ export default function ExportPdfButton({
       servicosEntrada,
       servicoSaida,
       objetivoProcesso,
-      indicadores
+      indicadores,
+      title: "Procedimento",
+      imageBytes,
+      pathFilename
     });
 
     // Cria um blob e abre o PDF editável em uma nova aba
