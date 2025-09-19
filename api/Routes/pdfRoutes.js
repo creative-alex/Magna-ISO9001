@@ -13,9 +13,12 @@ router.post('/upload-document', upload.single('file'), filesController.uploadDoc
 router.get('/list-pdfs', filesController.listPdfs);
 router.post('/pdf-form-data', filesController.getPdfFormData);
 router.post('/download', filesController.downloadPdf);
+router.get('/download/:filePath', filesController.downloadFile);
+router.get('/preview/:filePath', filesController.previewFile);
 router.post('/update-dono-processo', filesController.updateDonoProcesso);
 router.get('/process-owners', filesController.getProcessOwners);
 router.post('/delete', filesController.deletePdf);
+router.delete('/delete/:filePath', filesController.deleteFile);
 router.get('/list-documents-in-folder', filesController.listDocumentsInFolder);
 
 // ENDPOINTS SIMPLES E DIRETOS - SÓ O QUE É NECESSÁRIO

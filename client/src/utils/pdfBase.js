@@ -119,55 +119,72 @@ export async function createBasePdf(title, imageBytes, pathFilename) {
 }
 
 export function wrapText(text, font, fontSize, maxWidth) {
-  const paragraphs = text.split('\n');
-  let lines = [];
-  for (const para of paragraphs) {
+  if (!text || text.toString().trim() === '') return [''];
+  
+  const textStr = text.toString();
+  
+  // Primeiro, divide por quebras de linha manuais (\n)
+  const paragraphs = textStr.split('\n');
+  const allLines = [];
+  
+  paragraphs.forEach(paragraph => {
+    if (paragraph.trim() === '') {
+      allLines.push(''); // Preserva linhas vazias
+      return;
+    }
+    
+    const words = paragraph.split(/\s+/);
+    const lines = [];
     let currentLine = '';
-    for (let word of para.split(' ')) {
-      if (font.widthOfTextAtSize(word, fontSize) > maxWidth) {
-        let subWord = '';
-        for (let char of word) {
-          const testSubWord = subWord + char;
-          if (font.widthOfTextAtSize(testSubWord, fontSize) > maxWidth) {
-            if (subWord) {
-              lines.push(currentLine + subWord);
-              currentLine = '';
-              subWord = char;
-            } else {
-              lines.push(char);
-            }
-          } else {
-            subWord = testSubWord;
-          }
-        }
-        if (subWord) {
-          if (currentLine) {
-            lines.push(currentLine + subWord);
-            currentLine = '';
-          } else {
-            lines.push(subWord);
-          }
-        }
+    
+    words.forEach(word => {
+      if (!word.trim()) return; // Ignora palavras vazias
+      
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      const testWidth = font.widthOfTextAtSize(testLine, fontSize);
+      
+      if (testWidth <= maxWidth) {
+        currentLine = testLine;
       } else {
-        const testLine = currentLine ? `${currentLine} ${word}` : word;
-        if (font.widthOfTextAtSize(testLine, fontSize) > maxWidth) {
-          if (currentLine) {
-            lines.push(currentLine);
-            currentLine = word;
-          } else {
-            lines.push(word);
-          }
+        if (currentLine) {
+          lines.push(currentLine);
+          currentLine = word;
         } else {
-          currentLine = testLine;
+          // Se uma palavra individual é maior que maxWidth
+          // Tenta quebrar a palavra por caracteres
+          const chars = word.split('');
+          let partialWord = '';
+          
+          chars.forEach(char => {
+            const testChar = partialWord + char;
+            const charWidth = font.widthOfTextAtSize(testChar, fontSize);
+            
+            if (charWidth <= maxWidth) {
+              partialWord = testChar;
+            } else {
+              if (partialWord) {
+                lines.push(partialWord);
+                partialWord = char;
+              } else {
+                lines.push(char); // Força pelo menos um caractere
+              }
+            }
+          });
+          
+          if (partialWord) {
+            currentLine = partialWord;
+          }
         }
       }
-    }
+    });
+    
     if (currentLine) {
       lines.push(currentLine);
     }
-    if (para === '') {
-      lines.push('');
-    }
-  }
-  return lines;
+    
+    // Adiciona as linhas deste parágrafo ao resultado final
+    allLines.push(...lines);
+  });
+  
+  return allLines.length > 0 ? allLines : [''];
 }

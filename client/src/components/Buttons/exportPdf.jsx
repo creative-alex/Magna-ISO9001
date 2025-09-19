@@ -197,7 +197,6 @@ export default function ExportPdfButton({
       servicoSaida,
       objetivoProcesso,
       indicadores,
-      title: "Procedimento",
       imageBytes,
       pathFilename
     });

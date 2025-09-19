@@ -2,10 +2,31 @@ import React from "react";
 import downloadIcon from "../../icons/download.ico";
 
 const PdfPreviewButton = ({ file, currentPath }) => {
+  // Função para carregar automaticamente a imagem PNG da empresa
+  const loadCompanyImage = async () => {
+    try {
+      const response = await fetch('/c_comenius_cor.png');
+      if (response.ok) {
+        const arrayBuffer = await response.arrayBuffer();
+        console.log("✅ Imagem da empresa carregada para preview");
+        return new Uint8Array(arrayBuffer);
+      } else {
+        console.warn("⚠️ Imagem da empresa não encontrada para preview");
+        return null;
+      }
+    } catch (error) {
+      console.error("❌ Erro ao carregar imagem da empresa para preview:", error);
+      return null;
+    }
+  };
+
   const handlePreviewClick = async (e) => {
     e.stopPropagation(); // Evita trigger do onClick do div pai
     try {
       const filePath = [...currentPath, file.name].join("/");
+      
+      // Carregar a imagem PNG da empresa
+      const imageBytes = await loadCompanyImage();
       
       // Se está em subpasta de nível 2 ou mais (currentPath.length > 1), faz download direto
       // Nível 0: pasta raiz, Nível 1: primeira subpasta, Nível 2+: subpastas dentro de subpastas
@@ -133,7 +154,10 @@ const PdfPreviewButton = ({ file, currentPath }) => {
           objetivoProcesso, 
           indicadoresData, 
           servicosEntrada, 
-          servicoSaida
+          servicoSaida,
+          "Procedimento",
+          imageBytes,
+          filePath
         );
         
         // 4. Abre o preview
@@ -152,6 +176,9 @@ const PdfPreviewButton = ({ file, currentPath }) => {
         const mainRows = {};
         const obsRows = {};
         
+        // Debug dos dados do formulário
+        console.log('🔍 Dados do formulário recebidos:', Object.keys(formData));
+        
         Object.keys(formData).forEach(key => {
           if (key.startsWith('table2_r')) {
             const match = key.match(/table2_r(\d+)_c(\d+)/);
@@ -160,12 +187,26 @@ const PdfPreviewButton = ({ file, currentPath }) => {
               const col = parseInt(match[2]) - 1; // -1 porque começa em c1
               if (!mainRows[row]) mainRows[row] = [];
               mainRows[row][col] = formData[key] || '';
+              
+              // Debug para documentos associados e instruções
+              if (col === 3 && formData[key]) {
+                console.log(`📄 Documentos Associados linha ${row}:`, formData[key]);
+              }
+              if (col === 4 && formData[key]) {
+                console.log(`📋 Instruções linha ${row}:`, formData[key]);
+              }
             }
           } else if (key.startsWith('table1_r')) {
             const match = key.match(/table1_r(\d+)/);
             if (match) {
               const row = parseInt(match[1]) - 1; // -1 porque começa em r1
               obsRows[row] = [formData[key] || ''];
+              
+              // Debug para objetivos e outras seções
+              if (row === 0 && formData[key]) {
+                console.log('🎯 Objetivos encontrados:', formData[key]);
+              }
+              console.log(`📝 Seção ${row + 1}:`, formData[key]);
             }
           }
         });
@@ -207,7 +248,14 @@ const PdfPreviewButton = ({ file, currentPath }) => {
         ];
         
         // 3. Gera o PDF não editável do Template 1
-        const nonEditablePdfBytes = await generateNonEditablePdf(mainTableData, headers, obsTableData);
+        const nonEditablePdfBytes = await generateNonEditablePdf(
+          mainTableData, 
+          headers, 
+          obsTableData, 
+          "Procedimento", 
+          imageBytes, 
+          filePath
+        );
         
         // 4. Abre o preview
         const blob = new Blob([nonEditablePdfBytes], { type: "application/pdf" });

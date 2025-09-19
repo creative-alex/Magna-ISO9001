@@ -7,7 +7,7 @@ const InstrucoesTrabalho = ({
 }) => {
   const [instrucoesDisponiveis, setInstrucoesDisponiveis] = useState([]);
   const [instrucoesSelecionadas, setInstrucoesSelecionadas] = useState([]);
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   
@@ -186,23 +186,51 @@ const InstrucoesTrabalho = ({
       }
       
       // Encontra a subpasta que contém "Instruções de trabalho procedimento" e termina com o mesmo prefixo do ficheiro atual
-      const targetSubfolder = mainFolderNode.children.find(node => 
+      console.log('🔍 Procurando por pasta que:');
+      console.log('   - Contenha: "Instruções de trabalho procedimento"');
+      console.log('   - Termine com: "' + filePrefix + '"');
+      console.log('📂 Pastas disponíveis na pasta principal:');
+      mainFolderNode.children.forEach(node => {
+        if (node.type === 'folder') {
+          console.log(`   - "${node.name}" (toLowerCase: "${node.name.toLowerCase()}")`)
+          console.log(`     Contém "instruções": ${node.name.toLowerCase().includes('instruções de trabalho procedimento')}`)
+          console.log(`     Termina com "${filePrefix}": ${node.name.endsWith(filePrefix)}`)
+        }
+      });
+      
+      let targetSubfolder = mainFolderNode.children.find(node => 
         node.type === 'folder' && 
-        node.name.toLowerCase().includes('Instruções de trabalho procedimento') &&
+        (node.name.toLowerCase().includes('instruções de trabalho procedimento') ||
+         node.name.toLowerCase().includes('instrucoes de trabalho procedimento')) &&
         node.name.endsWith(filePrefix)
       );
       
       if (!targetSubfolder || !targetSubfolder.children) {
         console.log(`❌ Subpasta de "Instruções de trabalho procedimento" que termina com "${filePrefix}" não encontrada ou vazia`);
-        setInstrucoesDisponiveis([]);
-        setCurrentFolderPath(`${mainFolder}/Instruções de trabalho procedimento ${filePrefix}*`);
-        return;
+        
+        // Tenta uma busca alternativa mais flexível
+        console.log('🔄 Tentando busca alternativa...');
+        const alternativeSubfolder = mainFolderNode.children.find(node => 
+          node.type === 'folder' && 
+          (node.name.toLowerCase().includes('instruções de trabalho') || 
+           node.name.toLowerCase().includes('instrucoes de trabalho')) &&
+          node.name.includes(filePrefix)
+        );
+        
+        if (alternativeSubfolder && alternativeSubfolder.children) {
+          console.log(`✅ Pasta alternativa encontrada: "${alternativeSubfolder.name}"`);
+          targetSubfolder = alternativeSubfolder; // Usar a pasta alternativa
+        } else {
+          setInstrucoesDisponiveis([]);
+          setCurrentFolderPath(`${mainFolder}/Instruções de trabalho procedimento ${filePrefix}`);
+          return;
+        }
       }
       
-      console.log(`📂 Subpasta encontrada: ${targetSubfolder.name}`);
+      console.log(`📂 Usando subpasta: ${targetSubfolder.name}`);
       
       // Função recursiva para extrair todos os ficheiros da subpasta específica
-      const extractAllFiles = (nodes, currentPath = '') => {
+      const extractAllFiles = (nodes, currentPath = '', folderName = '') => {
         let allFiles = [];
         
         for (const node of nodes) {
@@ -213,11 +241,11 @@ const InstrucoesTrabalho = ({
             allFiles.push({
               name: node.name,
               path: fullPath,
-              folder: currentPath || targetSubfolder.name
+              folder: currentPath || folderName
             });
           } else if (node.type === 'folder' && node.children) {
             // Recursivamente busca ficheiros nas subpastas
-            const subFiles = extractAllFiles(node.children, fullPath);
+            const subFiles = extractAllFiles(node.children, fullPath, folderName);
             allFiles = allFiles.concat(subFiles);
           }
         }
@@ -226,7 +254,7 @@ const InstrucoesTrabalho = ({
       };
       
       // Extrai todos os ficheiros da subpasta específica
-      const allFiles = extractAllFiles(targetSubfolder.children);
+      const allFiles = extractAllFiles(targetSubfolder.children, '', targetSubfolder.name);
       console.log(`📋 ${allFiles.length} ficheiros encontrados na subpasta "${targetSubfolder.name}"`);
       
       // Filtra para mostrar apenas ficheiros (remove extensões para display)
@@ -352,100 +380,87 @@ const InstrucoesTrabalho = ({
     onChange(novoValor);
   };
 
-  // Função para fazer preview da instrução
-  const handlePreview = async (instrucao) => {
-    const instrucaoObject = instrucoesDisponiveis.find(inst => 
-      inst.displayName === instrucao || inst === instrucao
+  // Função para download de instrução
+  const handleDownload = (instrucaoName) => {
+    // Busca a instrução na lista disponível para obter o caminho completo
+    const instrucao = instrucoesDisponiveis.find(
+      inst => (typeof inst === 'object' ? inst.displayName : inst) === instrucaoName
     );
     
-    if (!instrucaoObject) {
-      alert('Instrução de trabalho não encontrada.');
-      return;
-    }
-    
-    const fullPath = typeof instrucaoObject === 'object' ? instrucaoObject.fullPath : instrucao;
-    console.log('👁️ Preview:', fullPath);
-    
-    try {
-      const response = await fetch('http://192.168.1.219:8080/files/get-pdf', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ path: encodeURIComponent(fullPath) }),
-      });
-
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        
-        // Abre o documento numa nova janela
-        const newWindow = window.open(url, '_blank');
-        if (!newWindow) {
-          alert('Pop-ups bloqueados. Por favor, permita pop-ups para visualizar a instrução.');
-        } else {
-          // Limpa o URL após um tempo para libertar memória
-          setTimeout(() => URL.revokeObjectURL(url), 5000);
-        }
-      } else {
-        const errorText = await response.text();
-        alert(`Erro ao carregar a instrução para preview: ${errorText}`);
-      }
-    } catch (error) {
-      console.error('🚨 Erro no preview:', error);
-      alert('Erro ao fazer preview da instrução de trabalho.');
+    if (instrucao && typeof instrucao === 'object') {
+      const fullPath = instrucao.fullPath;
+      console.log('Fazendo download de:', fullPath);
+      
+      // URL para download
+      const downloadUrl = `http://192.168.1.219:8080/files/download/${encodeURIComponent(fullPath)}`;
+      
+      // Cria um link temporário para download
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = instrucaoName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
   };
 
-  // Função para fazer download da instrução
-  const handleDownload = async (instrucao) => {
-    const instrucaoObject = instrucoesDisponiveis.find(inst => 
-      inst.displayName === instrucao || inst === instrucao
+  // Função para apagar instrução da base de dados
+  const handleDelete = async (instrucaoName) => {
+    // Busca a instrução na lista disponível para obter o caminho completo
+    const instrucao = instrucoesDisponiveis.find(
+      inst => (typeof inst === 'object' ? inst.displayName : inst) === instrucaoName
     );
     
-    if (!instrucaoObject) {
-      alert('Instrução de trabalho não encontrada.');
-      return;
-    }
-    
-    const fullPath = typeof instrucaoObject === 'object' ? instrucaoObject.fullPath : instrucao;
-    console.log('⬇️ Download:', fullPath);
-    
-    try {
-      const response = await fetch('http://192.168.1.219:8080/files/download', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ path: encodeURIComponent(fullPath) }),
-      });
-
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        
-        // Cria um link temporário para download
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = typeof instrucaoObject === 'object' ? instrucaoObject.displayName : instrucao;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // Limpa o URL temporário
-        URL.revokeObjectURL(url);
-      } else {
-        const errorText = await response.text();
-        alert(`Erro ao fazer download da instrução: ${errorText}`);
+    if (instrucao && typeof instrucao === 'object') {
+      const fullPath = instrucao.fullPath;
+      
+      // Confirma a ação
+      const confirmDelete = window.confirm(`Tem certeza que deseja apagar permanentemente o arquivo "${instrucaoName}"?\n\nEsta ação não pode ser desfeita.`);
+      
+      if (!confirmDelete) {
+        return;
       }
-    } catch (error) {
-      console.error('🚨 Erro no download:', error);
-      alert('Erro ao fazer download da instrução de trabalho.');
+      
+      try {
+        console.log('Apagando arquivo:', fullPath);
+        
+        const response = await fetch(`http://192.168.1.219:8080/files/delete/${encodeURIComponent(fullPath)}`, {
+          method: 'DELETE'
+        });
+        
+        if (response.ok) {
+          console.log('Arquivo apagado com sucesso');
+          
+          // Remove da lista de selecionados se estiver selecionado
+          if (instrucoesSelecionadas.includes(instrucaoName)) {
+            removeInstrucao(instrucaoName);
+          }
+          
+          // Recarrega a lista de instruções
+          await fetchInstrucoes();
+          
+          alert('Arquivo apagado com sucesso!');
+        } else {
+          console.error('Erro ao apagar arquivo:', response.statusText);
+          alert('Erro ao apagar arquivo. Tente novamente.');
+        }
+      } catch (error) {
+        console.error('Erro ao apagar arquivo:', error);
+        alert('Erro ao apagar arquivo. Tente novamente.');
+      }
     }
   };
 
   return (
     <div className="instrucoes-trabalho-container" style={{ position: 'relative', width: '100%', height: '100%' }}>
+      {/* Input hidden para permitir extração do valor em PDFs */}
+      <input 
+        type="hidden" 
+        value={currentValue || ''} 
+        data-component="instrucoes-trabalho"
+        readOnly
+      />
+      
       {/* Área principal de exibição e seleção */}
       <div 
         style={{
@@ -461,8 +476,9 @@ const InstrucoesTrabalho = ({
           cursor: 'pointer',
           position: 'relative'
         }}
-        onClick={() => setShowDropdown(!showDropdown)}
-        title="Clique para selecionar Instruções de trabalho procedimento"
+        onClick={() => setShowModal(true)}
+        title="Clique para abrir janela de seleção de Instruções de trabalho procedimento"
+        data-current-value={currentValue || ''}
       >
         {/* Cabeçalho com contador */}
         <div style={{
@@ -477,7 +493,7 @@ const InstrucoesTrabalho = ({
         }}>
           <span>Instruções ({instrucoesSelecionadas.length})</span>
           <span style={{ fontSize: '9px' }}>
-            {showDropdown ? '^' : 'v'}
+            📂
           </span>
         </div>
 
@@ -489,33 +505,38 @@ const InstrucoesTrabalho = ({
               const displayName = isVideo ? getVideoTitle(instrucao) : instrucao;
               
               return (
-                <div key={index} style={{ 
-                  padding: '3px 6px',
-                  backgroundColor: isVideo ? '#e8f0ff' : '#e8f5e8',
-                  borderRadius: '3px',
-                  fontSize: '10px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  border: isVideo ? '1px solid #c8d6e5' : '1px solid #c8e6c9'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', flex: 1, wordBreak: 'break-word' }}>
+                <div 
+                  key={index} 
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '2px 0',
+                    borderBottom: index < instrucoesSelecionadas.length - 1 ? '1px solid #f0f0f0' : 'none'
+                  }}
+                >
+                  {/* Ícone baseado no tipo */}
+                  <span style={{ fontSize: '8px', minWidth: '12px' }}>
+                    {isVideo ? '🎥' : '📄'}
+                  </span>
+                  
+                  {/* Nome truncado */}
+                  <span 
+                    style={{ 
+                      flex: 1, 
+                      whiteSpace: 'nowrap', 
+                      overflow: 'hidden', 
+                      textOverflow: 'ellipsis',
+                      fontSize: '9px'
+                    }}
+                    title={displayName}
+                  >
+                    {displayName}
+                  </span>
+                  
+                  {/* Botões de ação */}
+                  <div style={{ display: 'flex', gap: '2px' }}>
                     {isVideo && (
-                      <span style={{ 
-                        marginRight: '4px', 
-                        fontSize: '8px', 
-                        backgroundColor: '#1976d2', 
-                        color: 'white', 
-                        padding: '1px 3px', 
-                        borderRadius: '2px' 
-                      }}>
-                        VIDEO
-                      </span>
-                    )}
-                    <span>{displayName}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '2px', marginLeft: '4px' }}>
-                    {isVideo ? (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -526,38 +547,15 @@ const InstrucoesTrabalho = ({
                           border: 'none',
                           color: '#1976d2',
                           cursor: 'pointer',
-                          fontSize: '10px',
-                          padding: '1px 3px',
-                          borderRadius: '2px'
+                          fontSize: '8px',
+                          padding: '1px 2px'
                         }}
                         title="Abrir vídeo"
-                        onMouseEnter={(e) => e.target.style.backgroundColor = '#e3f2fd'}
-                        onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                       >
                         ▶
                       </button>
-                    ) : (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDownload(instrucao);
-                        }}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#388e3c',
-                          cursor: 'pointer',
-                          fontSize: '10px',
-                          padding: '1px 3px',
-                          borderRadius: '2px'
-                        }}
-                        title="Descarregar instrução"
-                        onMouseEnter={(e) => e.target.style.backgroundColor = '#e8f5e8'}
-                        onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                      >
-                        v
-                      </button>
                     )}
+                    
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -566,15 +564,12 @@ const InstrucoesTrabalho = ({
                       style={{
                         background: 'none',
                         border: 'none',
-                        color: '#666',
+                        color: '#d32f2f',
                         cursor: 'pointer',
-                        fontSize: '12px',
-                        padding: '0 4px',
-                        borderRadius: '2px'
+                        fontSize: '8px',
+                        padding: '1px 2px'
                       }}
                       title="Remover instrução"
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#ffcdd2'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                     >
                       ×
                     </button>
@@ -584,292 +579,410 @@ const InstrucoesTrabalho = ({
             })}
           </div>
         ) : (
-          <div style={{ 
-            flex: 1, 
-            display: 'flex', 
-            alignItems: 'center', 
+          <div style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
             justifyContent: 'center',
             color: '#999', 
             fontSize: '10px', 
             fontStyle: 'italic',
             textAlign: 'center'
           }}>
-            Clique para selecionar<br/>Instruções de trabalho procedimento
+            Clique para abrir janela<br/>Instruções de trabalho procedimento
           </div>
         )}
       </div>
 
-      {showDropdown && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            backgroundColor: 'white',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            zIndex: 1000,
-            maxHeight: '300px',
-            overflowY: 'auto'
-          }}
-        >
-          <div style={{ padding: '8px', borderBottom: '1px solid #eee', fontWeight: 'bold', fontSize: '12px' }}>
-            Ficheiros da subpasta: {currentFolderPath || 'Procurando...'}
-          </div>
-          
-          {/* Área de upload */}
-          <div style={{ padding: '8px', borderBottom: '1px solid #eee', backgroundColor: '#f0f8f0' }}>
-            <input
-              type="file"
-              onChange={handleFileUpload}
-              disabled={uploading}
-              style={{ display: 'none' }}
-              id="upload-instrucao"
-            />
-            <label
-              htmlFor="upload-instrucao"
+      {/* Modal */}
+      {showModal && (
+        <>
+          {/* Overlay de fundo */}
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 1000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            onClick={() => setShowModal(false)}
+          >
+            {/* Janela Modal */}
+            <div
               style={{
-                display: 'inline-block',
-                padding: '6px 12px',
-                backgroundColor: uploading ? '#6c757d' : '#28a745',
-                color: 'white',
-                borderRadius: '4px',
-                cursor: uploading ? 'not-allowed' : 'pointer',
-                fontSize: '11px',
-                border: 'none',
-                fontWeight: 'bold'
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                width: '80%',
+                maxWidth: '800px',
+                maxHeight: '80%',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
               }}
+              onClick={(e) => e.stopPropagation()}
             >
-              {uploading ? 'Enviando...' : 'Enviar Nova Instrução'}
-            </label>
-            <div style={{ fontSize: '9px', color: '#666', marginTop: '4px' }}>
-              Selecione qualquer tipo de ficheiro para enviar para esta subpasta
-            </div>
-          </div>
-
-          {/* Área de links de vídeo */}
-          <div style={{ padding: '8px', borderBottom: '1px solid #eee', backgroundColor: '#f0f5ff' }}>
-            {!showVideoForm ? (
-              <div>
+              {/* Cabeçalho da Modal */}
+              <div style={{ 
+                padding: '16px', 
+                borderBottom: '1px solid #eee', 
+                backgroundColor: '#f8f9fa',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>
+                    Instruções de Trabalho Procedimento
+                  </h3>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#666' }}>
+                    {currentFolderPath || 'Procurando...'}
+                  </p>
+                </div>
                 <button
-                  onClick={() => setShowVideoForm(true)}
+                  onClick={() => setShowModal(false)}
                   style={{
-                    padding: '6px 12px',
-                    backgroundColor: '#1976d2',
-                    color: 'white',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '11px',
+                    background: 'none',
                     border: 'none',
-                    fontWeight: 'bold'
+                    fontSize: '20px',
+                    cursor: 'pointer',
+                    color: '#666',
+                    padding: '4px 8px',
+                    borderRadius: '4px'
                   }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#e9ecef'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                 >
-                  Adicionar Link de Vídeo
+                  ×
                 </button>
-                <div style={{ fontSize: '9px', color: '#666', marginTop: '4px' }}>
-                  Suporte: YouTube, Vimeo, Dailymotion, Twitch, Loom, Wistia
-                </div>
               </div>
-            ) : (
-              <div>
-                <div style={{ marginBottom: '8px' }}>
-                  <label style={{ display: 'block', fontSize: '10px', marginBottom: '2px', fontWeight: 'bold' }}>
-                    URL do Vídeo:
-                  </label>
+
+              {/* Conteúdo da Modal */}
+              <div style={{ 
+                flex: 1, 
+                overflow: 'auto',
+                display: 'flex',
+                flexDirection: 'column'
+              }}>
+                {/* Área de upload */}
+                <div style={{ padding: '16px', borderBottom: '1px solid #eee', backgroundColor: '#f0f8f0' }}>
                   <input
-                    type="url"
-                    value={videoLink}
-                    onChange={(e) => setVideoLink(e.target.value)}
-                    placeholder="https://www.youtube.com/watch?v=..."
-                    style={{
-                      width: '100%',
-                      padding: '4px',
-                      fontSize: '10px',
-                      border: '1px solid #ccc',
-                      borderRadius: '3px'
-                    }}
+                    type="file"
+                    onChange={handleFileUpload}
+                    disabled={uploading}
+                    style={{ display: 'none' }}
+                    id="upload-instrucao"
                   />
-                </div>
-                <div style={{ marginBottom: '8px' }}>
-                  <label style={{ display: 'block', fontSize: '10px', marginBottom: '2px', fontWeight: 'bold' }}>
-                    Título (opcional):
+                  <label
+                    htmlFor="upload-instrucao"
+                    style={{
+                      display: 'inline-block',
+                      padding: '8px 16px',
+                      backgroundColor: uploading ? '#6c757d' : '#28a745',
+                      color: 'white',
+                      borderRadius: '4px',
+                      cursor: uploading ? 'not-allowed' : 'pointer',
+                      fontSize: '12px',
+                      border: 'none',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    {uploading ? 'A enviar...' : '📁 Enviar Nova Instrução'}
                   </label>
-                  <input
-                    type="text"
-                    value={videoTitle}
-                    onChange={(e) => setVideoTitle(e.target.value)}
-                    placeholder="Título personalizado do vídeo"
-                    style={{
-                      width: '100%',
-                      padding: '4px',
-                      fontSize: '10px',
-                      border: '1px solid #ccc',
-                      borderRadius: '3px'
-                    }}
-                  />
+                  <div style={{ fontSize: '11px', color: '#666', marginTop: '6px' }}>
+                    Selecione qualquer tipo de ficheiro para enviar para esta subpasta
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  <button
-                    onClick={handleAddVideoLink}
-                    style={{
-                      padding: '4px 8px',
-                      backgroundColor: '#28a745',
-                      color: 'white',
-                      borderRadius: '3px',
-                      cursor: 'pointer',
-                      fontSize: '10px',
-                      border: 'none'
-                    }}
-                  >
-                    Adicionar
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowVideoForm(false);
-                      setVideoLink('');
-                      setVideoTitle('');
-                    }}
-                    style={{
-                      padding: '4px 8px',
-                      backgroundColor: '#6c757d',
-                      color: 'white',
-                      borderRadius: '3px',
-                      cursor: 'pointer',
-                      fontSize: '10px',
-                      border: 'none'
-                    }}
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-          
-          {loading && (
-            <div style={{ padding: '8px', textAlign: 'center', fontSize: '12px', color: '#666' }}>
-              Carregando instruções...
-            </div>
-          )}
-          
-          {!loading && instrucoesDisponiveis.length === 0 && (
-            <div style={{ padding: '8px', textAlign: 'center', fontSize: '12px', color: '#666' }}>
-              Nenhuma instrução encontrada na subpasta:<br/>
-              <code style={{ fontSize: '10px' }}>{currentFolderPath || 'Caminho não determinado'}</code>
-            </div>
-          )}
-          
-          {!loading && instrucoesDisponiveis.map((instrucao, index) => {
-            const instrucaoName = typeof instrucao === 'object' ? instrucao.displayName : instrucao;
-            const instrucaoFolder = typeof instrucao === 'object' ? instrucao.folder : '';
-            const isSelected = instrucoesSelecionadas.includes(instrucaoName);
-            
-            return (
-              <div
-                key={index}
-                style={{
-                  padding: '6px 8px',
-                  fontSize: '12px',
-                  backgroundColor: isSelected ? '#e8f5e8' : 'transparent',
-                  borderLeft: isSelected ? '3px solid #4caf50' : '3px solid transparent',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '2px'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isSelected) {
-                    e.target.style.backgroundColor = '#f5f5f5';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isSelected) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-                  <div 
-                    style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, cursor: 'pointer' }}
-                    onClick={() => toggleInstrucao(instrucaoName)}
-                  >
-                    <span style={{ fontSize: '10px' }}>
-                      {isSelected ? 'X' : 'O'}
-                    </span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 'bold' }}>{instrucaoName}</div>
-                      {instrucaoFolder && instrucaoFolder !== '(raiz)' && (
-                        <div style={{ fontSize: '10px', color: '#666', fontStyle: 'italic' }}>
-                          Pasta: {instrucaoFolder}
-                        </div>
-                      )}
+
+                {/* Área de links de vídeo */}
+                <div style={{ padding: '16px', borderBottom: '1px solid #eee', backgroundColor: '#f0f5ff' }}>
+                  {!showVideoForm ? (
+                    <div>
+                      <button
+                        onClick={() => setShowVideoForm(true)}
+                        style={{
+                          padding: '8px 16px',
+                          backgroundColor: '#1976d2',
+                          color: 'white',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          border: 'none',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        🎥 Adicionar Link de Vídeo
+                      </button>
+                      <div style={{ fontSize: '11px', color: '#666', marginTop: '6px' }}>
+                        Suporte: YouTube, Vimeo, Dailymotion, Twitch, Loom, Wistia
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div>
+                      <div style={{ marginBottom: '12px' }}>
+                        <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px', fontWeight: 'bold' }}>
+                          URL do Vídeo:
+                        </label>
+                        <input
+                          type="url"
+                          value={videoLink}
+                          onChange={(e) => setVideoLink(e.target.value)}
+                          placeholder="https://www.youtube.com/watch?v=..."
+                          style={{
+                            width: '100%',
+                            padding: '8px',
+                            fontSize: '12px',
+                            border: '1px solid #ccc',
+                            borderRadius: '4px'
+                          }}
+                        />
+                      </div>
+                      <div style={{ marginBottom: '12px' }}>
+                        <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px', fontWeight: 'bold' }}>
+                          Título (opcional):
+                        </label>
+                        <input
+                          type="text"
+                          value={videoTitle}
+                          onChange={(e) => setVideoTitle(e.target.value)}
+                          placeholder="Título personalizado do vídeo"
+                          style={{
+                            width: '100%',
+                            padding: '8px',
+                            fontSize: '12px',
+                            border: '1px solid #ccc',
+                            borderRadius: '4px'
+                          }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={handleAddVideoLink}
+                          style={{
+                            padding: '8px 16px',
+                            backgroundColor: '#28a745',
+                            color: 'white',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            border: 'none'
+                          }}
+                        >
+                          Adicionar
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowVideoForm(false);
+                            setVideoLink('');
+                            setVideoTitle('');
+                          }}
+                          style={{
+                            padding: '8px 16px',
+                            backgroundColor: '#6c757d',
+                            color: 'white',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            border: 'none'
+                          }}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Lista de instruções */}
+                <div style={{ 
+                  flex: 1, 
+                  overflow: 'auto',
+                  minHeight: '300px',
+                  padding: '8px'
+                }}>
+                  {loading && (
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      height: '200px',
+                      fontSize: '14px', 
+                      color: '#666' 
+                    }}>
+                      🔄 A carregar instruções...
+                    </div>
+                  )}
                   
-                  <div style={{ display: 'flex', gap: '4px' }}>
+                  {!loading && instrucoesDisponiveis.length === 0 && (
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      flexDirection: 'column',
+                      height: '200px',
+                      fontSize: '14px', 
+                      color: '#666',
+                      textAlign: 'center'
+                    }}>
+                      <p>📭 Nenhuma instrução encontrada na subpasta:</p>
+                      <code style={{ fontSize: '12px', backgroundColor: '#f5f5f5', padding: '4px 8px', borderRadius: '4px' }}>
+                        {currentFolderPath || 'Caminho não determinado'}
+                      </code>
+                    </div>
+                  )}
+                  
+                  {!loading && instrucoesDisponiveis.map((instrucao, index) => {
+                    const instrucaoName = typeof instrucao === 'object' ? instrucao.displayName : instrucao;
+                    const instrucaoFolder = typeof instrucao === 'object' ? instrucao.folder : '';
+                    const isSelected = instrucoesSelecionadas.includes(instrucaoName);
+                    
+                    return (
+                      <div
+                        key={index}
+                        style={{
+                          padding: '12px',
+                          margin: '8px 0',
+                          fontSize: '13px',
+                          backgroundColor: isSelected ? '#e8f5e8' : '#f8f9fa',
+                          border: isSelected ? '2px solid #4caf50' : '1px solid #dee2e6',
+                          borderRadius: '6px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isSelected) {
+                            e.currentTarget.style.backgroundColor = '#e9ecef';
+                            e.currentTarget.style.borderColor = '#adb5bd';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isSelected) {
+                            e.currentTarget.style.backgroundColor = '#f8f9fa';
+                            e.currentTarget.style.borderColor = '#dee2e6';
+                          }
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                          <div 
+                            style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, cursor: 'pointer' }}
+                            onClick={() => toggleInstrucao(instrucaoName)}
+                          >
+                            <div style={{ 
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              backgroundColor: isSelected ? '#4caf50' : '#dee2e6',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '12px',
+                              color: 'white',
+                              fontWeight: 'bold'
+                            }}>
+                              {isSelected ? '✓' : ''}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 'bold', fontSize: '14px' }}>📄 {instrucaoName}</div>
+                              {instrucaoFolder && instrucaoFolder !== '(raiz)' && (
+                                <div style={{ fontSize: '11px', color: '#666', fontStyle: 'italic', marginTop: '2px' }}>
+                                  📁 Pasta: {instrucaoFolder}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDownload(instrucaoName);
+                              }}
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: '#388e3c',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '11px',
+                                fontWeight: 'bold'
+                              }}
+                              title="Descarregar instrução"
+                              onMouseEnter={(e) => e.target.style.backgroundColor = '#2e7d32'}
+                              onMouseLeave={(e) => e.target.style.backgroundColor = '#388e3c'}
+                            >
+                              ⬇️ Baixar
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(instrucaoName);
+                              }}
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: '#d32f2f',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '11px',
+                                fontWeight: 'bold'
+                              }}
+                              title="Apagar instrução permanentemente"
+                              onMouseEnter={(e) => e.target.style.backgroundColor = '#c62828'}
+                              onMouseLeave={(e) => e.target.style.backgroundColor = '#d32f2f'}
+                            >
+                              🗑️ Apagar
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Rodapé da Modal */}
+                <div style={{ 
+                  padding: '16px', 
+                  borderTop: '1px solid #eee', 
+                  backgroundColor: '#f8f9fa',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div style={{ fontSize: '12px', color: '#666' }}>
+                    {instrucoesSelecionadas.length} instrução(ões) selecionada(s)
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePreview(instrucaoName);
-                      }}
+                      onClick={() => setShowModal(false)}
                       style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#1976d2',
-                        cursor: 'pointer',
+                        padding: '8px 16px',
                         fontSize: '12px',
-                        padding: '2px 4px',
-                        borderRadius: '2px'
-                      }}
-                      title="Visualizar instrução"
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#e3f2fd'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                    >
-                      Ver
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDownload(instrucaoName);
-                      }}
-                      style={{
-                        background: 'none',
+                        backgroundColor: '#6c757d',
+                        color: 'white',
                         border: 'none',
-                        color: '#388e3c',
+                        borderRadius: '4px',
                         cursor: 'pointer',
-                        fontSize: '12px',
-                        padding: '2px 4px',
-                        borderRadius: '2px'
+                        fontWeight: 'bold'
                       }}
-                      title="Descarregar instrução"
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#e8f5e8'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                     >
-                      Baixar
+                      Fechar
                     </button>
                   </div>
                 </div>
               </div>
-            );
-          })}
-          
-          <div style={{ padding: '4px 8px', borderTop: '1px solid #eee', textAlign: 'center' }}>
-            <button
-              onClick={() => setShowDropdown(false)}
-              style={{
-                padding: '4px 8px',
-                fontSize: '11px',
-                backgroundColor: '#f0f0f0',
-                border: '1px solid #ccc',
-                borderRadius: '3px',
-                cursor: 'pointer'
-              }}
-            >
-              Fechar
-            </button>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

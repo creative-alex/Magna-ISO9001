@@ -70,6 +70,49 @@ export default function Template1({
     });
   }, [data, dataObs]);
 
+  // Função específica para Template 1 para obter HTML das tabelas
+  const getTemplate1TablesHtml = () => {
+    let mainTableHtml = "";
+    let obsTableHtml = "";
+
+    if (mainTableRef && mainTableRef.current) {
+      // Clone da tabela principal
+      const mainTableClone = mainTableRef.current.cloneNode(true);
+      
+      // Substitui o conteúdo das células dos componentes especiais pelos valores reais
+      const bodyRows = mainTableClone.querySelectorAll('tbody tr');
+      bodyRows.forEach((row, rowIdx) => {
+        const cells = row.querySelectorAll('td');
+        cells.forEach((cell, colIdx) => {
+          // Coluna 3 - Documentos Associados
+          if (colIdx === 3) {
+            const value = data[rowIdx] ? data[rowIdx][colIdx] : '';
+            console.log(`🔍 DEBUG Template1 - Linha ${rowIdx}, Coluna ${colIdx} (Documentos):`, value);
+            cell.innerHTML = value.split('\n').join('<br>');
+          }
+          // Coluna 4 - Instruções de trabalho
+          else if (colIdx === 4) {
+            const value = data[rowIdx] ? data[rowIdx][colIdx] : '';
+            console.log(`🔍 DEBUG Template1 - Linha ${rowIdx}, Coluna ${colIdx} (Instruções):`, value);
+            cell.innerHTML = value.split('\n').join('<br>');
+          }
+        });
+      });
+      
+      mainTableHtml = mainTableClone.outerHTML;
+    }
+
+    if (obsTableRef && obsTableRef.current) {
+      obsTableHtml = obsTableRef.current.outerHTML;
+    }
+
+    console.log("🔍 DEBUG Template1 - HTML gerado:");
+    console.log("  Main Table HTML (primeiros 200 chars):", mainTableHtml.substring(0, 200));
+    console.log("  Obs Table HTML (primeiros 200 chars):", obsTableHtml.substring(0, 200));
+
+    return { mainTableHtml, obsTableHtml };
+  };
+
   console.log("PathFileName:", pathFilename);
 
   return (
@@ -248,14 +291,14 @@ export default function Template1({
           donoProcesso={donoProcesso}
           objetivoProcesso={objetivoProcesso}
           indicadores={indicadores}
-          pathFilename={pathFilename}  // ← Este valor está vazio!
+          pathFilename={pathFilename}
           servicosEntrada={servicosEntrada}
           servicoSaida={servicoSaida}
           fieldNames={fieldNames}
           onSaveSuccess={onSaveSuccess}
         />
         <PreviewPdfButton 
-          getTablesHtml={getTablesHtml} 
+          getTablesHtml={getTemplate1TablesHtml} 
           pathFilename={pathFilename}
         />
       </div>

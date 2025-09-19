@@ -282,7 +282,7 @@ export default function NewTable() {
       });
 
       if (!response.ok) {
-        throw new Error('Erro ao criar tabela');
+        throw new Error('Erro ao criar procedimento');
       }
 
       console.log('Tabela criada com sucesso!');
@@ -291,8 +291,8 @@ export default function NewTable() {
       navigate('/file');
       
     } catch (error) {
-      console.error('Erro ao criar tabela:', error);
-      setError('Erro ao criar tabela: ' + error.message);
+      console.error('Erro ao criar procedimento:', error);
+      setError('Erro ao criar procedimento: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -578,7 +578,7 @@ export default function NewTable() {
             fontSize: '16px'
           }}
         >
-          {loading ? 'A criar...' : 'Criar Tabela'}
+          {loading ? 'A criar...' : 'Criar Procedimento'}
         </button>
       </div>
     </div>

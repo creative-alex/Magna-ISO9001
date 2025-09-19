@@ -2,6 +2,30 @@ import { xStart, yStart, wrapText } from './pdfBase';
 import { obsColWidth } from './pdfTables';
 import { rgb } from 'pdf-lib';
 
+// Função para calcular a altura exata da tabela de observações
+export function calculateObsTableHeight(dataObs, font) {
+  const obsRows = 5; // Sempre 5 seções
+  const safeDataObs = Array.from({ length: obsRows }, (_, i) =>
+    Array.isArray(dataObs) && Array.isArray(dataObs[i]) ? dataObs[i] : [""]
+  );
+
+  const fontSize = 8;
+  const maxWidth = obsColWidth[0] - 8;
+  const lineHeight = fontSize + 2;
+  const headerHeight = 25; // Altura dos headers
+  const minContentHeight = 30; // Altura mínima do conteúdo
+
+  // Calcula altura de cada seção (header + conteúdo)
+  const sectionHeights = safeDataObs.map((row) => {
+    const text = row[0] || '';
+    const lines = wrapText(text, font, fontSize, maxWidth);
+    const contentHeight = Math.max(minContentHeight, lines.length * lineHeight + 16);
+    return headerHeight + contentHeight;
+  });
+
+  return sectionHeights.reduce((a, b) => a + b, 0);
+}
+
 // Função para desenhar tabela de observações com headers cinza
 export function drawObsTableWithHeaders(page, font, dataObs) {
   const obsRows = 5; // Sempre 5 seções
@@ -13,15 +37,26 @@ export function drawObsTableWithHeaders(page, font, dataObs) {
     "5. Observações:"
   ];
   
-  const safeDataObs = Array.from({ length: obsRows }, (_, i) =>
-    Array.isArray(dataObs) && Array.isArray(dataObs[i]) ? dataObs[i] : [""]
-  );
+  // Garante que temos exatamente 5 seções na ordem correta
+  const safeDataObs = Array.from({ length: obsRows }, (_, i) => {
+    if (Array.isArray(dataObs) && Array.isArray(dataObs[i])) {
+      return dataObs[i];
+    } else if (Array.isArray(dataObs) && dataObs[i] !== undefined) {
+      return [dataObs[i]]; // Converte string em array se necessário
+    } else {
+      return [""]; // Seção vazia
+    }
+  });
 
-  const fontSize = 6;
+  console.log('🔍 DEBUG - Seções processadas para PDF:', safeDataObs.map((section, i) => 
+    `${headers[i]} -> "${section[0] ? section[0].substring(0, 50) : 'vazio'}..."`
+  ));
+
+  const fontSize = 8;
   const maxWidth = obsColWidth[0] - 8;
   const lineHeight = fontSize + 2;
-  const headerHeight = 25; // Altura dos headers
-  const minContentHeight = 30; // Altura mínima do conteúdo
+  const headerHeight = 25;
+  const minContentHeight = 30;
 
   // Calcula altura de cada seção (header + conteúdo)
   const sectionHeights = safeDataObs.map((row, i) => {

@@ -764,7 +764,11 @@ useEffect(() => {
           }
           // Coluna 4 - Instruções de trabalho procedimento  
           else if (colIdx === 4) {
-            const value = tableData.main[rowIdx] ? tableData.main[rowIdx][colIdx] : '';
+            const rowData = tableData.main[rowIdx];
+            const value = rowData ? rowData[colIdx] : '';
+            console.log(`🔍 DEBUG PDF - Linha ${rowIdx}, Coluna ${colIdx} (Instruções):`, value);
+            console.log(`🔍 DEBUG PDF - Row Data Completa:`, rowData);
+            console.log(`🔍 DEBUG PDF - tableData.main completo:`, tableData.main);
             cell.innerHTML = value.split('\n').join('<br>');
           }
         });

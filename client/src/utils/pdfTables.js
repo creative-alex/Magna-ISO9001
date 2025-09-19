@@ -1,10 +1,12 @@
 import { rgb } from 'pdf-lib';
 import { xStart, yStart, wrapText } from './pdfBase';
 
-export const colWidths = [90, 260, 50, 50, 50];
-export const obsColWidth = [500];
+// Template 1 - Larguras ajustadas para melhor acomodar texto
+// Fluxo, Descrição, Responsável, Documentos Associados, Instruções
+export const colWidths = [65, 200, 60, 95, 95];
+export const obsColWidth = [515]; // Mantém o tamanho atual
 export const obsRowHeight = 25;
-export const spaceBetweenTables = 30;
+export const spaceBetweenTables = 20;
 
 // Template 2 - Larguras ajustadas para melhor distribuição do conteúdo
 export const colWidthTemplate2 = [120, 100, 80, 80, 80, 80];

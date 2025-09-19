@@ -62,7 +62,7 @@ const DocumentosAssociados = ({
       }
       
       // Encontra a subpasta que segue o padrão "Informação Documentada - Procedimento (prefixo)"
-      const expectedSubfolderName = `Informação Documentada - Procedimento (${filePrefix})`;
+      const expectedSubfolderName = `Informação Documentada - Procedimento ${filePrefix}`;
       const targetSubfolder = mainFolderNode.children.find(node => 
         node.type === 'folder' && node.name === expectedSubfolderName
       );
@@ -312,6 +312,14 @@ const DocumentosAssociados = ({
 
   return (
     <div className="documentos-associados-container" style={{ position: 'relative', width: '100%', height: '100%' }}>
+      {/* Input hidden para permitir extração do valor em PDFs */}
+      <input 
+        type="hidden" 
+        value={currentValue || ''} 
+        data-component="documentos-associados"
+        readOnly
+      />
+      
       {/* Área principal de exibição e seleção */}
       <div 
         style={{
@@ -329,6 +337,7 @@ const DocumentosAssociados = ({
         }}
         onClick={() => setShowDropdown(!showDropdown)}
         title="Clique para selecionar documentos associados"
+        data-current-value={currentValue || ''}
       >
         {/* Cabeçalho com contador */}
         <div style={{
@@ -466,7 +475,7 @@ const DocumentosAssociados = ({
                 fontWeight: 'bold'
               }}
             >
-              {uploading ? 'Enviando...' : 'Enviar Novo Documento'}
+              {uploading ? 'A enviar...' : 'Enviar Novo Documento'}
             </label>
             <div style={{ fontSize: '9px', color: '#666', marginTop: '4px' }}>
               Selecione qualquer tipo de ficheiro para enviar para esta subpasta

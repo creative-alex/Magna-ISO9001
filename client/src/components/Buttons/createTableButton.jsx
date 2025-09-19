@@ -28,7 +28,7 @@ export default function CreateTableButton({ folderName, currentPath = [] }) {
     >
         <img 
             src={newFileIcon} 
-            alt="Criar Tabela" 
+            alt="Guardar documento" 
             style={{ width: '16px', height: '16px' }} 
         />
     </button>

@@ -480,6 +480,123 @@ const uploadDocument = async (req, res) => {
   }
 };
 
+// Nova função para apagar arquivos via DELETE com parâmetro na URL
+const deleteFile = async (req, res) => {
+  try {
+    console.log("deleteFile chamado");
+    const { filePath } = req.params;
+    
+    if (!filePath) {
+      console.log("FilePath não fornecido");
+      return res.status(400).json({ error: "Caminho do arquivo é obrigatório" });
+    }
+    
+    // Decodifica o caminho do arquivo caso tenha caracteres especiais
+    const decodedFilePath = decodeURIComponent(filePath);
+    console.log("Tentando eliminar ficheiro:", decodedFilePath);
+    
+    // Verifica se o arquivo existe
+    const file = bucket.file(decodedFilePath);
+    const [exists] = await file.exists();
+    
+    if (!exists) {
+      console.log("Arquivo não encontrado:", decodedFilePath);
+      return res.status(404).json({ error: "Arquivo não encontrado" });
+    }
+    
+    // Elimina o arquivo
+    await file.delete();
+    console.log("Arquivo eliminado com sucesso:", decodedFilePath);
+    
+    res.json({ success: true, message: "Ficheiro eliminado com sucesso" });
+    
+  } catch (error) {
+    console.error("Erro ao eliminar ficheiro:", error);
+    res.status(500).json({ error: "Erro interno do servidor", details: error.message });
+  }
+};
+
+// Nova função para download via GET com parâmetro na URL
+const downloadFile = async (req, res) => {
+  try {
+    console.log("downloadFile chamado");
+    const { filePath } = req.params;
+    
+    if (!filePath) {
+      console.log("FilePath não fornecido");
+      return res.status(400).send("Caminho do arquivo é obrigatório");
+    }
+    
+    // Decodifica o caminho do arquivo caso tenha caracteres especiais
+    const decodedFilePath = decodeURIComponent(filePath);
+    console.log("Fazendo download do arquivo:", decodedFilePath);
+    
+    const file = bucket.file(decodedFilePath);
+    const [exists] = await file.exists();
+    
+    if (!exists) {
+      console.log("Arquivo não encontrado:", decodedFilePath);
+      return res.status(404).send("Arquivo não encontrado");
+    }
+    
+    const [buffer] = await file.download();
+    const [metadata] = await file.getMetadata();
+    
+    // Define o nome do arquivo para download
+    const filename = decodedFilePath.split('/').pop();
+    
+    // Define o tipo de conteúdo baseado no metadata ou na extensão
+    const contentType = metadata.contentType || 'application/octet-stream';
+    
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+    
+  } catch (error) {
+    console.error("Erro ao fazer download do arquivo:", error);
+    res.status(500).send("Erro ao fazer download do arquivo: " + error.message);
+  }
+};
+
+// Nova função para preview via GET com parâmetro na URL
+const previewFile = async (req, res) => {
+  try {
+    console.log("previewFile chamado");
+    const { filePath } = req.params;
+    
+    if (!filePath) {
+      console.log("FilePath não fornecido");
+      return res.status(400).send("Caminho do arquivo é obrigatório");
+    }
+    
+    // Decodifica o caminho do arquivo caso tenha caracteres especiais
+    const decodedFilePath = decodeURIComponent(filePath);
+    console.log("Fazendo preview do arquivo:", decodedFilePath);
+    
+    const file = bucket.file(decodedFilePath);
+    const [exists] = await file.exists();
+    
+    if (!exists) {
+      console.log("Arquivo não encontrado:", decodedFilePath);
+      return res.status(404).send("Arquivo não encontrado");
+    }
+    
+    const [buffer] = await file.download();
+    const [metadata] = await file.getMetadata();
+    
+    // Define o tipo de conteúdo baseado no metadata ou na extensão
+    const contentType = metadata.contentType || 'application/octet-stream';
+    
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', 'inline'); // Para preview em vez de download
+    res.send(buffer);
+    
+  } catch (error) {
+    console.error("Erro ao fazer preview do arquivo:", error);
+    res.status(500).send("Erro ao fazer preview do arquivo: " + error.message);
+  }
+};
+
 module.exports = {
   uploadPdf,
   uploadDocument,
@@ -488,8 +605,11 @@ module.exports = {
   listFilesTree,
   getPdf,
   downloadPdf,
+  downloadFile,
+  previewFile,
   updateDonoProcesso,
   getProcessOwners,
   deletePdf,
+  deleteFile,
   listDocumentsInFolder,
 };
