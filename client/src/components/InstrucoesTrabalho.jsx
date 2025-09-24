@@ -3,7 +3,9 @@ import React, { useState, useEffect } from 'react';
 const InstrucoesTrabalho = ({ 
   currentValue, 
   onChange,
-  originalFilename
+  originalFilename,
+  isEditable = true, // Nova prop para controlar editabilidade
+  canEdit = true // Nova prop para controlar se pode editar (permissões)
 }) => {
   const [instrucoesDisponiveis, setInstrucoesDisponiveis] = useState([]);
   const [instrucoesSelecionadas, setInstrucoesSelecionadas] = useState([]);
@@ -469,15 +471,18 @@ const InstrucoesTrabalho = ({
           padding: '6px',
           border: '1px solid #ccc',
           borderRadius: '4px',
-          backgroundColor: instrucoesSelecionadas.length > 0 ? '#f9f9f9' : '#fff',
+          backgroundColor: isEditable 
+            ? (instrucoesSelecionadas.length > 0 ? '#f9f9f9' : '#fff')
+            : '#f5f5f5',
           fontSize: '11px',
           display: 'flex',
           flexDirection: 'column',
-          cursor: 'pointer',
-          position: 'relative'
+          cursor: (isEditable && canEdit) ? 'pointer' : 'default',
+          position: 'relative',
+          opacity: (isEditable && canEdit) ? 1 : 0.7
         }}
-        onClick={() => setShowModal(true)}
-        title="Clique para abrir janela de seleção de Instruções de trabalho procedimento"
+        onClick={(isEditable && canEdit) ? () => setShowModal(true) : undefined}
+        title={(isEditable && canEdit) ? "Clique para abrir janela de seleção de Instruções de trabalho procedimento" : ""}
         data-current-value={currentValue || ''}
       >
         {/* Cabeçalho com contador */}
@@ -535,44 +540,28 @@ const InstrucoesTrabalho = ({
                   </span>
                   
                   {/* Botões de ação */}
-                  <div style={{ display: 'flex', gap: '2px' }}>
-                    {isVideo && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenVideoLink(instrucao);
-                        }}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#1976d2',
-                          cursor: 'pointer',
-                          fontSize: '8px',
-                          padding: '1px 2px'
-                        }}
-                        title="Abrir vídeo"
-                      >
-                        ▶
-                      </button>
-                    )}
-                    
+                  <div style={{ display: 'flex', gap: '2px' }}>                                 
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         removeInstrucao(instrucao);
                       }}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#d32f2f',
-                        cursor: 'pointer',
-                        fontSize: '8px',
-                        padding: '1px 2px'
-                      }}
-                      title="Remover instrução"
-                    >
-                      ×
-                    </button>
+                       style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#666',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      padding: '0 4px',
+                      borderRadius: '2px',
+                      fontSize: '15px',
+                    }}
+                    title="Remover Instrução"
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#ffcdd2'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  >
+                    ×
+                  </button>
                   </div>
                 </div>
               );
@@ -595,7 +584,7 @@ const InstrucoesTrabalho = ({
       </div>
 
       {/* Modal */}
-      {showModal && (
+      {showModal && canEdit && (
         <>
           {/* Overlay de fundo */}
           <div

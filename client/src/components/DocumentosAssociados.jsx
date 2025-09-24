@@ -3,11 +3,13 @@ import React, { useState, useEffect } from 'react';
 const DocumentosAssociados = ({ 
   currentValue, 
   onChange, 
-  originalFilename
+  originalFilename,
+  isEditable = true, // Nova prop para controlar editabilidade
+  canEdit = true // Nova prop para controlar se pode editar (permissões)
 }) => {
   const [documentosDisponiveis, setDocumentosDisponiveis] = useState([]);
   const [documentosSelecionados, setDocumentosSelecionados] = useState([]);
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
 
@@ -328,15 +330,18 @@ const DocumentosAssociados = ({
           padding: '6px',
           border: '1px solid #ccc',
           borderRadius: '4px',
-          backgroundColor: documentosSelecionados.length > 0 ? '#f9f9f9' : '#fff',
+          backgroundColor: isEditable 
+            ? (documentosSelecionados.length > 0 ? '#f9f9f9' : '#fff')
+            : '#f5f5f5',
           fontSize: '11px',
           display: 'flex',
           flexDirection: 'column',
-          cursor: 'pointer',
-          position: 'relative'
+          cursor: isEditable ? 'pointer' : 'default',
+          position: 'relative',
+          opacity: (isEditable && canEdit) ? 1 : 0.7
         }}
-        onClick={() => setShowDropdown(!showDropdown)}
-        title="Clique para selecionar documentos associados"
+        onClick={(isEditable && canEdit) ? () => setShowModal(!showModal) : undefined}
+        title={(isEditable && canEdit) ? "Clique para selecionar documentos associados" : ""}
         data-current-value={currentValue || ''}
       >
         {/* Cabeçalho com contador */}
@@ -352,7 +357,7 @@ const DocumentosAssociados = ({
         }}>
           <span>Documentos ({documentosSelecionados.length})</span>
           <span style={{ fontSize: '9px' }}>
-            {showDropdown ? '^' : 'v'}
+            📂
           </span>
         </div>
 
@@ -375,26 +380,6 @@ const DocumentosAssociados = ({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleDownload(doc);
-                    }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#388e3c',
-                      cursor: 'pointer',
-                      fontSize: '10px',
-                      padding: '1px 3px',
-                      borderRadius: '2px'
-                    }}
-                    title="Descarregar documento"
-                    onMouseEnter={(e) => e.target.style.backgroundColor = '#e8f5e8'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                  >
-                    v
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
                       toggleDocumento(doc);
                     }}
                     style={{
@@ -404,7 +389,8 @@ const DocumentosAssociados = ({
                       cursor: 'pointer',
                       fontSize: '12px',
                       padding: '0 4px',
-                      borderRadius: '2px'
+                      borderRadius: '2px',
+                      fontSize: '15px',
                     }}
                     title="Remover documento"
                     onMouseEnter={(e) => e.target.style.backgroundColor = '#ffcdd2'}
@@ -432,178 +418,295 @@ const DocumentosAssociados = ({
         )}
       </div>
 
-      {showDropdown && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            backgroundColor: 'white',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            zIndex: 1000,
-            maxHeight: '300px',
-            overflowY: 'auto'
-          }}
-        >
-          <div style={{ padding: '8px', borderBottom: '1px solid #eee', fontWeight: 'bold', fontSize: '12px' }}>
-            Ficheiros da subpasta: {currentFolderPath || 'Procurando...'}
-          </div>
-          
-          {/* Área de upload */}
-          <div style={{ padding: '8px', borderBottom: '1px solid #eee', backgroundColor: '#f8f9fa' }}>
-            <input
-              type="file"
-              onChange={handleFileUpload}
-              disabled={uploading}
-              style={{ display: 'none' }}
-              id="upload-documento"
-            />
-            <label
-              htmlFor="upload-documento"
+      {showModal && canEdit && (
+        <>
+          {/* Overlay de fundo */}
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 1000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            onClick={() => setShowModal(false)}
+          >
+            {/* Janela Modal */}
+            <div
               style={{
-                display: 'inline-block',
-                padding: '6px 12px',
-                backgroundColor: uploading ? '#6c757d' : '#007bff',
-                color: 'white',
-                borderRadius: '4px',
-                cursor: uploading ? 'not-allowed' : 'pointer',
-                fontSize: '11px',
-                border: 'none',
-                fontWeight: 'bold'
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                width: '80%',
+                maxWidth: '800px',
+                maxHeight: '80%',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
               }}
+              onClick={(e) => e.stopPropagation()}
             >
-              {uploading ? 'A enviar...' : 'Enviar Novo Documento'}
-            </label>
-            <div style={{ fontSize: '9px', color: '#666', marginTop: '4px' }}>
-              Selecione qualquer tipo de ficheiro para enviar para esta subpasta
-            </div>
-          </div>
-          
-          {loading && (
-            <div style={{ padding: '8px', textAlign: 'center', fontSize: '12px', color: '#666' }}>
-              Carregando documentos...
-            </div>
-          )}
-          
-          {!loading && documentosDisponiveis.length === 0 && (
-            <div style={{ padding: '8px', textAlign: 'center', fontSize: '12px', color: '#666' }}>
-              Nenhum documento encontrado na subpasta:<br/>
-              <code style={{ fontSize: '10px' }}>{currentFolderPath || 'Caminho não determinado'}</code>
-            </div>
-          )}
-          
-          {!loading && documentosDisponiveis.map((documento, index) => {
-            const docName = typeof documento === 'object' ? documento.displayName : documento;
-            const docFolder = typeof documento === 'object' ? documento.folder : '';
-            const isSelected = documentosSelecionados.includes(docName);
-            
-            return (
-              <div
-                key={index}
-                style={{
-                  padding: '6px 8px',
-                  fontSize: '12px',
-                  backgroundColor: isSelected ? '#e3f2fd' : 'transparent',
-                  borderLeft: isSelected ? '3px solid #2196f3' : '3px solid transparent',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '2px'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isSelected) {
-                    e.target.style.backgroundColor = '#f5f5f5';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isSelected) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-                  <div 
-                    style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, cursor: 'pointer' }}
-                    onClick={() => toggleDocumento(docName)}
+              {/* Cabeçalho da Modal */}
+              <div style={{ 
+                padding: '16px', 
+                borderBottom: '1px solid #eee', 
+                backgroundColor: '#f8f9fa',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>
+                    Documentos Associados
+                  </h3>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#666' }}>
+                    {currentFolderPath || 'Procurando...'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowModal(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: '20px',
+                    cursor: 'pointer',
+                    color: '#666',
+                    padding: '4px 8px',
+                    borderRadius: '4px'
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#e9ecef'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Conteúdo da Modal */}
+              <div style={{ 
+                flex: 1, 
+                overflow: 'auto',
+                display: 'flex',
+                flexDirection: 'column'
+              }}>
+                {/* Área de upload */}
+                <div style={{ padding: '16px', borderBottom: '1px solid #eee', backgroundColor: '#f0f8f0' }}>
+                  <input
+                    type="file"
+                    onChange={handleFileUpload}
+                    disabled={uploading}
+                    style={{ display: 'none' }}
+                    id="upload-documento"
+                  />
+                  <label
+                    htmlFor="upload-documento"
+                    style={{
+                      display: 'inline-block',
+                      padding: '8px 16px',
+                      backgroundColor: uploading ? '#6c757d' : '#28a745',
+                      color: 'white',
+                      borderRadius: '4px',
+                      cursor: uploading ? 'not-allowed' : 'pointer',
+                      fontSize: '12px',
+                      border: 'none',
+                      fontWeight: 'bold'
+                    }}
                   >
-                    <span style={{ fontSize: '10px' }}>
-                      {isSelected ? 'X' : 'O'}
-                    </span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 'bold' }}>{docName}</div>
-                      {docFolder && docFolder !== '(raiz)' && (
-                        <div style={{ fontSize: '10px', color: '#666', fontStyle: 'italic' }}>
-                          Pasta: {docFolder}
-                        </div>
-                      )}
-                    </div>
+                    {uploading ? 'A enviar...' : '📁 Enviar Novo Documento'}
+                  </label>
+                  <div style={{ fontSize: '11px', color: '#666', marginTop: '6px' }}>
+                    Selecione qualquer tipo de ficheiro para enviar para esta subpasta
                   </div>
+                </div>
+                
+                {/* Lista de documentos */}
+                <div style={{ 
+                  flex: 1, 
+                  overflow: 'auto',
+                  minHeight: '300px',
+                  padding: '8px'
+                }}>
+                  {loading && (
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      height: '200px',
+                      fontSize: '14px', 
+                      color: '#666' 
+                    }}>
+                      🔄 A carregar documentos...
+                    </div>
+                  )}
                   
-                  <div style={{ display: 'flex', gap: '4px' }}>
+                  {!loading && documentosDisponiveis.length === 0 && (
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      flexDirection: 'column',
+                      height: '200px',
+                      fontSize: '14px', 
+                      color: '#666',
+                      textAlign: 'center'
+                    }}>
+                      <p>📭 Nenhum documento encontrado na subpasta:</p>
+                      <code style={{ fontSize: '12px', backgroundColor: '#f5f5f5', padding: '4px 8px', borderRadius: '4px' }}>
+                        {currentFolderPath || 'Caminho não determinado'}
+                      </code>
+                    </div>
+                  )}
+                  
+                  {!loading && documentosDisponiveis.map((documento, index) => {
+                    const docName = typeof documento === 'object' ? documento.displayName : documento;
+                    const docFolder = typeof documento === 'object' ? documento.folder : '';
+                    const isSelected = documentosSelecionados.includes(docName);
+                    
+                    return (
+                      <div
+                        key={index}
+                        style={{
+                          padding: '12px',
+                          margin: '8px 0',
+                          fontSize: '13px',
+                          backgroundColor: isSelected ? '#e8f5e8' : '#f8f9fa',
+                          border: isSelected ? '2px solid #4caf50' : '1px solid #dee2e6',
+                          borderRadius: '6px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isSelected) {
+                            e.currentTarget.style.backgroundColor = '#e9ecef';
+                            e.currentTarget.style.borderColor = '#adb5bd';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isSelected) {
+                            e.currentTarget.style.backgroundColor = '#f8f9fa';
+                            e.currentTarget.style.borderColor = '#dee2e6';
+                          }
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                          <div 
+                            style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, cursor: 'pointer' }}
+                            onClick={() => toggleDocumento(docName)}
+                          >
+                            <div style={{ 
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              backgroundColor: isSelected ? '#4caf50' : '#dee2e6',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '12px',
+                              color: 'white',
+                              fontWeight: 'bold'
+                            }}>
+                              {isSelected ? '✓' : ''}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 'bold', fontSize: '14px' }}>📄 {docName}</div>
+                              {docFolder && docFolder !== '(raiz)' && (
+                                <div style={{ fontSize: '11px', color: '#666', fontStyle: 'italic', marginTop: '2px' }}>
+                                  📁 Pasta: {docFolder}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePreview(docName);
+                              }}
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: '#1976d2',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '11px',
+                                fontWeight: 'bold'
+                              }}
+                              title="Visualizar documento"
+                              onMouseEnter={(e) => e.target.style.backgroundColor = '#1565c0'}
+                              onMouseLeave={(e) => e.target.style.backgroundColor = '#1976d2'}
+                            >
+                              👁️ Ver
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDownload(docName);
+                              }}
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: '#388e3c',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '11px',
+                                fontWeight: 'bold'
+                              }}
+                              title="Descarregar documento"
+                              onMouseEnter={(e) => e.target.style.backgroundColor = '#2e7d32'}
+                              onMouseLeave={(e) => e.target.style.backgroundColor = '#388e3c'}
+                            >
+                              ⬇️ Baixar
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Rodapé da Modal */}
+                <div style={{ 
+                  padding: '16px', 
+                  borderTop: '1px solid #eee', 
+                  backgroundColor: '#f8f9fa',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div style={{ fontSize: '12px', color: '#666' }}>
+                    {documentosSelecionados.length} documento(s) selecionado(s)
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePreview(docName);
-                      }}
+                      onClick={() => setShowModal(false)}
                       style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#1976d2',
-                        cursor: 'pointer',
+                        padding: '8px 16px',
                         fontSize: '12px',
-                        padding: '2px 4px',
-                        borderRadius: '2px'
-                      }}
-                      title="Visualizar documento"
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#e3f2fd'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                    >
-                      Ver
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDownload(docName);
-                      }}
-                      style={{
-                        background: 'none',
+                        backgroundColor: '#6c757d',
+                        color: 'white',
                         border: 'none',
-                        color: '#388e3c',
+                        borderRadius: '4px',
                         cursor: 'pointer',
-                        fontSize: '12px',
-                        padding: '2px 4px',
-                        borderRadius: '2px'
+                        fontWeight: 'bold'
                       }}
-                      title="Descarregar documento"
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#e8f5e8'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                     >
-                      Baixar
+                      Fechar
                     </button>
                   </div>
                 </div>
               </div>
-            );
-          })}
-          
-          <div style={{ padding: '4px 8px', borderTop: '1px solid #eee', textAlign: 'center' }}>
-            <button
-              onClick={() => setShowDropdown(false)}
-              style={{
-                padding: '4px 8px',
-                fontSize: '11px',
-                backgroundColor: '#f0f0f0',
-                border: '1px solid #ccc',
-                borderRadius: '3px',
-                cursor: 'pointer'
-              }}
-            >
-              Fechar
-            </button>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

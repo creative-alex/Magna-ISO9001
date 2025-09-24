@@ -3,7 +3,7 @@ import Login from './components/Auth/login';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import { Routes, Route, useNavigate } from "react-router-dom";
 import SelecionarPdf from "./pages/selectPdf";
-import TablePage from "./components/tabelaPDF"; 
+import TablePage from "./components/EditorProcedimentos"; 
 import CreateProcess from "./pages/novoProcesso";
 import Register from "./components/Auth/register";
 import { UserContext } from "./context/userContext";

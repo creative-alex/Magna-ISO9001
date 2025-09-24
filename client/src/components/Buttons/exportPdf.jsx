@@ -126,7 +126,21 @@ export default function ExportPdfButton({
       formData.append("objetivoProcesso", objetivoProcesso);
       formData.append("servicos_entrada", servicosEntrada);
       formData.append("servico_saida", servicoSaida);
-      formData.append("indicadores", JSON.stringify(indicadores));
+      
+      // Para Template2, sempre tratar indicadores como array e converter para campos individuais
+      if (Array.isArray(indicadores)) {
+        indicadores.forEach((indicador, index) => {
+          formData.append(`indicadores_r${index + 1}`, indicador || "");
+        });
+      } else {
+        // Fallback se ainda for objeto
+        formData.append("indicadores_r1", indicadores.indicadores_r1 || "");
+        formData.append("indicadores_r2", indicadores.indicadores_r2 || "");
+        formData.append("indicadores_r3", indicadores.indicadores_r3 || "");
+      }
+      
+      console.log("Template 2 - Enviando atividades:", atividades);
+      console.log("Template 2 - Enviando indicadores:", indicadores);
       console.log("Template 2 - Enviando servicos_entrada:", servicosEntrada);
       console.log("Template 2 - Enviando servico_saida:", servicoSaida);
     }

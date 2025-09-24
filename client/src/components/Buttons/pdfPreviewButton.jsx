@@ -275,6 +275,7 @@ const PdfPreviewButton = ({ file, currentPath }) => {
         src={downloadIcon} 
         alt={currentPath.length > 1 ? "Download direto" : "Preview PDF"} 
         style={{ width: '16px', height: '16px' }} 
+        title=" Download"
       />
     </button>
   );

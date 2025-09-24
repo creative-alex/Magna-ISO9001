@@ -105,17 +105,9 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
 
   // Função para verificar se o utilizador pode aceder a um processo
   const canAccessProcess = (filePath) => {
-    if (isAdmin) return true; // SuperAdmin pode aceder a tudo
-    
-    // Extrai o nome do processo (primeira pasta do caminho)
-    const processName = filePath.split('/')[0];
-    const processOwner = processOwners[processName];
-    
-    // Se não há dono definido, permite acesso (para compatibilidade)
-    if (!processOwner) return true;
-    
-    // Verifica se o utilizador atual é o dono
-    return processOwner === currentUser;
+    // TODOS os users podem aceder e ver os ficheiros
+    // As permissões de edição são controladas separadamente no canEdit
+    return true;
   };
 
   return (
@@ -125,9 +117,10 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
           // Para pastas de primeiro nível, mostra o dono se existir
           const isTopLevel = currentPath.length === 0;
           const folderOwner = isTopLevel ? processOwners[node.name] : null;
+          const isOwnerFolder = isTopLevel && folderOwner === currentUser;
           
           return (
-            <div key={node.name} className="folder">
+            <div key={node.name} className={`folder ${isOwnerFolder ? 'owner-folder' : ''}`}>
               <div
                 className={`folder-header ${expandedFolder === node.name ? 'active' : ''}`}
                 onClick={() => toggleFolder(node.name)}
@@ -167,6 +160,10 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
           // Remove a extensão apenas para PDFs para manter compatibilidade
           const displayName = node.name.endsWith('.pdf') ? node.name.slice(0, -4) : node.name;
           
+          // Verifica se o usuário pode deletar o arquivo
+          const isProcessOwner = processOwners[currentPath[0]] === currentUser;
+          const canDelete = isAdmin || isProcessOwner;
+          
           return (
             <div 
               key={node.name} 
@@ -177,7 +174,7 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
               <span className="file-name">{displayName}</span>
               <div className="file-actions">
                 <FilePreviewButton file={node} currentPath={currentPath} />
-                {isAdmin && (
+                {canDelete && (
                   <DeleteButton 
                     file={node} 
                     currentPath={currentPath} 
@@ -234,9 +231,24 @@ export default function SelecionarPdf() {
   };
 
   const handleSelectFile = (filePath) => {
-    // Substitui espaços por '-', barras por '__'
+    // Substituir espaços por '-', barras por '__'
     const formattedPath = filePath.replace(/\s/g, '-').replace(/\//g, '__');
-    navigate(`/file/${formattedPath}`, { state: { originalFilename: filePath } });
+    
+    // Determinar processo a partir do caminho do ficheiro
+    const pathParts = filePath.split('/');
+    const processName = pathParts[0]; // Assume que primeiro nível é o processo
+    
+    // Verificar se user pode editar este processo
+    const processOwner = processOwners[processName];
+    const canEdit = isAdmin || (processOwner === username);
+    
+    navigate(`/file/${formattedPath}`, { 
+      state: { 
+        originalFilename: filePath,
+        canEdit: canEdit,
+        isSuperAdmin: isAdmin
+      } 
+    });
   };
 
   // Filtra a árvore conforme o termo de busca

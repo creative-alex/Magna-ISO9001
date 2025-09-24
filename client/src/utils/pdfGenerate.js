@@ -1,7 +1,35 @@
-import { createBasePdf, wrapText, pageSize, xStart, yStart } from './pdfBase';
+import { createBasePdf, wrapText, pageSize, xStart, yStart, addHeader } from './pdfBase';
 import { drawTableLines, drawHeaders, drawObsTable, getObsRows, colWidths, obsColWidth, obsRowHeight, spaceBetweenTables, drawTemplate2Table, colWidthTemplate2 } from './pdfTables';
 import { drawObsTableWithHeaders, calculateObsTableHeight } from './pdfObsTable';
 import { PDFDocument, StandardFonts, rgb, PDFName, PDFArray, PDFDict } from 'pdf-lib';
+
+// Helper function to create text field with proper appearance
+function createTextFieldWithAppearance(form, fieldName, text, font, fontSize = 10, multiline = false) {
+  const textField = form.createTextField(fieldName);
+  if (multiline) {
+    textField.enableMultiline();
+  }
+  textField.setText(text || "");
+  
+  // Try to set appearance safely with multiple fallback strategies
+  try {
+    // First try: Set font size, then update appearances
+    textField.setFontSize(fontSize);
+    textField.updateAppearances(font);
+  } catch (error) {
+    console.warn(`Strategy 1 failed for field ${fieldName}:`, error);
+    try {
+      // Second try: Just update appearances without setting font size
+      textField.updateAppearances(font);
+    } catch (e) {
+      console.warn(`Strategy 2 failed for field ${fieldName}:`, e);
+      // Final fallback: Do nothing, field will use default appearance
+      console.warn(`Using default appearance for field ${fieldName}`);
+    }
+  }
+  
+  return textField;
+}
 
 // Função principal para gerar PDF editável
 export async function generateEditablePdf({
@@ -35,13 +63,13 @@ export async function generateEditablePdf({
       pathFilename
     });
   } else {
-    return await generateEditablePdfTemplate1(data, headers, dataObs, headersObs, title, imageBytes, pathFilename);
+    return await generateEditablePdfTemplate1(data, headers, dataObs, headersObs, title, imageBytes, pathFilename, 400);
   }
 }
 
 
 // Renomeie a função antiga para Template1
-export async function generateEditablePdfTemplate1(data, headers, dataObs, headersObs, title = "Procedimento", imageBytes = null, pathFilename = "") {
+export async function generateEditablePdfTemplate1(data, headers, dataObs, headersObs, title = "Procedimento", imageBytes = null, pathFilename = "", maxHeightForFirstTable = 400) {
   const { pdfDoc, page, font } = await createBasePdf(title, imageBytes, pathFilename);
   const form = pdfDoc.getForm();
   console.log("🎯 generateEditablePdf recebeu pathFilename:", pathFilename); 
@@ -54,8 +82,15 @@ export async function generateEditablePdfTemplate1(data, headers, dataObs, heade
   const obsRows = getObsRows(dataObs);
   const obsTableHeightReal = calculateObsTableHeight(dataObs, font);
   
+  // Configuração do limiar de altura para quebra de página
+  // Se a primeira tabela (observações) exceder esta altura, a segunda tabela vai para nova página
+  const pageBottomMargin = 50; // Margem inferior da página
+  const shouldBreakPage = obsTableHeightReal > maxHeightForFirstTable;
+  
   console.log("obsRows:", obsRows);
   console.log("obsTableHeightReal:", obsTableHeightReal);
+  console.log("maxHeightForFirstTable:", maxHeightForFirstTable);
+  console.log("shouldBreakPage:", shouldBreakPage);
   console.log("data.length:", safeData.length);
   console.log("yStart:", yStart);
   console.log("spaceBetweenTables:", spaceBetweenTables);
@@ -79,11 +114,9 @@ export async function generateEditablePdfTemplate1(data, headers, dataObs, heade
   // Criar campos de formulário para a tabela de observações
   for (let row = 0; row < obsRows; row++) {
     const fieldName = `table1_r${row + 1}`;
-    const textField = form.createTextField(fieldName);
-    textField.enableMultiline();
-    textField.setText(dataObs && dataObs[row] ? dataObs[row][0] : "");
+    const textField = createTextFieldWithAppearance(form, fieldName, dataObs && dataObs[row] ? dataObs[row][0] : "", font, 8, true);
     
-    // Add to page first, then set appearance
+    // Add to page
     textField.addToPage(page, {
       x: xStart + 2,
       y: yObs - rowHeightsObs[row] + 2,
@@ -94,29 +127,43 @@ export async function generateEditablePdfTemplate1(data, headers, dataObs, heade
       border: undefined,
     });
     
-    // Set appearance and font size after adding to page
-    textField.updateAppearances(font);
-    textField.setFontSize(8);
     yObs -= rowHeightsObs[row];
+  }
+
+  // Determina se precisa criar nova página para segunda tabela
+  let currentPage = page;
+  let currentYPos = yStart - obsTableHeightReal - spaceBetweenTables;
+  
+  if (shouldBreakPage) {
+    // Cria nova página para a segunda tabela
+    currentPage = pdfDoc.addPage(pageSize);
+    
+    // Adiciona cabeçalho na nova página se necessário
+    if (imageBytes || pathFilename) {
+      await addHeader(currentPage, font, title, imageBytes, pathFilename);
+    }
+    
+    currentYPos = yStart; // Reset da posição Y para o topo da nova página
+    console.log("🔄 Nova página criada para segunda tabela. yPos resetado para:", currentYPos);
   }
 
   // Gere dinamicamente os rowHeights para a tabela principal
   const rowHeights = Array(safeData.length + 1).fill(50); // +1 para o header
 
-  // Desenha tabela principal
+  // Desenha tabela principal na página apropriada
   // Primeiro desenha as linhas da tabela
-  drawTableLines(page, obsTableHeightReal, undefined, rowHeights);
+  drawTableLines(currentPage, shouldBreakPage ? 0 : obsTableHeightReal, shouldBreakPage ? yStart : null, rowHeights);
   
   // DEPOIS desenha os headers com fundo cinza por cima (igual Template 2)
   let xPos = xStart;
-  const yHeaders = yStart - obsTableHeightReal - spaceBetweenTables;
+  const yHeaders = shouldBreakPage ? yStart : (yStart - obsTableHeightReal - spaceBetweenTables);
   const headerHeight = rowHeights[0] || 50;
   
   safeHeaders.forEach((header, col) => {
     const colWidth = colWidths[col] || 100;
     
     // Quadrado cinza do header (igual Template 2)
-    page.drawRectangle({
+    currentPage.drawRectangle({
       x: xPos,
       y: yHeaders - headerHeight,
       width: colWidth,
@@ -138,7 +185,7 @@ export async function generateEditablePdfTemplate1(data, headers, dataObs, heade
       const textX = xPos + (colWidth - textWidth) / 2;
       const textY = startY - idx * lineHeight;
 
-      page.drawText(line, {
+      currentPage.drawText(line, {
         x: textX,
         y: textY,
         size: fontSize,
@@ -150,7 +197,7 @@ export async function generateEditablePdfTemplate1(data, headers, dataObs, heade
     xPos += colWidth;
   });
 
-  let yPos = yStart - obsTableHeightReal - spaceBetweenTables;
+  let yPos = shouldBreakPage ? yStart : (yStart - obsTableHeightReal - spaceBetweenTables);
   console.log("yPos inicial para tabela principal:", yPos);
   console.log("yStart:", yStart, "obsTableHeightReal:", obsTableHeightReal, "spaceBetweenTables:", spaceBetweenTables);
   
@@ -158,12 +205,10 @@ export async function generateEditablePdfTemplate1(data, headers, dataObs, heade
     let xPos = xStart;
     for (let col = 0; col < 5; col++) {
       const fieldName = `table2_r${row + 2}_c${col + 1}`;
-      const textField = form.createTextField(fieldName);
-      textField.enableMultiline();
-      textField.setText(safeData[row] && safeData[row][col] ? safeData[row][col] : "");
+      const textField = createTextFieldWithAppearance(form, fieldName, safeData[row] && safeData[row][col] ? safeData[row][col] : "", font, 8, true);
       
-      // Add to page first, then set appearance
-      textField.addToPage(page, {
+      // Add to page
+      textField.addToPage(currentPage, {
         x: xPos + 2,
         y: yPos - rowHeights[row + 1] + 2,
         width: colWidths[col] - 4,
@@ -172,10 +217,6 @@ export async function generateEditablePdfTemplate1(data, headers, dataObs, heade
         backgroundColor: rgb(1, 1, 1),
         border: undefined,
       });
-      
-      // Set appearance and font size after adding to page
-      textField.updateAppearances(font);
-      textField.setFontSize(8);
       
       xPos += colWidths[col];
     }
@@ -198,39 +239,23 @@ export async function generateEditablePdfTemplate2({ atividades, donoProcesso, o
 
   // DONO DO PROCESSO
   page.drawText("DONO DO PROCESSO\n(nomeado):", { x: xStart, y: yPos, size: 12, font });
-  const donoField = form.createTextField('dono_processo');
-  donoField.enableMultiline();
-  donoField.setText(donoProcesso || "");
-  donoField.updateAppearances(font);
-  donoField.setFontSize(10);
+  const donoField = createTextFieldWithAppearance(form, 'dono_processo', donoProcesso, font, 10, true);
   donoField.addToPage(page, { x: xStart + 320, y: yPos - 8, width: 230, height: 28 });
   yPos -= 38;
 
   // OBJETIVO DO PROCESSO
   page.drawText("OBJETIVO DO PROCESSO:", { x: xStart, y: yPos, size: 12, font });
-  const objetivoField = form.createTextField('objetivo_processo');
-  objetivoField.enableMultiline();
-  objetivoField.setText(objetivoProcesso || "");
-  objetivoField.updateAppearances(font);
-  objetivoField.setFontSize(10);
+  const objetivoField = createTextFieldWithAppearance(form, 'objetivo_processo', objetivoProcesso, font, 10, true);
   objetivoField.addToPage(page, { x: xStart + 320, y: yPos - 8, width: 230, height: 28 });
   yPos -= 38;
 
   // SERVIÇOS DE ENTRADAS / SAÍDA
   page.drawText("SERVIÇOS DE ENTRADAS", { x: xStart, y: yPos, size: 12, font });
   page.drawText("SERVIÇO DE SAÍDA", { x: xStart + 320, y: yPos, size: 12, font });
-  const entradaField = form.createTextField('servicos_entrada');
-  entradaField.enableMultiline();
-  entradaField.setText(servicosEntrada || "");
-  entradaField.updateAppearances(font);
-  entradaField.setFontSize(10);
+  const entradaField = createTextFieldWithAppearance(form, 'servicos_entrada', servicosEntrada, font, 10, true);
   console.log("Campo servicos_entrada criado com valor:", servicosEntrada || "");
   entradaField.addToPage(page, { x: xStart, y: yPos - 28, width: 290, height: 48 });
-  const saidaField = form.createTextField('servico_saida');
-  saidaField.enableMultiline();
-  saidaField.setText(servicoSaida || "");
-  saidaField.updateAppearances(font);
-  saidaField.setFontSize(10);
+  const saidaField = createTextFieldWithAppearance(form, 'servico_saida', servicoSaida, font, 10, true);
   console.log("Campo servico_saida criado com valor:", servicoSaida || "");
   saidaField.addToPage(page, { x: xStart + 320, y: yPos - 28, width: 230, height: 48 });
   yPos -= 88;
@@ -254,10 +279,7 @@ export async function generateEditablePdfTemplate2({ atividades, donoProcesso, o
     let xPos = xStart;
     for (let col = 0; col < atividades[row].length; col++) {
       const fieldName = `atividades_r${row + 1}_c${col + 1}`;
-      const textField = form.createTextField(fieldName);
-      textField.setText(atividades[row][col] || "");
-      textField.updateAppearances(font);
-      textField.setFontSize(8);
+      const textField = createTextFieldWithAppearance(form, fieldName, atividades[row][col], font, 8, false);
       textField.addToPage(page, { x: xPos + 2, y: camposY + 2, width: colWidthTemplate2[col] - 4, height: 16 });
       xPos += colWidthTemplate2[col];
     }
@@ -269,17 +291,24 @@ export async function generateEditablePdfTemplate2({ atividades, donoProcesso, o
   page.drawText("Indicadores de monitorização do processo", { x: xStart, y: indicadoresY, size: 12, font });
   indicadoresY -= 22;
   
-  // Criar os 3 campos de indicadores
-  const indicadorFields = ['indicadores_r1', 'indicadores_r2', 'indicadores_r3'];
-  indicadorFields.forEach((fieldName) => {
-    const textField = form.createTextField(fieldName);
-    textField.enableMultiline();
-    textField.setText(indicadores[fieldName] || "");
-    textField.updateAppearances(font);
-    textField.setFontSize(10);
-    textField.addToPage(page, { x: xStart, y: indicadoresY, width: 550, height: 28 });
-    indicadoresY -= 32;
-  });
+  // Tratar indicadores como array ou objeto
+  if (Array.isArray(indicadores)) {
+    // Se for array, criar campos dinamicamente
+    indicadores.forEach((indicador, index) => {
+      const fieldName = `indicadores_r${index + 1}`;
+      const textField = createTextFieldWithAppearance(form, fieldName, indicador || '', font, 10, true);
+      textField.addToPage(page, { x: xStart, y: indicadoresY, width: 550, height: 28 });
+      indicadoresY -= 32;
+    });
+  } else {
+    // Se for objeto, usar os 3 campos fixos
+    const indicadorFields = ['indicadores_r1', 'indicadores_r2', 'indicadores_r3'];
+    indicadorFields.forEach((fieldName) => {
+      const textField = createTextFieldWithAppearance(form, fieldName, indicadores[fieldName] || '', font, 10, true);
+      textField.addToPage(page, { x: xStart, y: indicadoresY, width: 550, height: 28 });
+      indicadoresY -= 32;
+    });
+  }
 
   return await pdfDoc.save();
 }
@@ -295,6 +324,21 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
   const safeObjetivoProcesso = objetivoProcesso || '';
   const safeServicosEntrada = servicosEntrada || '';
   const safeServicoSaida = servicoSaida || '';
+
+  // Sanitizador: tratar valores apenas com '-' (ou traços/espaços) como vazios no Template 2 (não editável)
+  const dashToEmpty = (val) => {
+    const s = (val ?? '').toString();
+    // Se contém apenas espaços e traços (inclui diferentes tipos de traço), considera vazio
+    return /^[\s\-–—]*$/.test(s) ? '' : s;
+  };
+
+  // Aplica sanitização a todos os campos relevantes do Template 2
+  const atividadesClean = safeAtividades.map(row => Array.isArray(row) ? row.map(dashToEmpty) : ['', '', '', '', '', '']);
+  const indicadoresClean = safeIndicadores.map(dashToEmpty).filter(text => text !== '');
+  const donoProcessoClean = dashToEmpty(safeDonoProcesso);
+  const objetivoProcessoClean = dashToEmpty(safeObjetivoProcesso);
+  const servicosEntradaClean = dashToEmpty(safeServicosEntrada);
+  const servicoSaidaClean = dashToEmpty(safeServicoSaida);
 
   console.log("🎯 generateNonEditablePdfTemplate2 - dados recebidos:");
   console.log("📋 atividades:", safeAtividades);
@@ -315,7 +359,7 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
   const xStartCentered = (pageWidth - tableWidth) / 2;
 
   // Usar a função utilitária para desenhar a tabela de cabeçalho do processo (centralizada)
-  let yPos = drawProcessHeaderTableCentered(page, font, yStart, safeDonoProcesso, safeObjetivoProcesso, safeServicosEntrada, safeServicoSaida, xStartCentered);
+  let yPos = drawProcessHeaderTableCentered(page, font, yStart, donoProcessoClean, objetivoProcessoClean, servicosEntradaClean, servicoSaidaClean, xStartCentered);
   
   console.log("yPos após header:", yPos); // Debug
 
@@ -329,63 +373,80 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
     "Requisitos\nCQCQ"
   ];
 
-  // Desenha tabela de atividades (versão customizada para centralizada)
+  // Desenha tabela de atividades (paginação e centralizada)
   const baseRowHeight = 25;
-  let yPos2 = yPos - 30;
+  let yPos2 = yPos - 1;
 
   // Calcula altura dinâmica para cada linha com base no conteúdo
   const getRowHeight = (rowData) => {
     let maxLines = 1;
     rowData.forEach((cellText, colIdx) => {
-      const wrappedLines = wrapText(cellText || '', font, 8, colWidthTemplate2[colIdx] - 8);
+      const wrappedLines = wrapText((cellText || ''), font, 8, colWidthTemplate2[colIdx] - 8);
       maxLines = Math.max(maxLines, wrappedLines.length);
     });
     return Math.max(baseRowHeight, maxLines * 10 + 10);
   };
 
   // Calcula alturas de todas as linhas
-  const rowHeights = safeAtividades.map(row => getRowHeight(row));
+  const rowHeights = atividadesClean.map(row => getRowHeight(row));
   const headerHeight = 35;
 
-  // Desenha cabeçalhos com fundo cinza
-  let xPos = xStartCentered;
-  headers.forEach((header, idx) => {
-    // Desenha fundo do cabeçalho
-    page.drawRectangle({
-      x: xPos,
-      y: yPos2 - headerHeight,
-      width: colWidthTemplate2[idx],
-      height: headerHeight,
-      color: rgb(0.7, 0.7, 0.7),
-      borderColor: rgb(0, 0, 0),
-      borderWidth: 1,
-    });
-    
-    // Desenha texto do cabeçalho com quebra de linha
-    const headerLines = header.split('\n');
-    headerLines.forEach((line, lineIdx) => {
-      page.drawText(line, { 
-        x: xPos + 4, 
-        y: yPos2 - 12 - (lineIdx * 10), 
-        size: 9, 
-        font,
-        color: rgb(0, 0, 0),
-      });
-    });
-    xPos += colWidthTemplate2[idx];
-  });
+  // Helpers para paginação
+  const marginBottom = 25;
+  let currentPage = page;
 
-  // Desenha dados das atividades linha por linha
+  const createNewPage = async () => {
+    const newPage = pdfDoc.addPage([pageSize[0], pageSize[1]]);
+    await addHeader(newPage, font, title, imageBytes, pathFilename);
+    return newPage;
+  };
+
+  const drawActivityHeaders = (pg, yTop) => {
+    let xPosLocal = xStartCentered;
+    headers.forEach((header, idx) => {
+      // Fundo do cabeçalho
+      pg.drawRectangle({
+        x: xPosLocal,
+        y: yTop - headerHeight,
+        width: colWidthTemplate2[idx],
+        height: headerHeight,
+        color: rgb(0.7, 0.7, 0.7),
+        borderColor: rgb(0, 0, 0),
+        borderWidth: 1,
+      });
+      // Texto
+      const headerLines = header.split('\n');
+      headerLines.forEach((line, lineIdx) => {
+        pg.drawText(line, {
+          x: xPosLocal + 4,
+          y: yTop - 12 - (lineIdx * 10),
+          size: 9,
+          font,
+          color: rgb(0, 0, 0),
+        });
+      });
+      xPosLocal += colWidthTemplate2[idx];
+    });
+  };
+
+  // Desenha primeira página de atividades
+  drawActivityHeaders(currentPage, yPos2);
   let currentY = yPos2 - headerHeight;
-  
-  for (let row = 0; row < safeAtividades.length; row++) {
+
+  for (let row = 0; row < atividadesClean.length; row++) {
     const rowHeight = rowHeights[row];
+
+    // Verifica espaço; se não couber, cria nova página e redesenha headers
+    if (currentY - rowHeight < marginBottom) {
+      currentPage = await createNewPage();
+      drawActivityHeaders(currentPage, yStart);
+      currentY = yStart - headerHeight;
+    }
+
     let dataX = xStartCentered;
-    
-    // Desenha as células da linha
-    for (let col = 0; col < safeAtividades[row].length; col++) {
-      // Desenha retângulo da célula
-      page.drawRectangle({
+    // Células da linha
+    for (let col = 0; col < atividadesClean[row].length; col++) {
+      currentPage.drawRectangle({
         x: dataX,
         y: currentY - rowHeight,
         width: colWidthTemplate2[col],
@@ -393,22 +454,16 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
         borderColor: rgb(0, 0, 0),
         borderWidth: 1,
       });
-      
-      // Processa e desenha o texto com quebra de linha
-      const cellText = safeAtividades[row][col] || '';
+
+      const cellText = atividadesClean[row][col] || '';
       const wrappedLines = wrapText(cellText, font, 8, colWidthTemplate2[col] - 8);
-      
+
       wrappedLines.forEach((line, lineIdx) => {
-        if (lineIdx < 8) { // Limita a 8 linhas por célula
-          // Calcula a largura disponível para o texto
-          const availableWidth = colWidthTemplate2[col] - 8; // 4px de margem de cada lado
-          
-          // Verifica se o texto cabe na largura disponível
+        if (lineIdx < 8) {
+          const availableWidth = colWidthTemplate2[col] - 8;
           const textWidth = font.widthOfTextAtSize(line, 8);
-          
           if (textWidth <= availableWidth) {
-            // Texto cabe normalmente
-            page.drawText(line, {
+            currentPage.drawText(line, {
               x: dataX + 4,
               y: currentY - 15 - (lineIdx * 10),
               size: 8,
@@ -416,13 +471,11 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
               color: rgb(0, 0, 0),
             });
           } else {
-            // Texto muito longo, trunca com reticências
             let truncatedText = line;
             while (font.widthOfTextAtSize(truncatedText + '...', 8) > availableWidth && truncatedText.length > 0) {
               truncatedText = truncatedText.slice(0, -1);
             }
-            
-            page.drawText(truncatedText + (truncatedText.length < line.length ? '...' : ''), {
+            currentPage.drawText(truncatedText + (truncatedText.length < line.length ? '...' : ''), {
               x: dataX + 4,
               y: currentY - 15 - (lineIdx * 10),
               size: 8,
@@ -432,48 +485,64 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
           }
         }
       });
-      
+
       dataX += colWidthTemplate2[col];
     }
     currentY -= rowHeight;
   }
 
+  // Atualiza yPos para continuar com indicadores
   yPos = currentY;
 
-  // Desenha indicadores
+  // Desenha indicadores com paginação
   yPos -= 50;
-  
-  // Header da tabela de indicadores
-  page.drawRectangle({
-    x: xStartCentered,
-    y: yPos - 25,
-    width: 540,
-    height: 25,
-    color: rgb(0.7, 0.7, 0.7),
-    borderColor: rgb(0, 0, 0),
-    borderWidth: 1,
-  });
-  
-  page.drawText("Indicadores de monitorização do processo", {
-    x: xStartCentered + 10,
-    y: yPos - 15,
-    size: 10,
-    font,
-    color: rgb(0, 0, 0),
-  });
-  
+
+  const drawIndicatorsHeader = (pg, yTop) => {
+    pg.drawRectangle({
+      x: xStartCentered,
+      y: yTop - 25,
+      width: 540,
+      height: 25,
+      color: rgb(0.7, 0.7, 0.7),
+      borderColor: rgb(0, 0, 0),
+      borderWidth: 1,
+    });
+    pg.drawText("Indicadores de monitorização do processo", {
+      x: xStartCentered + 10,
+      y: yTop - 15,
+      size: 10,
+      font,
+      color: rgb(0, 0, 0),
+    });
+  };
+
+  // Garante espaço para o header dos indicadores
+  if (yPos - 25 < marginBottom) {
+    currentPage = await createNewPage();
+    yPos = yStart;
+  }
+  drawIndicatorsHeader(currentPage, yPos);
   yPos -= 25;
   
   // Desenha indicadores com altura dinâmica
-  const processedIndicadores = safeIndicadores.slice(0, 10); // Limita a 10 indicadores
-  processedIndicadores.forEach((indicador, idx) => {
+  const processedIndicadores = indicadoresClean.slice(0, 10); // Limita a 10 indicadores e remove '-'
+  for (let idx = 0; idx < processedIndicadores.length; idx++) {
+    const indicador = processedIndicadores[idx];
     const text = (indicador || '').toString().trim();
     if (text && text !== 'testestesteste' && !text.includes('teste')) { // Filtro de segurança
       const lines = wrapText(text, font, 9, 520);
       const indicadorHeight = Math.max(30, lines.length * 12 + 15);
-      
+
+      // Nova página se não couber
+      if (yPos - indicadorHeight < marginBottom) {
+        currentPage = await createNewPage();
+        // Header de indicadores no topo da nova página
+        drawIndicatorsHeader(currentPage, yStart);
+        yPos = yStart - 25;
+      }
+
       // Desenha a célula do indicador
-      page.drawRectangle({
+      currentPage.drawRectangle({
         x: xStartCentered,
         y: yPos - indicadorHeight,
         width: 540,
@@ -493,7 +562,7 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
           
           if (textWidth <= availableWidth) {
             // Texto cabe normalmente
-            page.drawText(line, {
+            currentPage.drawText(line, {
               x: xStartCentered + 10,
               y: yPos - 15 - (lineIdx * 12),
               size: 9,
@@ -507,7 +576,7 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
               truncatedText = truncatedText.slice(0, -1);
             }
             
-            page.drawText(truncatedText + (truncatedText.length < line.length ? '...' : ''), {
+            currentPage.drawText(truncatedText + (truncatedText.length < line.length ? '...' : ''), {
               x: xStartCentered + 10,
               y: yPos - 15 - (lineIdx * 12),
               size: 9,
@@ -520,7 +589,7 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
       
       yPos -= indicadorHeight;
     }
-  });
+  }
 
   return await pdfDoc.save();
 }
@@ -534,11 +603,12 @@ export async function generateNonEditablePdf(data, headers, dataObs, title = "Pr
   const safeHeaders = Array.isArray(headers) && headers.length > 0 ? headers : ['', '', '', '', ''];
   const safeDataObs = Array.isArray(dataObs) && dataObs.length > 0 ? dataObs : [['']];
   
-  // Usa a nova função centralizada para calcular a altura real da tabela de observações
-  const obsTableHeightReal = calculateObsTableHeight(safeDataObs, font);
-
   // Desenha tabela de observações na primeira página COM headers cinza
-  drawObsTableWithHeaders(firstPage, font, safeDataObs);
+  const obsResult = await drawObsTableWithHeaders(firstPage, font, safeDataObs, imageBytes, pathFilename);
+  
+  // Agora temos que usar a última página e posição Y do resultado
+  let page = obsResult.currentPage;
+  let yPos = obsResult.currentYPosition - spaceBetweenTables;
 
   // --- Quebra de texto e altura dinâmica das linhas ---
   const fontSize = 8; // Definir fontSize para uso consistente
@@ -576,6 +646,8 @@ export async function generateNonEditablePdf(data, headers, dataObs, title = "Pr
       return wrapText(textForWrapping, font, fontSize, maxWidth);
     })
   );
+  // Offsets de linhas para permitir dividir uma mesma linha em várias páginas
+  const rowLineOffsets = safeData.map((row) => row.map(() => 0));
   const rowHeightsDynamic = wrappedData.map(
     row => {
       const heights = row.map(lines => {
@@ -593,11 +665,10 @@ export async function generateNonEditablePdf(data, headers, dataObs, title = "Pr
   const totalWidth = colWidths.reduce((a, b) => a + b, 0);
   const marginBottom = 25;
 
-  // Posição inicial da tabela principal
-  let yPos = yStart - obsTableHeightReal - spaceBetweenTables;
-  let page = firstPage;
+  // Posição inicial da tabela principal - já configurada acima
   let rowIndex = 0;
-  let isFirstPage = true;
+  // Controla se o cabeçalho da tabela (nomes das colunas) já foi desenhado
+  let headerDrawn = false;
 
   // Função para desenhar headers
   function drawTableHeaders(page, y, headerHeight) {
@@ -672,22 +743,81 @@ export async function generateNonEditablePdf(data, headers, dataObs, title = "Pr
     }
   }
 
-  // Desenha a tabela principal, quebrando para nova página se necessário
-  while (rowIndex < safeData.length) {
-    // Calcular espaço disponível nesta página
-    let availableHeight;
-    if (isFirstPage) {
-      availableHeight = yPos - marginBottom;
-    } else {
-      yPos = yStart;
-      availableHeight = yPos - marginBottom;
+  // Desenha um "pedaço" (chunk) de uma linha muito alta que não cabe na página
+  function drawRowChunk(page, row, yTop, availableHeight, drawHeaderOnThisPage) {
+    // Se deve desenhar o header nesta página
+    let yCursor = yTop;
+    let headerHeightLocal = 0;
+    if (drawHeaderOnThisPage) {
+      headerHeightLocal = rowHeightsDynamic[0];
+      drawTableHeaders(page, yCursor, headerHeightLocal);
+      yCursor -= headerHeightLocal;
+      availableHeight -= headerHeightLocal;
     }
 
-    console.log(`📏 Página ${isFirstPage ? '1 (primeira)' : 'nova'}: espaço disponível = ${availableHeight}`);
+    // Quantidade máxima de linhas de texto que cabem no espaço disponível
+    const maxLinesFit = Math.max(1, Math.floor((availableHeight - 16) / lineHeight));
+    // Linhas restantes da linha atual (maior entre as colunas)
+    const maxRemainingLines = Math.max(
+      ...wrappedData[row].map((lines, col) => Math.max(0, lines.length - rowLineOffsets[row][col]))
+    );
+    const linesThisChunk = Math.max(1, Math.min(maxLinesFit, maxRemainingLines));
+    const chunkHeight = linesThisChunk * lineHeight + 16;
 
-    // Quantas linhas cabem nesta página?
-    let rowsThisPage = 0;
-    let heightSum = isFirstPage ? rowHeightsDynamic[0] : 0; // header só na primeira página
+    // Desenha grid do chunk (uma única linha de altura variável)
+    const totalWidth = colWidths.reduce((a, b) => a + b, 0);
+    // Linha superior
+    page.drawLine({ start: { x: xStart, y: yCursor }, end: { x: xStart + totalWidth, y: yCursor }, thickness: 1, color: rgb(0, 0, 0) });
+    // Linhas verticais
+    let xPosGrid = xStart;
+    for (let j = 0; j <= colWidths.length; j++) {
+      page.drawLine({ start: { x: xPosGrid, y: yCursor }, end: { x: xPosGrid, y: yCursor - chunkHeight }, thickness: 1, color: rgb(0, 0, 0) });
+      if (j < colWidths.length) xPosGrid += colWidths[j];
+    }
+    // Linha inferior
+    page.drawLine({ start: { x: xStart, y: yCursor - chunkHeight }, end: { x: xStart + totalWidth, y: yCursor - chunkHeight }, thickness: 1, color: rgb(0, 0, 0) });
+
+    // Desenha o conteúdo (subset de linhas por coluna)
+    let xPos = xStart;
+    for (let col = 0; col < safeData[row].length; col++) {
+      const allLines = wrappedData[row][col] || [];
+      const offset = rowLineOffsets[row][col] || 0;
+      const remaining = Math.max(0, allLines.length - offset);
+      const drawCount = Math.min(remaining, linesThisChunk);
+
+      let textY = yCursor - 8;
+      for (let i = 0; i < drawCount; i++) {
+        const line = allLines[offset + i];
+        const currentY = textY - i * lineHeight;
+        const cellBottom = yCursor - chunkHeight + 4;
+        if (currentY < cellBottom) break; // Garantia extra
+        page.drawText(line, {
+          x: xPos + 4,
+          y: currentY,
+          size: fontSize,
+          font,
+          color: rgb(0, 0, 0),
+          maxWidth: maxWidths[col] || 100,
+        });
+      }
+      // Avança o offset desta coluna
+      rowLineOffsets[row][col] = offset + drawCount;
+      xPos += colWidths[col];
+    }
+
+    return { drawnHeight: headerHeightLocal + chunkHeight, chunkHeight, headerHeightLocal, yAfter: yCursor - chunkHeight };
+  }
+
+  // Desenha a tabela principal, quebrando para nova página se necessário
+  while (rowIndex < safeData.length) {
+    // Calcular espaço disponível nesta página (não redefinir yPos automaticamente)
+    let availableHeight = yPos - marginBottom;
+
+  console.log(`📏 Espaço disponível na página atual = ${availableHeight} (header já desenhado: ${headerDrawn})`);
+
+    // Quantas linhas cabem nesta página
+  let rowsThisPage = 0;
+  let heightSum = headerDrawn ? 0 : rowHeightsDynamic[0]; // reserva espaço do header se ainda não foi desenhado
     
     // Melhor lógica de verificação de espaço
     while (rowIndex + rowsThisPage < safeData.length) {
@@ -703,23 +833,58 @@ export async function generateNonEditablePdf(data, headers, dataObs, title = "Pr
       rowsThisPage++;
     }
     
-    // Garante que pelo menos uma linha seja desenhada (evita loop infinito)
+    // Se nenhuma linha cabe inteira nesta página, empurra tudo para a próxima página.
+    // Só divide uma linha se ela não couber nem numa nova página vazia (fallback raro).
     if (rowsThisPage === 0 && rowIndex < safeData.length) {
-      rowsThisPage = 1;
-      console.log(`⚠️ Forçando desenho de pelo menos 1 linha na página`);
+      const nextRowHeight = rowHeightsDynamic[rowIndex + 1] || 50;
+      const pageUsableHeight = (yStart - marginBottom) - rowHeightsDynamic[0]; // espaço abaixo do header numa nova página
+
+      if (nextRowHeight <= pageUsableHeight) {
+        // Cabe numa nova página: cria a nova página e volta para o loop (sem desenhar nada aqui)
+        const newPage = pdfDoc.addPage([pageSize[0], pageSize[1]]);
+        await addHeader(newPage, font, '', imageBytes, pathFilename); // logo + caminho em todas as páginas
+        page = newPage;
+        // Ainda não desenhámos o cabeçalho; manter como não desenhado para sair desenhado na nova página
+        yPos = yStart;
+        console.log(`➡️ Empurrando linha ${rowIndex} para a próxima página inteira.`);
+        continue; // recalcula availableHeight e rowsThisPage
+      } else {
+        // Nem numa página nova cabe: dividir em chunks (fallback)
+        console.log(`✂️ Linha ${rowIndex} é maior que uma página. Dividindo em páginas.`);
+
+        // Desenha um pedaço da linha atual nesta página
+        let yCursor = yPos;
+        const availableHere = availableHeight;
+        drawRowChunk(page, rowIndex, yCursor, availableHere, false); // não desenhar cabeçalho de colunas
+
+        // Continua em páginas seguintes até acabar
+        while (wrappedData[rowIndex].some((lines, col) => (rowLineOffsets[rowIndex][col] || 0) < lines.length)) {
+          const nextPage = pdfDoc.addPage([pageSize[0], pageSize[1]]);
+          await addHeader(nextPage, font, '', imageBytes, pathFilename);
+          page = nextPage;
+          drawRowChunk(page, rowIndex, yStart, (yStart - marginBottom), false);
+        }
+
+        rowIndex += 1; // linha completamente desenhada
+        // Cabeçalho da tabela já terá sido desenhado quando for a vez de linhas normais
+        yPos = yStart;
+        continue;
+      }
     }
 
     // Desenha grid e headers
     const rowsToDraw = rowsThisPage > 0 ? rowsThisPage : 1;
-    if (isFirstPage) {
+    const willDrawHeader = !headerDrawn; // indica se vamos desenhar o cabeçalho agora
+    if (willDrawHeader) {
       drawTableGrid(page, yPos, [rowHeightsDynamic[0], ...rowHeightsDynamic.slice(rowIndex + 1, rowIndex + 1 + rowsToDraw)], rowsToDraw, true);
       drawTableHeaders(page, yPos, rowHeightsDynamic[0]);
+      headerDrawn = true; // a partir daqui não voltamos a desenhar o cabeçalho
     } else {
       drawTableGrid(page, yPos, rowHeightsDynamic.slice(rowIndex + 1, rowIndex + 1 + rowsToDraw), rowsToDraw, false);
     }
 
     // Desenha dados
-    let yData = yPos - (isFirstPage ? rowHeightsDynamic[0] : 0);
+    let yData = yPos - (willDrawHeader ? rowHeightsDynamic[0] : 0);
     
     console.log(`📊 Desenhando ${rowsToDraw} linhas a partir da linha ${rowIndex}`);
     
@@ -843,7 +1008,6 @@ export async function generateNonEditablePdf(data, headers, dataObs, title = "Pr
             }
             
             validLines.forEach((line, lineIdx) => {
-              if (lineIdx < 15) { // Aumenta limite para 15 linhas por célula
                 try {
                   // Verifica se o texto cabe na célula horizontalmente
                   const textWidth = font.widthOfTextAtSize(line, fontSize);
@@ -882,7 +1046,6 @@ export async function generateNonEditablePdf(data, headers, dataObs, title = "Pr
                   console.log(`📝 Texto problemático: "${line}"`);
                   console.log(`� Posição: x=${xPos + 4}, y=${textY - lineIdx * lineHeight}`);
                 }
-              }
             });
           } else if (col === 3 || col === 4) {
             // Debug para colunas importantes (Documentos Associados e Instruções)
@@ -898,15 +1061,25 @@ export async function generateNonEditablePdf(data, headers, dataObs, title = "Pr
 
     // Avança para próximas linhas
     rowIndex += rowsToDraw;
+    // Atualiza posição Y disponível na mesma página para continuar empurrando as células seguintes para baixo
+    yPos = yData;
     
     console.log(`✅ Desenhadas ${rowsToDraw} linhas. Próximo índice: ${rowIndex}/${safeData.length}`);
     
-    // Se ainda há linhas para desenhar, criar nova página
+    // Se ainda há linhas para desenhar, só cria nova página se não houver espaço útil
     if (rowIndex < safeData.length) {
-      console.log(`📄 Criando nova página para continuar tabela`);
-      const newPage = pdfDoc.addPage([pageSize[0], pageSize[1]]);
-      page = newPage;
-      isFirstPage = false;
+      const remainingSpace = yPos - marginBottom;
+      if (remainingSpace < 60) {
+        console.log(`📄 Pouco espaço restante (${remainingSpace}). Criando nova página.`);
+        const newPage = pdfDoc.addPage([pageSize[0], pageSize[1]]);
+        await addHeader(newPage, font, '', imageBytes, pathFilename);
+        page = newPage;
+        // O cabeçalho da tabela já foi desenhado anteriormente; manter headerDrawn=true
+        yPos = yStart;
+      } else {
+        // Continuar na mesma página (header já desenhado anteriormente)
+        // Nada a fazer aqui
+      }
     }
   }
 
@@ -1040,7 +1213,14 @@ export function drawProcessHeaderTable(page, font, yPos, donoProcesso, objetivoP
   const totalWidth = 540;
   const leftColWidth = 200;
   const rightColWidth = totalWidth - leftColWidth;
-  const rowHeight = 35;
+  
+  // Calcular altura dinâmica para o objetivo do processo
+  const objetivoWrapped = wrapText(objetivoProcesso || '', font, 10, rightColWidth - 16);
+  const minRowHeight = 35;
+  const lineHeight = 12;
+  const padding = 10;
+  const objetivoRowHeight = Math.max(minRowHeight, (objetivoWrapped.length * lineHeight) + padding);
+  
   const headerHeight = 30;
   const entradaSaidaHeight = 25;
   const contentHeight = 120;
@@ -1092,18 +1272,18 @@ export function drawProcessHeaderTable(page, font, yPos, donoProcesso, objetivoP
   // OBJETIVO DO PROCESSO
   page.drawRectangle({
     x: xStart,
-    y: yPos - headerHeight - rowHeight,
+    y: yPos - headerHeight - objetivoRowHeight,
     width: leftColWidth,
-    height: rowHeight,
+    height: objetivoRowHeight,
     color: rgb(0.7, 0.7, 0.7),
     borderColor: rgb(0, 0, 0),
     borderWidth: 1,
   });
   page.drawRectangle({
     x: xStart + leftColWidth,
-    y: yPos - headerHeight - rowHeight,
+    y: yPos - headerHeight - objetivoRowHeight,
     width: rightColWidth,
-    height: rowHeight,
+    height: objetivoRowHeight,
     borderColor: rgb(0, 0, 0),
     borderWidth: 1,
   });
@@ -1115,7 +1295,6 @@ export function drawProcessHeaderTable(page, font, yPos, donoProcesso, objetivoP
     color: rgb(0, 0, 0),
   });
   
-  const objetivoWrapped = wrapText(objetivoProcesso || '', font, 10, rightColWidth - 16);
   objetivoWrapped.forEach((line, idx) => {
     page.drawText(line, {
       x: xStart + leftColWidth + 8,
@@ -1129,7 +1308,7 @@ export function drawProcessHeaderTable(page, font, yPos, donoProcesso, objetivoP
   // SERVIÇOS DE ENTRADAS / SAÍDA - Cabeçalho
   page.drawRectangle({
     x: xStart,
-    y: yPos - headerHeight - rowHeight - entradaSaidaHeight,
+    y: yPos - headerHeight - objetivoRowHeight - entradaSaidaHeight,
     width: leftColWidth,
     height: entradaSaidaHeight,
     color: rgb(0.7, 0.7, 0.7),
@@ -1138,7 +1317,7 @@ export function drawProcessHeaderTable(page, font, yPos, donoProcesso, objetivoP
   });
   page.drawRectangle({
     x: xStart + leftColWidth,
-    y: yPos - headerHeight - rowHeight - entradaSaidaHeight,
+    y: yPos - headerHeight - objetivoRowHeight - entradaSaidaHeight,
     width: rightColWidth,
     height: entradaSaidaHeight,
     color: rgb(0.7, 0.7, 0.7),
@@ -1147,14 +1326,14 @@ export function drawProcessHeaderTable(page, font, yPos, donoProcesso, objetivoP
   });
   page.drawText('SERVIÇOS DE ENTRADAS', {
     x: xStart + 8,
-    y: yPos - headerHeight - rowHeight - 16,
+    y: yPos - headerHeight - objetivoRowHeight - 16,
     size: 10,
     font,
     color: rgb(0, 0, 0),
   });
   page.drawText('SERVIÇO DE SAÍDA', {
     x: xStart + leftColWidth + 8,
-    y: yPos - headerHeight - rowHeight - 16,
+    y: yPos - headerHeight - objetivoRowHeight - 16,
     size: 10,
     font,
     color: rgb(0, 0, 0),
@@ -1163,7 +1342,7 @@ export function drawProcessHeaderTable(page, font, yPos, donoProcesso, objetivoP
   // SERVIÇOS DE ENTRADAS / SAÍDA - Conteúdo
   page.drawRectangle({
     x: xStart,
-    y: yPos - headerHeight - rowHeight - entradaSaidaHeight - contentHeight,
+    y: yPos - headerHeight - objetivoRowHeight - entradaSaidaHeight - contentHeight,
     width: leftColWidth,
     height: contentHeight,
     borderColor: rgb(0, 0, 0),
@@ -1171,7 +1350,7 @@ export function drawProcessHeaderTable(page, font, yPos, donoProcesso, objetivoP
   });
   page.drawRectangle({
     x: xStart + leftColWidth,
-    y: yPos - headerHeight - rowHeight - entradaSaidaHeight - contentHeight,
+    y: yPos - headerHeight - objetivoRowHeight - entradaSaidaHeight - contentHeight,
     width: rightColWidth,
     height: contentHeight,
     borderColor: rgb(0, 0, 0),
@@ -1184,11 +1363,11 @@ export function drawProcessHeaderTable(page, font, yPos, donoProcesso, objetivoP
   const entradaWrapped = wrapText(servicosEntrada || '', font, fontSize, leftColWidth - 16);
   const saidaWrapped = wrapText(servicoSaida || '', font, fontSize, rightColWidth - 16);
   
-  let entradaY = yPos - headerHeight - rowHeight - entradaSaidaHeight - 15;
+  let entradaY = yPos - headerHeight - objetivoRowHeight - entradaSaidaHeight - 15;
   let saidaY = entradaY;
   
   entradaWrapped.forEach((line, idx) => {
-    if (entradaY - (idx * 12) > yPos - headerHeight - rowHeight - entradaSaidaHeight - contentHeight + 5) {
+    if (entradaY - (idx * 12) > yPos - headerHeight - objetivoRowHeight - entradaSaidaHeight - contentHeight + 5) {
       page.drawText(line, {
         x: xStart + 8,
         y: entradaY - (idx * 12),
@@ -1200,7 +1379,7 @@ export function drawProcessHeaderTable(page, font, yPos, donoProcesso, objetivoP
   });
   
   saidaWrapped.forEach((line, idx) => {
-    if (saidaY - (idx * 12) > yPos - headerHeight - rowHeight - entradaSaidaHeight - contentHeight + 5) {
+    if (saidaY - (idx * 12) > yPos - headerHeight - objetivoRowHeight - entradaSaidaHeight - contentHeight + 5) {
       page.drawText(line, {
         x: xStart + leftColWidth + 8,
         y: saidaY - (idx * 12),
@@ -1212,7 +1391,7 @@ export function drawProcessHeaderTable(page, font, yPos, donoProcesso, objetivoP
   });
 
   // Retorne a nova posição Y para continuar desenhando abaixo
-  return yPos - headerHeight - rowHeight - entradaSaidaHeight - contentHeight - 25;
+  return yPos - headerHeight - objetivoRowHeight - entradaSaidaHeight - contentHeight - 25;
 }
 
 // Função centralizada para o header do processo
@@ -1221,7 +1400,14 @@ export function drawProcessHeaderTableCentered(page, font, yPos, donoProcesso, o
   const totalWidth = 540;
   const leftColWidth = 200;
   const rightColWidth = totalWidth - leftColWidth;
-  const rowHeight = 35;
+  
+  // Calcular altura dinâmica para o objetivo do processo
+  const objetivoWrapped = wrapText(objetivoProcesso || '', font, 10, rightColWidth - 16);
+  const minRowHeight = 35;
+  const lineHeight = 12;
+  const padding = 10;
+  const objetivoRowHeight = Math.max(minRowHeight, (objetivoWrapped.length * lineHeight) + padding);
+  
   const headerHeight = 30;
   const entradaSaidaHeight = 25;
   const contentHeight = 120;
@@ -1273,18 +1459,18 @@ export function drawProcessHeaderTableCentered(page, font, yPos, donoProcesso, o
   // OBJETIVO DO PROCESSO
   page.drawRectangle({
     x: xStartCentered,
-    y: yPos - headerHeight - rowHeight,
+    y: yPos - headerHeight - objetivoRowHeight,
     width: leftColWidth,
-    height: rowHeight,
+    height: objetivoRowHeight,
     color: rgb(0.7, 0.7, 0.7),
     borderColor: rgb(0, 0, 0),
     borderWidth: 1,
   });
   page.drawRectangle({
     x: xStartCentered + leftColWidth,
-    y: yPos - headerHeight - rowHeight,
+    y: yPos - headerHeight - objetivoRowHeight,
     width: rightColWidth,
-    height: rowHeight,
+    height: objetivoRowHeight,
     borderColor: rgb(0, 0, 0),
     borderWidth: 1,
   });
@@ -1296,7 +1482,6 @@ export function drawProcessHeaderTableCentered(page, font, yPos, donoProcesso, o
     color: rgb(0, 0, 0),
   });
   
-  const objetivoWrapped = wrapText(objetivoProcesso || '', font, 10, rightColWidth - 16);
   objetivoWrapped.forEach((line, idx) => {
     page.drawText(line, {
       x: xStartCentered + leftColWidth + 8,
@@ -1310,7 +1495,7 @@ export function drawProcessHeaderTableCentered(page, font, yPos, donoProcesso, o
   // SERVIÇOS DE ENTRADAS / SAÍDA - Cabeçalho
   page.drawRectangle({
     x: xStartCentered,
-    y: yPos - headerHeight - rowHeight - entradaSaidaHeight,
+    y: yPos - headerHeight - objetivoRowHeight - entradaSaidaHeight,
     width: leftColWidth,
     height: entradaSaidaHeight,
     color: rgb(0.7, 0.7, 0.7),
@@ -1319,7 +1504,7 @@ export function drawProcessHeaderTableCentered(page, font, yPos, donoProcesso, o
   });
   page.drawRectangle({
     x: xStartCentered + leftColWidth,
-    y: yPos - headerHeight - rowHeight - entradaSaidaHeight,
+    y: yPos - headerHeight - objetivoRowHeight - entradaSaidaHeight,
     width: rightColWidth,
     height: entradaSaidaHeight,
     color: rgb(0.7, 0.7, 0.7),
@@ -1328,14 +1513,14 @@ export function drawProcessHeaderTableCentered(page, font, yPos, donoProcesso, o
   });
   page.drawText('SERVIÇOS DE ENTRADAS', {
     x: xStartCentered + 8,
-    y: yPos - headerHeight - rowHeight - 16,
+    y: yPos - headerHeight - objetivoRowHeight - 16,
     size: 10,
     font,
     color: rgb(0, 0, 0),
   });
   page.drawText('SERVIÇO DE SAÍDA', {
     x: xStartCentered + leftColWidth + 8,
-    y: yPos - headerHeight - rowHeight - 16,
+    y: yPos - headerHeight - objetivoRowHeight - 16,
     size: 10,
     font,
     color: rgb(0, 0, 0),
@@ -1344,7 +1529,7 @@ export function drawProcessHeaderTableCentered(page, font, yPos, donoProcesso, o
   // SERVIÇOS DE ENTRADAS / SAÍDA - Conteúdo
   page.drawRectangle({
     x: xStartCentered,
-    y: yPos - headerHeight - rowHeight - entradaSaidaHeight - contentHeight,
+    y: yPos - headerHeight - objetivoRowHeight - entradaSaidaHeight - contentHeight,
     width: leftColWidth,
     height: contentHeight,
     borderColor: rgb(0, 0, 0),
@@ -1352,7 +1537,7 @@ export function drawProcessHeaderTableCentered(page, font, yPos, donoProcesso, o
   });
   page.drawRectangle({
     x: xStartCentered + leftColWidth,
-    y: yPos - headerHeight - rowHeight - entradaSaidaHeight - contentHeight,
+    y: yPos - headerHeight - objetivoRowHeight - entradaSaidaHeight - contentHeight,
     width: rightColWidth,
     height: contentHeight,
     borderColor: rgb(0, 0, 0),
@@ -1365,11 +1550,11 @@ export function drawProcessHeaderTableCentered(page, font, yPos, donoProcesso, o
   const entradaWrapped = wrapText(servicosEntrada || '', font, fontSize, leftColWidth - 16);
   const saidaWrapped = wrapText(servicoSaida || '', font, fontSize, rightColWidth - 16);
   
-  let entradaY = yPos - headerHeight - rowHeight - entradaSaidaHeight - 15;
+  let entradaY = yPos - headerHeight - objetivoRowHeight - entradaSaidaHeight - 15;
   let saidaY = entradaY;
   
   entradaWrapped.forEach((line, idx) => {
-    if (entradaY - (idx * 12) > yPos - headerHeight - rowHeight - entradaSaidaHeight - contentHeight + 5) {
+    if (entradaY - (idx * 12) > yPos - headerHeight - objetivoRowHeight - entradaSaidaHeight - contentHeight + 5) {
       page.drawText(line, {
         x: xStartCentered + 8,
         y: entradaY - (idx * 12),
@@ -1381,7 +1566,7 @@ export function drawProcessHeaderTableCentered(page, font, yPos, donoProcesso, o
   });
   
   saidaWrapped.forEach((line, idx) => {
-    if (saidaY - (idx * 12) > yPos - headerHeight - rowHeight - entradaSaidaHeight - contentHeight + 5) {
+    if (saidaY - (idx * 12) > yPos - headerHeight - objetivoRowHeight - entradaSaidaHeight - contentHeight + 5) {
       page.drawText(line, {
         x: xStartCentered + leftColWidth + 8,
         y: saidaY - (idx * 12),
@@ -1393,5 +1578,5 @@ export function drawProcessHeaderTableCentered(page, font, yPos, donoProcesso, o
   });
 
   // Retorne a nova posição Y para continuar desenhando abaixo
-  return yPos - headerHeight - rowHeight - entradaSaidaHeight - contentHeight - 25;
+  return yPos - headerHeight - objetivoRowHeight - entradaSaidaHeight - contentHeight - 25;
 }

@@ -9,7 +9,7 @@ export const obsRowHeight = 25;
 export const spaceBetweenTables = 20;
 
 // Template 2 - Larguras ajustadas para melhor distribuição do conteúdo
-export const colWidthTemplate2 = [120, 100, 80, 80, 80, 80];
+export const colWidthTemplate2 = [140, 200, 50, 50, 50, 50];
 
 // Função para obter o número de linhas da tabela de observações
 export function getObsRows(dataObs) {

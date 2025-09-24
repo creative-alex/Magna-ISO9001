@@ -7,6 +7,9 @@ import useRowContextMenu from "../ContextMenu/useRowContextMenu";
 import "./styleTemplates.css";
 
 export default function Template1({ 
+  isEditable = false, // Nova prop para controlar editabilidade (começa não-editável)
+  setIsEditable, // Nova prop para alterar estado de editabilidade
+  canEdit = true, // Nova prop para controlar se pode editar (permissões)
   data = [["", "", "", "", ""]],
   dataObs = [[""]],
   handleChange, 
@@ -16,8 +19,7 @@ export default function Template1({
   servicoSaida = "",
   setServicosEntrada,
   setServicoSaida,
-  originalFilename, // Nova prop para identificar o arquivo atual
-  // Props para ExportPdfButton
+  originalFilename, 
   atividades,
   donoProcesso,
   objetivoProcesso,
@@ -25,12 +27,9 @@ export default function Template1({
   pathFilename,
   fieldNames,
   onSaveSuccess,
-  // Props para PreviewPdfButton
   getTablesHtml,
-  // Refs para as tabelas
   obsTableRef,
   mainTableRef,
-  // Funções para manipulação de linhas
   onMoveRowUp,
   onMoveRowDown,
   onInsertRowAbove,
@@ -41,7 +40,6 @@ export default function Template1({
 }) {
   const textAreaRefs = useRef({});
   
-  // Hook único para o context menu
   const contextMenu = useRowContextMenu({
     totalRows: data.length,
     onMoveRowUp,
@@ -54,9 +52,7 @@ export default function Template1({
   // Função para redimensionar textarea automaticamente
   const handleTextareaResize = (e) => {
     const textarea = e.target;
-    // Reset height to auto to get proper scrollHeight
     textarea.style.height = 'auto';
-    // Set height to match content
     textarea.style.height = `${Math.max(textarea.scrollHeight, 50)}px`;
   };
 
@@ -117,8 +113,47 @@ export default function Template1({
 
   return (
     <div className="template1-container">
-      {/* ADICIONAR ESTE LOG PARA DEBUG */}
-      {console.log("🔍 Template1 - pathFilename recebido:", pathFilename)}
+      {/* Action buttons at top right */}
+      <div className="action-buttons-container">
+        {/* Botão Editar/Guardar integrado - só aparece se canEdit for true */}
+        {setIsEditable && canEdit && (
+          <>
+            {!isEditable ? (
+              <button 
+                className="edit-button"
+                onClick={() => setIsEditable(true)}
+                title="Ativar modo de edição"
+              >
+                ✏️ Editar
+              </button>
+            ) : (
+              <ExportPdfButton
+                templateType={templateType}
+                data={data}
+                headers={['Fluxo\ndas Ações', 'Descrição', 'Responsável', 'Documentos\nAssociados', 'Instruções\nde Trabalho']}
+                dataObs={dataObs}
+                headersObs={['Observações']}
+                atividades={atividades}
+                donoProcesso={donoProcesso}
+                objetivoProcesso={objetivoProcesso}
+                indicadores={indicadores}
+                pathFilename={pathFilename}
+                servicosEntrada={servicosEntrada}
+                servicoSaida={servicoSaida}
+                fieldNames={fieldNames}
+                onSaveSuccess={() => {
+                  onSaveSuccess && onSaveSuccess();
+                  setIsEditable(false); // Desativa edição após guardar
+                }}
+              />
+            )}
+          </>
+        )}
+        <PreviewPdfButton 
+          getTablesHtml={getTemplate1TablesHtml} 
+          pathFilename={pathFilename}
+        />
+      </div>
     
       {/* Tabela de Observações */}
       <div ref={obsTableRef} className="primeira-tabela">
@@ -139,9 +174,15 @@ export default function Template1({
                   ref={el => textAreaRefs.current[`obj-0-0`] = el}
                   className="editable-table-textarea tabela-observacoes-textarea"
                   value={dataObs[0] ? dataObs[0][0] : ''}
-                  onChange={e => handleChangeObs(0, 0, e.target.value)}
-                  onInput={handleTextareaResize}
-                  placeholder="Digite os objetivos do documento..."
+                  onChange={isEditable ? e => handleChangeObs(0, 0, e.target.value) : undefined}
+                  onInput={isEditable ? handleTextareaResize : undefined}
+                  placeholder={isEditable ? "Digite os objetivos do documento..." : ""}
+                  readOnly={!isEditable}
+                  style={{
+                    backgroundColor: isEditable ? 'white' : '#f5f5f5',
+                    cursor: isEditable ? 'text' : 'default',
+                    border: isEditable ? '1px solid #ddd' : '1px solid #e0e0e0'
+                  }}
                 />
               </td>
             </tr>
@@ -156,9 +197,15 @@ export default function Template1({
                   ref={el => textAreaRefs.current[`campo-1-0`] = el}
                   className="editable-table-textarea tabela-observacoes-textarea"
                   value={dataObs[1] ? dataObs[1][0] : ''}
-                  onChange={e => handleChangeObs(1, 0, e.target.value)}
-                  onInput={handleTextareaResize}
-                  placeholder="Digite o campo de aplicação..."
+                  onChange={isEditable ? e => handleChangeObs(1, 0, e.target.value) : undefined}
+                  onInput={isEditable ? handleTextareaResize : undefined}
+                  placeholder={isEditable ? "Digite o campo de aplicação..." : ""}
+                  readOnly={!isEditable}
+                  style={{
+                    backgroundColor: isEditable ? 'white' : '#f5f5f5',
+                    cursor: isEditable ? 'text' : 'default',
+                    border: isEditable ? '1px solid #ddd' : '1px solid #e0e0e0'
+                  }}
                 />
               </td>
             </tr>
@@ -173,9 +220,15 @@ export default function Template1({
                   ref={el => textAreaRefs.current[`def-2-0`] = el}
                   className="editable-table-textarea tabela-observacoes-textarea"
                   value={dataObs[2] ? dataObs[2][0] : ''}
-                  onChange={e => handleChangeObs(2, 0, e.target.value)} 
-                  onInput={handleTextareaResize}
-                  placeholder="Digite as definições relevantes..."
+                  onChange={isEditable ? e => handleChangeObs(2, 0, e.target.value) : undefined} 
+                  onInput={isEditable ? handleTextareaResize : undefined}
+                  placeholder={isEditable ? "Digite as definições relevantes..." : ""}
+                  readOnly={!isEditable}
+                  style={{
+                    backgroundColor: isEditable ? 'white' : '#f5f5f5',
+                    cursor: isEditable ? 'text' : 'default',
+                    border: isEditable ? '1px solid #ddd' : '1px solid #e0e0e0'
+                  }}
                 />
               </td>
             </tr>
@@ -190,9 +243,15 @@ export default function Template1({
                   ref={el => textAreaRefs.current[`abrev-3-0`] = el}
                   className="editable-table-textarea tabela-observacoes-textarea"
                   value={dataObs[3] ? dataObs[3][0] : ''}
-                  onChange={e => handleChangeObs(3, 0, e.target.value)}
-                  onInput={handleTextareaResize}
-                  placeholder="Digite as abreviaturas utilizadas..."
+                  onChange={isEditable ? e => handleChangeObs(3, 0, e.target.value) : undefined}
+                  onInput={isEditable ? handleTextareaResize : undefined}
+                  placeholder={isEditable ? "Digite as abreviaturas utilizadas..." : ""}
+                  readOnly={!isEditable}
+                  style={{
+                    backgroundColor: isEditable ? 'white' : '#f5f5f5',
+                    cursor: isEditable ? 'text' : 'default',
+                    border: isEditable ? '1px solid #ddd' : '1px solid #e0e0e0'
+                  }}
                 />
               </td>
             </tr>
@@ -207,9 +266,15 @@ export default function Template1({
                   ref={el => textAreaRefs.current[`obs-4-0`] = el}
                   className="editable-table-textarea tabela-observacoes-textarea"
                   value={dataObs[4] ? dataObs[4][0] : ''}
-                  onChange={e => handleChangeObs(4, 0, e.target.value)}
-                  onInput={handleTextareaResize}
-                  placeholder="Digite observações adicionais..."
+                  onChange={isEditable ? e => handleChangeObs(4, 0, e.target.value) : undefined}
+                  onInput={isEditable ? handleTextareaResize : undefined}
+                  placeholder={isEditable ? "Digite observações adicionais..." : ""}
+                  readOnly={!isEditable}
+                  style={{
+                    backgroundColor: isEditable ? 'white' : '#f5f5f5',
+                    cursor: isEditable ? 'text' : 'default',
+                    border: isEditable ? '1px solid #ddd' : '1px solid #e0e0e0'
+                  }}
                 />
               </td>
             </tr>
@@ -242,15 +307,19 @@ export default function Template1({
                       // Coluna de Documentos Associados - usa componente especial
                       <DocumentosAssociados
                         currentValue={cell}
-                        onChange={(value) => handleChange(rowIdx, colIdx, value)}
+                        onChange={isEditable ? (value) => handleChange(rowIdx, colIdx, value) : undefined}
                         originalFilename={originalFilename}
+                        isEditable={isEditable}
+                        canEdit={canEdit}
                       />
                     ) : colIdx === 4 ? (
                       // Coluna de Instruções de trabalho procedimento - usa componente especial
                       <InstrucoesTrabalho
                         currentValue={cell}
-                        onChange={(value) => handleChange(rowIdx, colIdx, value)}
+                        onChange={isEditable ? (value) => handleChange(rowIdx, colIdx, value) : undefined}
                         originalFilename={originalFilename}
+                        isEditable={isEditable}
+                        canEdit={canEdit}
                       />
                     ) : (
                       // Outras colunas - usa textarea normal
@@ -258,15 +327,21 @@ export default function Template1({
                         ref={el => textAreaRefs.current[`main-${rowIdx}-${colIdx}`] = el}
                         className="editable-table-textarea tabela-principal-textarea"                      
                         value={cell}
-                        onChange={e => handleChange(rowIdx, colIdx, e.target.value)}
-                        onInput={handleTextareaResize}
-                        placeholder={
+                        onChange={isEditable ? e => handleChange(rowIdx, colIdx, e.target.value) : undefined}
+                        onInput={isEditable ? handleTextareaResize : undefined}
+                        readOnly={!isEditable}
+                        placeholder={isEditable ? (
                           colIdx === 0 ? 'Fluxo' :
                           colIdx === 1 ? 'Descrição' :
                           colIdx === 2 ? 'Responsável' :
                           colIdx === 3 ? 'Documentos' :
                           'Instruções'
-                        }
+                        ) : ""}
+                        style={{
+                          backgroundColor: isEditable ? 'white' : '#f5f5f5',
+                          cursor: isEditable ? 'text' : 'default',
+                          border: isEditable ? '1px solid #ddd' : '1px solid #e0e0e0'
+                        }}
                       />
                     )}
                   </td>
@@ -276,32 +351,12 @@ export default function Template1({
           </tbody>
         </table>
       </div>
+      <p style={{ fontSize: '12px', color: '#666', fontStyle: 'italic', marginTop: '-15px', marginBottom: '15px' }}>
+        Clique com o botão direito para adicionar, mover ou remover uma linha.
+      </p>
 
       {/* Renderizar o context menu fora da tabela */}
       {contextMenu.contextMenu}
-
-      <div className="action-buttons-container">
-        <ExportPdfButton
-          templateType={templateType}
-          data={data}
-          headers={['Fluxo\ndas Ações', 'Descrição', 'Responsável', 'Documentos\nAssociados', 'Instruções\nde Trabalho']}
-          dataObs={dataObs}
-          headersObs={['Observações']}
-          atividades={atividades}
-          donoProcesso={donoProcesso}
-          objetivoProcesso={objetivoProcesso}
-          indicadores={indicadores}
-          pathFilename={pathFilename}
-          servicosEntrada={servicosEntrada}
-          servicoSaida={servicoSaida}
-          fieldNames={fieldNames}
-          onSaveSuccess={onSaveSuccess}
-        />
-        <PreviewPdfButton 
-          getTablesHtml={getTemplate1TablesHtml} 
-          pathFilename={pathFilename}
-        />
-      </div>
     </div>
   );
 }

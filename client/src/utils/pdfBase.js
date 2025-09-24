@@ -1,6 +1,6 @@
 ﻿import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
-export const colWidths = [150, 140, 70, 70, 70];
+export const colWidths = [150, 170, 60, 60, 60];
 export const pageSize = [600, 800];
 export const xStart = 50;
 export const yStart = 680;
@@ -12,23 +12,35 @@ export const obsTableHeight = obsRows * obsRowHeight;
 export const obsXStart = xStart;
 export const obsYStart = yStart;
 
-export const spaceBetweenTables = 30;
+export const spaceBetweenTables = 20;
 
 export async function addHeader(page, font, title, imageBytes = null, pathFilename) {
   console.log("🎯 addHeader chamado:", { title, hasImage: !!imageBytes, pathFilename });
 
   const { width, height } = page.getSize();
   
-  // REMOVER O TÍTULO COMPLETAMENTE
-  // (código do título removido)
+  // Desenhar o título (nome do documento) no topo ao centro - só se não for o título padrão
+  if (title && title.trim() !== '' && title !== 'Procedimento') {
+    const titleSize = 14;
+    const titleWidth = font.widthOfTextAtSize(title, titleSize);
+    const titleX = (width - titleWidth) / 2;
+    const titleY = height - 40;
+    page.drawText(title, {
+      x: titleX,
+      y: titleY,
+      size: titleSize,
+      font,
+      color: rgb(0, 0, 0),
+    });
+  }
   
   // Desenhar pathFilename no canto extremo direito em duas linhas
   if (pathFilename) {
     const fileFontSize = 12;
-    
-    // Dividir o pathFilename em duas partes (pasta e arquivo)
-    const parts = pathFilename.split('/');
-    const filename = parts.pop() || pathFilename; // Nome do arquivo
+    // Normaliza separadores (Windows \ -> /) e divide em pasta/arquivo
+    const normalizedPath = pathFilename.replace(/\\/g, '/');
+    const parts = normalizedPath.split('/');
+    const filename = parts.pop() || normalizedPath; // Nome do arquivo
     const folder = parts.join('/'); // Pasta(s)
     
     const marginRight = 50; // Mais para a esquerda (era 10, agora 50)
@@ -49,7 +61,7 @@ export async function addHeader(page, font, title, imageBytes = null, pathFilena
     }
     
     // Segunda linha (nome do arquivo) - ainda mais em baixo
-    const filenameWidth = font.widthOfTextAtSize(filename, fileFontSize);
+  const filenameWidth = font.widthOfTextAtSize(filename, fileFontSize);
     const filenameX = width - filenameWidth - marginRight;
     const filenameY = height - 75; // Mais em baixo (era -35, agora -75)
     
@@ -99,13 +111,7 @@ export async function addHeader(page, font, title, imageBytes = null, pathFilena
     }
   }
   
-  const lineY = height - 130;
-  page.drawLine({
-    start: { x: 50, y: lineY },
-    end: { x: width - 50, y: lineY },
-    thickness: 1,
-    color: rgb(0.5, 0.5, 0.5),
-  });
+  // Removido o separador horizontal para não repetir em todas as páginas
 }
 
 export async function createBasePdf(title, imageBytes, pathFilename) {

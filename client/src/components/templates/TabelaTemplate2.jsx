@@ -5,6 +5,10 @@ import useRowContextMenu from "../ContextMenu/useRowContextMenu";
 import "./styleTemplates.css"; 
 
 export default function Template2({
+  isEditable = false, // Nova prop para controlar editabilidade (começa não-editável)
+  setIsEditable, // Nova prop para alterar estado de editabilidade
+  canEdit = true, // Nova prop para controlar se pode editar (permissões)
+  isSuperAdmin = false, // Nova prop para controlar se é SuperAdmin (pode mudar dono processo)
   data = [[ "", "" ]],
   handleChange,
   handleAtividadesChange,
@@ -55,7 +59,7 @@ export default function Template2({
 
   // Hook para o context menu dos indicadores (dinâmico)
   const contextMenuIndicadores = useRowContextMenu({
-    totalRows: Array.isArray(indicadores) ? indicadores.length : 3, // Suporte para array ou objeto
+    totalRows: Array.isArray(indicadores) ? indicadores.length : 3, 
     onMoveRowUp: onMoveIndicadorUp,
     onMoveRowDown: onMoveIndicadorDown,
     onInsertRowAbove: onInsertIndicadorAbove,
@@ -198,7 +202,53 @@ export default function Template2({
 
   return (
     <div className="template2-container">
-      {/* Configurações do Cabeçalho */}
+      {/* Action buttons at top right */}
+      <div className="action-buttons-container">
+        {/* Botão Editar/Guardar integrado */}
+        {setIsEditable && canEdit && (
+          <>
+            {!isEditable ? (
+              <button 
+                className="edit-button"
+                onClick={() => setIsEditable(true)}
+                title="Ativar modo de edição"
+              >
+                ✏️ Editar
+              </button>
+            ) : (
+              <ExportPdfButton
+                templateType={2}
+                data={data}
+                headers={[]}
+                dataObs={[]}
+                headersObs={[]}
+                atividades={atividades}
+                donoProcesso={donoProcesso}
+                donoProcessoOriginal={donoProcessoOriginal}
+                objetivoProcesso={objetivoProcesso}
+                indicadores={indicadores}
+                pathFilename={pathFilename}
+                servicosEntrada={servicosEntrada}
+                servicoSaida={servicoSaida}
+                onSaveSuccess={() => {
+                  onSaveSuccess && onSaveSuccess();
+                  setIsEditable(false); // Desativa edição após guardar
+                }}
+              />
+            )}
+          </>
+        )}
+        <PreviewPdfButton 
+          templateType={2}
+          atividades={atividades}
+          donoProcesso={donoProcesso}
+          objetivoProcesso={objetivoProcesso}
+          indicadores={indicadores}
+          servicosEntrada={servicosEntrada}
+          servicoSaida={servicoSaida}
+        />
+      </div>
+      
       {/* Tabela principal */}
 <table className="tabela-processo">
   <thead>
@@ -210,6 +260,7 @@ export default function Template2({
             className={`tabela-processo-select ${donoProcessoAlterado ? 'altered' : ''}`}
             value={donoProcesso}
             onChange={e => setDonoProcesso(e.target.value)}
+            disabled={!isEditable || !isSuperAdmin}
           >
             <option value="">Selecione um funcionário...</option>
             {funcionarios.map((funcionario) => (
@@ -237,6 +288,7 @@ export default function Template2({
           onInput={handleTextareaResize}
           placeholder="Descreva o objetivo principal do processo..."
           style={{ resize: 'none' }}
+          readOnly={!isEditable}
         />
       </td>
     </tr>
@@ -256,6 +308,7 @@ export default function Template2({
           onInput={handleTextareaResize}
           placeholder="Descreva os serviços de entrada necessários..."
           style={{ resize: 'none' }}
+          readOnly={!isEditable}
         />
       </td>
       <td colSpan={3} className="cell-top">
@@ -267,6 +320,7 @@ export default function Template2({
           onInput={handleTextareaResize}
           placeholder="Descreva o serviço de saída resultante..."
           style={{ resize: 'none' }}
+          readOnly={!isEditable}
         />
       </td>
     </tr>
@@ -310,6 +364,7 @@ export default function Template2({
                 onInput={handleTextareaResize}
                 placeholder={`${colIdx === 0 ? 'Atividade' : colIdx === 1 ? 'Procedimento' : 'Requisito'}...`}
                 style={{ resize: 'none' }}
+                readOnly={!isEditable}
               />
             </td>
           );
@@ -348,6 +403,7 @@ export default function Template2({
               onInput={handleTextareaResize}
               placeholder={`Indicador ${rowIdx + 1} de monitorização...`}
               style={{ resize: 'none' }}
+              readOnly={!isEditable}
             />
           </td>
         </tr>
@@ -368,6 +424,7 @@ export default function Template2({
               onInput={handleTextareaResize}
               placeholder="Primeiro indicador de monitorização..."
               style={{ resize: 'none' }}
+              readOnly={!isEditable}
             />
           </td>
         </tr>
@@ -384,6 +441,7 @@ export default function Template2({
               onInput={handleTextareaResize}
               placeholder="Segundo indicador de monitorização..."
               style={{ resize: 'none' }}
+              readOnly={!isEditable}
             />
           </td>
         </tr>
@@ -400,6 +458,7 @@ export default function Template2({
               onInput={handleTextareaResize}
               placeholder="Terceiro indicador de monitorização..."
               style={{ resize: 'none' }}
+              readOnly={!isEditable}
             />
           </td>
         </tr>
@@ -407,34 +466,6 @@ export default function Template2({
     )}
   </tbody>
 </table>
-
-      <div className="action-buttons-container">
-        <ExportPdfButton
-          templateType={2}
-          data={data}
-          headers={[]}
-          dataObs={[]}
-          headersObs={[]}
-          atividades={atividades}
-          donoProcesso={donoProcesso}
-          donoProcessoOriginal={donoProcessoOriginal}
-          objetivoProcesso={objetivoProcesso}
-          indicadores={indicadores}
-          pathFilename={pathFilename}
-          servicosEntrada={servicosEntrada}
-          servicoSaida={servicoSaida}
-          onSaveSuccess={onSaveSuccess}
-        />
-        <PreviewPdfButton 
-          templateType={2}
-          atividades={atividades}
-          donoProcesso={donoProcesso}
-          objetivoProcesso={objetivoProcesso}
-          indicadores={indicadores}
-          servicosEntrada={servicosEntrada}
-          servicoSaida={servicoSaida}
-        />
-      </div>
     </div>
   );
 }

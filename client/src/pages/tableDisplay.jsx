@@ -4,6 +4,10 @@ import Template2 from "../components/templates/TabelaTemplate2";
 
 export default function TabelaPdf({
   templateType = 1,
+  isEditable = true, // Nova prop para controlar editabilidade
+  setIsEditable, // Nova prop para alterar estado de editabilidade
+  canEdit = true, // Nova prop para controlar se pode editar (permissões)
+  isSuperAdmin = false, // Nova prop para controlar se é SuperAdmin
   data,
   dataObs,
   handleChangeMain,
@@ -84,6 +88,10 @@ export default function TabelaPdf({
 
       {isTemplate2 ? (
         <Template2
+          isEditable={isEditable}
+          setIsEditable={setIsEditable}
+          canEdit={canEdit}
+          isSuperAdmin={isSuperAdmin}
           data={data}
           dataObs={dataObs}
           handleChange={handleChange}
@@ -119,6 +127,7 @@ export default function TabelaPdf({
         />
       ) : (
         <Template1
+          isEditable={isEditable}
           data={data}
           dataObs={dataObs}
           handleChange={handleChangeMain}

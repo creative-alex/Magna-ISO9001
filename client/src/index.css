@@ -234,6 +234,12 @@ body {
   border: 1px solid #e5e7eb;
 }
 
+.folder.owner-folder {
+  border: 2px solid #C8932F;
+  box-shadow: 0 2px 8px rgba(200, 147, 47, 0.15);
+  background: #fffbf0;
+}
+
 .folder-header {
   display: flex;
   align-items: center;

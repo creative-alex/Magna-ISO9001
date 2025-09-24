@@ -1,9 +1,10 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useContext } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
+import { UserContext } from "../context/userContext";
 import TabelaPdf from "../pages/tableDisplay";
 import Template1 from "./templates/TabelaTemplate1";
-import ExportPdfButton from "../components/Buttons/exportPdf";
-import PreviewPdfButton from "../components/Buttons/previewPDF";
+import ExportPdfButton from "./Buttons/exportPdf";
+import PreviewPdfButton from "./Buttons/previewPDF";
 
 // Definição dos dois templates
 const tabelas = [
@@ -117,7 +118,9 @@ export default function TablePageUnified() {
   const { filename } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-
+  
+  // Context do usuário para verificar permissões
+  const { username } = useContext(UserContext);
 
   const originalFilename =
     location?.state?.originalFilename
@@ -154,15 +157,37 @@ const [atividades, setAtividades] = useState([
   ["", "", "", "", "", ""],
   ["", "", "", "", "", ""]
 ]);
-const [indicadores, setIndicadores] = useState([
-  "", "", ""
-]);
+const [indicadores, setIndicadores] = useState(() => {
+  // Inicializa baseado no template
+  if (isTemplate2) {
+    return ["", "", ""]; // Manter como array para Template2 também para permitir dinamismo
+  } else {
+    return ["", "", ""];
+  }
+});
 const [donoProcesso, setDonoProcesso] = useState("");
 const [donoProcessoOriginal, setDonoProcessoOriginal] = useState("");
 const [objetivoProcesso, setObjetivoProcesso] = useState("");
 const [servicosEntrada, setServicosEntrada] = useState("");
 const [servicoSaida, setServicoSaida] = useState("");
 const [funcionarios, setFuncionarios] = useState([]);
+
+// Estado para controlar se as tabelas são editáveis (inicialmente false)
+const [isEditable, setIsEditable] = useState(false);
+
+// Receber canEdit do state (calculado em selectPdf) ou fallback para false
+const canEditFromState = location?.state?.canEdit;
+
+// Receber isSuperAdmin do state (calculado em selectPdf) ou fallback
+const isSuperAdminFromState = location?.state?.isSuperAdmin;
+
+// Fallback: verificar permissões localmente se não vier do state
+const isAdmin = username === "superadmin" || username === "SuperAdmin";
+const canEditFallback = isAdmin || (donoProcesso === username);
+
+// Usar o valor do state se disponível, senão usar fallback
+const canEdit = canEditFromState !== undefined ? canEditFromState : canEditFallback;
+const isSuperAdmin = isSuperAdminFromState !== undefined ? isSuperAdminFromState : isAdmin;
 
 // Carregar funcionários do backend
 useEffect(() => {
@@ -262,12 +287,36 @@ useEffect(() => {
     });
     setHasUnsavedChanges(true);
   };
-  const handleIndicadoresChange = (rowIdx, value) => {
-    setIndicadores(prev => {
-      const novo = [...prev];
-      novo[rowIdx] = value;
-      return novo;
-    });
+  const handleIndicadoresChange = (field, value) => {
+    if (isTemplate2) {
+      // Para Template2, sempre trata como array mas converte índices se necessário
+      if (typeof field === 'string' && field.startsWith('indicadores_r')) {
+        // Se receber chave de objeto, converte para índice
+        const match = field.match(/indicadores_r(\d+)/);
+        if (match) {
+          const index = parseInt(match[1]) - 1;
+          setIndicadores(prev => {
+            const novo = [...prev];
+            novo[index] = value;
+            return novo;
+          });
+        }
+      } else {
+        // Se receber índice numérico diretamente
+        setIndicadores(prev => {
+          const novo = [...prev];
+          novo[field] = value;
+          return novo;
+        });
+      }
+    } else {
+      // Para Template1, trata como array
+      setIndicadores(prev => {
+        const novo = [...prev];
+        novo[field] = value;
+        return novo;
+      });
+    }
     setHasUnsavedChanges(true);
   };
 
@@ -449,7 +498,10 @@ useEffect(() => {
                    ["", "", "", "", "", ""],
                    ["", "", "", "", "", ""],
                    ["", "", "", "", "", ""]]);
+    
+    // Sempre inicializa indicadores como array para ambos os templates
     setIndicadores(["", "", ""]);
+    
     setDonoProcesso("");
     setObjetivoProcesso("");
     setServicosEntrada("");
@@ -538,45 +590,36 @@ useEffect(() => {
           setDonoProcesso(donoProcessoValue);
           setDonoProcessoOriginal(donoProcessoValue); // Definir valor original
           setObjetivoProcesso(formData.objetivo_processo || "");
-          setAtividades([
-            [
-              formData.atividades_r1_c1 || "",
-              formData.atividades_r1_c2 || "",
-              formData.atividades_r1_c3 || "",
-              formData.atividades_r1_c4 || "",
-              formData.atividades_r1_c5 || "",
-              formData.atividades_r1_c6 || "",
-            ],
-            [
-              formData.atividades_r2_c1 || "",
-              formData.atividades_r2_c2 || "",
-              formData.atividades_r2_c3 || "",
-              formData.atividades_r2_c4 || "",
-              formData.atividades_r2_c5 || "",
-              formData.atividades_r2_c6 || "",
-            ],
-            [
-              formData.atividades_r3_c1 || "",
-              formData.atividades_r3_c2 || "",
-              formData.atividades_r3_c3 || "",
-              formData.atividades_r3_c4 || "",
-              formData.atividades_r3_c5 || "",
-              formData.atividades_r3_c6 || "",
-            ],
-            [
-              formData.atividades_r4_c1 || "",
-              formData.atividades_r4_c2 || "",
-              formData.atividades_r4_c3 || "",
-              formData.atividades_r4_c4 || "",
-              formData.atividades_r4_c5 || "",
-              formData.atividades_r4_c6 || "",
-            ],
-          ]);
-          setIndicadores([
-            formData.indicadores_r1 || "",
-            formData.indicadores_r2 || "",
-            formData.indicadores_r3 || ""
-          ]);
+          // Busca por linhas adicionais de atividades dinâmicamente
+          const atividadeFields = Object.keys(formData).filter(f => /^atividades_r\d+_c\d+$/.test(f));
+          const atividadeRowNumbers = atividadeFields.map(f => parseInt(f.match(/^atividades_r(\d+)_c\d+$/)[1], 10));
+          const maxAtividadeRow = Math.max(...atividadeRowNumbers, 4);
+          
+          const novasAtividades = [];
+          for (let row = 1; row <= maxAtividadeRow; row++) {
+            novasAtividades.push([
+              formData[`atividades_r${row}_c1`] || "",
+              formData[`atividades_r${row}_c2`] || "",
+              formData[`atividades_r${row}_c3`] || "",
+              formData[`atividades_r${row}_c4`] || "",
+              formData[`atividades_r${row}_c5`] || "",
+              formData[`atividades_r${row}_c6`] || "",
+            ]);
+          }
+          
+          setAtividades(novasAtividades);
+          
+          // Busca por indicadores dinamicamente
+          const indicadorFields = Object.keys(formData).filter(f => /^indicadores_r\d+$/.test(f));
+          const indicadorNumbers = indicadorFields.map(f => parseInt(f.match(/^indicadores_r(\d+)$/)[1], 10));
+          const maxIndicadorNumber = Math.max(...indicadorNumbers, 3);
+          
+          const novosIndicadores = [];
+          for (let i = 1; i <= maxIndicadorNumber; i++) {
+            novosIndicadores.push(formData[`indicadores_r${i}`] || "");
+          }
+          
+          setIndicadores(novosIndicadores);
           setServicosEntrada(formData.servicos_entrada || "");
           setServicoSaida(formData.servico_saida || "");
         } else {
@@ -798,6 +841,10 @@ useEffect(() => {
         <>
           <TabelaPdf
             templateType={2}
+            isEditable={isEditable}
+            setIsEditable={setIsEditable}
+            canEdit={canEdit}
+            isSuperAdmin={isSuperAdmin}
             data={tableData.main}
             dataObs={tableData.obs}
             atividades={atividades}
@@ -843,6 +890,9 @@ useEffect(() => {
         </>
       ) : (
         <Template1
+          isEditable={isEditable}
+          setIsEditable={setIsEditable}
+          canEdit={canEdit}
           data={tableData.main}
           dataObs={tableData.obs}
           originalFilename={originalFilename}

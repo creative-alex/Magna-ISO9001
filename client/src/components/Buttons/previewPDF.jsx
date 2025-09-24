@@ -4,7 +4,7 @@ import { generateNonEditablePdfFromHtml, generateNonEditablePdfTemplate2 } from 
 export default function PreviewPdfButton({ 
   getTablesHtml, 
   templateType = 1,
-  pathFilename, // ← ADICIONAR ESTE PARÂMETRO
+  pathFilename, // Parâmetro para o caminho do ficheiro
   // Props específicas para Template 2
   atividades,
   donoProcesso,
@@ -46,7 +46,7 @@ export default function PreviewPdfButton({
         servicoSaida,
         "Procedimento",
         imageBytes,
-        ""
+        pathFilename || "TESTE"
       );
       const blob = new Blob([nonEditablePdfBytes], { type: "application/pdf" });
       const blobUrl = URL.createObjectURL(blob);
@@ -73,7 +73,7 @@ export default function PreviewPdfButton({
 
   return (
     <button className="preview-button" onClick={handlePreviewNonEditable}>
-      Preview
+      Download
     </button>
   );
 }
