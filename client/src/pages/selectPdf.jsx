@@ -6,7 +6,9 @@ import AddUserButton from "../components/Buttons/addUserButton";
 import AddProcessButton from "../components/Buttons/addProcessButton";
 import DeleteButton from "../components/Buttons/delete";
 import CreateTableButton from "../components/Buttons/createTableButton";
+import AIAssistant from "../components/AIAssistant/AIAssistant";
 import Logo from "../logo.svg"
+import Ver from "../icons/ver.ico"
 import "../index.css";
 
 // Função recursiva para filtrar nodes por nome
@@ -117,7 +119,7 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
           // Para pastas de primeiro nível, mostra o dono se existir
           const isTopLevel = currentPath.length === 0;
           const folderOwner = isTopLevel ? processOwners[node.name] : null;
-          const isOwnerFolder = isTopLevel && folderOwner === currentUser;
+          const isOwnerFolder = isTopLevel && folderOwner && folderOwner.split(',').map(nome => nome.trim()).includes(currentUser);
           
           return (
             <div key={node.name} className={`folder ${isOwnerFolder ? 'owner-folder' : ''}`}>
@@ -129,7 +131,7 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
                   {node.name}
                 </span>
                 <div className="folder-actions" style={{ display: 'flex', alignItems: 'center' }}>
-                  {canAccessProcess([...currentPath, node.name].join("/")) && currentPath.length === 0 ? (
+                  {canAccessProcess([...currentPath, node.name].join("/")) && currentPath.length === 0 && (isAdmin || (folderOwner && folderOwner.split(',').map(nome => nome.trim()).includes(currentUser))) ? (
                     <CreateTableButton
                       folderName={node.name}
                       currentPath={currentPath}
@@ -161,7 +163,8 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
           const displayName = node.name.endsWith('.pdf') ? node.name.slice(0, -4) : node.name;
           
           // Verifica se o usuário pode deletar o arquivo
-          const isProcessOwner = processOwners[currentPath[0]] === currentUser;
+          const processOwnerString = processOwners[currentPath[0]];
+          const isProcessOwner = processOwnerString && processOwnerString.split(',').map(nome => nome.trim()).includes(currentUser);
           const canDelete = isAdmin || isProcessOwner;
           
           return (
@@ -173,6 +176,7 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
             >
               <span className="file-name">{displayName}</span>
               <div className="file-actions">
+                {/* <button style={{ title:'Ver'}}><img src={Ver} alt="Ver" style={{ width: '100%', height: '35px' }} /></button> */}
                 <FilePreviewButton file={node} currentPath={currentPath} />
                 {canDelete && (
                   <DeleteButton 
@@ -238,9 +242,16 @@ export default function SelecionarPdf() {
     const pathParts = filePath.split('/');
     const processName = pathParts[0]; // Assume que primeiro nível é o processo
     
+    // Função utilitária para verificar se um usuário está na lista de donos do processo
+    const isUserProcessOwner = (processOwnerString, username) => {
+      if (!processOwnerString || !username) return false;
+      const donosArray = processOwnerString.split(',').map(nome => nome.trim()).filter(nome => nome);
+      return donosArray.includes(username);
+    };
+    
     // Verificar se user pode editar este processo
     const processOwner = processOwners[processName];
-    const canEdit = isAdmin || (processOwner === username);
+    const canEdit = isAdmin || isUserProcessOwner(processOwner, username);
     
     navigate(`/file/${formattedPath}`, { 
       state: { 
@@ -308,6 +319,18 @@ export default function SelecionarPdf() {
           onDelete={reloadFileTree}
         />
       </div>
+
+      {/* AI Assistant */}
+      <AIAssistant 
+        fileTree={filteredTree}
+        searchTerm={searchTerm}
+        username={username}
+        isAdmin={isAdmin}
+        processOwners={processOwners}
+        onSuggestion={(suggestion) => {
+          console.log('AI Suggestion:', suggestion);
+        }}
+      />
     </div>
   );
 };

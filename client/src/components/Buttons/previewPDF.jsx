@@ -11,7 +11,8 @@ export default function PreviewPdfButton({
   objetivoProcesso,
   indicadores,
   servicosEntrada,
-  servicoSaida
+  servicoSaida,
+  history = [] // Novo prop para histórico
 }) {
   // Função para carregar automaticamente a imagem PNG da empresa
   const loadCompanyImage = async () => {
@@ -32,6 +33,10 @@ export default function PreviewPdfButton({
   };
 
   const handlePreviewNonEditable = async () => {
+    console.log("🔍 DEBUG PreviewPdfButton - templateType:", templateType);
+    console.log("🔍 DEBUG PreviewPdfButton - history recebido:", history);
+    console.log("🔍 DEBUG PreviewPdfButton - history length:", history?.length);
+    
     // Carregar a imagem PNG da empresa
     const imageBytes = await loadCompanyImage();
     
@@ -46,7 +51,8 @@ export default function PreviewPdfButton({
         servicoSaida,
         "Procedimento",
         imageBytes,
-        pathFilename || "TESTE"
+        pathFilename,
+        history
       );
       const blob = new Blob([nonEditablePdfBytes], { type: "application/pdf" });
       const blobUrl = URL.createObjectURL(blob);
@@ -58,12 +64,15 @@ export default function PreviewPdfButton({
         return;
       }
       const { mainTableHtml, obsTableHtml } = getTablesHtml();
+      console.log("🔍 DEBUG PreviewPdfButton - mainTableHtml (primeiros 500 chars):", mainTableHtml?.substring(0, 500));
+      
       const nonEditablePdfBytes = await generateNonEditablePdfFromHtml(
         mainTableHtml, 
         obsTableHtml, 
         "Procedimento", 
         imageBytes, 
-        pathFilename || ""
+        pathFilename || "",
+        history
       );
       const blob = new Blob([nonEditablePdfBytes], { type: "application/pdf" });
       const blobUrl = URL.createObjectURL(blob);

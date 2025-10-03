@@ -285,10 +285,17 @@ const updateDonoProcesso = async (req, res) => {
     }
 
     // Atualiza o documento encontrado
-    await docRef.update({
+    const updateData = {
       donoProcesso: donoProcesso,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
+    };
+
+    // Se histórico foi enviado, incluir na atualização
+    if (req.body.history && Array.isArray(req.body.history)) {
+      updateData.history = req.body.history;
+    }
+
+    await docRef.update(updateData);
 
     console.log("donoProcesso atualizado com sucesso");
     res.json({ success: true, message: "Dono do processo atualizado com sucesso" });
@@ -321,6 +328,78 @@ const getProcessOwners = async (req, res) => {
     
   } catch (error) {
     console.error("Erro ao buscar donos dos processos:", error);
+    res.status(500).json({ error: "Erro interno do servidor", details: error.message });
+  }
+};
+
+// Nova função para salvar histórico
+const saveProcessHistory = async (req, res) => {
+  try {
+    console.log("saveProcessHistory chamado");
+    const { processId, history } = req.body;
+    
+    if (!processId || !Array.isArray(history)) {
+      return res.status(400).json({ error: "processId e history (array) são obrigatórios" });
+    }
+
+    console.log("Salvando histórico para processId:", processId, "entries:", history.length);
+
+    const db = admin.firestore();
+    const processosRef = db.collection('processos');
+    const docRef = processosRef.doc(processId);
+    
+    // Verifica se documento existe
+    const docSnapshot = await docRef.get();
+    if (!docSnapshot.exists) {
+      // Se não existe, cria novo documento apenas com histórico
+      await docRef.set({
+        history: history,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    } else {
+      // Se existe, atualiza apenas o histórico
+      await docRef.update({
+        history: history,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    }
+
+    console.log("Histórico salvo com sucesso");
+    res.json({ success: true, message: "Histórico salvo com sucesso" });
+
+  } catch (error) {
+    console.error("Erro ao salvar histórico:", error);
+    res.status(500).json({ error: "Erro interno do servidor", details: error.message });
+  }
+};
+
+// Nova função para buscar dados completos do processo (incluindo histórico)
+const getProcessData = async (req, res) => {
+  try {
+    console.log("getProcessData chamado");
+    const { processId } = req.body;
+    
+    if (!processId) {
+      return res.status(400).json({ error: "processId é obrigatório" });
+    }
+
+    const db = admin.firestore();
+    const processosRef = db.collection('processos');
+    const docRef = processosRef.doc(processId);
+    const docSnapshot = await docRef.get();
+    
+    if (!docSnapshot.exists) {
+      console.log("Processo não encontrado:", processId);
+      return res.json({ exists: false, data: null });
+    }
+
+    const data = docSnapshot.data();
+    console.log("Dados do processo carregados:", processId);
+    res.json({ exists: true, data: data });
+
+  } catch (error) {
+    console.error("Erro ao buscar dados do processo:", error);
     res.status(500).json({ error: "Erro interno do servidor", details: error.message });
   }
 };
@@ -609,6 +688,8 @@ module.exports = {
   previewFile,
   updateDonoProcesso,
   getProcessOwners,
+  saveProcessHistory,
+  getProcessData,
   deletePdf,
   deleteFile,
   listDocumentsInFolder,

@@ -1,6 +1,7 @@
 import React from "react";
 import Template1 from "../components/templates/TabelaTemplate1";
 import Template2 from "../components/templates/TabelaTemplate2";
+import AIAssistant from "../components/AIAssistant/AIAssistant";
 
 export default function TabelaPdf({
   templateType = 1,
@@ -56,6 +57,8 @@ export default function TabelaPdf({
   onInsertIndicadorBelow,
   onDeleteIndicador,
   funcionarios = [], // Nova prop para funcionários
+  history = [], // Nova prop para histórico
+  clearHistory // Nova prop para função de limpar histórico
 }) {
   const isTemplate2 = templateType === 2;
 
@@ -84,7 +87,6 @@ export default function TabelaPdf({
 
  return (
     <div>
-      {console.log("🔍 tableDisplay - pathFilename que vai ser passado:", pathFilename)}
 
       {isTemplate2 ? (
         <Template2
@@ -124,10 +126,13 @@ export default function TabelaPdf({
           onDeleteIndicador={handleDeleteIndicador}
           pathFilename={pathFilename}
           onSaveSuccess={onSaveSuccess}
+          history={history}
+          clearHistory={clearHistory}
         />
       ) : (
         <Template1
           isEditable={isEditable}
+          useNewAttachmentManager={true} // Usa o novo gerenciador de anexos
           data={data}
           dataObs={dataObs}
           handleChange={handleChangeMain}
@@ -154,9 +159,21 @@ export default function TabelaPdf({
           getTablesHtml={getTablesHtml}
           obsTableRef={obsTableRef}
           mainTableRef={mainTableRef}
+          history={history}
+          clearHistory={clearHistory}
         />
       )}
+      
+      {/* AI Assistant para continuar tutorial em todas as páginas */}
+      <AIAssistant 
+        fileTree={[]} 
+        searchTerm=""
+        username="User" // Pode ser melhorado para pegar username real
+        isAdmin={false}
+        isSuperAdmin={isSuperAdmin}
+        processOwners={{}}
+        onSuggestion={() => {}}
+      />
     </div>
   );
 }
-

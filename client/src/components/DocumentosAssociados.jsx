@@ -367,38 +367,38 @@ const DocumentosAssociados = ({
             {documentosSelecionados.map((doc, index) => (
               <div key={index} style={{ 
                 padding: '3px 6px',
-                backgroundColor: '#e3f2fd',
                 borderRadius: '3px',
                 fontSize: '10px',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                border: '1px solid #bbdefb'
               }}>
                 <span style={{ flex: 1, wordBreak: 'break-word' }}>{doc}</span>
-                <div style={{ display: 'flex', gap: '2px', marginLeft: '4px' }}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleDocumento(doc);
-                    }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#666',
-                      cursor: 'pointer',
-                      fontSize: '12px',
-                      padding: '0 4px',
-                      borderRadius: '2px',
-                      fontSize: '15px',
-                    }}
-                    title="Remover documento"
-                    onMouseEnter={(e) => e.target.style.backgroundColor = '#ffcdd2'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                  >
-                    ×
-                  </button>
-                </div>
+                {isEditable && (
+                  <div style={{ display: 'flex', gap: '2px', marginLeft: '4px' }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleDocumento(doc);
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#666',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        padding: '0 4px',
+                        borderRadius: '2px',
+                        fontSize: '15px',
+                      }}
+                      title="Remover documento"
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#ffcdd2'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -455,7 +455,6 @@ const DocumentosAssociados = ({
               <div style={{ 
                 padding: '16px', 
                 borderBottom: '1px solid #eee', 
-                backgroundColor: '#f8f9fa',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center'

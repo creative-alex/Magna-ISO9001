@@ -1,22 +1,7 @@
 import React, { useState } from 'react';
-import { initializeApp } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useNavigate, Link } from "react-router-dom";
-
-// Configuração do Firebase usando variáveis do .env
-const firebaseConfig = {
-  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
-  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.REACT_APP_FIREBASE_APP_ID,
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
 
 const Register = () => {
   const [nome, setNome] = useState('');
@@ -47,20 +32,16 @@ const Register = () => {
     }
 
     try {
-      // Criar utilizador no Firebase Auth
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-
-      // Dados do utilizador para o backend (role padrão: 'User')
+      // Criar utilizador apenas no backend (evita auto-login)
       const newUser = { 
         nome, 
         email, 
-        role: 'User', 
-        uid: user.uid,
+        temporaryPassword: password, // Enviar password para criação no backend
+        role: 'User',
         isFirstLogin: true
       };
 
-      // Guardar no backend
+      // Criar no backend
       const response = await fetch('http://192.168.1.219:8080/users/createUser', {
         method: 'POST',
         headers: {
@@ -70,12 +51,11 @@ const Register = () => {
       });
 
       if (!response.ok) {
-        // Se falhar no backend, eliminar do Firebase
-        await user.delete();
-        throw new Error('Erro ao guardar utilizador na base de dados');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao criar utilizador');
       }
 
-      toast.success('Conta criada com sucesso! Faça login para continuar.');
+      toast.success('Conta criada com sucesso! O utilizador pode agora fazer login.');
       
       // Limpar campos
       setNome('');
@@ -91,18 +71,10 @@ const Register = () => {
       console.error('Erro ao criar conta:', error);
       
       let errorMessage = 'Erro ao criar conta';
-      switch (error.code) {
-        case 'auth/email-already-in-use':
-          errorMessage = 'Este e-mail já está em uso';
-          break;
-        case 'auth/weak-password':
-          errorMessage = 'Password muito fraca';
-          break;
-        case 'auth/invalid-email':
-          errorMessage = 'E-mail inválido';
-          break;
-        default:
-          errorMessage = error.message;
+      if (error.message.includes('email-already-exists') || error.message.includes('Email já está em uso')) {
+        errorMessage = 'Este e-mail já está em uso';
+      } else if (error.message) {
+        errorMessage = error.message;
       }
       
       setMessage(errorMessage);

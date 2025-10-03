@@ -46,9 +46,12 @@ export async function generateEditablePdf({
   servicoSaida,
   title = "", // Added missing title parameter
   imageBytes = null, // Novo parâmetro para imagem
-  pathFilename = "" // Novo parâmetro para caminho do ficheiro
+  pathFilename = "", // Novo parâmetro para caminho do ficheiro
+  history = [] // Novo parâmetro para histórico
 }) {
-    console.log("🎯 generateEditablePdf recebeu pathFilename:", pathFilename); 
+    console.log("🎯 generateEditablePdf recebeu pathFilename:", pathFilename);
+    console.log("🔍 generateEditablePdf recebeu history:", history);
+    console.log("🔍 generateEditablePdf history length:", history?.length);
 
   if (templateType === 2) {
     return await generateEditablePdfTemplate2({
@@ -60,16 +63,17 @@ export async function generateEditablePdf({
       servicoSaida,
       title,
       imageBytes,
-      pathFilename
+      pathFilename,
+      history
     });
   } else {
-    return await generateEditablePdfTemplate1(data, headers, dataObs, headersObs, title, imageBytes, pathFilename, 400);
+    return await generateEditablePdfTemplate1(data, headers, dataObs, headersObs, title, imageBytes, pathFilename, 400, history);
   }
 }
 
 
 // Renomeie a função antiga para Template1
-export async function generateEditablePdfTemplate1(data, headers, dataObs, headersObs, title = "Procedimento", imageBytes = null, pathFilename = "", maxHeightForFirstTable = 400) {
+export async function generateEditablePdfTemplate1(data, headers, dataObs, headersObs, title = "Procedimento", imageBytes = null, pathFilename = "", maxHeightForFirstTable = 400, history = []) {
   const { pdfDoc, page, font } = await createBasePdf(title, imageBytes, pathFilename);
   const form = pdfDoc.getForm();
   console.log("🎯 generateEditablePdf recebeu pathFilename:", pathFilename); 
@@ -228,7 +232,7 @@ export async function generateEditablePdfTemplate1(data, headers, dataObs, heade
 
 // Implemente a função para Template2 conforme sugerido antes
 
-export async function generateEditablePdfTemplate2({ atividades, donoProcesso, objetivoProcesso, indicadores, servicosEntrada, servicoSaida, title = "Procedimento", imageBytes = null, pathFilename = "" }) {
+export async function generateEditablePdfTemplate2({ atividades, donoProcesso, objetivoProcesso, indicadores, servicosEntrada, servicoSaida, title = "Procedimento", imageBytes = null, pathFilename = "", history = [] }) {
   const { pdfDoc, page, font } = await createBasePdf(title, imageBytes, pathFilename);
   const form = pdfDoc.getForm();
 
@@ -314,8 +318,12 @@ export async function generateEditablePdfTemplate2({ atividades, donoProcesso, o
 }
 
 // Função para gerar PDF não editável do Template 2
-export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, objetivoProcesso, indicadores, servicosEntrada, servicoSaida, title = "Procedimento", imageBytes = null, pathFilename = "") {
+export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, objetivoProcesso, indicadores, servicosEntrada, servicoSaida, title = "Procedimento", imageBytes = null, pathFilename, history = []) {
+  console.log("🔍 DEBUG generateNonEditablePdfTemplate2 - history recebido:", history);
+  console.log("🔍 DEBUG generateNonEditablePdfTemplate2 - history length:", history?.length);
+  
   const { pdfDoc, page, font } = await createBasePdf(title, imageBytes, pathFilename);
+  let activePage = page; // Para controle de páginas no histórico
 
   // Validações de entrada
   const safeAtividades = Array.isArray(atividades) && atividades.length > 0 ? atividades : [['', '', '', '', '', '']];
@@ -339,6 +347,7 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
   const objetivoProcessoClean = dashToEmpty(safeObjetivoProcesso);
   const servicosEntradaClean = dashToEmpty(safeServicosEntrada);
   const servicoSaidaClean = dashToEmpty(safeServicoSaida);
+
 
   console.log("🎯 generateNonEditablePdfTemplate2 - dados recebidos:");
   console.log("📋 atividades:", safeAtividades);
@@ -591,11 +600,242 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
     }
   }
 
+  // Desenhar histórico de alterações se existir (Template 2)
+  // Sempre na base do documento, depois de todas as tabelas
+  if (history && history.length > 0) {
+    console.log("🔍 DEBUG Template2 - Desenhando histórico de alterações:", history.length, "entradas");
+    
+    // Garantir espaço suficiente - sempre colocar numa nova secção
+    yPos -= 60; // Mais espaço antes do histórico
+    
+    // Se não há espaço suficiente, criar nova página
+    const marginBottom = 50;
+    const espacoNecessario = 150; // Espaço mínimo para título + algumas linhas
+    
+    if (yPos - espacoNecessario < marginBottom) {
+      console.log("📄 Template2 - Criando nova página para histórico");
+      const newPage = pdfDoc.addPage([pageSize[0], pageSize[1]]);
+      yPos = yStart - 80; // Começar mais abaixo na nova página
+      activePage = newPage;
+    }
+    
+    // Linha separadora antes do histórico
+    activePage.drawLine({
+      start: { x: xStart, y: yPos + 20 },
+      end: { x: xStart + 540, y: yPos + 20 },
+      thickness: 1,
+      color: rgb(0.7, 0.7, 0.7),
+    });
+    
+    // Título do histórico com destaque
+    activePage.drawText('Histórico de Alterações', {
+      x: xStart,
+      y: yPos,
+      size: 14,
+      font,
+      color: rgb(0, 0, 0),
+    });
+    yPos -= 30;
+    
+    // Cabeçalhos da tabela de histórico
+    // Função para quebrar texto por largura real da célula
+    function wrapTextToWidth(text, maxWidth, font, fontSize) {
+      if (!text) return [''];
+      
+      // Remover caracteres de quebra de linha e outros caracteres não suportados
+      const cleanText = text.replace(/[\n\r\t]/g, ' ').replace(/\s+/g, ' ').trim();
+      if (!cleanText) return [''];
+      
+      const words = cleanText.split(' ');
+      const lines = [];
+      let currentLine = '';
+      
+      words.forEach(word => {
+        const testLine = currentLine ? currentLine + ' ' + word : word;
+        try {
+          const testWidth = font.widthOfTextAtSize(testLine, fontSize);
+          if (testWidth <= maxWidth) {
+            currentLine = testLine;
+          } else {
+            if (currentLine) lines.push(currentLine);
+            // Se a palavra sozinha é maior que a célula, quebra a palavra
+            try {
+              if (font.widthOfTextAtSize(word, fontSize) > maxWidth) {
+                let subWord = word;
+                while (subWord.length > 0) {
+                  let i = 1;
+                  while (i <= subWord.length) {
+                    try {
+                      if (font.widthOfTextAtSize(subWord.substring(0, i), fontSize) > maxWidth) break;
+                      i++;
+                    } catch (e) {
+                      break;
+                    }
+                  }
+                  if (i > 1) {
+                    lines.push(subWord.substring(0, i-1));
+                    subWord = subWord.substring(i-1);
+                  } else {
+                    // Se nem um caractere cabe, força pelo menos um
+                    lines.push(subWord.charAt(0));
+                    subWord = subWord.substring(1);
+                  }
+                }
+                currentLine = '';
+              } else {
+                currentLine = word;
+              }
+            } catch (e) {
+              // Se houver erro ao calcular largura da palavra, usa fallback
+              currentLine = word;
+            }
+          }
+        } catch (e) {
+          // Se houver erro ao calcular largura da linha, usa fallback simples
+          if (testLine.length <= 30) { // Fallback baseado em caracteres
+            currentLine = testLine;
+          } else {
+            if (currentLine) lines.push(currentLine);
+            currentLine = word;
+          }
+        }
+      });
+      
+      if (currentLine) lines.push(currentLine);
+      return lines.length > 0 ? lines : [''];
+    }
+    const historyHeaders = ['Data', 'Utilizador', 'Ação', 'Mudou de', 'Para'];
+    const historyColWidths = [50, 60, 60, 170, 170]; // Total: 540 - Distribuição equilibrada
+    let xPos = xStart;
+    
+    // Desenha cabeçalhos
+    historyHeaders.forEach((header, col) => {
+      // Fundo cinza para cabeçalho
+      activePage.drawRectangle({
+        x: xPos,
+        y: yPos - 18,
+        width: historyColWidths[col],
+        height: 18,
+        color: rgb(0.9, 0.9, 0.9),
+      });
+      
+      // Borda do cabeçalho
+      activePage.drawRectangle({
+        x: xPos,
+        y: yPos - 18,
+        width: historyColWidths[col],
+        height: 18,
+        borderColor: rgb(0, 0, 0),
+        borderWidth: 0.5,
+      });
+      
+      // Texto do cabeçalho
+      activePage.drawText(header, {
+        x: xPos + 4,
+        y: yPos - 12,
+        size: 10,
+        font,
+        color: rgb(0, 0, 0),
+      });
+      
+      xPos += historyColWidths[col];
+    });
+    
+    yPos -= 18;
+    
+    // Desenha linhas de histórico
+    history.forEach((entry, rowIdx) => {
+      // Processar descrição para separar "de" e "para"
+      const descricao = entry.descricao || '';
+      let mudouDe = '';
+      let para = '';
+      
+      // Verificar se é uma alteração com formato "campo: de 'valor1' para 'valor2'"
+      const matchAlteracao = descricao.match(/^(.+?):\s*de\s*["'](.+?)["']\s*para\s*["'](.+?)["']$/);
+      if (matchAlteracao) {
+        mudouDe = matchAlteracao[2];
+        para = matchAlteracao[3];
+      } else if (descricao.includes(' para ')) {
+        // Formato mais simples "de X para Y"
+        const parts = descricao.split(' para ');
+        if (parts.length === 2) {
+          mudouDe = parts[0].replace(/^.+?de\s*["']?/, '').replace(/["']$/, '');
+          para = parts[1].replace(/["']$/, '');
+        }
+      } else {
+        // Se não conseguir separar, colocar toda a descrição em "Para"
+        para = descricao;
+      }
+      
+      // Quebra de texto por largura real para cada célula
+      const fontSize = 8;
+      const historyData = [entry.data || '', entry.utilizador || '', entry.acao || '', mudouDe, para];
+      let cellLines = [];
+      let maxLinesInRow = 1;
+      historyData.forEach((cellData, col) => {
+        const maxWidth = historyColWidths[col] - 8;
+        // Aplicar quebra de texto a TODAS as colunas
+        cellLines[col] = wrapTextToWidth(cellData, maxWidth, font, fontSize);
+        maxLinesInRow = Math.max(maxLinesInRow, cellLines[col].length);
+      });
+        
+      // ...existing code...
+      
+      // Calcular altura baseada no número real de linhas + padding generoso
+      const rowHeight = Math.max(35, maxLinesInRow * 15 + 20); // Altura mínima 35, 15px por linha + 20px padding
+      
+      // Verifica se há espaço para a linha
+      if (yPos - rowHeight < marginBottom) {
+        const newPage = pdfDoc.addPage([pageSize[0], pageSize[1]]);
+        yPos = yStart - 30;
+        activePage = newPage;
+      }
+      
+      xPos = xStart;
+      
+      historyData.forEach((cellData, col) => {
+        // Borda da célula
+        activePage.drawRectangle({
+          x: xPos,
+          y: yPos - rowHeight,
+          width: historyColWidths[col],
+          height: rowHeight,
+          borderColor: rgb(0, 0, 0),
+          borderWidth: 0.5,
+        });
+        
+        // Usar as linhas já calculadas
+        const lines = cellLines[col];
+        // Desenhar cada linha de texto com espaçamento adequado
+        lines.forEach((line, lineIdx) => {
+          activePage.drawText(line, {
+            x: xPos + 4,
+            y: yPos - 16 - (lineIdx * 14), // Começar mais baixo e mais espaço entre linhas
+            size: fontSize,
+            font,
+            color: rgb(0, 0, 0),
+          });
+        });
+        
+        xPos += historyColWidths[col];
+      });
+      
+      yPos -= rowHeight;
+    });
+    
+    console.log("✅ Template2 - Histórico desenhado com", history.length, "entradas");
+  } else {
+    console.log("ℹ️ Template2 - Nenhum histórico para desenhar");
+  }
+  
   return await pdfDoc.save();
 }
 
 // Função principal para gerar PDF não editável
-export async function generateNonEditablePdf(data, headers, dataObs, title = "Procedimento", imageBytes = null, pathFilename = "") {
+export async function generateNonEditablePdf(data, headers, dataObs, title = "Procedimento", imageBytes = null, pathFilename = "", history = []) {
+  console.log("🔍 generateNonEditablePdf recebeu history:", history);
+  console.log("🔍 generateNonEditablePdf history length:", history?.length);
+  
   const { pdfDoc, page: firstPage, font } = await createBasePdf(title, imageBytes, pathFilename);
 
   // Validações de entrada
@@ -1083,6 +1323,196 @@ export async function generateNonEditablePdf(data, headers, dataObs, title = "Pr
     }
   }
 
+  // Desenhar histórico de alterações se existir (Template 1)
+  // Sempre na base do documento, depois de todas as tabelas
+  console.log("🔍 BEFORE drawing history - history:", history);
+  console.log("🔍 BEFORE drawing history - history length:", history?.length);
+  
+  if (history && history.length > 0) {
+    console.log("🔍 DEBUG Template1 - Desenhando histórico de alterações:", history.length, "entradas");
+    
+    // Garantir espaço suficiente - sempre colocar numa nova secção
+    yPos -= 60; // Mais espaço antes do histórico
+    
+    // Definir margem inferior para verificar espaço disponível
+    const marginBottom = 50;
+    const espacoNecessario = 150; // Espaço mínimo para título + algumas linhas
+    
+    // Verificar se há espaço para pelo menos o cabeçalho
+    if (yPos - espacoNecessario < marginBottom) {
+      console.log("📄 Template1 - Criando nova página para histórico");
+      page = pdfDoc.addPage([pageSize[0], pageSize[1]]);
+      yPos = yStart - 80; // Começar mais abaixo na nova página
+    }
+    
+    // Linha separadora antes do histórico
+    page.drawLine({
+      start: { x: xStart, y: yPos + 20 },
+      end: { x: xStart + 540, y: yPos + 20 },
+      thickness: 1,
+      color: rgb(0.7, 0.7, 0.7),
+    });
+    
+    // Título do histórico com destaque
+    page.drawText('Histórico de Alterações', {
+      x: xStart,
+      y: yPos,
+      size: 12,
+      font: font,
+      color: rgb(0, 0, 0),
+    });
+    yPos -= 25;
+    
+    // Cabeçalhos da tabela de histórico
+    const historyHeaders = ['Data', 'Utilizador', 'Ação', 'Mudou de', 'Para'];
+    // Larguras das colunas: [Data, Utilizador, Ação, Mudou de, Para] - Total deve ser 540
+    const historyColWidths = [80, 70, 60, 165, 165]; // Total: 540 - Distribuição equilibrada 
+    let xPos = xStart;
+    
+    // Desenha cabeçalhos
+    historyHeaders.forEach((header, col) => {
+      // Fundo cinza para cabeçalho
+      page.drawRectangle({
+        x: xPos,
+        y: yPos - 15,
+        width: historyColWidths[col],
+        height: 15,
+        color: rgb(0.9, 0.9, 0.9),
+      });
+      
+      // Borda do cabeçalho
+      page.drawRectangle({
+        x: xPos,
+        y: yPos - 15,
+        width: historyColWidths[col],
+        height: 15,
+        borderColor: rgb(0, 0, 0),
+        borderWidth: 0.5,
+      });
+      
+      // Texto do cabeçalho
+      page.drawText(header, {
+        x: xPos + 4,
+        y: yPos - 10,
+        size: 9,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+      
+      xPos += historyColWidths[col];
+    });
+    
+    yPos -= 15;
+    
+    // Desenha linhas de histórico
+    history.forEach((entry, rowIdx) => {
+      // Processar descrição para separar "de" e "para"
+      const descricao = entry.descricao || '';
+      let mudouDe = '';
+      let para = '';
+      
+      // Verificar se é uma alteração com formato "campo: de 'valor1' para 'valor2'"
+      const matchAlteracao = descricao.match(/^(.+?):\s*de\s*["'](.+?)["']\s*para\s*["'](.+?)["']$/);
+      if (matchAlteracao) {
+        mudouDe = matchAlteracao[2];
+        para = matchAlteracao[3];
+      } else if (descricao.includes(' para ')) {
+        // Formato mais simples "de X para Y"
+        const parts = descricao.split(' para ');
+        if (parts.length === 2) {
+          mudouDe = parts[0].replace(/^.+?de\s*["']?/, '').replace(/["']$/, '');
+          para = parts[1].replace(/["']$/, '');
+        }
+      } else {
+        // Se não conseguir separar, colocar toda a descrição em "Para"
+        para = descricao;
+      }
+      
+      const historyData = [entry.data || '', entry.utilizador || '', entry.acao || '', mudouDe, para];
+      
+      // Calcular altura necessária baseada no número real de linhas quebradas
+      let maxLinesInRow = 1;
+      const cellLines = []; // Array para armazenar as linhas quebradas de cada célula
+      
+      historyData.forEach((cellData, col) => {
+        // Calcular quantos caracteres cabem na largura da célula
+        const cellWidth = historyColWidths[col] - 6; // Largura da célula menos padding
+        const fontSize = 8;
+        const avgCharWidth = fontSize * 0.6; // Aproximação da largura média de caractere
+        const maxCharsPerLine = Math.floor(cellWidth / avgCharWidth);
+        
+        const words = cellData.split(' ');
+        const lines = [];
+        let currentLine = '';
+        
+        words.forEach(word => {
+          const testLine = currentLine ? currentLine + ' ' + word : word;
+          if (testLine.length <= maxCharsPerLine) {
+            currentLine = testLine;
+          } else {
+            if (currentLine) {
+              lines.push(currentLine);
+              currentLine = word;
+            } else {
+              // Palavra muito longa, forçar quebra
+              lines.push(word.substring(0, maxCharsPerLine));
+              currentLine = word.substring(maxCharsPerLine);
+            }
+          }
+        });
+        if (currentLine) lines.push(currentLine);
+        
+        cellLines[col] = lines;
+        maxLinesInRow = Math.max(maxLinesInRow, lines.length);
+      });
+      
+      // Calcular altura baseada no número real de linhas + padding generoso
+      const rowHeight = Math.max(30, maxLinesInRow * 13 + 18); // Altura mínima 30, 13px por linha + 18px padding
+      
+      // Verifica se há espaço para a linha
+      if (yPos - rowHeight < marginBottom) {
+        page = pdfDoc.addPage([pageSize[0], pageSize[1]]);
+        yPos = yStart - 20;
+      }
+      
+      xPos = xStart;
+      
+      historyData.forEach((cellData, col) => {
+        // Borda da célula
+        page.drawRectangle({
+          x: xPos,
+          y: yPos - rowHeight,
+          width: historyColWidths[col],
+          height: rowHeight,
+          borderColor: rgb(0, 0, 0),
+          borderWidth: 0.5,
+        });
+        
+        // Usar as linhas já calculadas
+        const lines = cellLines[col];
+        
+        // Desenhar cada linha de texto com espaçamento adequado
+        lines.forEach((line, lineIdx) => {
+          page.drawText(line, {
+            x: xPos + 3,
+            y: yPos - 16 - (lineIdx * 12), // Melhor posicionamento inicial e espaçamento
+            size: 8,
+            font: font,
+            color: rgb(0, 0, 0),
+          });
+        });
+        
+        xPos += historyColWidths[col];
+      });
+      
+      yPos -= rowHeight;
+    });
+    
+    console.log("✅ Histórico desenhado com", history.length, "entradas");
+  } else {
+    console.log("ℹ️ Nenhum histórico para desenhar");
+  }
+  
   return await pdfDoc.save();
 }
 
@@ -1091,7 +1521,7 @@ export async function generateNonEditablePdf(data, headers, dataObs, title = "Pr
  * @param {string} obsTableHtml
  * @returns {Promise<Uint8Array>}
  */
-export async function generateNonEditablePdfFromHtml(mainTableHtml, obsTableHtml, title = "Procedimento", imageBytes = null, pathFilename = "") {
+export async function generateNonEditablePdfFromHtml(mainTableHtml, obsTableHtml, title = "Procedimento", imageBytes = null, pathFilename = "", history = []) {
   const parser = new DOMParser();
   // Função para extrair texto de uma célula, convertendo <br> em \n
   function getCellTextWithBreaks(cell) {
@@ -1193,6 +1623,8 @@ export async function generateNonEditablePdfFromHtml(mainTableHtml, obsTableHtml
   const mainTableArr = htmlTableToArray(mainTableHtml);
   const obsTableArr = htmlTableToArray(obsTableHtml);
 
+  console.log("🔍 DEBUG generateNonEditablePdfFromHtml - Histórico recebido:", history);
+
   const headers = mainTableArr[0] || [];
   const data = mainTableArr.slice(1);
   
@@ -1203,8 +1635,9 @@ export async function generateNonEditablePdfFromHtml(mainTableHtml, obsTableHtml
   console.log("  Headers:", headers);
   console.log("  Data (primeiras 2 linhas):", data.slice(0, 2));
   console.log("  DataObs:", dataObs.map((obs, i) => `${i+1}: ${obs[0] ? obs[0].substring(0, 40) : 'vazio'}...`));
+  console.log("  History passado diretamente:", history);
 
-  return await generateNonEditablePdf(data, headers, dataObs, title, imageBytes, pathFilename);
+  return await generateNonEditablePdf(data, headers, dataObs, title, imageBytes, pathFilename, history);
 }
 
 // Adicione esta função utilitária

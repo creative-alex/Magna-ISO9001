@@ -417,7 +417,7 @@ const InstrucoesTrabalho = ({
       const fullPath = instrucao.fullPath;
       
       // Confirma a ação
-      const confirmDelete = window.confirm(`Tem certeza que deseja apagar permanentemente o arquivo "${instrucaoName}"?\n\nEsta ação não pode ser desfeita.`);
+      const confirmDelete = window.confirm(`Tem certeza que deseja apagar permanentemente o arquivo "${instrucaoName}"?\nEsta ação não pode ser desfeita.`);
       
       if (!confirmDelete) {
         return;
@@ -540,29 +540,31 @@ const InstrucoesTrabalho = ({
                   </span>
                   
                   {/* Botões de ação */}
-                  <div style={{ display: 'flex', gap: '2px' }}>                                 
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeInstrucao(instrucao);
+                  {isEditable && (
+                    <div style={{ display: 'flex', gap: '2px' }}>                                 
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeInstrucao(instrucao);
+                        }}
+                         style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#666',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        padding: '0 4px',
+                        borderRadius: '2px',
+                        fontSize: '15px',
                       }}
-                       style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#666',
-                      cursor: 'pointer',
-                      fontSize: '12px',
-                      padding: '0 4px',
-                      borderRadius: '2px',
-                      fontSize: '15px',
-                    }}
-                    title="Remover Instrução"
-                    onMouseEnter={(e) => e.target.style.backgroundColor = '#ffcdd2'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                  >
-                    ×
-                  </button>
-                  </div>
+                      title="Remover Instrução"
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#ffcdd2'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                    >
+                      ×
+                    </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -910,27 +912,29 @@ const InstrucoesTrabalho = ({
                             >
                               ⬇️ Baixar
                             </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(instrucaoName);
-                              }}
-                              style={{
-                                padding: '6px 12px',
-                                backgroundColor: '#d32f2f',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                fontSize: '11px',
-                                fontWeight: 'bold'
-                              }}
-                              title="Apagar instrução permanentemente"
-                              onMouseEnter={(e) => e.target.style.backgroundColor = '#c62828'}
-                              onMouseLeave={(e) => e.target.style.backgroundColor = '#d32f2f'}
-                            >
-                              🗑️ Apagar
-                            </button>
+                            {isEditable && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDelete(instrucaoName);
+                                }}
+                                style={{
+                                  padding: '6px 12px',
+                                  backgroundColor: '#d32f2f',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  fontSize: '11px',
+                                  fontWeight: 'bold'
+                                }}
+                                title="Apagar instrução permanentemente"
+                                onMouseEnter={(e) => e.target.style.backgroundColor = '#c62828'}
+                                onMouseLeave={(e) => e.target.style.backgroundColor = '#d32f2f'}
+                              >
+                                🗑️ Apagar
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>

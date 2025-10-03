@@ -72,6 +72,38 @@
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
+/* Estilos para botões View e Download (consistentes com os outros botões) */
+.view-button, .download-button {
+  background: #f8f9fa;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  color: #495057;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 20px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.view-button:hover, .download-button:hover {
+  background: #e9ecef;
+  border-color: #dee2e6;
+  color: #495057;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  transform: translateY(-2px);
+}
+
+.view-button:active, .download-button:active {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
 /* ===== CONTAINER GERAL DOS TEMPLATES ===== */
 .pdf-container, .template2-container, .template1-container {
   display: flex;

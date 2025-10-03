@@ -15,14 +15,21 @@ const verifyTokenAndGetUserInfo = async (req, res) => {
     const userRecord = await admin.auth().getUser(decodedToken.uid);
 
     // Busca informações adicionais do utilizador no Firestore
-    const querySnapshot = await db.collection('users').where('email', '==', userRecord.email).get();
-
+    // Primeiro tenta buscar por UID (documento)
+    let userDoc = await db.collection('users').doc(decodedToken.uid).get();
     let userData = {};
-    if (!querySnapshot.empty) {
-      userData = querySnapshot.docs[0].data();
+    
+    if (userDoc.exists) {
+      userData = userDoc.data();
+    } else {
+      // Se não encontrar por UID, tenta buscar por email (compatibilidade com dados antigos)
+      const querySnapshot = await db.collection('users').where('email', '==', userRecord.email).get();
+      if (!querySnapshot.empty) {
+        userData = querySnapshot.docs[0].data();
+      }
     }
 
-    const isSuperAdmin = userData.role === "SuperAdmin";
+    const isSuperAdmin = userData.role === "SuperAdmin" || userData.role === "superadmin";
 
     res.json({
       message: 'Token válido',
@@ -42,14 +49,43 @@ const verifyTokenAndGetUserInfo = async (req, res) => {
 
 const createUser = async (req, res) => {
   try {
-    const { nome, email, temporaryPassword } = req.body;
+    const { nome, email, role, uid, isFirstLogin } = req.body;
 
     // Validação básica
-    if (!nome || !email || !temporaryPassword) {
-      return res.status(400).json({ error: 'Nome, email e senha temporária são obrigatórios' });
+    if (!nome || !email) {
+      return res.status(400).json({ error: 'Nome e email são obrigatórios' });
     }
 
-    // Gerar ID único
+    // Se foi criado via Firebase Auth no frontend, apenas salvar no Firestore
+    if (uid) {
+      try {
+        const userDocRef = db.collection('users').doc(uid);
+        await userDocRef.set({
+          nome,
+          email,
+          role: role || 'User',
+          isFirstLogin: isFirstLogin !== undefined ? isFirstLogin : true,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        return res.status(201).json({ 
+          message: 'Usuário criado com sucesso',
+          id: uid
+        });
+      } catch (firestoreError) {
+        console.error('Erro ao salvar no Firestore:', firestoreError);
+        return res.status(500).json({ error: 'Falha ao salvar usuário na base de dados' });
+      }
+    }
+
+    // Lógica para criação via admin (caso não tenha uid do Firebase Auth)
+    const { temporaryPassword, entidade } = req.body;
+    
+    if (!temporaryPassword) {
+      return res.status(400).json({ error: 'Password temporária é obrigatória quando não há uid' });
+    }
+
+    // Gerar ID único baseado no nome
     let baseUserId = nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-');
     let userId = baseUserId;
     let counter = 1;
@@ -82,20 +118,22 @@ const createUser = async (req, res) => {
 
     // Criar usuário no Firestore
     try {
-      // Nova lógica para entityId
-      const entityId = entidade
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/&/g, 'e')
-        .replace(/-/g, ' ')
-        .replace(/[^a-z0-9\s]/g, '')
-        .trim()
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-+|-+$/g, '');
+      let entityRef = null;
+      if (entidade) {
+        const entityId = entidade
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/&/g, 'e')
+          .replace(/-/g, ' ')
+          .replace(/[^a-z0-9\s]/g, '')
+          .trim()
+          .replace(/\s+/g, '-')
+          .replace(/-+/g, '-')
+          .replace(/^-+|-+$/g, '');
 
-      const entityRef = `entidades/${entityId}`;
+        entityRef = `entidades/${entityId}`;
+      }
       
       await userDocRef.set({
         nome,

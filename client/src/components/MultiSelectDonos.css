@@ -1,0 +1,173 @@
+/* MultiSelectDonos.css */
+
+.multi-select-container {
+  position: relative;
+  width: 100%;
+}
+
+.multi-select-input {
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 8px 12px;
+  min-height: 40px;
+  background-color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: border-color 0.2s;
+}
+
+.multi-select-input:hover {
+  border-color: #007bff;
+}
+
+.multi-select-input.disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+  border-color: #ddd;
+}
+
+.multi-select-input.disabled:hover {
+  border-color: #ddd;
+}
+
+.multi-select-input.altered {
+  border-color: #28a745;
+  background-color: #f8fff9;
+}
+
+.selected-donos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 1;
+  align-items: center;
+}
+
+.placeholder {
+  color: #999;
+  font-style: italic;
+}
+
+.dono-tag {
+  background-color: #007bff;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 150px;
+}
+
+.dono-tag span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.remove-dono-btn {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  margin-left: 4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.remove-dono-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.dropdown-arrow {
+  color: #666;
+  font-size: 12px;
+  transition: transform 0.2s;
+  margin-left: 8px;
+}
+
+.dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+.multi-select-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #ccc;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 1000;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.dropdown-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background-color 0.2s;
+}
+
+.dropdown-item:hover:not(.disabled) {
+  background-color: #f8f9fa;
+}
+
+.dropdown-item.selected {
+  background-color: #e3f2fd;
+}
+
+.dropdown-item.disabled {
+  color: #999;
+  cursor: not-allowed;
+}
+
+.dropdown-item input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+.dropdown-item.disabled input[type="checkbox"] {
+  cursor: not-allowed;
+}
+
+.alteration-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background-color: #28a745;
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  white-space: nowrap;
+  z-index: 1001;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .dono-tag {
+    max-width: 120px;
+    font-size: 11px;
+  }
+  
+  .multi-select-dropdown {
+    max-height: 150px;
+  }
+}

@@ -15,6 +15,8 @@ const AddUserButton = () => {
         src={userAddIcon} 
         alt="Adicionar Utilizador" 
         style={{ width: '16px', height: '16px', marginRight: '5px' }} 
+        title="Adicionar Utilizador"
+        
       />
     </button>
   );

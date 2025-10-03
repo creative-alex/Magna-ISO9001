@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from "react";
 import ExportPdfButton from "../Buttons/exportPdf";
 import PreviewPdfButton from "../Buttons/previewPDF";
 import useRowContextMenu from "../ContextMenu/useRowContextMenu";
+import MultiSelectDonos from "../MultiSelectDonos";
 import "./styleTemplates.css"; 
 
 export default function Template2({
@@ -43,7 +44,11 @@ export default function Template2({
   // Props adicionais para ExportPdfButton
   pathFilename = "",
   onSaveSuccess,
+  history = [], // Novo parâmetro para histórico
+  clearHistory // Nova prop para função de limpar histórico
 }) {
+  // Log do histórico para debug
+  console.log('Histórico:', history);
   // Refs para textareas auto-resize
   const textAreaRefs = useRef({});
   
@@ -198,10 +203,21 @@ export default function Template2({
     });
   }, [atividades, servicosEntrada, servicoSaida, objetivoProcesso, indicadores]);
 
+    const Title = pathFilename ? pathFilename.split('/') : [''];
+
+
   console.log("PathFileName:", pathFilename);
 
   return (
     <div className="template2-container">
+       <h2 style={{textAlign: 'left', margin: 0, paddingLeft: 0, width: '100%'}}>
+                {Title.map((line, index) => (
+                  <React.Fragment key={index}>
+                    {line}
+                    {index < Title.length - 1 && <br />}
+                  </React.Fragment>
+                ))}
+              </h2>
       {/* Action buttons at top right */}
       <div className="action-buttons-container">
         {/* Botão Editar/Guardar integrado */}
@@ -234,6 +250,7 @@ export default function Template2({
                   onSaveSuccess && onSaveSuccess();
                   setIsEditable(false); // Desativa edição após guardar
                 }}
+                history={history}
               />
             )}
           </>
@@ -246,7 +263,30 @@ export default function Template2({
           indicadores={indicadores}
           servicosEntrada={servicosEntrada}
           servicoSaida={servicoSaida}
+          pathFilename={pathFilename}
+          history={history}
         />
+        
+        {/* Botão de debug para limpar histórico - só aparece quando está a editar */}
+        {isEditable && clearHistory && (
+          <button 
+            className="clear-history-button"
+            onClick={clearHistory}
+            title="Limpar histórico (Debug)"
+            style={{
+              backgroundColor: '#ff4444',
+              color: 'white',
+              border: 'none',
+              padding: '8px 12px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '12px',
+              marginLeft: '10px'
+            }}
+          >
+            🗑️ Limpar Histórico
+          </button>
+        )}
       </div>
       
       {/* Tabela principal */}
@@ -255,26 +295,14 @@ export default function Template2({
     <tr>
       <th colSpan={2} className="header-left">DONO DO PROCESSO<br/>(nomeado):</th>
       <td colSpan={4} className="cell-left">
-        <div className="select-container">
-          <select
-            className={`tabela-processo-select ${donoProcessoAlterado ? 'altered' : ''}`}
-            value={donoProcesso}
-            onChange={e => setDonoProcesso(e.target.value)}
-            disabled={!isEditable || !isSuperAdmin}
-          >
-            <option value="">Selecione um funcionário...</option>
-            {funcionarios.map((funcionario) => (
-              <option key={funcionario.id} value={funcionario.nome}>
-                {funcionario.nome}
-              </option>
-            ))}
-          </select>
-          {donoProcessoAlterado && (
-            <div className="alteration-badge">
-              Alterado
-            </div>
-          )}
-        </div>
+        <MultiSelectDonos
+          funcionarios={funcionarios}
+          donoProcesso={donoProcesso}
+          setDonoProcesso={setDonoProcesso}
+          isEditable={isEditable}
+          isSuperAdmin={isSuperAdmin}
+          donoProcessoAlterado={donoProcessoAlterado}
+        />
       </td>
     </tr>
     <tr>
@@ -466,6 +494,77 @@ export default function Template2({
     )}
   </tbody>
 </table>
+
+      {/* DEBUG: Mostrar tabela de histórico visível na interface */}
+      {history && history.length > 0 && (
+        <div style={{ 
+          margin: '20px 0', 
+          padding: '15px', 
+          border: '2px solid #28a745', 
+          borderRadius: '8px',
+          backgroundColor: '#d4edda',
+          display: 'none' // Mudar para 'block' para ver o histórico na interface
+        }}>
+          <h3 style={{ color: '#155724', marginBottom: '15px' }}>
+            🔍 DEBUG Template2 - Histórico de Alterações ({history.length} entradas)
+          </h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ 
+              width: '100%', 
+              borderCollapse: 'collapse',
+              fontSize: '12px'
+            }}>
+              <thead>
+                <tr style={{ backgroundColor: '#28a745', color: 'white' }}>
+                  <th style={{ padding: '8px', border: '1px solid #ddd' }}>Data</th>
+                  <th style={{ padding: '8px', border: '1px solid #ddd' }}>Utilizador</th>
+                  <th style={{ padding: '8px', border: '1px solid #ddd' }}>Ação</th>
+                  <th style={{ padding: '8px', border: '1px solid #ddd' }}>Descrição</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((entry, index) => (
+                  <tr key={index} style={{ backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8f9fa' }}>
+                    <td style={{ padding: '6px', border: '1px solid #ddd', fontSize: '11px' }}>
+                      {entry.data || 'N/A'}
+                    </td>
+                    <td style={{ padding: '6px', border: '1px solid #ddd', fontSize: '11px' }}>
+                      {entry.utilizador || 'N/A'}
+                    </td>
+                    <td style={{ padding: '6px', border: '1px solid #ddd', fontSize: '11px' }}>
+                      {entry.acao || 'N/A'}
+                    </td>
+                    <td style={{ 
+                      padding: '6px', 
+                      border: '1px solid #ddd', 
+                      fontSize: '11px',
+                      maxWidth: '300px',
+                      wordWrap: 'break-word'
+                    }}>
+                      {entry.descricao || 'N/A'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Se não há histórico, mostrar aviso de debug */}
+      {(!history || history.length === 0) && (
+        <div style={{ 
+          margin: '20px 0', 
+          padding: '15px', 
+          border: '2px solid #dc3545', 
+          borderRadius: '8px',
+          backgroundColor: '#f8d7da',
+          color: '#721c24'
+        }}>
+          <h3>⚠️ DEBUG Template2 - Nenhum histórico encontrado</h3>
+          <p>History prop: {JSON.stringify(history)}</p>
+        </div>
+      )}
     </div>
   );
 }

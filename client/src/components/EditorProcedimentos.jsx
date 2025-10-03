@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useContext } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { UserContext } from "../context/userContext";
+import AIAssistant from "./AIAssistant/AIAssistant";
 import TabelaPdf from "../pages/tableDisplay";
 import Template1 from "./templates/TabelaTemplate1";
 import ExportPdfButton from "./Buttons/exportPdf";
@@ -113,8 +114,11 @@ const tabelasTemplate2 = [
   }
 ];
 
-
 export default function TablePageUnified() {
+  // Estado para histórico de alterações - só adiciona quando guarda
+  const [history, setHistory] = useState([]);
+  console.log('🔍 DEBUG Estado do histórico:', history);
+  const { user } = useContext(UserContext);
   const { filename } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -127,6 +131,8 @@ export default function TablePageUnified() {
       ? location.state.originalFilename
       : decodeURIComponent(filename || "").replace(/__/g, '/').replace(/-/g, ' ');
 
+  // Extrai o nome do processo (antes do primeiro "/")
+  const nomeProcesso = originalFilename ? originalFilename.split('/')[0] : "";
 
   // Extrai só o nome do ficheiro (após o último '__')
   const fileNameOnly = filename ? filename.split('__').pop() : "";
@@ -168,8 +174,15 @@ const [indicadores, setIndicadores] = useState(() => {
 const [donoProcesso, setDonoProcesso] = useState("");
 const [donoProcessoOriginal, setDonoProcessoOriginal] = useState("");
 const [objetivoProcesso, setObjetivoProcesso] = useState("");
+const [objetivoProcessoOriginal, setObjetivoProcessoOriginal] = useState("");
 const [servicosEntrada, setServicosEntrada] = useState("");
+const [servicosEntradaOriginal, setServicosEntradaOriginal] = useState("");
 const [servicoSaida, setServicoSaida] = useState("");
+const [servicoSaidaOriginal, setServicoSaidaOriginal] = useState("");
+const [obsTableOriginal, setObsTableOriginal] = useState([]);
+const [mainTableOriginal, setMainTableOriginal] = useState([]);
+const [atividadesOriginal, setAtividadesOriginal] = useState([]);
+const [indicadoresOriginal, setIndicadoresOriginal] = useState([]);
 const [funcionarios, setFuncionarios] = useState([]);
 
 // Estado para controlar se as tabelas são editáveis (inicialmente false)
@@ -181,9 +194,16 @@ const canEditFromState = location?.state?.canEdit;
 // Receber isSuperAdmin do state (calculado em selectPdf) ou fallback
 const isSuperAdminFromState = location?.state?.isSuperAdmin;
 
+// Função utilitária para verificar se um usuário está na lista de donos do processo
+const isUserOwner = (donoProcessoString, username) => {
+  if (!donoProcessoString || !username) return false;
+  const donosArray = donoProcessoString.split(',').map(nome => nome.trim()).filter(nome => nome);
+  return donosArray.includes(username);
+};
+
 // Fallback: verificar permissões localmente se não vier do state
 const isAdmin = username === "superadmin" || username === "SuperAdmin";
-const canEditFallback = isAdmin || (donoProcesso === username);
+const canEditFallback = isAdmin || isUserOwner(donoProcesso, username);
 
 // Usar o valor do state se disponível, senão usar fallback
 const canEdit = canEditFromState !== undefined ? canEditFromState : canEditFallback;
@@ -273,12 +293,17 @@ useEffect(() => {
     if (isBlocking && window.history.state?.blocker) {
       window.history.back();
     }
+    // Cleanup dos timeouts
+    clearTimeout(window.atividadesTimeout);
+    clearTimeout(window.mainTableTimeout);
+    clearTimeout(window.obsTableTimeout);
+    clearTimeout(window.template2TableTimeout);
   };
 }, [hasUnsavedChanges]);
 
 
 
-  // Handlers para Template2
+  // Handlers para Template2 - removido histórico automático
   const handleAtividadesChange = (rowIdx, colIdx, value) => {
     setAtividades(prev => {
       const novo = prev.map(row => [...row]);
@@ -288,13 +313,16 @@ useEffect(() => {
     setHasUnsavedChanges(true);
   };
   const handleIndicadoresChange = (field, value) => {
+    let index = field;
+    
     if (isTemplate2) {
       // Para Template2, sempre trata como array mas converte índices se necessário
       if (typeof field === 'string' && field.startsWith('indicadores_r')) {
         // Se receber chave de objeto, converte para índice
         const match = field.match(/indicadores_r(\d+)/);
         if (match) {
-          const index = parseInt(match[1]) - 1;
+          index = parseInt(match[1]) - 1;
+          
           setIndicadores(prev => {
             const novo = [...prev];
             novo[index] = value;
@@ -433,8 +461,6 @@ useEffect(() => {
   // Função para atualizar donoProcesso no backend
   const updateDonoProcessoBackend = async (newDonoProcesso) => {
     try {
-      // Extrai o nome do processo (antes do primeiro "/")
-      const nomeProcesso = originalFilename.split('/')[0];
       console.log("Atualizando donoProcesso no backend:", { originalFilename, nomeProcesso, newDonoProcesso });
       
       const response = await fetch("http://192.168.1.219:8080/files/update-dono-processo", {
@@ -461,6 +487,10 @@ useEffect(() => {
 
   // Função personalizada para setDonoProcesso que também atualiza o backend
   const handleSetDonoProcesso = async (newDonoProcesso) => {
+    if (donoProcesso !== newDonoProcesso) {
+      // addHistoryEntry('Modificou', 'Dono do Processo', donoProcesso, newDonoProcesso); // REMOVIDO: só grava histórico ao guardar
+    }
+    
     // Atualiza o estado local
     setDonoProcesso(newDonoProcesso);
     setHasUnsavedChanges(true);
@@ -471,16 +501,28 @@ useEffect(() => {
 
   // Wrappers para outros setters que marcam mudanças
   const handleSetObjetivoProcesso = (value) => {
+    if (objetivoProcesso !== value) {
+      // addHistoryEntry('Modificou', 'Objetivo do Processo', objetivoProcesso, value); // REMOVIDO: só grava histórico ao guardar
+    }
+    
     setObjetivoProcesso(value);
     setHasUnsavedChanges(true);
   };
 
   const handleSetServicosEntrada = (value) => {
+    if (servicosEntrada !== value) {
+      // addHistoryEntry('Modificou', 'Serviços de Entrada', servicosEntrada, value); // REMOVIDO: só grava histórico ao guardar
+    }
+    
     setServicosEntrada(value);
     setHasUnsavedChanges(true);
   };
 
   const handleSetServicoSaida = (value) => {
+    if (servicoSaida !== value) {
+      // addHistoryEntry('Modificou', 'Serviço de Saída', servicoSaida, value); // REMOVIDO: só grava histórico ao guardar
+    }
+    
     setServicoSaida(value);
     setHasUnsavedChanges(true);
   };
@@ -513,6 +555,13 @@ useEffect(() => {
   // Refs para exportação/preview
   const mainTableRef = useRef(null);
   const obsTableRef = useRef(null);
+
+  // Carregar histórico do backend quando o componente é montado
+  useEffect(() => {
+    if (nomeProcesso) {
+      loadHistoryFromBackend();
+    }
+  }, [nomeProcesso]); // Recarrega quando nomeProcesso muda
 
   // Buscar dados do PDF selecionado (opcional, pode remover se não usar)
   useEffect(() => {
@@ -581,6 +630,11 @@ useEffect(() => {
                 )
               : Array.from({ length: currentTemplate[0].rows }, () => Array(currentTemplate[0].cols).fill(""))
           };
+          
+          // Definir valores originais das tabelas para comparação
+          setObsTableOriginal(JSON.parse(JSON.stringify(newState.obs)));
+          setMainTableOriginal(JSON.parse(JSON.stringify(newState.main)));
+          
           return newState;
         });
 
@@ -589,7 +643,11 @@ useEffect(() => {
           const donoProcessoValue = formData.dono_processo || "";
           setDonoProcesso(donoProcessoValue);
           setDonoProcessoOriginal(donoProcessoValue); // Definir valor original
-          setObjetivoProcesso(formData.objetivo_processo || "");
+          
+          const objetivoProcessoValue = formData.objetivo_processo || "";
+          setObjetivoProcesso(objetivoProcessoValue);
+          setObjetivoProcessoOriginal(objetivoProcessoValue); // Definir valor original
+          
           // Busca por linhas adicionais de atividades dinâmicamente
           const atividadeFields = Object.keys(formData).filter(f => /^atividades_r\d+_c\d+$/.test(f));
           const atividadeRowNumbers = atividadeFields.map(f => parseInt(f.match(/^atividades_r(\d+)_c\d+$/)[1], 10));
@@ -608,6 +666,7 @@ useEffect(() => {
           }
           
           setAtividades(novasAtividades);
+          setAtividadesOriginal(JSON.parse(JSON.stringify(novasAtividades))); // Definir valor original
           
           // Busca por indicadores dinamicamente
           const indicadorFields = Object.keys(formData).filter(f => /^indicadores_r\d+$/.test(f));
@@ -620,12 +679,24 @@ useEffect(() => {
           }
           
           setIndicadores(novosIndicadores);
-          setServicosEntrada(formData.servicos_entrada || "");
-          setServicoSaida(formData.servico_saida || "");
+          setIndicadoresOriginal(JSON.parse(JSON.stringify(novosIndicadores))); // Definir valor original
+          
+          const servicosEntradaValue = formData.servicos_entrada || "";
+          setServicosEntrada(servicosEntradaValue);
+          setServicosEntradaOriginal(servicosEntradaValue); // Definir valor original
+          
+          const servicoSaidaValue = formData.servico_saida || "";
+          setServicoSaida(servicoSaidaValue);
+          setServicoSaidaOriginal(servicoSaidaValue); // Definir valor original
         } else {
           // Para Template 1, também carrega os serviços se existirem
-          setServicosEntrada(formData.servicos_entrada || "");
-          setServicoSaida(formData.servico_saida || "");
+          const servicosEntradaValue = formData.servicos_entrada || "";
+          setServicosEntrada(servicosEntradaValue);
+          setServicosEntradaOriginal(servicosEntradaValue); // Definir valor original
+          
+          const servicoSaidaValue = formData.servico_saida || "";
+          setServicoSaida(servicoSaidaValue);
+          setServicoSaidaOriginal(servicoSaidaValue); // Definir valor original
         }
 
         // Reset do estado de mudanças após carregar dados
@@ -771,7 +842,253 @@ useEffect(() => {
     handleAddRowAt(rowIdx + 1, newRow, isMainTable);
   };
 
-  // Função para exportação/preview
+  // Função para adicionar registo ao histórico
+  const addHistoryEntry = (acao, descricao, valorAnterior = null, valorNovo = null) => {
+    console.log('🔍 DEBUG addHistoryEntry chamada:', { acao, descricao, valorAnterior, valorNovo });
+    
+    const data = new Date().toLocaleString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    
+    let descricaoCompleta = descricao;
+    if (valorAnterior !== null && valorNovo !== null) {
+      // Não registra se os valores são idênticos
+      if (valorAnterior === valorNovo) {
+        console.log('🔍 DEBUG Valores idênticos, não registrando no histórico:', { valorAnterior, valorNovo });
+        return;
+      }
+      
+      const anteriorTruncado = valorAnterior.length > 30 ? valorAnterior.substring(0, 27) + '...' : valorAnterior;
+      const novoTruncado = valorNovo.length > 30 ? valorNovo.substring(0, 27) + '...' : valorNovo;
+      descricaoCompleta = `${descricao}: de "${anteriorTruncado}" para "${novoTruncado}"`;
+    }
+    
+    // Verifica se já existe uma entrada idêntica recente (últimos 5 segundos)
+    const agora = Date.now();
+    const entradaRecente = history.find(entry => {
+      const entryTime = new Date(entry.data.replace(' às ', ' ').replace(' de ', '/').replace(' de ', '/')).getTime();
+      return (agora - entryTime < 5000) && 
+             entry.utilizador === (username || user?.name || user?.email || 'Utilizador') &&
+             entry.acao === acao &&
+             entry.descricao === descricaoCompleta;
+    });
+    
+    if (entradaRecente) {
+      console.log('🔍 DEBUG Entrada duplicada detectada, não adicionando ao histórico');
+      return;
+    }
+    
+    const novaEntrada = {
+      data,
+      utilizador: username || user?.name || user?.email || 'Utilizador',
+      acao,
+      descricao: descricaoCompleta
+    };
+    
+    console.log('🔍 DEBUG Nova entrada de histórico criada:', novaEntrada);
+    
+    setHistory(prev => {
+      const novoHistorico = [...prev, novaEntrada];
+      console.log('🔍 DEBUG Histórico atualizado:', novoHistorico);
+      return novoHistorico;
+    });
+  };
+
+  // Função para limpar o histórico (apenas para debug)
+  const clearHistory = () => {
+    if (window.confirm('Tem a certeza que quer limpar todo o histórico? Esta ação não pode ser desfeita.')) {
+      setHistory([]);
+      console.log('Histórico limpo pelo utilizador:', username);
+    }
+  };
+
+  // Nova função para salvar histórico no backend
+  const saveHistoryToBackend = async (historyData) => {
+    try {
+      console.log('💾 Salvando histórico no backend para:', nomeProcesso);
+      
+      const response = await fetch("http://192.168.1.219:8080/files/save-process-history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          processId: nomeProcesso, 
+          history: historyData 
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erro HTTP: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Histórico salvo no backend:', result);
+      return true;
+    } catch (error) {
+      console.error('❌ Erro ao salvar histórico no backend:', error);
+      return false;
+    }
+  };
+
+  // Nova função para carregar histórico do backend
+  const loadHistoryFromBackend = async () => {
+    try {
+      if (!nomeProcesso) return;
+      
+      console.log('📥 Carregando histórico do backend para:', nomeProcesso);
+      
+      const response = await fetch("http://192.168.1.219:8080/files/get-process-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ processId: nomeProcesso }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erro HTTP: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.exists && result.data && result.data.history) {
+        console.log('✅ Histórico carregado do backend:', result.data.history.length, 'entradas');
+        setHistory(result.data.history);
+      } else {
+        console.log('ℹ️ Nenhum histórico encontrado no backend para:', nomeProcesso);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar histórico do backend:', error);
+    }
+  };
+
+  // Função para guardar alterações e registar histórico detalhado
+  function handleSave() {
+    const agora = new Date().toLocaleString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    
+    // Lista das alterações específicas feitas
+    const alteracoes = [];
+    
+    // Verificar mudanças no dono do processo
+    if (donoProcesso !== donoProcessoOriginal) {
+      alteracoes.push(`Dono do Processo: de "${donoProcessoOriginal || 'vazio'}" para "${donoProcesso}"`);
+    }
+    
+    // Verificar mudanças no objetivo do processo
+    if (objetivoProcesso !== objetivoProcessoOriginal) {
+      alteracoes.push(`Objetivo do Processo: de "${objetivoProcessoOriginal || 'vazio'}" para "${objetivoProcesso}"`);
+    }
+    
+    // Verificar mudanças nos serviços de entrada
+    if (servicosEntrada !== servicosEntradaOriginal) {
+      alteracoes.push(`Serviços de Entrada: de "${servicosEntradaOriginal || 'vazio'}" para "${servicosEntrada}"`);
+    }
+    
+    // Verificar mudanças no serviço de saída
+    if (servicoSaida !== servicoSaidaOriginal) {
+      alteracoes.push(`Serviço de Saída: de "${servicoSaidaOriginal || 'vazio'}" para "${servicoSaida}"`);
+    }
+    
+    // Verificar mudanças na tabela de observações
+    if (obsTableOriginal.length > 0 && tableData.obs) {
+      for (let rowIdx = 0; rowIdx < Math.max(obsTableOriginal.length, tableData.obs.length); rowIdx++) {
+        const linhaOriginal = obsTableOriginal[rowIdx] || [];
+        const linhaAtual = tableData.obs[rowIdx] || [];
+        
+        for (let colIdx = 0; colIdx < Math.max(linhaOriginal.length, linhaAtual.length); colIdx++) {
+          const valorOriginal = linhaOriginal[colIdx] || '';
+          const valorAtual = linhaAtual[colIdx] || '';
+          
+          if (valorOriginal !== valorAtual) {
+            alteracoes.push(`Tabela Observações (linha ${rowIdx + 1}): de "${valorOriginal || 'vazio'}" para "${valorAtual}"`);
+          }
+        }
+      }
+    }
+    
+    // Verificar mudanças na tabela principal
+    if (mainTableOriginal.length > 0 && tableData.main) {
+      for (let rowIdx = 0; rowIdx < Math.max(mainTableOriginal.length, tableData.main.length); rowIdx++) {
+        const linhaOriginal = mainTableOriginal[rowIdx] || [];
+        const linhaAtual = tableData.main[rowIdx] || [];
+        
+        for (let colIdx = 0; colIdx < Math.max(linhaOriginal.length, linhaAtual.length); colIdx++) {
+          const valorOriginal = linhaOriginal[colIdx] || '';
+          const valorAtual = linhaAtual[colIdx] || '';
+          
+          if (valorOriginal !== valorAtual) {
+            // Definir nomes das colunas baseado no template
+            const nomeColuna = template === tabelasTemplate2 
+              ? ['Etapa', 'Atividade', 'Responsável', 'Documentos', 'Instruções', 'Observações'][colIdx] || `Coluna ${colIdx + 1}`
+              : ['Fluxo das Ações', 'Descrição', 'Responsável', 'Documentos Associados', 'Instruções de Trabalho'][colIdx] || `Coluna ${colIdx + 1}`;
+            
+            alteracoes.push(`${nomeColuna} (linha ${rowIdx + 1}): de "${valorOriginal || 'vazio'}" para "${valorAtual}"`);
+          }
+        }
+      }
+    }
+    
+    // Verificar mudanças nas atividades (Template 2)
+    if (template === tabelasTemplate2 && atividadesOriginal.length > 0 && atividades) {
+      for (let rowIdx = 0; rowIdx < Math.max(atividadesOriginal.length, atividades.length); rowIdx++) {
+        const linhaOriginal = atividadesOriginal[rowIdx] || [];
+        const linhaAtual = atividades[rowIdx] || [];
+        
+        for (let colIdx = 0; colIdx < Math.max(linhaOriginal.length, linhaAtual.length); colIdx++) {
+          const valorOriginal = linhaOriginal[colIdx] || '';
+          const valorAtual = linhaAtual[colIdx] || '';
+          
+          if (valorOriginal !== valorAtual) {
+            const nomeColunaAtividade = ['Etapa', 'Atividade', 'Responsável', 'Documentos', 'Instruções', 'Observações'][colIdx] || `Coluna ${colIdx + 1}`;
+            alteracoes.push(`Atividades - ${nomeColunaAtividade} (linha ${rowIdx + 1}): de "${valorOriginal || 'vazio'}" para "${valorAtual}"`);
+          }
+        }
+      }
+    }
+    
+    // Verificar mudanças nos indicadores (Template 2)
+    if (template === tabelasTemplate2 && indicadoresOriginal.length > 0 && indicadores) {
+      for (let idx = 0; idx < Math.max(indicadoresOriginal.length, indicadores.length); idx++) {
+        const valorOriginal = indicadoresOriginal[idx] || '';
+        const valorAtual = indicadores[idx] || '';
+        
+        if (valorOriginal !== valorAtual) {
+          alteracoes.push(`Indicador ${idx + 1}: de "${valorOriginal || 'vazio'}" para "${valorAtual}"`);
+        }
+      }
+    }
+    
+    // Se há alterações específicas, regista-las
+    if (alteracoes.length > 0) {
+      alteracoes.forEach(alteracao => {
+        addHistoryEntry('Modificou', alteracao);
+      });
+    }
+    
+    // Sempre adiciona uma entrada geral de salvamento
+    addHistoryEntry('Guardou', `Documento atualizado em ${agora}`);
+    
+    setHasUnsavedChanges(false);
+    
+    // Salvar histórico no backend após atualizar estado local
+    setTimeout(() => {
+      setHistory(currentHistory => {
+        saveHistoryToBackend(currentHistory);
+        return currentHistory;
+      });
+    }, 100); // Pequeno delay para garantir que o estado foi atualizado
+    
+    // Atualizar valores originais após salvar
+    setDonoProcessoOriginal(donoProcesso);
+    setObjetivoProcessoOriginal(objetivoProcesso);
+    setServicosEntradaOriginal(servicosEntrada);
+    setServicoSaidaOriginal(servicoSaida);
+    setObsTableOriginal(JSON.parse(JSON.stringify(tableData.obs || [])));
+    setMainTableOriginal(JSON.parse(JSON.stringify(tableData.main || [])));
+    
+    // Atualizar valores originais específicos do Template 2
+    if (template === tabelasTemplate2) {
+      setAtividadesOriginal(JSON.parse(JSON.stringify(atividades || [])));
+      setIndicadoresOriginal(JSON.parse(JSON.stringify(indicadores || [])));
+    }
+  }
+
+  // Função para obter o HTML das tabelas para exportação
   const getTablesHtml = () => {
     let mainTableHtml = "";
     let obsTableHtml = "";
@@ -824,17 +1141,43 @@ useEffect(() => {
       obsTableHtml = obsTableRef.current.outerHTML;
     }
 
+    // Adiciona tabela de histórico invisível (só aparece no PDF)
+    let historyTableHtml = "";
+    if (history && history.length > 0) {
+      historyTableHtml = `
+        <div style="display: none; page-break-before: always;" class="history-section-for-pdf">
+          <h3 style="font-size: 14px; font-weight: bold; margin: 15px 0 10px 0;">Histórico de Alterações</h3>
+          <table border="1" cellpadding="3" cellspacing="0" style="width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 9px; table-layout: fixed;">
+            <thead>
+              <tr style="background-color: #f0f0f0;">
+                <th style="padding: 4px; border: 1px solid #000; font-weight: bold; width: 15%;">Data</th>
+                <th style="padding: 4px; border: 1px solid #000; font-weight: bold; width: 15%;">Utilizador</th>
+                <th style="padding: 4px; border: 1px solid #000; font-weight: bold; width: 15%;">Ação</th>
+                <th style="padding: 4px; border: 1px solid #000; font-weight: bold; width: 55%;">Descrição</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${history.map(item => `
+                <tr>
+                  <td style="padding: 4px; border: 1px solid #000; word-wrap: break-word; overflow-wrap: break-word;">${item.data || ''}</td>
+                  <td style="padding: 4px; border: 1px solid #000; word-wrap: break-word; overflow-wrap: break-word;">${item.utilizador || ''}</td>
+                  <td style="padding: 4px; border: 1px solid #000; word-wrap: break-word; overflow-wrap: break-word;">${item.acao || ''}</td>
+                  <td style="padding: 4px; border: 1px solid #000; word-wrap: break-word; overflow-wrap: break-word; max-width: 300px;">${(item.descricao || '').replace(/"/g, '&quot;')}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
     return {
-      mainTableHtml,
+      mainTableHtml: mainTableHtml + historyTableHtml,
       obsTableHtml
     };
   };
 
   // Logs do estado atual a cada render
-
-
-
-
   return (
     <div>
       {isTemplate2 ? (
@@ -872,18 +1215,27 @@ useEffect(() => {
             onInsertIndicadorBelow={handleInsertIndicadorBelow}
             onDeleteIndicador={handleDeleteIndicador}
             pathFilename={originalFilename}
-            onSaveSuccess={() => {
-              setHasUnsavedChanges(false);
-              setDonoProcessoOriginal(donoProcesso);
-            }}
+            onSaveSuccess={handleSave}
+            history={history}
+            clearHistory={clearHistory}
             handleChange={
               (rowIdx, colIdx, value) => {
+                const valorAnterior = tableData.main[rowIdx] ? tableData.main[rowIdx][colIdx] : '';
+                
                 setTableData(prev => {
                   const newData = prev.main.map(row => [...row]);
                   newData[rowIdx][colIdx] = value;
                   return { ...prev, main: newData };
                 });
                 setHasUnsavedChanges(true);
+                
+                // Debounce removido - histórico só é criado ao guardar
+                // clearTimeout(window.template2TableTimeout);
+                // window.template2TableTimeout = setTimeout(() => {
+                //   if (valorAnterior !== value) {
+                //     addHistoryEntry('Modificou', `Tabela principal (linha ${rowIdx + 1}, coluna ${colIdx + 1})`, valorAnterior, value);
+                //   }
+                // }, 500);
               }
             }           
           />
@@ -893,24 +1245,49 @@ useEffect(() => {
           isEditable={isEditable}
           setIsEditable={setIsEditable}
           canEdit={canEdit}
+          useNewAttachmentManager={true} // Usa o novo gerenciador de anexos
           data={tableData.main}
           dataObs={tableData.obs}
           originalFilename={originalFilename}
           handleChange={(rowIdx, colIdx, value) => {
+            const valorAnterior = tableData.main[rowIdx] ? tableData.main[rowIdx][colIdx] : '';
+            
             setTableData(prev => {
               const newData = prev.main.map(row => [...row]);
               newData[rowIdx][colIdx] = value;
               return { ...prev, main: newData };
             });
             setHasUnsavedChanges(true);
+            
+            // Debounce removido - histórico só é criado ao guardar
+            // clearTimeout(window.mainTableTimeout);
+            // window.mainTableTimeout = setTimeout(() => {
+            //   if (valorAnterior !== value) {
+            //     const colunas = ['Fluxo das Ações', 'Descrição', 'Responsável', 'Documentos Associados', 'Instruções de Trabalho'];
+            //     const nomeColuna = colunas[colIdx] || `Coluna ${colIdx + 1}`;
+            //     addHistoryEntry('Modificou', `${nomeColuna} (linha ${rowIdx + 1})`, valorAnterior, value);
+            //   }
+            // }, 500);
           }}
           handleChangeObs={(rowIdx, colIdx, value) => {
+            const valorAnterior = tableData.obs[rowIdx] ? tableData.obs[rowIdx][colIdx] : '';
+            
             setTableData(prev => {
               const newData = prev.obs.map(row => [...row]);
               newData[rowIdx][colIdx] = value;
               return { ...prev, obs: newData };
             });
             setHasUnsavedChanges(true);
+            
+            // Debounce removido - histórico só é criado ao guardar
+            // clearTimeout(window.obsTableTimeout);
+            // window.obsTableTimeout = setTimeout(() => {
+            //   if (valorAnterior !== value) {
+            //     const secoes = ['Objetivos', 'Âmbito', 'Referências Normativas', 'Termos e Definições', 'Procedimento'];
+            //     const nomeSecao = secoes[rowIdx] || `Seção ${rowIdx + 1}`;
+            //     addHistoryEntry('Modificou', nomeSecao, valorAnterior, value);
+            //   }
+            // }, 500);
           }}
           headers={template[1].headers}
           headersObs={template[0].headers}
@@ -938,8 +1315,21 @@ useEffect(() => {
           getTablesHtml={getTablesHtml}
           obsTableRef={obsTableRef}
           mainTableRef={mainTableRef}
-        />
+          history={history}
+          clearHistory={clearHistory}
+  />
       )}
+      
+      {/* AI Assistant para continuar tutorial */}
+      <AIAssistant 
+        fileTree={[]}
+        searchTerm=""
+        username={username}
+        isAdmin={isAdmin}
+        isSuperAdmin={isSuperAdmin}
+        processOwners={{}}
+        onSuggestion={() => {}}
+      />
     </div>
   );
 }

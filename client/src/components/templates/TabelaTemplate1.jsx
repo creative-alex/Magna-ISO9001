@@ -36,7 +36,9 @@ export default function Template1({
   onInsertRowBelow,
   onDeleteRow,
   onAddRowObs,
-  onDeleteRowObs
+  onDeleteRowObs,
+  history = [],
+  clearHistory
 }) {
   const textAreaRefs = useRef({});
   
@@ -65,6 +67,9 @@ export default function Template1({
       }
     });
   }, [data, dataObs]);
+
+  {/*Faz o originalNameFile dar quebra de linha ao título*/}
+  const Title = originalFilename ? originalFilename.split('/') : [''];
 
   // Função específica para Template 1 para obter HTML das tabelas
   const getTemplate1TablesHtml = () => {
@@ -105,14 +110,28 @@ export default function Template1({
     console.log("🔍 DEBUG Template1 - HTML gerado:");
     console.log("  Main Table HTML (primeiros 200 chars):", mainTableHtml.substring(0, 200));
     console.log("  Obs Table HTML (primeiros 200 chars):", obsTableHtml.substring(0, 200));
+    console.log("  Histórico NÃO incluído no HTML - será passado diretamente");
 
-    return { mainTableHtml, obsTableHtml };
+    return { 
+      mainTableHtml, 
+      obsTableHtml 
+    };
   };
 
   console.log("PathFileName:", pathFilename);
 
   return (
-    <div className="template1-container">
+    <div className="template1-container" style={{alignItems: 'flex-start'}}>
+      <div className="template1-header" style={{textAlign: 'left', margin: 0, padding: 0, width: '100%', alignSelf: 'flex-start'}}>
+        <h2 style={{textAlign: 'left', margin: 0, paddingLeft: 0, width: '100%'}}>
+          {Title.map((line, index) => (
+            <React.Fragment key={index}>
+              {line}
+              {index < Title.length - 1 && <br />}
+            </React.Fragment>
+          ))}
+        </h2>
+      </div>
       {/* Action buttons at top right */}
       <div className="action-buttons-container">
         {/* Botão Editar/Guardar integrado - só aparece se canEdit for true */}
@@ -141,6 +160,7 @@ export default function Template1({
                 servicosEntrada={servicosEntrada}
                 servicoSaida={servicoSaida}
                 fieldNames={fieldNames}
+                history={history}
                 onSaveSuccess={() => {
                   onSaveSuccess && onSaveSuccess();
                   setIsEditable(false); // Desativa edição após guardar
@@ -152,7 +172,29 @@ export default function Template1({
         <PreviewPdfButton 
           getTablesHtml={getTemplate1TablesHtml} 
           pathFilename={pathFilename}
+          history={history}
         />
+        
+        {/* Botão de debug para limpar histórico - só aparece quando está a editar */}
+        {isEditable && clearHistory && (
+          <button 
+            className="clear-history-button"
+            onClick={clearHistory}
+            title="Limpar histórico (Debug)"
+            style={{
+              backgroundColor: '#ff4444',
+              color: 'white',
+              border: 'none',
+              padding: '8px 12px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '12px',
+              marginLeft: '10px'
+            }}
+          >
+            🗑️ Limpar Histórico
+          </button>
+        )}
       </div>
     
       {/* Tabela de Observações */}
@@ -299,7 +341,7 @@ export default function Template1({
               <tr 
                 key={rowIdx} 
                 className="editable-table-row"
-                onContextMenu={(e) => contextMenu.handleContextMenuEvent(e, rowIdx)}
+                onContextMenu={isEditable ? (e) => contextMenu.handleContextMenuEvent(e, rowIdx) : undefined}
               >
                 {row.map((cell, colIdx) => (
                   <td key={colIdx} className="editable-table-cell">
@@ -356,7 +398,78 @@ export default function Template1({
       </p>
 
       {/* Renderizar o context menu fora da tabela */}
-      {contextMenu.contextMenu}
+      {isEditable && contextMenu.contextMenu}
+
+      {/* DEBUG: Mostrar tabela de histórico visível na interface */}
+      {history && history.length > 0 && (
+        <div style={{ 
+          margin: '20px 0', 
+          padding: '15px', 
+          border: '2px solid #007bff', 
+          borderRadius: '8px',
+          backgroundColor: '#f8f9fa',
+          display: 'none'
+        }}>
+          <h3 style={{ color: '#007bff', marginBottom: '15px' }}>
+            🔍 DEBUG - Histórico de Alterações ({history.length} entradas)
+          </h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ 
+              width: '100%', 
+              borderCollapse: 'collapse',
+              fontSize: '12px'
+            }}>
+              <thead>
+                <tr style={{ backgroundColor: '#007bff', color: 'white' }}>
+                  <th style={{ padding: '8px', border: '1px solid #ddd' }}>Data</th>
+                  <th style={{ padding: '8px', border: '1px solid #ddd' }}>Utilizador</th>
+                  <th style={{ padding: '8px', border: '1px solid #ddd' }}>Ação</th>
+                  <th style={{ padding: '8px', border: '1px solid #ddd' }}>Descrição</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((entry, index) => (
+                  <tr key={index} style={{ backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8f9fa' }}>
+                    <td style={{ padding: '6px', border: '1px solid #ddd', fontSize: '11px' }}>
+                      {entry.data || 'N/A'}
+                    </td>
+                    <td style={{ padding: '6px', border: '1px solid #ddd', fontSize: '11px' }}>
+                      {entry.utilizador || 'N/A'}
+                    </td>
+                    <td style={{ padding: '6px', border: '1px solid #ddd', fontSize: '11px' }}>
+                      {entry.acao || 'N/A'}
+                    </td>
+                    <td style={{ 
+                      padding: '6px', 
+                      border: '1px solid #ddd', 
+                      fontSize: '11px',
+                      maxWidth: '300px',
+                      wordWrap: 'break-word'
+                    }}>
+                      {entry.descricao || 'N/A'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Se não há histórico, mostrar aviso de debug */}
+      {(!history || history.length === 0) && (
+        <div style={{ 
+          margin: '20px 0', 
+          padding: '15px', 
+          border: '2px solid #dc3545', 
+          borderRadius: '8px',
+          backgroundColor: '#f8d7da',
+          color: '#721c24'
+        }}>
+          <h3>⚠️ DEBUG - Nenhum histórico encontrado</h3>
+          <p>History prop: {JSON.stringify(history)}</p>
+        </div>
+      )}
     </div>
   );
 }

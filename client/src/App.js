@@ -7,6 +7,7 @@ import TablePage from "./components/EditorProcedimentos";
 import CreateProcess from "./pages/novoProcesso";
 import Register from "./components/Auth/register";
 import { UserContext } from "./context/userContext";
+import { TutorialProvider } from "./context/tutorialContext";
 import NewTable from "./pages/novoProcedimento"
 import FirstLogin from "./components/Auth/firstLogin";
 import './App.css';
@@ -23,6 +24,7 @@ function App() {
   };
 
   return (
+    <TutorialProvider>
       <Routes>
         {/* Rota pública de login */}
         <Route 
@@ -108,6 +110,7 @@ function App() {
           }
         />
       </Routes>
+    </TutorialProvider>
   );
 };
 

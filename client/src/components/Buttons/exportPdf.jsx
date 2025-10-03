@@ -17,7 +17,8 @@ export default function ExportPdfButton({
   exportRef,
   servicosEntrada,
   servicoSaida,
-  onSaveSuccess // Novo prop para callback após guardar
+  onSaveSuccess, // Novo prop para callback após guardar
+  history = [] // Novo prop para histórico
 }) {
   // Função para carregar automaticamente a imagem PNG da empresa
   const loadCompanyImage = async () => {
@@ -86,6 +87,10 @@ export default function ExportPdfButton({
       console.log("✅ Imagem da empresa carregada:", imageBytes.length, "bytes");
     }
 
+    console.log("🔍 DEBUG ExportPdfButton - templateType:", templateType);
+    console.log("🔍 DEBUG ExportPdfButton - history recebido:", history);
+    console.log("🔍 DEBUG ExportPdfButton - history length:", history?.length);
+
     // Passe todos os dados e o templateType
     const editablePdfBytes = await generateEditablePdf({
       templateType,
@@ -101,7 +106,8 @@ export default function ExportPdfButton({
       servicoSaida,
       title: "Procedimento",
       imageBytes,
-      pathFilename: pathFilename || "SemNome/documento.pdf" // ← FALLBACK se estiver vazio
+      pathFilename: pathFilename || "SemNome/documento.pdf", // ← FALLBACK se estiver vazio
+      history
     });
     
     console.log("🔍 DEBUG - pathFilename enviado para generateEditablePdf:", pathFilename || "SemNome/documento.pdf");
@@ -212,7 +218,8 @@ export default function ExportPdfButton({
       objetivoProcesso,
       indicadores,
       imageBytes,
-      pathFilename
+      pathFilename,
+      history
     });
 
     // Cria um blob e abre o PDF editável em uma nova aba

@@ -17,6 +17,8 @@ router.get('/download/:filePath', filesController.downloadFile);
 router.get('/preview/:filePath', filesController.previewFile);
 router.post('/update-dono-processo', filesController.updateDonoProcesso);
 router.get('/process-owners', filesController.getProcessOwners);
+router.post('/save-process-history', filesController.saveProcessHistory);
+router.post('/get-process-data', filesController.getProcessData);
 router.post('/delete', filesController.deletePdf);
 router.delete('/delete/:filePath', filesController.deleteFile);
 router.get('/list-documents-in-folder', filesController.listDocumentsInFolder);

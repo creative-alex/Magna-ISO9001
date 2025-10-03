@@ -1,4 +1,33 @@
-﻿import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+﻿
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+
+// Função para desenhar histórico de edições na última página do PDF
+export function addEditHistoryToPdf(page, font, editHistory) {
+  if (!editHistory || !Array.isArray(editHistory) || editHistory.length === 0) return;
+  const { width } = page.getSize();
+  const fontSize = 10;
+  let y = 60; // Rodapé, ajustável
+  page.drawText('Histórico de Edições:', {
+    x: 50,
+    y,
+    size: fontSize + 2,
+    font,
+    color: rgb(0.2, 0.2, 0.2),
+  });
+  y -= 18;
+  editHistory.forEach((entry) => {
+    // entry: { date, user, before, after }
+    const line = `${entry.date} ${entry.user} Modificou\n${entry.before} para ${entry.after}`;
+    page.drawText(line, {
+      x: 50,
+      y,
+      size: fontSize,
+      font,
+      color: rgb(0.2, 0.2, 0.2),
+    });
+    y -= 16;
+  });
+}
 
 export const colWidths = [150, 170, 60, 60, 60];
 export const pageSize = [600, 800];
@@ -35,21 +64,21 @@ export async function addHeader(page, font, title, imageBytes = null, pathFilena
   }
   
   // Desenhar pathFilename no canto extremo direito em duas linhas
-  if (pathFilename) {
-    const fileFontSize = 12;
-    // Normaliza separadores (Windows \ -> /) e divide em pasta/arquivo
-    const normalizedPath = pathFilename.replace(/\\/g, '/');
-    const parts = normalizedPath.split('/');
-    const filename = parts.pop() || normalizedPath; // Nome do arquivo
-    const folder = parts.join('/'); // Pasta(s)
-    
-    const marginRight = 50; // Mais para a esquerda (era 10, agora 50)
-    
-    // Primeira linha (pasta) - mais em baixo
-    if (folder) {
-      const folderWidth = font.widthOfTextAtSize(folder, fileFontSize);
-      const folderX = width - folderWidth - marginRight;
-      const folderY = height - 60; // Mais em baixo (era -20, agora -60)
+    if (pathFilename) {
+      const fileFontSize = 12;
+      // Normaliza separadores (Windows \ -> /) e divide em pasta/arquivo
+      const normalizedPath = pathFilename.replace(/\\/g, '/');
+      const parts = normalizedPath.split('/');
+      const filename = parts.pop() || normalizedPath; // Nome do arquivo
+      const folder = parts.join('/'); // Pasta(s)
+      
+      const marginRight = 50; // Mais para a esquerda (era 10, agora 50)
+      
+      // Primeira linha (pasta) - mais em baixo
+      if (folder) {
+        const folderWidth = font.widthOfTextAtSize(folder, fileFontSize);
+        const folderX = width - folderWidth - marginRight;
+        const folderY = height - 60; // Mais em baixo (era -20, agora -60)
       
       page.drawText(folder, {
         x: folderX,
@@ -120,6 +149,36 @@ export async function createBasePdf(title, imageBytes, pathFilename) {
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   
   await addHeader(page, font, title, imageBytes, pathFilename);
+  
+    // Função para desenhar histórico de edições na última página do PDF
+
+  // Função para desenhar histórico de edições na última página do PDF
+  function addEditHistoryToPdf(page, font, editHistory) {
+    if (!editHistory || !Array.isArray(editHistory) || editHistory.length === 0) return;
+    const { width } = page.getSize();
+    const fontSize = 10;
+    let y = 60; // Rodapé, ajustável
+    page.drawText('Histórico de Edições:', {
+      x: 50,
+      y,
+      size: fontSize + 2,
+      font,
+      color: rgb(0.2, 0.2, 0.2),
+    });
+    y -= 18;
+    editHistory.forEach((entry) => {
+      // entry: { date, user, before, after }
+      const line = `${entry.date} ${entry.user} Modificou\n${entry.before} para ${entry.after}`;
+      page.drawText(line, {
+        x: 50,
+        y,
+        size: fontSize,
+        font,
+        color: rgb(0.2, 0.2, 0.2),
+      });
+      y -= 16;
+    });
+  }
   
   return { pdfDoc, page, font };
 }

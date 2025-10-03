@@ -81,7 +81,7 @@ const Login = ({onLoginSuccess}) => {
                 <LoadingPage />
             ) : (
                 <div className="auth-container">
-                    <h2 className="auth-title">Login</h2>
+                    <h2 className="auth-title">MAGNA ISO 9001</h2>
                     <form onSubmit={handleSubmit} className="auth-form">
                         <div className="auth-field">
                             <label className="auth-label">Email:</label>
@@ -105,7 +105,7 @@ const Login = ({onLoginSuccess}) => {
                         </div>
                         {error && <div className="auth-error">{error}</div>}
                         <button type="submit" className="auth-button" disabled={loading}>
-                            Entrar
+                            
                         </button>
                     </form>
                 </div>

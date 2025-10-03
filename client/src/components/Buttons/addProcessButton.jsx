@@ -15,6 +15,7 @@ const AddProcessButton = () => {
         src={fileAddIcon} 
         alt="Adicionar Processo" 
         style={{ width: '16px', height: '16px', marginRight: '5px' }} 
+        title="Adicionar Processo"
       />
     </button>
   );
