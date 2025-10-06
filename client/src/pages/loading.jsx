@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import Logo from '../logo.svg';
 
 const LoadingPage = () => {
   const [loadingText, setLoadingText] = useState('A carregar');
@@ -35,62 +36,155 @@ const LoadingPage = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-      <div className="bg-white p-12 rounded-2xl shadow-2xl text-center max-w-md w-full mx-4">
-        {/* Logo/Título */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">
-            Magna ISO 9001
-          </h1>
-        </div>
-
-        {/* Spinner de Loading */}
-        <div className="mb-8 flex justify-center">
-          <div className="relative">
-            <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-            <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-r-indigo-400 rounded-full animate-ping"></div>
+    <div className="file-container">
+      <div className="header">
+        <img src={Logo} alt="Logo" className="logo" />
+        <h2 className="title">Magna ISO90001</h2>
+      </div>
+      
+      <div className="file-panel">
+        <div className="loading-content">
+          {/* Spinner de Loading */}
+          <div className="loading-spinner">
+            <div className="spinner-ring"></div>
+            <div className="spinner-pulse"></div>
           </div>
-        </div>
 
-        {/* Texto de Loading */}
-        <div className="mb-6">
-          <p className="text-lg text-gray-700 font-medium">
-            {loadingText}<span className="text-blue-600">{dots}</span>
+          {/* Texto de Loading */}
+          <div className="loading-text">
+            <p>
+              {loadingText}<span className="loading-dots">{dots}</span>
+            </p>
+          </div>
+
+          {/* Barra de Progresso */}
+          <div className="loading-progress">
+            <div className="progress-bar"></div>
+          </div>
+
+          {/* Mensagem adicional */}
+          <p className="loading-message">
+            Por favor aguarde...
           </p>
         </div>
-
-        {/* Barra de Progresso */}
-        <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
-          <div className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-full animate-pulse" 
-               style={{
-                 width: '75%',
-                 animation: 'loading-bar 3s ease-in-out infinite'
-               }}>
-          </div>
-        </div>
-
-        {/* Mensagem adicional */}
-        <p className="text-sm text-gray-500">
-          Por favor aguarde...
-        </p>
       </div>
 
-      {/* CSS personalizado inline */}
       <style jsx>{`
+        .loading-content {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 3rem 2rem;
+          text-align: center;
+          max-width: 400px;
+          margin: 0 auto;
+        }
+
+        .loading-spinner {
+          position: relative;
+          margin-bottom: 2rem;
+        }
+
+        .spinner-ring {
+          width: 64px;
+          height: 64px;
+          border: 4px solid #e5e7eb;
+          border-top: 4px solid #C8932F;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+
+        .spinner-pulse {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 64px;
+          height: 64px;
+          border: 4px solid transparent;
+          border-right: 4px solid rgba(200, 147, 47, 0.3);
+          border-radius: 50%;
+          animation: pulse 2s ease-in-out infinite;
+        }
+
+        .loading-text {
+          margin-bottom: 1.5rem;
+        }
+
+        .loading-text p {
+          font-size: 18px;
+          font-weight: 600;
+          color: #374151;
+          margin: 0;
+        }
+
+        .loading-dots {
+          color: #C8932F;
+          font-weight: bold;
+        }
+
+        .loading-progress {
+          width: 100%;
+          max-width: 300px;
+          height: 8px;
+          background: #e5e7eb;
+          border-radius: 4px;
+          overflow: hidden;
+          margin-bottom: 1rem;
+        }
+
+        .progress-bar {
+          height: 100%;
+          background: linear-gradient(90deg, #C8932F, #b8832a);
+          border-radius: 4px;
+          animation: loading-bar 3s ease-in-out infinite;
+        }
+
+        .loading-message {
+          font-size: 14px;
+          color: #6b7280;
+          margin: 0;
+          font-style: italic;
+        }
+
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse {
+          0%, 100% {
+            transform: scale(1);
+            opacity: 1;
+          }
+          50% {
+            transform: scale(1.1);
+            opacity: 0.3;
+          }
+        }
+
         @keyframes loading-bar {
           0% { width: 0%; }
-          50% { width: 75%; }
+          25% { width: 30%; }
+          50% { width: 60%; }
+          75% { width: 85%; }
           100% { width: 100%; }
         }
-        
-        .animate-ping {
-          animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
-        }
-        
-        @keyframes ping {
-          75%, 100% {
-            transform: scale(1.1);
-            opacity: 0;
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+          .loading-content {
+            padding: 2rem 1rem;
+          }
+          
+          .spinner-ring,
+          .spinner-pulse {
+            width: 48px;
+            height: 48px;
+          }
+          
+          .loading-text p {
+            font-size: 16px;
           }
         }
       `}</style>

@@ -1,9 +1,12 @@
 import React, { useState, useContext } from "react";
 import { UserContext } from "../../context/userContext";
 import { useNavigate } from "react-router-dom";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import LogoutButton from "./logout";const FirstLoginComponent = ({ onComplete }) => {
+import LogoutButton from "./logout";
+import Logo from "../../logo.svg";
+
+const FirstLoginComponent = ({ onComplete }) => {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const { userEmail } = useContext(UserContext);
@@ -52,30 +55,41 @@ import LogoutButton from "./logout";const FirstLoginComponent = ({ onComplete })
   };
 
   return (
-    <>
-    <div className="form-container center gradient-border">
-      <ToastContainer position="top-center" autoClose={3000} /> 
-      <h2>Alterar Senha</h2>
-      <input
-        type="password"
-        placeholder="Nova Senha"
-        value={newPassword}
-        onChange={(e) => setNewPassword(e.target.value)}
-        className="form-input"
-      />
-      <input
-        type="password"
-        placeholder="Confirme a Nova Senha"
-        value={confirmPassword}
-        onChange={(e) => setConfirmPassword(e.target.value)}
-        className="form-input"
-        style={{ marginTop: "10px" }}
-      />
-      <button className="btn" style={{ marginTop: "10px" }} onClick={handlePasswordChange}>
-        Confirmar
-      </button>
+    <div className="file-container">
+      <div className="header">
+        <img src={Logo} alt="Logo" className="logo" />
+        <h2 className="title">Magna ISO90001</h2>
+      </div>
+      <div className="file-panel">
+        <div className="panel-title">Alterar Senha</div>
+        <form className="auth-form">
+          <div className="auth-field">
+            <label className="auth-label">Nova Senha:</label>
+            <input
+              type="password"
+              placeholder="Nova Senha"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="auth-input"
+            />
+          </div>
+          <div className="auth-field">
+            <label className="auth-label">Confirme a Nova Senha:</label>
+            <input
+              type="password"
+              placeholder="Confirme a Nova Senha"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="auth-input"
+            />
+          </div>
+          <button type="button" className="auth-button" onClick={handlePasswordChange}>
+            Confirmar
+          </button>
+        </form>
+      </div>
+
     </div>
-    </>
   );
 };
 

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { ToastContainer, toast } from 'react-toastify';
+import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useNavigate, Link } from "react-router-dom";
+import Logo from "../../logo.svg";
 
 const Register = () => {
   const [nome, setNome] = useState('');
@@ -85,54 +86,63 @@ const Register = () => {
   };
 
   return (
-    <div className="login-container">
-      <h2>Criar Nova Conta</h2>
-      
-      {message && <p className="error">{message}</p>}
-      
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label htmlFor="nome">Nome:</label>
-          <input
-            id="nome"
-            type="text"
-            value={nome}
-            onChange={(e) => setNome(e.target.value)}
-            required
-            placeholder="Insira o seu nome completo"
-          />
-        </div>
+    <div className="file-container">
+      <div className="header">
+        <img src={Logo} alt="Logo" className="logo" />
+        <h2 className="title">Magna ISO90001</h2>
+      </div>
+      <div className="file-panel">
+        <div className="panel-title">Criar Nova Conta</div>
+        
+        {message && <div className="auth-error">{message}</div>}
+        
+        <form onSubmit={handleSubmit} className="auth-form">
+          <div className="auth-field">
+            <label htmlFor="nome" className="auth-label">Nome:</label>
+            <input
+              id="nome"
+              type="text"
+              className="auth-input"
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              required
+              placeholder="Insira o seu nome completo"
+            />
+          </div>
 
-        <div className="form-group">
-          <label htmlFor="email">Email:</label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            placeholder="seu@email.com"
-          />
-        </div>
+          <div className="auth-field">
+            <label htmlFor="email" className="auth-label">Email:</label>
+            <input
+              id="email"
+              type="email"
+              className="auth-input"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              placeholder="seu@email.com"
+            />
+          </div>
 
-        <div className="form-group">
-          <label htmlFor="password">Password Temporária:</label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            minLength={6}
-            required
-            placeholder="Mínimo 6 caracteres"
-          />
-        </div>
+          <div className="auth-field">
+            <label htmlFor="password" className="auth-label">Password Temporária:</label>
+            <input
+              id="password"
+              type="password"
+              className="auth-input"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              minLength={6}
+              required
+              placeholder="Mínimo 6 caracteres"
+            />
+          </div>
 
-        <button type="submit" disabled={loading}>
-          {loading ? "Criando conta..." : "Criar Conta"}
-        </button>
-      </form>
-      <ToastContainer />
+          <button type="submit" className="auth-button" disabled={loading}>
+            {loading ? "A criar conta..." : "Criar Conta"}
+          </button>
+        </form>
+      </div>
+
     </div>
   );
 };

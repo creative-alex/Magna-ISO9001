@@ -10,6 +10,8 @@ import { UserContext } from "./context/userContext";
 import { TutorialProvider } from "./context/tutorialContext";
 import NewTable from "./pages/novoProcedimento"
 import FirstLogin from "./components/Auth/firstLogin";
+import { ToastContainer } from "react-toastify";
+import 'react-toastify/dist/ReactToastify.css';
 import './App.css';
 
 function App() {
@@ -110,6 +112,17 @@ function App() {
           }
         />
       </Routes>
+      <ToastContainer 
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
     </TutorialProvider>
   );
 };
