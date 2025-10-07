@@ -42,7 +42,7 @@ const DocumentosAssociados = ({
     setLoading(true);
     try {
       // Busca todos os ficheiros na pasta principal e suas subpastas
-      const response = await fetch('https://api9001.duckdns.org/files/list-files-tree');
+      const response = await fetch('https://api-iso-9001.onrender.com/files/list-files-tree');
       
       if (!response.ok) {
         throw new Error('Erro ao buscar árvore de ficheiros');
@@ -172,7 +172,7 @@ const DocumentosAssociados = ({
       formData.append('file', file);
       formData.append('folderPath', folderPath + '/');
 
-      const response = await fetch('https://api9001.duckdns.org/files/upload-document', {
+      const response = await fetch('https://api-iso-9001.onrender.com/files/upload-document', {
         method: 'POST',
         body: formData,
       });
@@ -235,7 +235,7 @@ const DocumentosAssociados = ({
     console.log('👁️ Preview:', fullPath);
     
     try {
-      const response = await fetch('https://api9001.duckdns.org/files/get-pdf', {
+      const response = await fetch('https://api-iso-9001.onrender.com/files/get-pdf', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -280,7 +280,7 @@ const DocumentosAssociados = ({
     console.log('⬇️ Download:', fullPath);
     
     try {
-      const response = await fetch('https://api9001.duckdns.org/files/download', {
+      const response = await fetch('https://api-iso-9001.onrender.com/files/download', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

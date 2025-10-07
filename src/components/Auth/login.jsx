@@ -47,17 +47,25 @@ const Login = ({onLoginSuccess}) => {
         try {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
-            const token = await user.getIdToken();
             
-            const response = await fetch("https://api9001.duckdns.org/users/verifyTokenAndGetUserInfo", {
+            // Forçar refresh do token para garantir que está atualizado
+            const token = await user.getIdToken(true);
+            
+            console.log("🔐 Token gerado:", token.substring(0, 50) + "...");
+            console.log("👤 User UID:", user.uid);
+            
+                        const response = await fetch("https://api-iso-9001.onrender.com/users/verifyTokenAndGetUserInfo", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`, // Adicionar header Authorization
                 },
                 body: JSON.stringify({ token }),
             });
             
             const data = await response.json();
+            console.log("📥 Resposta da API:", response.status, data);
+            
             if (response.ok) {
                 // Verificar se é o primeiro login
                 if (data.isFirstLogin) {

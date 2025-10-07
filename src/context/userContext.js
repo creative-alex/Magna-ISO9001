@@ -28,14 +28,21 @@ export const UserProvider = ({ children }) => {
   // Função para verificar e validar o token do utilizador
   const validateUserToken = async (user) => {
     try {
-      const token = await user.getIdToken();
-      const response = await fetch("https://api9001.duckdns.org/users/verifyTokenAndGetUserInfo", {
+      // Forçar refresh do token para garantir que está atualizado
+      const token = await user.getIdToken(true);
+      
+      console.log("🔐 Validando token...", token.substring(0, 50) + "...");
+      
+      const response = await fetch("https://api-iso-9001.onrender.com/users/verifyTokenAndGetUserInfo", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`, // Adicionar header Authorization
         },
         body: JSON.stringify({ token }),
       });
+      
+      console.log("📥 Resposta da validação:", response.status);
       
       if (response.ok) {
         const userData = await response.json();
