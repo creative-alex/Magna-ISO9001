@@ -19,7 +19,7 @@ const DeleteButton = ({ file, currentPath, onDelete }) => {
         try {
             const filePath = [...currentPath, file.name].join("/");
             
-            const response = await fetch(`http://192.168.1.219:8080/files/delete`, {
+            const response = await fetch(`https://api9001.duckdns.org/files/delete`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

@@ -213,7 +213,7 @@ const isSuperAdmin = isSuperAdminFromState !== undefined ? isSuperAdminFromState
 useEffect(() => {
   const carregarFuncionarios = async () => {
     try {
-      const response = await fetch("http://192.168.1.219:8080/users/getAllUsers");
+      const response = await fetch("https://api9001.duckdns.org/users/getAllUsers");
       if (!response.ok) {
         throw new Error("Erro ao carregar funcionários");
       }
@@ -463,7 +463,7 @@ useEffect(() => {
     try {
       console.log("Atualizando donoProcesso no backend:", { originalFilename, nomeProcesso, newDonoProcesso });
       
-      const response = await fetch("http://192.168.1.219:8080/files/update-dono-processo", {
+      const response = await fetch("https://api9001.duckdns.org/files/update-dono-processo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
@@ -571,7 +571,7 @@ useEffect(() => {
 
     let currentTemplate = template;
 
-    fetch("http://192.168.1.219:8080/files/pdf-form-data", {
+    fetch("https://api9001.duckdns.org/files/pdf-form-data", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ filename: encodeURIComponent(originalFilename) }),
@@ -905,7 +905,7 @@ useEffect(() => {
     try {
       console.log('💾 Salvando histórico no backend para:', nomeProcesso);
       
-      const response = await fetch("http://192.168.1.219:8080/files/save-process-history", {
+      const response = await fetch("https://api9001.duckdns.org/files/save-process-history", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
@@ -934,7 +934,7 @@ useEffect(() => {
       
       console.log('📥 Carregando histórico do backend para:', nomeProcesso);
       
-      const response = await fetch("http://192.168.1.219:8080/files/get-process-data", {
+      const response = await fetch("https://api9001.duckdns.org/files/get-process-data", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ processId: nomeProcesso }),

@@ -218,13 +218,13 @@ export default function SelecionarPdf() {
 
   useEffect(() => {
     // Busca a árvore de ficheiros
-    fetch("http://192.168.1.219:8080/files/list-files-tree")
+    fetch("https://api9001.duckdns.org/files/list-files-tree")
       .then(res => res.json())
       .then(setFileTree)
       .catch(() => setFileTree([]));
 
     // Busca os donos dos processos
-    fetch("http://192.168.1.219:8080/files/process-owners")
+    fetch("https://api9001.duckdns.org/files/process-owners")
       .then(res => res.json())
       .then(setProcessOwners)
       .catch(() => setProcessOwners({}));
@@ -232,7 +232,7 @@ export default function SelecionarPdf() {
 
   // Função para recarregar a árvore de ficheiros após eliminação
   const reloadFileTree = () => {
-    fetch("http://192.168.1.219:8080/files/list-files-tree")
+    fetch("https://api9001.duckdns.org/files/list-files-tree")
       .then(res => res.json())
       .then(setFileTree)
       .catch(() => setFileTree([]));

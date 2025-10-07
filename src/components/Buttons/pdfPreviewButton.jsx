@@ -39,7 +39,7 @@ const PdfPreviewButton = ({ file, currentPath }) => {
         button.title = 'A descarregar...';
         button.style.opacity = '0.7';
         
-        const response = await fetch('http://192.168.1.219:8080/files/download', {
+        const response = await fetch('https://api9001.duckdns.org/files/download', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -72,7 +72,7 @@ const PdfPreviewButton = ({ file, currentPath }) => {
       }
       
       // 1. Primeiro, carrega os dados do PDF
-      const formDataResponse = await fetch("http://192.168.1.219:8080/files/pdf-form-data", {
+      const formDataResponse = await fetch("https://api9001.duckdns.org/files/pdf-form-data", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

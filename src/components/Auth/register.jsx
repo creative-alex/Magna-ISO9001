@@ -43,7 +43,7 @@ const Register = () => {
       };
 
       // Criar no backend
-      const response = await fetch('http://192.168.1.219:8080/users/createUser', {
+      const response = await fetch('https://api9001.duckdns.org/users/createUser', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

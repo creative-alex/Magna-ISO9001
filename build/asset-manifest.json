@@ -1,0 +1,22 @@
+{
+  "files": {
+    "main.css": "/Magna-ISO9001/static/css/main.2ce0ac0e.css",
+    "main.js": "/Magna-ISO9001/static/js/main.ba014194.js",
+    "static/js/453.f7be5b23.chunk.js": "/Magna-ISO9001/static/js/453.f7be5b23.chunk.js",
+    "static/media/bin.ico": "/Magna-ISO9001/static/media/bin.ca88803b6ff14a3ed091.ico",
+    "static/media/download.ico": "/Magna-ISO9001/static/media/download.8ef97bb4e0b1fa694d6c.ico",
+    "static/media/file_add.ico": "/Magna-ISO9001/static/media/file_add.62975d507be786608f89.ico",
+    "static/media/plus.ico": "/Magna-ISO9001/static/media/plus.b1600cdcb47761c8ef91.ico",
+    "static/media/user_add.ico": "/Magna-ISO9001/static/media/user_add.17214fbbcfaf74f17383.ico",
+    "static/media/ver.ico": "/Magna-ISO9001/static/media/ver.a5a20e35de58c9209560.ico",
+    "static/media/logo.svg": "/Magna-ISO9001/static/media/logo.995232adc80b178e4020c6c651da4aa3.svg",
+    "index.html": "/Magna-ISO9001/index.html",
+    "main.2ce0ac0e.css.map": "/Magna-ISO9001/static/css/main.2ce0ac0e.css.map",
+    "main.ba014194.js.map": "/Magna-ISO9001/static/js/main.ba014194.js.map",
+    "453.f7be5b23.chunk.js.map": "/Magna-ISO9001/static/js/453.f7be5b23.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.2ce0ac0e.css",
+    "static/js/main.ba014194.js"
+  ]
+}

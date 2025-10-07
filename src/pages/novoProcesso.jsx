@@ -35,7 +35,7 @@ export default function CreateProcess() {
     const fetchNextProcessNumber = async () => {
       try {
         // Buscar a lista de donos de processos para determinar quantos processos existem
-        const response = await fetch('http://192.168.1.219:8080/files/process-owners');
+        const response = await fetch('https://api9001.duckdns.org/files/process-owners');
         if (response.ok) {
           const processOwners = await response.json();
           
@@ -89,7 +89,7 @@ export default function CreateProcess() {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await fetch('http://192.168.1.219:8080/users/getAllUsers');
+        const response = await fetch('https://api9001.duckdns.org/users/getAllUsers');
         if (response.ok) {
           const usersData = await response.json();
           setUsers(usersData);
@@ -195,7 +195,7 @@ export default function CreateProcess() {
       console.log('Enviando dados para o backend...');
 
       // 3. PRIMEIRO: Guardar o PDF
-      const pdfResponse = await fetch('http://192.168.1.219:8080/files/save-pdf', {
+      const pdfResponse = await fetch('https://api9001.duckdns.org/files/save-pdf', {
         method: 'POST',
         body: formData
       });
@@ -208,7 +208,7 @@ export default function CreateProcess() {
       
       // 4. SEGUNDO: Criar o registro na BD
       console.log('🚀 Criando registro na BD...');
-      const recordResponse = await fetch('http://192.168.1.219:8080/files/create-record', {
+      const recordResponse = await fetch('https://api9001.duckdns.org/files/create-record', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

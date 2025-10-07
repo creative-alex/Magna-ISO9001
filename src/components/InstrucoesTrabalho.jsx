@@ -166,7 +166,7 @@ const InstrucoesTrabalho = ({
     setLoading(true);
     try {
       // Busca todos os ficheiros na pasta principal e suas subpastas
-      const response = await fetch('http://192.168.1.219:8080/files/list-files-tree');
+      const response = await fetch('https://api9001.duckdns.org/files/list-files-tree');
       
       if (!response.ok) {
         throw new Error('Erro ao buscar árvore de ficheiros');
@@ -324,7 +324,7 @@ const InstrucoesTrabalho = ({
       formData.append('file', file);
       formData.append('folderPath', folderPath + '/');
 
-      const response = await fetch('http://192.168.1.219:8080/files/upload-document', {
+      const response = await fetch('https://api9001.duckdns.org/files/upload-document', {
         method: 'POST',
         body: formData,
       });
@@ -394,7 +394,7 @@ const InstrucoesTrabalho = ({
       console.log('Fazendo download de:', fullPath);
       
       // URL para download
-      const downloadUrl = `http://192.168.1.219:8080/files/download/${encodeURIComponent(fullPath)}`;
+      const downloadUrl = `https://api9001.duckdns.org/files/download/${encodeURIComponent(fullPath)}`;
       
       // Cria um link temporário para download
       const link = document.createElement('a');
@@ -426,7 +426,7 @@ const InstrucoesTrabalho = ({
       try {
         console.log('Apagando arquivo:', fullPath);
         
-        const response = await fetch(`http://192.168.1.219:8080/files/delete/${encodeURIComponent(fullPath)}`, {
+        const response = await fetch(`https://api9001.duckdns.org/files/delete/${encodeURIComponent(fullPath)}`, {
           method: 'DELETE'
         });
         

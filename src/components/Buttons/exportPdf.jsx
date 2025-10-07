@@ -151,7 +151,7 @@ export default function ExportPdfButton({
       console.log("Template 2 - Enviando servico_saida:", servicoSaida);
     }
 
-    await fetch("http://192.168.1.219:8080/files/upload-pdf", {
+    await fetch("https://api9001.duckdns.org/files/upload-pdf", {
       method: "POST",
       body: formData,
     });
@@ -162,7 +162,7 @@ export default function ExportPdfButton({
         console.log("Atualizando dono do processo:", donoProcesso);
         const processId = pathFilename; // Usando o filename como processId
         
-        await fetch("http://192.168.1.219:8080/files/update-dono-processo", {
+        await fetch("https://api9001.duckdns.org/files/update-dono-processo", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
