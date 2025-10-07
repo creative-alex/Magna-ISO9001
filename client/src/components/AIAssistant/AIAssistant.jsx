@@ -205,24 +205,24 @@ const AIAssistant = ({
     window.addEventListener('popstate', handleURLChange);
     
     // Detectar navegação via History API
-    const originalPushState = history.pushState;
-    const originalReplaceState = history.replaceState;
+    const originalPushState = window.history.pushState;
+    const originalReplaceState = window.history.replaceState;
     
-    history.pushState = function(...args) {
-      originalPushState.apply(history, args);
+    window.history.pushState = function(...args) {
+      originalPushState.apply(window.history, args);
       handleURLChange();
     };
     
-    history.replaceState = function(...args) {
-      originalReplaceState.apply(history, args);
+    window.history.replaceState = function(...args) {
+      originalReplaceState.apply(window.history, args);
       handleURLChange();
     };
 
     return () => {
       observer.disconnect();
       window.removeEventListener('popstate', handleURLChange);
-      history.pushState = originalPushState;
-      history.replaceState = originalReplaceState;
+      window.history.pushState = originalPushState;
+      window.history.replaceState = originalReplaceState;
     };
   }, [tutorial.isActive, tutorial.tutorialState]);
 
