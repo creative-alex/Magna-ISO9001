@@ -21,10 +21,10 @@ async function testAuth() {
     // Teste 1: Verificar endpoints públicos
     console.log("\n📡 Testando endpoints públicos:");
     
-    const pingResponse = await fetch("https://api-iso-9001.onrender.com/ping");
+    const pingResponse = await fetch("https://api9001.duckdns.org/ping");
     console.log(`/ping: ${pingResponse.status} - ${await pingResponse.text()}`);
     
-    const healthResponse = await fetch("https://api-iso-9001.onrender.com/health");
+    const healthResponse = await fetch("https://api9001.duckdns.org/health");
     console.log(`/health: ${healthResponse.status} - ${await healthResponse.text()}`);
     
     // Teste 2: Verificar configuração do Firebase
@@ -41,7 +41,7 @@ async function testAuth() {
     const token = await user.getIdToken();
     console.log("Token gerado:", token.substring(0, 50) + "...");
     
-    const response = await fetch("https://api-iso-9001.onrender.com/users/verifyTokenAndGetUserInfo", {
+    const response = await fetch("https://api9001.duckdns.org/users/verifyTokenAndGetUserInfo", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -8,7 +8,7 @@ async function testNewAPI() {
     
     // Teste ping
     try {
-      const pingResponse = await fetch("https://api-iso-9001.onrender.com/ping");
+      const pingResponse = await fetch("https://api9001.duckdns.org/ping");
       console.log(`✅ /ping: ${pingResponse.status} - ${await pingResponse.text()}`);
     } catch (error) {
       console.log(`❌ /ping: Erro - ${error.message}`);
@@ -16,7 +16,7 @@ async function testNewAPI() {
     
     // Teste health
     try {
-      const healthResponse = await fetch("https://api-iso-9001.onrender.com/health");
+      const healthResponse = await fetch("https://api9001.duckdns.org/health");
       console.log(`✅ /health: ${healthResponse.status} - ${await healthResponse.text()}`);
     } catch (error) {
       console.log(`❌ /health: Erro - ${error.message}`);
@@ -24,7 +24,7 @@ async function testNewAPI() {
     
     // Teste verifyToken com token inválido
     try {
-      const tokenResponse = await fetch("https://api-iso-9001.onrender.com/users/verifyTokenAndGetUserInfo", {
+      const tokenResponse = await fetch("https://api9001.duckdns.org/users/verifyTokenAndGetUserInfo", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -60,7 +60,7 @@ console.log(`
    firebase.auth().currentUser.getIdToken(true).then(token => console.log(token))
 3. Copiar o token e testar manualmente:
    
-   fetch("https://api-iso-9001.onrender.com/users/verifyTokenAndGetUserInfo", {
+   fetch("https://api9001.duckdns.org/users/verifyTokenAndGetUserInfo", {
      method: "POST",
      headers: { "Content-Type": "application/json" },
      body: JSON.stringify({ token: "SEU_TOKEN_AQUI" })

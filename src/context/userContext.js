@@ -33,7 +33,7 @@ export const UserProvider = ({ children }) => {
       
       console.log("🔐 Validando token...", token.substring(0, 50) + "...");
       
-      const response = await fetch("https://api-iso-9001.onrender.com/users/verifyTokenAndGetUserInfo", {
+      const response = await fetch("https://api9001.duckdns.org/users/verifyTokenAndGetUserInfo", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

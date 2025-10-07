@@ -57,7 +57,7 @@ Abrir DevTools → Console e verificar:
 # PowerShell - Testar com token real
 $token = "SEU_TOKEN_AQUI"
 $body = @{ token = $token } | ConvertTo-Json
-Invoke-WebRequest -Uri "https://api-iso-9001.onrender.com/users/verifyTokenAndGetUserInfo" -Method POST -ContentType "application/json" -Body $body
+Invoke-WebRequest -Uri "https://api9001.duckdns.org/users/verifyTokenAndGetUserInfo" -Method POST -ContentType "application/json" -Body $body
 ```
 
 ### 3. Verificar Configuração Firebase
