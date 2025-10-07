@@ -1,0 +1,193 @@
+/* AI Assistant Styles - Balão de fala simples */
+.ai-assistant {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  transition: all 0.3s ease;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.ai-assistant__toggle {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 2px solid #a67725;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(200, 147, 47, 0.3);
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ai-assistant__toggle:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(200, 147, 47, 0.5);
+  background: linear-gradient(135deg, #b8832a 0%, #a67725 100%);
+}
+
+/* Balão de fala simples */
+.ai-assistant__bubble {
+  position: absolute;
+  bottom: 75px;
+  right: 0;
+  min-width: 20vw;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 12px 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  animation: bubbleAppear 0.3s ease-out;
+  font-size: 14px;
+  line-height: 1.4;
+  color: #374151;
+}
+
+/* Input pequeno no balão */
+.ai-assistant__bubble-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.ai-assistant__bubble-input input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 20px;
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.ai-assistant__bubble-input input:focus {
+  border-color: #C8932F;
+}
+
+.ai-assistant__bubble-input input::placeholder {
+  color: #9ca3af;
+  font-size: 11px;
+}
+
+.ai-assistant__bubble-send-btn {
+  background: #C8932F;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background-color 0.2s ease;
+}
+
+.ai-assistant__bubble-send-btn:hover {
+  background: #b8832a;
+}
+
+.ai-assistant__bubble-send-btn:disabled {
+  background: #d1d5db;
+  cursor: not-allowed;
+}
+
+/* Seta do balão */
+.ai-assistant__bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  right: 20px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid #ffffff;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.1));
+}
+
+@keyframes bubbleAppear {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Estados do tutorial */
+.ai-assistant__bubble--success {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+.ai-assistant__bubble--info {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1e40af;
+}
+
+.ai-assistant__bubble--warning {
+  background: #fffbeb;
+  border-color: #fed7aa;
+  color: #92400e;
+}
+
+/* Botão de fechar no balão */
+.ai-assistant__bubble-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: #9ca3af;
+  padding: 0;
+  line-height: 1;
+}
+
+.ai-assistant__bubble-close:hover {
+  color: #6b7280;
+}
+
+/* Efeito de destaque para elementos durante tutorial */
+.tutorial-highlight {
+  position: relative;
+  z-index: 999;
+}
+
+.tutorial-highlight::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  background: rgba(200, 147, 47, 0.2);
+  border: 2px solid #C8932F;
+  border-radius: 8px;
+  animation: tutorialPulse 2s infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+@keyframes tutorialPulse {
+  0%, 100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.02);
+  }
+}
