@@ -1,13 +1,13 @@
-ï»¿
+
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
-// FunÃ§Ã£o para desenhar histÃ³rico de ediÃ§Ãµes na Ãºltima pÃ¡gina do PDF
+// Função para desenhar histórico de edições na última página do PDF
 export function addEditHistoryToPdf(page, font, editHistory) {
   if (!editHistory || !Array.isArray(editHistory) || editHistory.length === 0) return;
   const { width } = page.getSize();
   const fontSize = 10;
-  let y = 60; // RodapÃ©, ajustÃ¡vel
-  page.drawText('HistÃ³rico de EdiÃ§Ãµes:', {
+  let y = 60; // Rodapé, ajustável
+  page.drawText('Histórico de Edições:', {
     x: 50,
     y,
     size: fontSize + 2,
@@ -44,11 +44,11 @@ export const obsYStart = yStart;
 export const spaceBetweenTables = 20;
 
 export async function addHeader(page, font, title, imageBytes = null, pathFilename) {
-  console.log("ðŸŽ¯ addHeader chamado:", { title, hasImage: !!imageBytes, pathFilename });
+  console.log("?? addHeader chamado:", { title, hasImage: !!imageBytes, pathFilename });
 
   const { width, height } = page.getSize();
   
-  // Desenhar o tÃ­tulo (nome do documento) no topo ao centro - sÃ³ se nÃ£o for o tÃ­tulo padrÃ£o
+  // Desenhar o título (nome do documento) no topo ao centro - só se não for o título padrão
   if (title && title.trim() !== '' && title !== 'Procedimento') {
     const titleSize = 14;
     const titleWidth = font.widthOfTextAtSize(title, titleSize);
@@ -116,7 +116,7 @@ export async function addHeader(page, font, title, imageBytes = null, pathFilena
         console.log(" Detectado JPEG");
         image = await page.doc.embedJpg(imageBytes);
       } else {
-        console.warn(" Formato nÃ£o suportado");
+        console.warn(" Formato não suportado");
         return;
       }
       
@@ -140,7 +140,7 @@ export async function addHeader(page, font, title, imageBytes = null, pathFilena
     }
   }
   
-  // Removido o separador horizontal para nÃ£o repetir em todas as pÃ¡ginas
+  // Removido o separador horizontal para não repetir em todas as páginas
 }
 
 export async function createBasePdf(title, imageBytes, pathFilename) {
@@ -150,15 +150,15 @@ export async function createBasePdf(title, imageBytes, pathFilename) {
   
   await addHeader(page, font, title, imageBytes, pathFilename);
   
-    // FunÃ§Ã£o para desenhar histÃ³rico de ediÃ§Ãµes na Ãºltima pÃ¡gina do PDF
+    // Função para desenhar histórico de edições na última página do PDF
 
-  // FunÃ§Ã£o para desenhar histÃ³rico de ediÃ§Ãµes na Ãºltima pÃ¡gina do PDF
+  // Função para desenhar histórico de edições na última página do PDF
   function addEditHistoryToPdf(page, font, editHistory) {
     if (!editHistory || !Array.isArray(editHistory) || editHistory.length === 0) return;
     const { width } = page.getSize();
     const fontSize = 10;
-    let y = 60; // RodapÃ©, ajustÃ¡vel
-    page.drawText('HistÃ³rico de EdiÃ§Ãµes:', {
+    let y = 60; // Rodapé, ajustável
+    page.drawText('Histórico de Edições:', {
       x: 50,
       y,
       size: fontSize + 2,
@@ -215,7 +215,7 @@ export function wrapText(text, font, fontSize, maxWidth) {
           lines.push(currentLine);
           currentLine = word;
         } else {
-          // Se uma palavra individual Ã© maior que maxWidth
+          // Se uma palavra individual é maior que maxWidth
           // Tenta quebrar a palavra por caracteres
           const chars = word.split('');
           let partialWord = '';
@@ -231,7 +231,7 @@ export function wrapText(text, font, fontSize, maxWidth) {
                 lines.push(partialWord);
                 partialWord = char;
               } else {
-                lines.push(char); // ForÃ§a pelo menos um caractere
+                lines.push(char); // Força pelo menos um caractere
               }
             }
           });
@@ -247,7 +247,7 @@ export function wrapText(text, font, fontSize, maxWidth) {
       lines.push(currentLine);
     }
     
-    // Adiciona as linhas deste parÃ¡grafo ao resultado final
+    // Adiciona as linhas deste parágrafo ao resultado final
     allLines.push(...lines);
   });
   
