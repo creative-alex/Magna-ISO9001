@@ -105,13 +105,6 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
     setExpandedFolder(expandedFolder === folderName ? null : folderName);
   };
 
-  // Função para verificar se o utilizador pode aceder a um processo
-  const canAccessProcess = (filePath) => {
-    // TODOS os users podem aceder e ver os ficheiros
-    // As permissões de edição são controladas separadamente no canEdit
-    return true;
-  };
-
   return (
     <div className="folder-structure">
       {sortedNodes.map(node => {
@@ -131,7 +124,7 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
                   {node.name}
                 </span>
                 <div className="folder-actions" style={{ display: 'flex', alignItems: 'center' }}>
-                  {canAccessProcess([...currentPath, node.name].join("/")) && currentPath.length === 0 && (isAdmin || (folderOwner && folderOwner.split(',').map(nome => nome.trim()).includes(currentUser))) ? (
+                  {currentPath.length === 0 && (isAdmin || (folderOwner && folderOwner.split(',').map(nome => nome.trim()).includes(currentUser))) ? (
                     <CreateTableButton
                       folderName={node.name}
                       currentPath={currentPath}
@@ -157,7 +150,10 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
         } else {
           // node.type === "file"
           const filePath = [...currentPath, node.name].join("/");
-          const hasAccess = canAccessProcess(filePath);
+          
+          // Ficheiros na raiz (nível 0) e dentro de pastas (nível 1) podem ser clicáveis
+          // Ficheiros em subpastas (nível 2+) NÃO podem ser clicáveis
+          const isClickableFile = currentPath.length <= 1;
           
           // Remove a extensão apenas para PDFs para manter compatibilidade
           const displayName = node.name.endsWith('.pdf') ? node.name.slice(0, -4) : node.name;
@@ -170,9 +166,9 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
           return (
             <div 
               key={node.name} 
-              className={`file ${hasAccess ? 'file-clickable' : ''}`}
-              onClick={hasAccess ? () => onSelectFile(filePath) : undefined}
-              style={{ cursor: hasAccess ? 'pointer' : 'default' }}
+              className={`file ${isClickableFile ? 'file-clickable' : ''}`}
+              onClick={isClickableFile ? () => onSelectFile(filePath) : undefined}
+              style={{ cursor: isClickableFile ? 'pointer' : 'default' }}
             >
               <span className="file-name">{displayName}</span>
               <div className="file-actions">
