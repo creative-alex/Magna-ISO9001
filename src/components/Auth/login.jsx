@@ -55,7 +55,7 @@ const Login = ({onLoginSuccess}) => {
             console.log("🔐 Token gerado:", token.substring(0, 50) + "...");
             console.log("👤 User UID:", user.uid);
             
-            const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.USERS}/verifyTokenAndGetUserInfo`, {
+                        const response = await fetch("https://api9001.duckdns.org/users/verifyTokenAndGetUserInfo", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
