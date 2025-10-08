@@ -6,6 +6,7 @@ import { UserContext } from "../../context/userContext";
 import LoadingPage from "../../pages/loading";
 import FirstLoginComponent from "./firstLogin";
 import Logo from "../../logo.svg";
+import { API_CONFIG } from "../../utils/constants";
 
 const Login = ({onLoginSuccess}) => {
     const [email, setEmail] = useState("");
@@ -54,7 +55,7 @@ const Login = ({onLoginSuccess}) => {
             console.log("🔐 Token gerado:", token.substring(0, 50) + "...");
             console.log("👤 User UID:", user.uid);
             
-                        const response = await fetch("https://api-iso-9001.onrender.com/users/verifyTokenAndGetUserInfo", {
+            const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.USERS}/verifyTokenAndGetUserInfo`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

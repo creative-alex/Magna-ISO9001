@@ -2,7 +2,7 @@
   "name": "front-end",
   "version": "0.1.0",
   "private": true,
-  "homepage": "./",
+  "homepage": "https://magnaiso9001.comenius.pt/",
   "dependencies": {
     "@react-pdf/renderer": "^4.3.0",
     "@testing-library/dom": "^10.4.0",

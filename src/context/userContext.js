@@ -2,6 +2,7 @@ import { createContext, useState, useEffect } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import LoadingPage from "../pages/loading";
+import { API_CONFIG } from "../utils/constants";
 
 // Configuração do Firebase
 const firebaseConfig = {
@@ -33,7 +34,7 @@ export const UserProvider = ({ children }) => {
       
       console.log("🔐 Validando token...", token.substring(0, 50) + "...");
       
-      const response = await fetch("https://api-iso-9001.onrender.com/users/verifyTokenAndGetUserInfo", {
+      const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.USERS}/verifyTokenAndGetUserInfo`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
