@@ -7,7 +7,7 @@
 /coverage
 
 # Production
-/build
+# /build (commented out for GitHub Actions deployment)
 
 # Misc
 .DS_Store
