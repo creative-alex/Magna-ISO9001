@@ -13,10 +13,9 @@ const Login = ({onLoginSuccess}) => {
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
-    const [isFirstLogin, setIsFirstLogin] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
-    const { auth, isAuthenticated } = useContext(UserContext);
+    const { auth, isAuthenticated, setUserEmail } = useContext(UserContext);
     const hasShownToast = useRef(false); // Prevenir múltiplos toasts
     const isLoginInProgress = useRef(false); // Prevenir re-execução do login
     
@@ -29,7 +28,6 @@ const Login = ({onLoginSuccess}) => {
             setPassword("");
             setError("");
             setLoading(false);
-            setIsFirstLogin(false);
         }
     }, [isAuthenticated]);
 
@@ -70,10 +68,18 @@ const Login = ({onLoginSuccess}) => {
             if (response.ok) {
                 // Verificar se é o primeiro login
                 if (data.isFirstLogin) {
-                    setIsFirstLogin(true);
+                    console.log("✅ É primeiro login! Redirecionando para /first-login...");
                     setLoading(false);
                     isLoginInProgress.current = false;
+                    
+                    // Guardar email no contexto para o first login
+                    setUserEmail(data.email);
+                    
+                    // Redirecionar para a página de first login
+                    navigate("/first-login", { replace: true });
                     return; // Não continuar com o login normal
+                } else {
+                    console.log("❌ NÃO é primeiro login, continuando login normal...");
                 }
                 
                 // Login bem-sucedido - só mostrar toast se foi um login real, não um redirecionamento
@@ -103,19 +109,7 @@ const Login = ({onLoginSuccess}) => {
         }
     }
 
-    const handleFirstLoginComplete = () => {
-        setIsFirstLogin(false);
-        hasShownToast.current = false; // Reset toast flag
-        isLoginInProgress.current = false; // Reset login flag
-        // Redirecionar para a página de login novamente
-        toast.success("Senha alterada com sucesso! Faça login novamente.");
-    };
-
-    // Se for primeiro login, mostrar o componente FirstLogin
-    if (isFirstLogin) {
-        return <FirstLoginComponent onComplete={handleFirstLoginComplete} />;
-    }
-
+    console.log("🎯 Mostrando login normal");
     return (
         <>
             {loading ? (

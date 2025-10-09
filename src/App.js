@@ -105,11 +105,7 @@ function App() {
         />
         <Route 
           path="/first-login"
-          element={
-            <ProtectedRoute>
-              <FirstLogin />
-            </ProtectedRoute>
-          }
+          element={<FirstLogin />}
         />
       </Routes>
       <ToastContainer 

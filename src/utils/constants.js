@@ -1,6 +1,6 @@
 // API Configuration
 export const API_CONFIG = {
-  BASE_URL: process.env.REACT_APP_API_URL || 'http://localhost:3001',
+  BASE_URL: process.env.REACT_APP_API_URL,
   ENDPOINTS: {
     AUTH: '/auth',
     USERS: '/users',
@@ -11,6 +11,6 @@ export const API_CONFIG = {
 
 // Other constants can be added here
 export const APP_CONSTANTS = {
-  MIN_PASSWORD_LENGTH: 8,
+  MIN_PASSWORD_LENGTH: 6,
   MAX_UPLOAD_SIZE: 10 * 1024 * 1024, 
 };
