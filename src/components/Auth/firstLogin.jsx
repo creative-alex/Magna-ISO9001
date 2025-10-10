@@ -75,8 +75,9 @@ const FirstLoginComponent = ({ onComplete }) => {
         if (onComplete) {
           onComplete();
         } else {
-          // Redirecionar para página de login
+          // Redirecionar para página de login e terminar sessão
           navigate("/");
+          
         }
       }, 2000); // 2 segundos de atraso
     } catch (error) {

@@ -19,6 +19,32 @@ const Login = ({onLoginSuccess}) => {
     const hasShownToast = useRef(false); // Prevenir múltiplos toasts
     const isLoginInProgress = useRef(false); // Prevenir re-execução do login
     
+    // Função para traduzir erros do Firebase para mensagens amigáveis
+    const getFirebaseErrorMessage = (error) => {
+        const errorCode = error.code;
+        
+        switch (errorCode) {
+            case 'auth/invalid-credential':
+                return 'Email ou senha incorretos. Verifique os seus dados e tente novamente.';
+            case 'auth/user-not-found':
+                return 'Não existe uma conta associada a este email.';
+            case 'auth/wrong-password':
+                return 'Senha incorreta. Verifique a sua senha e tente novamente.';
+            case 'auth/invalid-email':
+                return 'O formato do email não é válido.';
+            case 'auth/user-disabled':
+                return 'Esta conta foi desactivada. Contacte o administrador.';
+            case 'auth/too-many-requests':
+                return 'Muitas tentativas de login falhadas. Tente novamente mais tarde.';
+            case 'auth/network-request-failed':
+                return 'Erro de conexão. Verifique a sua ligação à internet.';
+            case 'auth/invalid-login-credentials':
+                return 'Credenciais de login inválidas. Verifique o email e senha.';
+            default:
+                return 'Erro ao fazer login. Verifique os seus dados e tente novamente.';
+        }
+    };
+    
     // Reset do componente quando o usuário faz logout
     useEffect(() => {
         if (!isAuthenticated) {
@@ -100,8 +126,9 @@ const Login = ({onLoginSuccess}) => {
         }
         catch (error) {
             console.error("Erro no login:", error);
-            setError("Erro ao fazer login: " + error.message);
-            toast.error("Erro ao fazer login: " + error.message);
+            const friendlyErrorMessage = getFirebaseErrorMessage(error);
+            setError(friendlyErrorMessage);
+            toast.error(friendlyErrorMessage);
         }
         finally {
             setLoading(false);
