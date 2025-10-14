@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import DeleteButton from './Buttons/delete';
+import { UserContext } from '../context/userContext';
 
 const DocumentosAssociados = ({ 
   currentValue, 
@@ -7,6 +9,8 @@ const DocumentosAssociados = ({
   isEditable = true, // Nova prop para controlar editabilidade
   canEdit = true // Nova prop para controlar se pode editar (permissões)
 }) => {
+  const { username, userRole } = useContext(UserContext);
+  const isSuperAdmin = (userRole && userRole.toLowerCase() === 'superadmin') || (username && username.toLowerCase() === 'superadmin');
   const [documentosDisponiveis, setDocumentosDisponiveis] = useState([]);
   const [documentosSelecionados, setDocumentosSelecionados] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -197,6 +201,22 @@ const DocumentosAssociados = ({
       setUploading(false);
       // Limpa o input file
       event.target.value = '';
+    }
+  };
+
+  // Callback após eliminação: atualiza lista e seleção
+  const handleDeleteAssociated = async (filePath) => {
+    try {
+      // Remove o documento eliminado da seleção, se existir
+      const deletedName = filePath.split('/').pop();
+      if (documentosSelecionados.includes(deletedName)) {
+        const novos = documentosSelecionados.filter(d => d !== deletedName);
+        setDocumentosSelecionados(novos);
+        onChange(novos.join('\n'));
+      }
+    } finally {
+      // Recarrega documentos da subpasta
+      await fetchDocumentos();
     }
   };
 
@@ -622,7 +642,7 @@ const DocumentosAssociados = ({
                             </div>
                           </div>
                           
-                          <div style={{ display: 'flex', gap: '8px' }}>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -665,6 +685,22 @@ const DocumentosAssociados = ({
                             >
                               ⬇️ Baixar
                             </button>
+                            {isSuperAdmin && (
+                              (() => {
+                                // Determina caminho completo e partes para o botão de eliminar
+                                const fullPath = typeof documento === 'object' ? documento.fullPath : (currentFolderPath ? `${currentFolderPath}/${docName}` : docName);
+                                const parts = fullPath.split('/');
+                                const fileNameOnly = parts.pop();
+                                const currentPathParts = parts; // caminho sem o ficheiro
+                                return (
+                                  <DeleteButton
+                                    file={{ name: fileNameOnly }}
+                                    currentPath={currentPathParts}
+                                    onDelete={handleDeleteAssociated}
+                                  />
+                                );
+                              })()
+                            )}
                           </div>
                         </div>
                       </div>

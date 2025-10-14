@@ -176,9 +176,6 @@ const PdfPreviewButton = ({ file, currentPath }) => {
         const mainRows = {};
         const obsRows = {};
         
-        // Debug dos dados do formulário
-        console.log('🔍 Dados do formulário recebidos:', Object.keys(formData));
-        
         Object.keys(formData).forEach(key => {
           if (key.startsWith('table2_r')) {
             const match = key.match(/table2_r(\d+)_c(\d+)/);

@@ -47,7 +47,9 @@ export async function generateEditablePdf({
   title = "", // Added missing title parameter
   imageBytes = null, // Novo parâmetro para imagem
   pathFilename = "", // Novo parâmetro para caminho do ficheiro
-  history = [] // Novo parâmetro para histórico
+  history = [], // Novo parâmetro para histórico
+  mergedSpans = {},
+  hiddenCells = {}
 }) {
     console.log("🎯 generateEditablePdf recebeu pathFilename:", pathFilename);
     console.log("🔍 generateEditablePdf recebeu history:", history);
@@ -64,7 +66,9 @@ export async function generateEditablePdf({
       title,
       imageBytes,
       pathFilename,
-      history
+      history,
+      mergedSpans,
+      hiddenCells
     });
   } else {
     return await generateEditablePdfTemplate1(data, headers, dataObs, headersObs, title, imageBytes, pathFilename, 400, history);
@@ -232,7 +236,7 @@ export async function generateEditablePdfTemplate1(data, headers, dataObs, heade
 
 // Implemente a função para Template2 conforme sugerido antes
 
-export async function generateEditablePdfTemplate2({ atividades, donoProcesso, objetivoProcesso, indicadores, servicosEntrada, servicoSaida, title = "Procedimento", imageBytes = null, pathFilename = "", history = [] }) {
+export async function generateEditablePdfTemplate2({ atividades, donoProcesso, objetivoProcesso, indicadores, servicosEntrada, servicoSaida, title = "Procedimento", imageBytes = null, pathFilename = "", history = [], mergedSpans = {}, hiddenCells = {} }) {
   const { pdfDoc, page, font } = await createBasePdf(title, imageBytes, pathFilename);
   const form = pdfDoc.getForm();
 
@@ -277,17 +281,26 @@ export async function generateEditablePdfTemplate2({ atividades, donoProcesso, o
   // Desenha grid e cabeçalhos da tabela de atividades
   drawTemplate2Table(page, font, yPos, atividades, headers);
 
-  // Campos editáveis para cada célula de atividades
+  // Campos editáveis para cada célula de atividades com suporte a "rowspan" lógico
   let camposY = yPos - 20; // primeira linha de dados
+  const baseRowHeight = 20;
   for (let row = 0; row < atividades.length; row++) {
     let xPos = xStart;
+    const rowKeyPrefix = `${row}-`;
     for (let col = 0; col < atividades[row].length; col++) {
+      const key = `${row}-${col}`;
+      // Se a célula está coberta por união acima, não desenhar o campo
+      if (hiddenCells[key]) { xPos += colWidthTemplate2[col]; continue; }
+      // Se esta é a célula de topo de uma união, aumentar a altura do campo
+      const span = mergedSpans[key] || 1;
       const fieldName = `atividades_r${row + 1}_c${col + 1}`;
       const textField = createTextFieldWithAppearance(form, fieldName, atividades[row][col], font, 8, false);
-      textField.addToPage(page, { x: xPos + 2, y: camposY + 2, width: colWidthTemplate2[col] - 4, height: 16 });
+      const height = baseRowHeight * span - 4; // 2px padding top/bottom
+      textField.addToPage(page, { x: xPos + 2, y: camposY - (baseRowHeight * (span - 1)) + 2, width: colWidthTemplate2[col] - 4, height });
       xPos += colWidthTemplate2[col];
     }
-    camposY -= 20;
+    // Avança Y pela altura base da linha (as unidas expandem no topo)
+    camposY -= baseRowHeight;
   }
 
   // Indicadores
@@ -318,7 +331,7 @@ export async function generateEditablePdfTemplate2({ atividades, donoProcesso, o
 }
 
 // Função para gerar PDF não editável do Template 2
-export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, objetivoProcesso, indicadores, servicosEntrada, servicoSaida, title = "Procedimento", imageBytes = null, pathFilename, history = []) {
+export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, objetivoProcesso, indicadores, servicosEntrada, servicoSaida, title = "Procedimento", imageBytes = null, pathFilename, history = [], mergeInfo = {}) {
   console.log("🔍 DEBUG generateNonEditablePdfTemplate2 - history recebido:", history);
   console.log("🔍 DEBUG generateNonEditablePdfTemplate2 - history length:", history?.length);
   
@@ -397,7 +410,22 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
   };
 
   // Calcula alturas de todas as linhas
-  const rowHeights = atividadesClean.map(row => getRowHeight(row));
+  const { mergedSpans = {}, hiddenCells = {} } = mergeInfo;
+  // Calcula alturas de todas as linhas considerando apenas células VISÍVEIS para cada linha
+  const rowHeights = atividadesClean.map((row, rIdx) => {
+    let hasVisible = false;
+    let maxLines = 1;
+    row.forEach((cellText, cIdx) => {
+      const hidden = !!hiddenCells[`${rIdx}-${cIdx}`];
+      if (!hidden) {
+        hasVisible = true;
+        const wrappedLines = wrapText((cellText || ''), font, 8, colWidthTemplate2[cIdx] - 8);
+        maxLines = Math.max(maxLines, wrappedLines.length);
+      }
+    });
+    if (!hasVisible) return baseRowHeight;
+    return Math.max(baseRowHeight, maxLines * 10 + 10);
+  });
   const headerHeight = 35;
 
   // Helpers para paginação
@@ -453,47 +481,76 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
     }
 
     let dataX = xStartCentered;
-    // Células da linha
+    // Células da linha (com suporte a união)
     for (let col = 0; col < atividadesClean[row].length; col++) {
-      currentPage.drawRectangle({
-        x: dataX,
-        y: currentY - rowHeight,
-        width: colWidthTemplate2[col],
-        height: rowHeight,
-        borderColor: rgb(0, 0, 0),
-        borderWidth: 1,
-      });
+      const key = `${row}-${col}`;
+      const span = mergedSpans[key] || 1;
+      const isHidden = !!hiddenCells[key];
 
-      const cellText = atividadesClean[row][col] || '';
-      const wrappedLines = wrapText(cellText, font, 8, colWidthTemplate2[col] - 8);
-
-      wrappedLines.forEach((line, lineIdx) => {
-        if (lineIdx < 8) {
-          const availableWidth = colWidthTemplate2[col] - 8;
-          const textWidth = font.widthOfTextAtSize(line, 8);
-          if (textWidth <= availableWidth) {
-            currentPage.drawText(line, {
-              x: dataX + 4,
-              y: currentY - 15 - (lineIdx * 10),
-              size: 8,
-              font,
-              color: rgb(0, 0, 0),
-            });
-          } else {
-            let truncatedText = line;
-            while (font.widthOfTextAtSize(truncatedText + '...', 8) > availableWidth && truncatedText.length > 0) {
-              truncatedText = truncatedText.slice(0, -1);
-            }
-            currentPage.drawText(truncatedText + (truncatedText.length < line.length ? '...' : ''), {
-              x: dataX + 4,
-              y: currentY - 15 - (lineIdx * 10),
-              size: 8,
-              font,
-              color: rgb(0, 0, 0),
-            });
-          }
+      // Determina altura a desenhar para este retângulo/célula
+      let cellHeight = rowHeight;
+      // Se é topo de uma união, somar as alturas das próximas (span-1) linhas cobertas
+      if (span > 1) {
+        let extra = 0;
+        for (let k = 1; k < span; k++) {
+          const r2 = row + k;
+          if (r2 < rowHeights.length) extra += rowHeights[r2];
         }
-      });
+        cellHeight += extra;
+      }
+
+      // Desenha a caixa da célula somente se não estiver hidden
+      if (!isHidden) {
+        currentPage.drawRectangle({
+          x: dataX,
+          y: currentY - cellHeight,
+          width: colWidthTemplate2[col],
+          height: cellHeight,
+          borderColor: rgb(0, 0, 0),
+          borderWidth: 1,
+        });
+
+        const cellText = atividadesClean[row][col] || '';
+        const wrappedLines = wrapText(cellText, font, 8, colWidthTemplate2[col] - 8);
+
+        // Centragem vertical apenas para células unidas (span > 1) e quando o conteúdo cabe
+        const lineHeightPx = 10;
+        const textBlockHeight = wrappedLines.length * lineHeightPx;
+        let startPad = 15; // alinhamento topo por defeito
+        if (span > 1 && textBlockHeight + 8 <= cellHeight) {
+          const extraTop = Math.max(0, Math.floor((cellHeight - textBlockHeight) / 2));
+          startPad = Math.max(8, extraTop + 5); // 5px de margem para não colar ao topo
+        }
+
+        wrappedLines.forEach((line, lineIdx) => {
+          if (lineIdx < 50) { // limite generoso por segurança
+            const availableWidth = colWidthTemplate2[col] - 8;
+            const textWidth = font.widthOfTextAtSize(line, 8);
+            const textY = currentY - startPad - (lineIdx * lineHeightPx);
+            if (textWidth <= availableWidth) {
+              currentPage.drawText(line, {
+                x: dataX + 4,
+                y: textY,
+                size: 8,
+                font,
+                color: rgb(0, 0, 0),
+              });
+            } else {
+              let truncatedText = line;
+              while (font.widthOfTextAtSize(truncatedText + '...', 8) > availableWidth && truncatedText.length > 0) {
+                truncatedText = truncatedText.slice(0, -1);
+              }
+              currentPage.drawText(truncatedText + (truncatedText.length < line.length ? '...' : ''), {
+                x: dataX + 4,
+                y: textY,
+                size: 8,
+                font,
+                color: rgb(0, 0, 0),
+              });
+            }
+          }
+        });
+      }
 
       dataX += colWidthTemplate2[col];
     }

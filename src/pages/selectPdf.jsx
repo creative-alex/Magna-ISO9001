@@ -161,7 +161,7 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
           // Verifica se o usuário pode deletar o arquivo
           const processOwnerString = processOwners[currentPath[0]];
           const isProcessOwner = processOwnerString && processOwnerString.split(',').map(nome => nome.trim()).includes(currentUser);
-          const canDelete = isAdmin || isProcessOwner;
+          const canDelete = isAdmin ;
           
           return (
             <div 

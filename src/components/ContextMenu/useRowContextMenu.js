@@ -8,7 +8,8 @@ const useRowContextMenu = ({
   onMoveRowDown, 
   onInsertRowAbove, 
   onInsertRowBelow, 
-  onDeleteRow 
+  onDeleteRow,
+  cellContextMenu // optional: array of cell-specific menu items
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -77,7 +78,7 @@ const useRowContextMenu = ({
     };
   }, [isOpen]);
 
-  const menuItems = [
+  const baseMenuItems = [
     {
       label: 'Mover para cima',
       icon: '↑',
@@ -114,6 +115,14 @@ const useRowContextMenu = ({
       className: 'delete-row'
     }
   ];
+
+  // Final menu items
+  let menuItems = baseMenuItems;
+  
+  // Add cell-specific menu items if provided
+  if (cellContextMenu && cellContextMenu.length > 0) {
+    menuItems = [...cellContextMenu, { type: 'separator' }, ...baseMenuItems];
+  }
 
   const contextMenu = isOpen ? createPortal(
     <div

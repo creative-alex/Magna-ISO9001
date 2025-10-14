@@ -32,7 +32,6 @@ export const UserProvider = ({ children }) => {
       // Forçar refresh do token para garantir que está atualizado
       const token = await user.getIdToken(true);
       
-      console.log("🔐 Validando token...", token.substring(0, 50) + "...");
       
       const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.USERS}/verifyTokenAndGetUserInfo`, {
         method: "POST",
@@ -43,7 +42,6 @@ export const UserProvider = ({ children }) => {
         body: JSON.stringify({ token }),
       });
       
-      console.log("📥 Resposta da validação:", response.status);
       
       if (response.ok) {
         const userData = await response.json();

@@ -7,10 +7,12 @@ import LoadingPage from "../../pages/loading";
 import FirstLoginComponent from "./firstLogin";
 import Logo from "../../logo.svg";
 import { API_CONFIG } from "../../utils/constants";
+import Ver from "../../icons/ver.ico";
 
 const Login = ({onLoginSuccess}) => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
@@ -76,8 +78,6 @@ const Login = ({onLoginSuccess}) => {
             // Forçar refresh do token para garantir que está atualizado
             const token = await user.getIdToken(true);
             
-            console.log("🔐 Token gerado:", token.substring(0, 50) + "...");
-            console.log("👤 User UID:", user.uid);
             
                         const response = await fetch("https://api9001.duckdns.org/users/verifyTokenAndGetUserInfo", {
                 method: "POST",
@@ -89,12 +89,10 @@ const Login = ({onLoginSuccess}) => {
             });
             
             const data = await response.json();
-            console.log("📥 Resposta da API:", response.status, data);
             
             if (response.ok) {
                 // Verificar se é o primeiro login
                 if (data.isFirstLogin) {
-                    console.log("✅ É primeiro login! Redirecionando para /first-login...");
                     setLoading(false);
                     isLoginInProgress.current = false;
                     
@@ -105,7 +103,6 @@ const Login = ({onLoginSuccess}) => {
                     navigate("/first-login", { replace: true });
                     return; // Não continuar com o login normal
                 } else {
-                    console.log("❌ NÃO é primeiro login, continuando login normal...");
                 }
                 
                 // Login bem-sucedido - só mostrar toast se foi um login real, não um redirecionamento
@@ -136,7 +133,6 @@ const Login = ({onLoginSuccess}) => {
         }
     }
 
-    console.log("🎯 Mostrando login normal");
     return (
         <>
             {loading ? (
@@ -161,13 +157,24 @@ const Login = ({onLoginSuccess}) => {
                             </div>
                             <div className="auth-field">
                                 <label className="auth-label">Senha:</label>
-                                <input
-                                    type="password"
-                                    className="auth-input"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    required
-                                />
+                                <div className="auth-input-wrapper">
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        className="auth-input"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        className="auth-input-toggle"
+                                        onClick={() => setShowPassword((p) => !p)}
+                                        aria-label={showPassword ? "Ocultar password" : "Ver password"}
+                                        title={showPassword ? "Ocultar password" : "Ver password"}
+                                    >
+                                        <img src={Ver} alt="" aria-hidden="true" />
+                                    </button>
+                                </div>
                             </div>
                             {error && <div className="auth-error">{error}</div>}
                             <button type="submit" className="auth-button" disabled={loading}>

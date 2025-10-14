@@ -404,6 +404,8 @@ useEffect(() => {
     }
   };
 
+
+
   // Funções para manipulação de indicadores
   const handleMoveIndicadorUp = (rowIdx) => {
     if (rowIdx > 0) {
@@ -1059,10 +1061,7 @@ useEffect(() => {
         addHistoryEntry('Modificou', alteracao);
       });
     }
-    
-    // Sempre adiciona uma entrada geral de salvamento
-    addHistoryEntry('Guardou', `Documento atualizado em ${agora}`);
-    
+        
     setHasUnsavedChanges(false);
     
     // Salvar histórico no backend após atualizar estado local

@@ -173,6 +173,17 @@ body {
   font-size: 16px;
   transition: all 0.3s ease;
   background: #ffffff;
+  font-family: inherit; /* garantir mesma fonte em text/password */
+  box-sizing: border-box; /* estabilidade de medidas */
+  height: 44px; /* manter altura estável ao alternar */
+  width: 100%; /* manter largura estável */
+  letter-spacing: normal; /* evitar diferenças entre tipos */
+}
+
+/* Ocultar botão nativo de revelar/limpar no Edge/IE para impedir shift */
+.auth-input::-ms-reveal,
+.auth-input::-ms-clear {
+  display: none;
 }
 
 .auth-input:focus {
@@ -180,6 +191,43 @@ body {
   border-color: #C8932F;
   background: white;
   box-shadow: 0 0 0 3px rgba(200, 147, 47, 0.1);
+}
+
+/* Toggle de visibilidade dentro do input de senha */
+.auth-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.auth-input-wrapper .auth-input {
+  padding-right: 40px; /* espaço para o ícone */
+}
+
+.auth-input-toggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.auth-input-toggle img {
+  width: 18px;
+  height: 18px;
+  opacity: 0.85;
+}
+
+.auth-input-toggle:hover img {
+  opacity: 1;
 }
 
 .auth-button {

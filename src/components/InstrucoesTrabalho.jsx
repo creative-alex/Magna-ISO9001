@@ -156,9 +156,6 @@ const InstrucoesTrabalho = ({
     const mainFolder = parts[0];
     const currentFileName = parts[parts.length - 1]; // Nome do ficheiro atual
     
-    console.log('📁 Pasta principal:', mainFolder);
-    console.log('📄 Nome do ficheiro atual:', currentFileName);
-    
     // Extrai o prefixo do nome do ficheiro (parte antes do primeiro espaço)
     const filePrefix = currentFileName.split(' ')[0];
     console.log('🏷️ Prefixo do ficheiro:', filePrefix);
@@ -173,7 +170,6 @@ const InstrucoesTrabalho = ({
       }
       
       const fileTree = await response.json();
-      console.log('🌳 Árvore de ficheiros recebida');
       
       // Encontra a pasta principal na árvore
       const mainFolderNode = fileTree.find(node => 
@@ -187,11 +183,6 @@ const InstrucoesTrabalho = ({
         return;
       }
       
-      // Encontra a subpasta que contém "Instruções de trabalho procedimento" e termina com o mesmo prefixo do ficheiro atual
-      console.log('🔍 Procurando por pasta que:');
-      console.log('   - Contenha: "Instruções de trabalho procedimento"');
-      console.log('   - Termine com: "' + filePrefix + '"');
-      console.log('📂 Pastas disponíveis na pasta principal:');
       mainFolderNode.children.forEach(node => {
         if (node.type === 'folder') {
           console.log(`   - "${node.name}" (toLowerCase: "${node.name.toLowerCase()}")`)
@@ -208,7 +199,6 @@ const InstrucoesTrabalho = ({
       );
       
       if (!targetSubfolder || !targetSubfolder.children) {
-        console.log(`❌ Subpasta de "Instruções de trabalho procedimento" que termina com "${filePrefix}" não encontrada ou vazia`);
         
         // Tenta uma busca alternativa mais flexível
         console.log('🔄 Tentando busca alternativa...');
@@ -220,7 +210,6 @@ const InstrucoesTrabalho = ({
         );
         
         if (alternativeSubfolder && alternativeSubfolder.children) {
-          console.log(`✅ Pasta alternativa encontrada: "${alternativeSubfolder.name}"`);
           targetSubfolder = alternativeSubfolder; // Usar a pasta alternativa
         } else {
           setInstrucoesDisponiveis([]);
@@ -229,7 +218,6 @@ const InstrucoesTrabalho = ({
         }
       }
       
-      console.log(`📂 Usando subpasta: ${targetSubfolder.name}`);
       
       // Função recursiva para extrair todos os ficheiros da subpasta específica
       const extractAllFiles = (nodes, currentPath = '', folderName = '') => {
@@ -257,7 +245,6 @@ const InstrucoesTrabalho = ({
       
       // Extrai todos os ficheiros da subpasta específica
       const allFiles = extractAllFiles(targetSubfolder.children, '', targetSubfolder.name);
-      console.log(`📋 ${allFiles.length} ficheiros encontrados na subpasta "${targetSubfolder.name}"`);
       
       // Filtra para mostrar apenas ficheiros (remove extensões para display)
       const instrucoes = allFiles.map(file => ({

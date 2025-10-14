@@ -17,8 +17,10 @@ export default function ExportPdfButton({
   exportRef,
   servicosEntrada,
   servicoSaida,
-  onSaveSuccess, // Novo prop para callback após guardar
-  history = [] // Novo prop para histórico
+  mergedSpans = {},
+  hiddenCells = {},
+  onSaveSuccess,
+  history = [], 
 }) {
   // Função para carregar automaticamente a imagem PNG da empresa
   const loadCompanyImage = async () => {
@@ -26,7 +28,6 @@ export default function ExportPdfButton({
       const response = await fetch('/c_comenius_cor.png');
       if (response.ok) {
         const arrayBuffer = await response.arrayBuffer();
-        console.log("✅ Imagem da empresa carregada automaticamente");
         return arrayBuffer;
       } else {
         console.warn("⚠️ Imagem da empresa não encontrada");
@@ -53,14 +54,6 @@ export default function ExportPdfButton({
 
   // Função para enviar PDF editável para o backend
   const handleSendToBackend = async () => {
-    console.log("🔍 DEBUG - pathFilename recebido:", pathFilename);
-    console.log("🔍 DEBUG - tipo do pathFilename:", typeof pathFilename);
-    console.log("🔍 DEBUG - pathFilename está vazio?", !pathFilename);
-    
-    console.log("handleSendToBackend chamado com:");
-    console.log("templateType:", templateType);
-    console.log("servicosEntrada:", servicosEntrada);
-    console.log("servicoSaida:", servicoSaida);
     
     const stringHeaders = headers.map(h =>
       typeof h === "string"
@@ -76,20 +69,13 @@ export default function ExportPdfButton({
     const filename = parts.pop();
     const folders = parts;
     
-    console.log("🔍 DEBUG - parts após split:", parts);
-    console.log("🔍 DEBUG - filename:", filename);
-    console.log("🔍 DEBUG - folders:", folders);
 
     // Carregar automaticamente a imagem PNG da empresa
     let imageBytes = await loadCompanyImage();
     if (imageBytes) {
       imageBytes = new Uint8Array(imageBytes);
-      console.log("✅ Imagem da empresa carregada:", imageBytes.length, "bytes");
     }
 
-    console.log("🔍 DEBUG ExportPdfButton - templateType:", templateType);
-    console.log("🔍 DEBUG ExportPdfButton - history recebido:", history);
-    console.log("🔍 DEBUG ExportPdfButton - history length:", history?.length);
 
     // Passe todos os dados e o templateType
     const editablePdfBytes = await generateEditablePdf({
@@ -104,13 +90,14 @@ export default function ExportPdfButton({
       indicadores,
       servicosEntrada,
       servicoSaida,
+      mergedSpans,
+      hiddenCells,
       title: "Procedimento",
       imageBytes,
-      pathFilename: pathFilename || "SemNome/documento.pdf", // ← FALLBACK se estiver vazio
+      pathFilename: pathFilename, 
       history
     });
     
-    console.log("🔍 DEBUG - pathFilename enviado para generateEditablePdf:", pathFilename || "SemNome/documento.pdf");
     
     const formData = new FormData();
     formData.append("file", new Blob([editablePdfBytes], { type: "application/pdf" }), filename);
@@ -144,12 +131,7 @@ export default function ExportPdfButton({
         formData.append("indicadores_r2", indicadores.indicadores_r2 || "");
         formData.append("indicadores_r3", indicadores.indicadores_r3 || "");
       }
-      
-      console.log("Template 2 - Enviando atividades:", atividades);
-      console.log("Template 2 - Enviando indicadores:", indicadores);
-      console.log("Template 2 - Enviando servicos_entrada:", servicosEntrada);
-      console.log("Template 2 - Enviando servico_saida:", servicoSaida);
-    }
+          }
 
     await fetch("https://api9001.duckdns.org/files/upload-pdf", {
       method: "POST",
@@ -173,7 +155,6 @@ export default function ExportPdfButton({
           }),
         });
         
-        console.log("Dono do processo atualizado com sucesso!");
       } catch (error) {
         console.error("Erro ao atualizar dono do processo:", error);
       }

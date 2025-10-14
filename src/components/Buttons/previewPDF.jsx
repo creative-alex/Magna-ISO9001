@@ -4,15 +4,16 @@ import { generateNonEditablePdfFromHtml, generateNonEditablePdfTemplate2 } from 
 export default function PreviewPdfButton({ 
   getTablesHtml, 
   templateType = 1,
-  pathFilename, // Parâmetro para o caminho do ficheiro
-  // Props específicas para Template 2
+  pathFilename, 
   atividades,
   donoProcesso,
   objetivoProcesso,
   indicadores,
   servicosEntrada,
   servicoSaida,
-  history = [] // Novo prop para histórico
+  history = [], 
+  mergedSpans = {},
+  hiddenCells = {}
 }) {
   // Função para carregar automaticamente a imagem PNG da empresa
   const loadCompanyImage = async () => {
@@ -20,7 +21,6 @@ export default function PreviewPdfButton({
       const response = await fetch('/c_comenius_cor.png');
       if (response.ok) {
         const arrayBuffer = await response.arrayBuffer();
-        console.log("✅ Imagem da empresa carregada para preview");
         return new Uint8Array(arrayBuffer);
       } else {
         console.warn("⚠️ Imagem da empresa não encontrada para preview");
@@ -32,14 +32,8 @@ export default function PreviewPdfButton({
     }
   };
 
-  const handlePreviewNonEditable = async () => {
-    console.log("🔍 DEBUG PreviewPdfButton - templateType:", templateType);
-    console.log("🔍 DEBUG PreviewPdfButton - history recebido:", history);
-    console.log("🔍 DEBUG PreviewPdfButton - history length:", history?.length);
-    
-    // Carregar a imagem PNG da empresa
-    const imageBytes = await loadCompanyImage();
-    
+  const handlePreviewNonEditable = async () => {    
+    const imageBytes = await loadCompanyImage();    
     if (templateType === 2) {
       // Usa a função específica do Template 2
       const nonEditablePdfBytes = await generateNonEditablePdfTemplate2(
@@ -52,7 +46,8 @@ export default function PreviewPdfButton({
         "Procedimento",
         imageBytes,
         pathFilename,
-        history
+        history,
+        { mergedSpans, hiddenCells }
       );
       const blob = new Blob([nonEditablePdfBytes], { type: "application/pdf" });
       const blobUrl = URL.createObjectURL(blob);

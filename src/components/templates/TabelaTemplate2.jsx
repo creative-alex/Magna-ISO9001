@@ -52,6 +52,14 @@ export default function Template2({
   // Refs para textareas auto-resize
   const textAreaRefs = useRef({});
   
+  // Estado para rastrear a célula clicada no context menu
+  const [contextMenuCell, setContextMenuCell] = useState(null);
+  // Estado para células unidas e células cobertas
+  // mergedSpans: chave "row-col" -> número de linhas abrangidas (>=2)
+  // hiddenCells: chave "row-col" -> true (célula coberta por uma união acima)
+  const [mergedSpans, setMergedSpans] = useState({});
+  const [hiddenCells, setHiddenCells] = useState({});
+
   // Hook para o context menu das atividades
   const contextMenuAtividades = useRowContextMenu({
     totalRows: atividades.length,
@@ -59,7 +67,80 @@ export default function Template2({
     onMoveRowDown: onMoveAtividadeDown,
     onInsertRowAbove: onInsertAtividadeAbove,
     onInsertRowBelow: onInsertAtividadeBelow,
-    onDeleteRow: onDeleteAtividade
+    onDeleteRow: onDeleteAtividade,
+    // Itens específicos de célula: unir/expandir e desfazer passo a passo
+    cellContextMenu: (() => {
+      const canAct = contextMenuCell && Number.isInteger(contextMenuCell.row) && Number.isInteger(contextMenuCell.col);
+      const keyTop = canAct ? `${contextMenuCell.row}-${contextMenuCell.col}` : '';
+      const currentSpan = (canAct && mergedSpans[keyTop]) ? mergedSpans[keyTop] : 1;
+      const nextRow = canAct ? contextMenuCell.row + currentSpan : -1;
+      const canExpandDown = !!canAct && nextRow < atividades.length && !hiddenCells[`${nextRow}-${contextMenuCell.col}`];
+      const canUnmergeStep = !!canAct && currentSpan >= 2;
+
+      return [
+        {
+          label: 'Unir/Expandir para baixo',
+          icon: '↕',
+          className: 'merge-down',
+          disabled: !canExpandDown,
+          action: () => {
+            if (!canExpandDown) return;
+            const { row, col } = contextMenuCell;
+            const topKey = `${row}-${col}`;
+            const span = mergedSpans[topKey] ? mergedSpans[topKey] : 1;
+            const targetRow = row + span; // linha a unir agora
+            // Valores atuais
+            const topVal = (atividades[row] && atividades[row][col]) || '';
+            const bottomVal = (atividades[targetRow] && atividades[targetRow][col]) || '';
+            // Concatenar com quebra de linha se ambos existirem
+            const newVal = topVal && bottomVal ? `${topVal}\n${bottomVal}` : (topVal || bottomVal);
+            // Atualizar dados via handlers fornecidos
+            handleAtividadesChange(row, col, newVal);
+            handleAtividadesChange(targetRow, col, '');
+            // Atualizar spans e células cobertas
+            setMergedSpans(prev => ({ ...prev, [topKey]: span + 1 }));
+            setHiddenCells(prev => ({ ...prev, [`${targetRow}-${col}`]: true }));
+          }
+        },
+        {
+          label: 'Reduzir união ',
+          icon: '⟲',
+          className: 'unmerge',
+          disabled: !canUnmergeStep,
+          action: () => {
+            if (!canUnmergeStep) return;
+            const { row, col } = contextMenuCell;
+            const topKey = `${row}-${col}`;
+            const span = mergedSpans[topKey];
+            if (!span || span < 2) return;
+            const lastCoveredRow = row + span - 1;
+            const mergedValue = (atividades[row] && atividades[row][col]) || '';
+            const lastNl = mergedValue.lastIndexOf('\n');
+            if (lastNl !== -1) {
+              const topPart = mergedValue.slice(0, lastNl);
+              const bottomPart = mergedValue.slice(lastNl + 1);
+              handleAtividadesChange(row, col, topPart);
+              handleAtividadesChange(lastCoveredRow, col, bottomPart);
+            }
+            // Atualizar spans e desbloquear última célula coberta
+            setMergedSpans(prev => {
+              const next = { ...prev };
+              if (span > 2) {
+                next[topKey] = span - 1;
+              } else {
+                delete next[topKey];
+              }
+              return next;
+            });
+            setHiddenCells(prev => {
+              const next = { ...prev };
+              delete next[`${lastCoveredRow}-${col}`];
+              return next;
+            });
+          }
+        }
+      ];
+    })()
   });
 
   // Hook para o context menu dos indicadores (dinâmico)
@@ -191,14 +272,69 @@ export default function Template2({
     const textarea = e.target;
     textarea.style.height = 'auto';
     textarea.style.height = `${Math.max(textarea.scrollHeight, 40)}px`;
+    // Se for célula unida, ajustar padding para centrar verticalmente
+    const isMerged = textarea.dataset && textarea.dataset.merged === '1';
+    if (isMerged) {
+      const td = textarea.closest('td');
+      if (td) {
+        // Mede altura disponível no TD e do conteúdo (scrollHeight inclui padding)
+        const tdH = td.clientHeight;
+        // Coloca altura auto para medir conteúdo real
+        const prevH = textarea.style.height;
+        textarea.style.height = 'auto';
+        const contentH = textarea.scrollHeight;
+        textarea.style.height = prevH;
+        // Padding base atual
+        const cs = window.getComputedStyle(textarea);
+        const baseTop = parseFloat(cs.paddingTop) || 10;
+        const baseBottom = parseFloat(cs.paddingBottom) || 10;
+        const baseTotal = baseTop + baseBottom;
+        const contentFits = contentH <= tdH; // conteúdo cabe dentro do TD?
+        if (contentFits) {
+          // Centrar com padding extra e ocupar 100% do TD
+          const extraEach = Math.max(Math.floor((tdH - contentH) / 2), 0);
+          textarea.style.height = '100%';
+          textarea.style.paddingTop = `${baseTop + extraEach}px`;
+          textarea.style.paddingBottom = `${baseBottom + extraEach}px`;
+        } else {
+          // Deixar crescer para caber o conteúdo, sem scrollbars
+          textarea.style.height = `${contentH}px`;
+          textarea.style.paddingTop = `${baseTop}px`;
+          textarea.style.paddingBottom = `${baseBottom}px`;
+        }
+        textarea.style.overflowY = 'hidden';
+      }
+    } else {
+      textarea.style.paddingTop = '';
+      textarea.style.paddingBottom = '';
+      textarea.style.overflowY = 'hidden';
+    }
   };
+
+  // Re-aplica o cálculo após renderizações e alterações de dados
+  useEffect(() => {
+    const doRecalc = () => {
+      Object.values(textAreaRefs.current || {}).forEach((el) => {
+        if (el) {
+          const evt = new Event('input', { bubbles: true });
+          el.dispatchEvent(evt);
+        }
+      });
+    };
+    const raf = requestAnimationFrame(doRecalc);
+    window.addEventListener('resize', doRecalc);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', doRecalc);
+    };
+  }, [atividades, mergedSpans, hiddenCells]);
 
   // Redimensiona textareas quando dados mudam
   useEffect(() => {
     Object.values(textAreaRefs.current).forEach(textarea => {
       if (textarea) {
-        textarea.style.height = 'auto';
-        textarea.style.height = `${Math.max(textarea.scrollHeight, 40)}px`;
+        // Reutiliza a mesma lógica do onInput para aplicar auto-resize e centragem vertical quando necessário
+        handleTextareaResize({ target: textarea });
       }
     });
   }, [atividades, servicosEntrada, servicoSaida, objetivoProcesso, indicadores]);
@@ -246,6 +382,8 @@ export default function Template2({
                 pathFilename={pathFilename}
                 servicosEntrada={servicosEntrada}
                 servicoSaida={servicoSaida}
+                mergedSpans={mergedSpans}
+                hiddenCells={hiddenCells}
                 onSaveSuccess={() => {
                   onSaveSuccess && onSaveSuccess();
                   setIsEditable(false); // Desativa edição após guardar
@@ -265,6 +403,8 @@ export default function Template2({
           servicoSaida={servicoSaida}
           pathFilename={pathFilename}
           history={history}
+          mergedSpans={mergedSpans}
+          hiddenCells={hiddenCells}
         />
         
         {/* Botão de debug para limpar histórico - só aparece quando está a editar */}
@@ -357,54 +497,82 @@ export default function Template2({
 
 {/* Tabela Principais Atividades */}
 <table className="tabela-atividades">
+  <colgroup>
+    <col className="col-1" />
+    <col className="col-2" />
+    <col className="col-3" />
+    <col className="col-4" />
+    <col className="col-5" />
+    <col className="col-6" />
+  </colgroup>
   <thead>
     <tr>
-      <th>Principais Atividades</th>
-      <th>Procedimentos Associados</th>
-      <th>Requisitos ISO 9001</th>
-      <th>Requisitos DGERT</th>
-      <th>Requisitos EQAVET</th>
-      <th>Requisitos CQCQ</th>
+      <th className="col-1">Principais Atividades</th>
+      <th className="col-2">Procedimentos Associados</th>
+      <th className="col-3">Requisitos ISO 9001</th>
+      <th className="col-4">Requisitos DGERT</th>
+      <th className="col-5">Requisitos EQAVET</th>
+      <th className="col-6">Requisitos CQCQ</th>
     </tr>
   </thead>
   <tbody>
-    {atividades.map((row, rowIdx) => (
-      <tr 
-        key={rowIdx}
-        onContextMenu={(e) => contextMenuAtividades.handleContextMenuEvent(e, rowIdx)}
-      >
-        {row.map((cell, colIdx) => {
-          const labels = [
-            'Principais Atividades',
-            'Procedimentos Associados', 
-            'Requisitos ISO 9001',
-            'Requisitos DGERT',
-            'Requisitos EQAVET',
-            'Requisitos CQCQ'
-          ];
-          return (
-            <td key={colIdx} data-label={labels[colIdx]}>
-              <textarea
-                ref={(el) => textAreaRefs.current[`atividade-${rowIdx}-${colIdx}`] = el}
-                className="tabela-atividades-input custom"
-                value={cell}
-                onChange={e => handleAtividadesChange(rowIdx, colIdx, e.target.value)}
-                onInput={handleTextareaResize}
-                placeholder={`${colIdx === 0 ? 'Atividade' : colIdx === 1 ? 'Procedimento' : 'Requisito'}...`}
-                style={{ resize: 'none' }}
-                readOnly={!isEditable}
-              />
-            </td>
-          );
-        })}
-      </tr>
-    ))}
+    {atividades.map((row, rowIdx) => {
+      return (
+        <tr 
+          key={rowIdx}
+          onContextMenu={isEditable ? (e) => contextMenuAtividades.handleContextMenuEvent(e, rowIdx) : undefined}
+        >
+          {row.map((cell, colIdx) => {
+            const labels = [
+              'Principais Atividades',
+              'Procedimentos Associados', 
+              'Requisitos ISO 9001',
+              'Requisitos DGERT',
+              'Requisitos EQAVET',
+              'Requisitos CQCQ'
+            ];
+
+            const key = `${rowIdx}-${colIdx}`;
+            const mergedTop = (mergedSpans[key] && mergedSpans[key] >= 2) || false;
+            // Célula está coberta por uma união acima?
+            const hidden = !!hiddenCells[key];
+            if (hidden) return null;
+
+            return (
+              <td 
+                key={colIdx} 
+                data-label={labels[colIdx]}
+                onContextMenu={isEditable ? ((e) => {
+                  e.stopPropagation();
+                  setContextMenuCell({ row: rowIdx, col: colIdx });
+                  contextMenuAtividades.handleContextMenuEvent(e, rowIdx);
+                }) : undefined}
+                rowSpan={mergedTop ? mergedSpans[key] : 1}
+                className={`${mergedTop ? 'merged-cell ' : ''}col-${colIdx + 1}`}
+              >
+                <textarea
+                  ref={(el) => textAreaRefs.current[`atividade-${rowIdx}-${colIdx}`] = el}
+                  className="tabela-atividades-input custom"
+                  value={cell}
+                  onChange={e => handleAtividadesChange(rowIdx, colIdx, e.target.value)}
+                  onInput={handleTextareaResize}
+                  placeholder={`${colIdx === 0 ? 'Atividade' : colIdx === 1 ? 'Procedimento' : 'Requisito'}...`}
+                  style={{ resize: 'none' }}
+                  data-merged={mergedTop ? '1' : '0'}
+                  readOnly={!isEditable}
+                />
+              </td>
+            );
+          })}
+        </tr>
+      );
+    })}
   </tbody>
 </table>
 
 {/* Renderizar os context menus fora das tabelas */}
-{contextMenuAtividades.contextMenu}
-{contextMenuIndicadores.contextMenu}
+{isEditable && contextMenuAtividades.contextMenu}
+{isEditable && contextMenuIndicadores.contextMenu}
 
 {/* Tabela Indicadores de monitorização do processo */}
 <table className="tabela-indicadores">
@@ -418,7 +586,7 @@ export default function Template2({
     {Array.isArray(indicadores) ? (
       // Se for array, renderizar dinamicamente
       indicadores.map((indicador, rowIdx) => (
-        <tr key={rowIdx} onContextMenu={(e) => contextMenuIndicadores.handleContextMenuEvent(e, rowIdx)}>
+        <tr key={rowIdx} onContextMenu={isEditable ? (e) => contextMenuIndicadores.handleContextMenuEvent(e, rowIdx) : undefined}>
           <td>
             <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>
               Indicador R{rowIdx + 1}:
@@ -439,7 +607,7 @@ export default function Template2({
     ) : (
       // Se for objeto, renderizar os 3 campos fixos
       <>
-        <tr onContextMenu={(e) => contextMenuIndicadores.handleContextMenuEvent(e, 0)}>
+        <tr onContextMenu={isEditable ? (e) => contextMenuIndicadores.handleContextMenuEvent(e, 0) : undefined}>
           <td>
             <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>
               Indicador R1:
@@ -456,7 +624,7 @@ export default function Template2({
             />
           </td>
         </tr>
-        <tr onContextMenu={(e) => contextMenuIndicadores.handleContextMenuEvent(e, 1)}>
+        <tr onContextMenu={isEditable ? (e) => contextMenuIndicadores.handleContextMenuEvent(e, 1) : undefined}>
           <td>
             <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>
               Indicador R2:
@@ -473,7 +641,7 @@ export default function Template2({
             />
           </td>
         </tr>
-        <tr onContextMenu={(e) => contextMenuIndicadores.handleContextMenuEvent(e, 2)}>
+        <tr onContextMenu={isEditable ? (e) => contextMenuIndicadores.handleContextMenuEvent(e, 2) : undefined}>
           <td>
             <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>
               Indicador R3:
