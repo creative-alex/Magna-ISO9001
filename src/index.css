@@ -139,6 +139,7 @@ body {
   gap: 1.5rem;
   max-width: 400px;
   margin: 0 auto;
+  position: relative; /* criar contexto de posicionamento */
 }
 
 .login-form {
@@ -178,6 +179,10 @@ body {
   height: 44px; /* manter altura estável ao alternar */
   width: 100%; /* manter largura estável */
   letter-spacing: normal; /* evitar diferenças entre tipos */
+  line-height: 20px; /* fixar altura de linha */
+  vertical-align: middle; /* alinhar verticalmente */
+  contain: layout; /* isolar layout do resto da página */
+  transform: translateZ(0); /* forçar layer GPU */
 }
 
 /* Ocultar botão nativo de revelar/limpar no Edge/IE para impedir shift */
@@ -196,8 +201,10 @@ body {
 /* Toggle de visibilidade dentro do input de senha */
 .auth-input-wrapper {
   position: relative;
-  display: flex;
-  align-items: center;
+  display: block; /* mudar para block para evitar flex shifts */
+  height: 44px; /* fixar altura igual ao input */
+  contain: layout style; /* isolar layout */
+  will-change: contents; /* preparar para mudanças */
 }
 
 .auth-input-wrapper .auth-input {
@@ -208,7 +215,7 @@ body {
   position: absolute;
   right: 10px;
   top: 50%;
-  transform: translateY(-50%);
+  transform: translateY(-50%) translateZ(0); /* forçar GPU layer */
   background: transparent;
   border: none;
   padding: 0;
@@ -218,12 +225,17 @@ body {
   align-items: center;
   justify-content: center;
   line-height: 0;
+  height: 22px; /* altura fixa do botão */
+  width: 22px; /* largura fixa do botão */
+  will-change: transform; /* preparar para animações */
 }
 
 .auth-input-toggle img {
   width: 18px;
   height: 18px;
   opacity: 0.85;
+  display: block; /* evitar inline spacing */
+  flex-shrink: 0; /* não permitir encolher */
 }
 
 .auth-input-toggle:hover img {
@@ -243,6 +255,8 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-top: 1rem;
+  contain: layout; /* isolar layout */
+  transform: translateZ(0); /* forçar GPU layer */
 }
 
 .auth-button:hover:not(:disabled) {
