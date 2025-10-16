@@ -11,9 +11,9 @@ export default function CreateTableButton({ folderName, currentPath = [] }) {
     
     // Constrói o caminho completo da pasta
     const fullPath = [...currentPath, folderName].join('/');
-    
-    // Navega para newTable com a pasta pré-selecionada
-    navigate('/newtable', { 
+
+    // Navega para novoProcedimento com a pasta pré-selecionada
+    navigate('/novo-procedimento', { 
       state: { 
         preselectedFolder: fullPath 
       } 

@@ -5,6 +5,7 @@ import { Routes, Route, useNavigate } from "react-router-dom";
 import SelecionarPdf from "./pages/selectPdf";
 import TablePage from "./components/EditorProcedimentos"; 
 import CreateProcess from "./pages/novoProcesso";
+import CreateProcedimento from "./pages/novoProcedimento";
 import Register from "./components/Auth/register";
 import { UserContext } from "./context/userContext";
 import { TutorialProvider } from "./context/tutorialContext";
@@ -72,10 +73,10 @@ function App() {
           } 
         />
         <Route 
-          path="/create-process" 
+          path="/novo-procedimento" 
           element={
             <ProtectedRoute>
-              <CreateProcess />
+              <CreateProcedimento />
             </ProtectedRoute>
           } 
         />
@@ -88,10 +89,10 @@ function App() {
           } 
         />
         <Route 
-          path="/processamento" 
+          path="/novo-processo" 
           element={
             <ProtectedRoute>
-              <NewTable />
+              <CreateProcess />
             </ProtectedRoute>
           } 
         />

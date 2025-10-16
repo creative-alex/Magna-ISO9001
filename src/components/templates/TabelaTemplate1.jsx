@@ -70,7 +70,18 @@ export default function Template1({
   }, [data, dataObs]);
 
   {/*Faz o originalNameFile dar quebra de linha ao título*/}
-  const Title = originalFilename ? originalFilename.split('/') : [''];
+  const processTitle = () => {
+    if (!originalFilename) return [''];
+    // Remove a extensão .pdf se existir
+    const nameWithoutExtension = originalFilename.replace(/\.pdf$/i, '');
+    const parts = nameWithoutExtension.split('/');
+    // Adiciona "Procedimento" antes da segunda parte
+    if (parts.length > 1 && parts[1]) {
+      parts[1] = `Procedimento ${parts[1]}`;
+    }
+    return parts;
+  };
+  const Title = processTitle();
 
   // Função específica para Template 1 para obter HTML das tabelas
   const getTemplate1TablesHtml = () => {

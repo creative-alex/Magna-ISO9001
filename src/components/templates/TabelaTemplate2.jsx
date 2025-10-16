@@ -339,7 +339,18 @@ export default function Template2({
     });
   }, [atividades, servicosEntrada, servicoSaida, objetivoProcesso, indicadores]);
 
-    const Title = pathFilename ? pathFilename.split('/') : [''];
+  const processTitle = () => {
+    if (!pathFilename) return [''];
+    // Remove a extensão .pdf se existir
+    const nameWithoutExtension = pathFilename.replace(/\.pdf$/i, '');
+    const parts = nameWithoutExtension.split('/');
+    // Adiciona "Processo" antes da segunda parte
+    if (parts.length > 1 && parts[1]) {
+      parts[1] = `Procedimento ${parts[1]}`;
+    }
+    return parts;
+  };
+  const Title = processTitle();
 
 
   console.log("PathFileName:", pathFilename);

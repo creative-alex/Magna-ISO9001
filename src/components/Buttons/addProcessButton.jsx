@@ -6,7 +6,7 @@ const AddProcessButton = () => {
   const navigate = useNavigate();
 
   const handleAddProcess = () => {
-    navigate('/create-process');
+    navigate('/novo-processo');
   };
 
   return (

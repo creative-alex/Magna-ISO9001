@@ -13,8 +13,6 @@ export default function NewTable() {
   const [processFolder, setProcessFolder] = useState('');
   const [nextTableNumber, setNextTableNumber] = useState(null);
   const [manualPrefix, setManualPrefix] = useState('');
-  const [servicosEntrada, setServicosEntrada] = useState('');
-  const [servicoSaida, setServicoSaida] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -270,8 +268,6 @@ export default function NewTable() {
       // Dados específicos do Template 1
       formData.append('mainTableData', JSON.stringify(tabelaPrincipal));
       formData.append('obsTableData', JSON.stringify(observacoes));
-      formData.append('servicos_entrada', servicosEntrada || "");
-      formData.append('servico_saida', servicoSaida || "");
 
       console.log('Enviando dados para o backend...');
 
@@ -341,7 +337,7 @@ export default function NewTable() {
                 } else {
                   return 'Aguardando carregamento do número...';
                 }
-                return `Nome do ficheiro será: ${prefix} ${processName || '[Nome da Matriz]'}.pdf`;
+                return `Nome do ficheiro será: Procedimento ${prefix} ${processName || '[Nome da Matriz]'}.pdf`;
               })()
             : 'Selecione uma pasta para ver o nome do ficheiro'
           }
@@ -370,103 +366,112 @@ export default function NewTable() {
         </small>
       </div>
 
-      {/* Serviços de Entrada e Saída (opcionais) */}
-      <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
-        <div style={{ flex: 1 }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-            Serviços de Entrada (opcional):
-          </label>
-          <textarea
-            value={servicosEntrada}
-            onChange={(e) => setServicosEntrada(e.target.value)}
-            placeholder="Recursos, informações ou serviços necessários"
-            rows={3}
-            style={{ 
-              width: '100%', 
-              padding: '8px', 
-              border: '1px solid #ccc', 
-              borderRadius: '4px',
-              fontSize: '14px',
-              resize: 'vertical'
-            }}
-          />
-        </div>
-
-        <div style={{ flex: 1 }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-            Serviço de Saída (opcional):
-          </label>
-          <textarea
-            value={servicoSaida}
-            onChange={(e) => setServicoSaida(e.target.value)}
-            placeholder="Resultado ou produto final"
-            rows={3}
-            style={{ 
-              width: '100%', 
-              padding: '8px', 
-              border: '1px solid #ccc', 
-              borderRadius: '4px',
-              fontSize: '14px',
-              resize: 'vertical'
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Tabela de Observações */}
+      {/* Seções do Documento (substitui Tabela de Observações) */}
       <div style={{ marginBottom: '20px' }}>
-        <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>
-          Observações:
-        </label>
-        {observacoes.map((obs, index) => (
-          <div key={index} style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-            <textarea
-              value={obs[0]}
-              onChange={(e) => handleObservacoesChange(index, e.target.value)}
-              placeholder={`Observação ${index + 1}`}
-              rows={2}
-              style={{ 
-                flex: 1, 
-                padding: '8px', 
-                border: '1px solid #ccc', 
-                borderRadius: '4px',
-                fontSize: '14px',
-                resize: 'vertical'
-              }}
-            />
-            {observacoes.length > 1 && (
-              <button
-                type="button"
-                onClick={() => removeObservacaoRow(index)}
-                style={{ 
-                  padding: '8px 12px', 
-                  backgroundColor: '#dc3545', 
-                  color: 'white', 
-                  border: 'none', 
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  height: 'fit-content'
-                }}
-              >
-                Remover
-              </button>
-            )}
-          </div>
-        ))}
-        <button
-          type="button"
-          onClick={addObservacaoRow}
-          style={{ 
-            padding: '8px 16px', 
-            backgroundColor: '#28a745', 
-            color: 'white', 
-            border: 'none', 
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          Adicionar Observação
-        </button>
+        {/* 1. Objetivos */}
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', color: '#333' }}>
+            1. Objetivos:
+          </label>
+          <textarea
+            value={observacoes[0][0]}
+            onChange={(e) => handleObservacoesChange(0, e.target.value)}
+            placeholder="Digite os objetivos do documento..."
+            rows={3}
+            style={{ 
+              width: '100%', 
+              padding: '8px', 
+              border: '1px solid #ccc', 
+              borderRadius: '4px',
+              fontSize: '14px',
+              resize: 'vertical'
+            }}
+          />
+        </div>
+
+        {/* 2. Campo de Aplicação */}
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', color: '#333' }}>
+            2. Campo de Aplicação:
+          </label>
+          <textarea
+            value={observacoes[1][0]}
+            onChange={(e) => handleObservacoesChange(1, e.target.value)}
+            placeholder="Digite o campo de aplicação..."
+            rows={3}
+            style={{ 
+              width: '100%', 
+              padding: '8px', 
+              border: '1px solid #ccc', 
+              borderRadius: '4px',
+              fontSize: '14px',
+              resize: 'vertical'
+            }}
+          />
+        </div>
+
+        {/* 3. Definições */}
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', color: '#333' }}>
+            3. Definições:
+          </label>
+          <textarea
+            value={observacoes[2][0]}
+            onChange={(e) => handleObservacoesChange(2, e.target.value)}
+            placeholder="Digite as definições relevantes..."
+            rows={3}
+            style={{ 
+              width: '100%', 
+              padding: '8px', 
+              border: '1px solid #ccc', 
+              borderRadius: '4px',
+              fontSize: '14px',
+              resize: 'vertical'
+            }}
+          />
+        </div>
+
+        {/* 4. Abreviaturas */}
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', color: '#333' }}>
+            4. Abreviaturas:
+          </label>
+          <textarea
+            value={observacoes[3][0]}
+            onChange={(e) => handleObservacoesChange(3, e.target.value)}
+            placeholder="Digite as abreviaturas utilizadas..."
+            rows={3}
+            style={{ 
+              width: '100%', 
+              padding: '8px', 
+              border: '1px solid #ccc', 
+              borderRadius: '4px',
+              fontSize: '14px',
+              resize: 'vertical'
+            }}
+          />
+        </div>
+
+        {/* 5. Observações */}
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', color: '#333' }}>
+            5. Observações:
+          </label>
+          <textarea
+            value={observacoes[4][0]}
+            onChange={(e) => handleObservacoesChange(4, e.target.value)}
+            placeholder="Digite observações adicionais..."
+            rows={3}
+            style={{ 
+              width: '100%', 
+              padding: '8px', 
+              border: '1px solid #ccc', 
+              borderRadius: '4px',
+              fontSize: '14px',
+              resize: 'vertical'
+            }}
+          />
+        </div>
       </div>
 
       {/* Tabela Principal */}
