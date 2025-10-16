@@ -15,6 +15,11 @@ const DocumentosAssociados = ({
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  
+  // Estados para links de formulário Google
+  const [formLink, setFormLink] = useState('');
+  const [formTitle, setFormTitle] = useState('');
+  const [showFormForm, setShowFormForm] = useState(false);
 
   const [currentFolderPath, setCurrentFolderPath] = useState('');
   
@@ -41,6 +46,117 @@ const DocumentosAssociados = ({
       confirmDialog.onConfirm();
     }
     setConfirmDialog({ show: false, message: '', onConfirm: null });
+  };
+
+  // Função para verificar se uma entrada é um link de formulário Google
+  const isFormLink = (entry) => {
+    return entry.startsWith('[FORM]');
+  };
+
+  // Função para validar URLs de formulários Google
+  const isValidFormUrl = (url) => {
+    try {
+      const urlObj = new URL(url);
+      const hostname = urlObj.hostname.toLowerCase();
+      const fullUrl = url.toLowerCase();
+      
+      // Suporte para Google Forms e outros formulários online
+      return (
+        (hostname.includes('docs.google.com') && fullUrl.includes('/forms/')) ||
+        hostname.includes('forms.gle') ||
+        hostname.includes('typeform.com') ||
+        hostname.includes('surveymonkey.com') ||
+        hostname.includes('jotform.com') ||
+        hostname.includes('formstack.com') ||
+        hostname.includes('wufoo.com') ||
+        hostname.includes('cognitoforms.com') ||
+        hostname.includes('forms.office.com') // Microsoft Forms
+      );
+    } catch {
+      return false;
+    }
+  };
+
+  // Função para extrair título automático de URLs do Google Forms
+  const extractFormTitle = async (url) => {
+    try {
+      const urlObj = new URL(url);
+      if (urlObj.hostname.includes('docs.google.com') || urlObj.hostname.includes('forms.gle')) {
+        return `Formulário Google`;
+      } else if (urlObj.hostname.includes('typeform.com')) {
+        return `Formulário Typeform`;
+      } else if (urlObj.hostname.includes('forms.office.com')) {
+        return `Formulário Microsoft`;
+      }
+      return `Formulário`;
+    } catch {
+      return '';
+    }
+  };
+
+  // Função para adicionar link de formulário
+  const handleAddFormLink = async () => {
+    if (!formLink.trim()) {
+      showNotification('Por favor, insira um link de formulário válido.', 'warning');
+      return;
+    }
+
+    if (!isValidFormUrl(formLink)) {
+      showNotification('URL de formulário não suportada. Suporte: Google Forms, Typeform, SurveyMonkey, JotForm, Microsoft Forms, etc.', 'error');
+      return;
+    }
+
+    let title = formTitle.trim();
+    if (!title) {
+      // Tenta extrair título automaticamente
+      title = await extractFormTitle(formLink);
+      if (!title) {
+        // Se não conseguir extrair, usa um título padrão
+        const urlObj = new URL(formLink);
+        title = `Formulário - ${urlObj.hostname}`;
+      }
+    }
+
+    // Formato especial para links de formulário: inclui título e URL para o PDF
+    const formEntry = `[FORM] ${title}||${formLink}`;
+    
+    // Adiciona aos selecionados
+    const novosDocumentos = [...documentosSelecionados, formEntry];
+    setDocumentosSelecionados(novosDocumentos);
+    
+    // Atualiza o valor no componente pai
+    const novoValor = novosDocumentos.join('\n');
+    onChange(novoValor);
+
+    // Limpa o formulário
+    setFormLink('');
+    setFormTitle('');
+    setShowFormForm(false);
+    
+    showNotification('Link de formulário adicionado com sucesso!', 'success');
+  };
+
+  // Função para abrir link de formulário
+  const handleOpenFormLink = (formEntry) => {
+    const urlMatch = formEntry.match(/\|\|(.+)$/);
+    if (urlMatch) {
+      const url = urlMatch[1];
+      window.open(url, '_blank');
+    }
+  };
+
+  // Função para extrair título do link de formulário
+  const getFormTitle = (formEntry) => {
+    // Remove o prefixo [FORM] e extrai apenas o título (antes do ||)
+    const titlePart = formEntry.replace('[FORM] ', '').split('||')[0];
+    return titlePart;
+  };
+
+  // Função para extrair URL do link de formulário
+  const getFormUrl = (formEntry) => {
+    // Extrai a URL (depois do ||)
+    const parts = formEntry.split('||');
+    return parts.length > 1 ? parts[1] : '';
   };
 
   // Busca documentos da subpasta específica baseada no prefixo do ficheiro atual
@@ -316,6 +432,13 @@ const DocumentosAssociados = ({
     onChange(novoValor);
   };
 
+  // Função para remover documento selecionado (incluindo formulários)
+  const removeDocumento = (doc) => {
+    const novos = documentosSelecionados.filter(d => d !== doc);
+    setDocumentosSelecionados(novos);
+    onChange(novos.join('\n'));
+  };
+
   // Função para fazer preview do documento
   const handlePreview = async (documento) => {
     const docObject = documentosDisponiveis.find(doc => 
@@ -358,6 +481,55 @@ const DocumentosAssociados = ({
     } catch (error) {
       console.error('🚨 Erro no preview:', error);
       showNotification('Erro ao fazer preview do documento.', 'error');
+    }
+  };
+
+  // Função para visualizar ficheiro em nova tab
+  const handleViewDocumento = async (documento) => {
+    // Verifica se é um link de formulário
+    if (isFormLink(documento)) {
+      const url = getFormUrl(documento);
+      if (url) {
+        window.open(url, '_blank');
+      }
+      return;
+    }
+
+    // Para ficheiros normais, busca o caminho e abre preview
+    const docObject = typeof documento === 'object' ? documento : documentosDisponiveis.find(d => d.displayName === documento);
+    const fullPath = typeof documento === 'object' ? documento.fullPath : docObject?.fullPath;
+
+    if (!fullPath) {
+      console.error('Caminho não encontrado para:', documento);
+      showNotification('Erro: Caminho do documento não encontrado.', 'error');
+      return;
+    }
+    
+    try {
+      const response = await fetch('https://api9001.duckdns.org/files/download', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ path: encodeURIComponent(fullPath) }),
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        
+        // Abre em nova tab
+        window.open(url, '_blank');
+        
+        // Limpa o URL após um tempo
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } else {
+        const errorText = await response.text();
+        showNotification(`Erro ao visualizar o documento: ${errorText}`, 'error');
+      }
+    } catch (error) {
+      console.error('🚨 Erro na visualização:', error);
+      showNotification('Erro ao visualizar o documento.', 'error');
     }
   };
 
@@ -460,43 +632,86 @@ const DocumentosAssociados = ({
         {/* Lista de documentos selecionados */}
         {documentosSelecionados.length > 0 ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            {documentosSelecionados.map((doc, index) => (
-              <div key={index} style={{ 
-                padding: '3px 6px',
-                borderRadius: '3px',
-                fontSize: '10px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}>
-                <span style={{ flex: 1, wordBreak: 'break-word' }}>{doc}</span>
-                {isEditable && (
-                  <div style={{ display: 'flex', gap: '2px', marginLeft: '4px' }}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleDocumento(doc);
-                      }}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#666',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        padding: '0 4px',
-                        borderRadius: '2px',
-                        fontSize: '15px',
-                      }}
-                      title="Remover documento"
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#ffcdd2'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                    >
-                      ×
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
+            {documentosSelecionados.map((doc, index) => {
+              const isForm = isFormLink(doc);
+              const displayName = isForm ? getFormTitle(doc) : doc;
+              
+              return (
+                <div 
+                  key={index} 
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '2px 0',
+                    borderBottom: index < documentosSelecionados.length - 1 ? '1px solid #f0f0f0' : 'none'
+                  }}
+                >
+                  {/* Ícone baseado no tipo */}
+                  <span style={{ fontSize: '8px', minWidth: '12px' }}>
+                    {isForm ? '📝' : '📄'}
+                  </span>
+                  
+                  {/* Nome truncado - clicável quando não está em edição */}
+                  <span 
+                    onClick={!isEditable ? (e) => {
+                      e.stopPropagation();
+                      handleViewDocumento(doc);
+                    } : undefined}
+                    style={{ 
+                      flex: 1, 
+                      whiteSpace: 'nowrap', 
+                      overflow: 'hidden', 
+                      textOverflow: 'ellipsis',
+                      fontSize: '9px',
+                      cursor: !isEditable ? 'pointer' : 'default',
+                      color: !isEditable ? '#0066cc' : 'inherit',
+                      textDecoration: !isEditable ? 'underline' : 'none'
+                    }}
+                    title={!isEditable ? `Clique para abrir: ${displayName}` : displayName}
+                    onMouseEnter={(e) => {
+                      if (!isEditable) {
+                        e.target.style.color = '#0052a3';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isEditable) {
+                        e.target.style.color = '#0066cc';
+                      }
+                    }}
+                  >
+                    {displayName}
+                  </span>
+                  
+                  {/* Botões de ação */}
+                  {isEditable && (
+                    <div style={{ display: 'flex', gap: '2px' }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeDocumento(doc);
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#666',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          padding: '0 4px',
+                          borderRadius: '2px',
+                          fontSize: '15px',
+                        }}
+                        title="Remover documento"
+                        onMouseEnter={(e) => e.target.style.backgroundColor = '#ffcdd2'}
+                        onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div style={{ 
@@ -616,6 +831,105 @@ const DocumentosAssociados = ({
                   <div style={{ fontSize: '11px', color: '#666', marginTop: '6px' }}>
                     Selecione qualquer tipo de ficheiro para enviar para esta subpasta
                   </div>
+                </div>
+
+                {/* Área de links de formulário Google */}
+                <div style={{ padding: '16px', borderBottom: '1px solid #eee', backgroundColor: '#fff8e1' }}>
+                  {!showFormForm ? (
+                    <div>
+                      <button
+                        onClick={() => setShowFormForm(true)}
+                        style={{
+                          padding: '8px 16px',
+                          backgroundColor: '#ff9800',
+                          color: 'white',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          border: 'none',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        📝 Adicionar Link de Formulário
+                      </button>
+                      <div style={{ fontSize: '11px', color: '#666', marginTop: '6px' }}>
+                        Suporte: Google Forms, Typeform, SurveyMonkey, JotForm, Microsoft Forms
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ marginBottom: '12px' }}>
+                        <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px', fontWeight: 'bold' }}>
+                          URL do Formulário:
+                        </label>
+                        <input
+                          type="url"
+                          value={formLink}
+                          onChange={(e) => setFormLink(e.target.value)}
+                          placeholder="https://docs.google.com/forms/..."
+                          style={{
+                            width: '100%',
+                            padding: '8px',
+                            fontSize: '12px',
+                            border: '1px solid #ccc',
+                            borderRadius: '4px'
+                          }}
+                        />
+                      </div>
+                      <div style={{ marginBottom: '12px' }}>
+                        <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px', fontWeight: 'bold' }}>
+                          Título (opcional):
+                        </label>
+                        <input
+                          type="text"
+                          value={formTitle}
+                          onChange={(e) => setFormTitle(e.target.value)}
+                          placeholder="Título personalizado do formulário"
+                          style={{
+                            width: '100%',
+                            padding: '8px',
+                            fontSize: '12px',
+                            border: '1px solid #ccc',
+                            borderRadius: '4px'
+                          }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={handleAddFormLink}
+                          style={{
+                            padding: '8px 16px',
+                            backgroundColor: '#28a745',
+                            color: 'white',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            border: 'none'
+                          }}
+                        >
+                          Adicionar
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowFormForm(false);
+                            setFormLink('');
+                            setFormTitle('');
+                          }}
+                          style={{
+                            padding: '8px 16px',
+                            backgroundColor: '#6c757d',
+                            color: 'white',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            border: 'none'
+                          }}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 
                 {/* Lista de documentos */}
@@ -789,6 +1103,91 @@ const DocumentosAssociados = ({
                       </div>
                     );
                   })}
+                  
+                  {/* Seção de Formulários Selecionados */}
+                  {documentosSelecionados.some(doc => isFormLink(doc)) && (
+                    <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '2px solid #eee' }}>
+                      <h4 style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '12px', color: '#ff9800' }}>
+                        📝 Formulários Adicionados
+                      </h4>
+                      {documentosSelecionados
+                        .filter(doc => isFormLink(doc))
+                        .map((formEntry, index) => {
+                          const title = getFormTitle(formEntry);
+                          const url = getFormUrl(formEntry);
+                          
+                          return (
+                            <div
+                              key={`form-${index}`}
+                              style={{
+                                padding: '12px',
+                                margin: '8px 0',
+                                fontSize: '13px',
+                                backgroundColor: '#fff8e1',
+                                border: '2px solid #ff9800',
+                                borderRadius: '6px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '12px'
+                              }}
+                            >
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 'bold', fontSize: '14px' }}>📝 {title}</div>
+                                <div style={{ fontSize: '11px', color: '#666', marginTop: '2px', wordBreak: 'break-all' }}>
+                                  🔗 {url}
+                                </div>
+                              </div>
+                              
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenFormLink(formEntry);
+                                  }}
+                                  style={{
+                                    padding: '6px 12px',
+                                    backgroundColor: '#ff9800',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '11px',
+                                    fontWeight: 'bold'
+                                  }}
+                                  title="Abrir formulário"
+                                  onMouseEnter={(e) => e.target.style.backgroundColor = '#f57c00'}
+                                  onMouseLeave={(e) => e.target.style.backgroundColor = '#ff9800'}
+                                >
+                                  🌐 Abrir
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeDocumento(formEntry);
+                                  }}
+                                  style={{
+                                    padding: '6px 12px',
+                                    backgroundColor: '#d32f2f',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '11px',
+                                    fontWeight: 'bold'
+                                  }}
+                                  title="Remover formulário"
+                                  onMouseEnter={(e) => e.target.style.backgroundColor = '#c62828'}
+                                  onMouseLeave={(e) => e.target.style.backgroundColor = '#d32f2f'}
+                                >
+                                  ✕ Remover
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
                 </div>
 
                 {/* Rodapé da Modal */}

@@ -352,7 +352,7 @@ export default function NewTable() {
           type="text"
           value={manualPrefix}
           onChange={(e) => setManualPrefix(e.target.value)}
-          placeholder="Ex: 01, 02, A1, B2, etc. (deixe vazio para numeração automática)"
+          placeholder="Ex: 01, 02, 03, 04, etc. (deixe vazio para numeração automática)"
           style={{ 
             width: '100%', 
             padding: '8px', 

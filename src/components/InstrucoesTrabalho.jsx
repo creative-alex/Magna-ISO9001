@@ -4,8 +4,8 @@ const InstrucoesTrabalho = ({
   currentValue, 
   onChange,
   originalFilename,
-  isEditable = true, // Nova prop para controlar editabilidade
-  canEdit = true // Nova prop para controlar se pode editar (permissões)
+  isEditable = true, 
+  canEdit = true 
 }) => {
   const [instrucoesDisponiveis, setInstrucoesDisponiveis] = useState([]);
   const [instrucoesSelecionadas, setInstrucoesSelecionadas] = useState([]);
@@ -138,10 +138,59 @@ const InstrucoesTrabalho = ({
 
   // Função para abrir link de vídeo
   const handleOpenVideoLink = (videoEntry) => {
-    const urlMatch = videoEntry.match(/\| (.+)$/);
+    const urlMatch = videoEntry.match(/\|\|(.+)$/);
     if (urlMatch) {
       const url = urlMatch[1];
       window.open(url, '_blank');
+    }
+  };
+
+  // Função para visualizar instrução em nova tab
+  const handleViewInstrucao = async (instrucao) => {
+    // Verifica se é um link de vídeo
+    if (isVideoLink(instrucao)) {
+      const url = getVideoUrl(instrucao);
+      if (url) {
+        window.open(url, '_blank');
+      }
+      return;
+    }
+
+    // Para ficheiros normais, busca o caminho e abre preview
+    const instrucaoObject = typeof instrucao === 'object' ? instrucao : instrucoesDisponiveis.find(i => i.displayName === instrucao);
+    const fullPath = typeof instrucao === 'object' ? instrucao.fullPath : instrucaoObject?.fullPath;
+
+    if (!fullPath) {
+      console.error('Caminho não encontrado para:', instrucao);
+      showNotification('Erro: Caminho da instrução não encontrado.', 'error');
+      return;
+    }
+    
+    try {
+      const response = await fetch('https://api9001.duckdns.org/files/download', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ path: encodeURIComponent(fullPath) }),
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        
+        // Abre em nova tab
+        window.open(url, '_blank');
+        
+        // Limpa o URL após um tempo
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } else {
+        const errorText = await response.text();
+        showNotification(`Erro ao visualizar a instrução: ${errorText}`, 'error');
+      }
+    } catch (error) {
+      console.error('🚨 Erro na visualização:', error);
+      showNotification('Erro ao visualizar a instrução.', 'error');
     }
   };
 
@@ -543,16 +592,33 @@ const InstrucoesTrabalho = ({
                     {isVideo ? '🎥' : '📄'}
                   </span>
                   
-                  {/* Nome truncado */}
+                  {/* Nome truncado - clicável quando não está em edição */}
                   <span 
+                    onClick={!isEditable ? (e) => {
+                      e.stopPropagation();
+                      handleViewInstrucao(instrucao);
+                    } : undefined}
                     style={{ 
                       flex: 1, 
                       whiteSpace: 'nowrap', 
                       overflow: 'hidden', 
                       textOverflow: 'ellipsis',
-                      fontSize: '9px'
+                      fontSize: '9px',
+                      cursor: !isEditable ? 'pointer' : 'default',
+                      color: !isEditable ? '#0066cc' : 'inherit',
+                      textDecoration: !isEditable ? 'underline' : 'none'
                     }}
-                    title={displayName}
+                    title={!isEditable ? `Clique para abrir: ${displayName}` : displayName}
+                    onMouseEnter={(e) => {
+                      if (!isEditable) {
+                        e.target.style.color = '#0052a3';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isEditable) {
+                        e.target.style.color = '#0066cc';
+                      }
+                    }}
                   >
                     {displayName}
                   </span>
