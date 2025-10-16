@@ -158,7 +158,7 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
           // Remove a extensão apenas para PDFs para manter compatibilidade
           const displayName = node.name.endsWith('.pdf') ? node.name.slice(0, -4) : node.name;
           
-          // Verifica se o usuário pode deletar o arquivo
+          // Verifica se o user pode deletar o arquivo
           const processOwnerString = processOwners[currentPath[0]];
           const isProcessOwner = processOwnerString && processOwnerString.split(',').map(nome => nome.trim()).includes(currentUser);
           const canDelete = isAdmin ;
@@ -246,7 +246,7 @@ export default function SelecionarPdf() {
     const pathParts = filePath.split('/');
     const processName = pathParts[0]; // Assume que primeiro nível é o processo
     
-    // Função utilitária para verificar se um usuário está na lista de donos do processo
+    // Função utilitária para verificar se um user está na lista de donos do processo
     const isUserProcessOwner = (processOwnerString, username) => {
       if (!processOwnerString || !username) return false;
       const donosArray = processOwnerString.split(',').map(nome => nome.trim()).filter(nome => nome);

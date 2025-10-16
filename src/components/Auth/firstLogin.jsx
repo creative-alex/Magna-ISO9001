@@ -64,7 +64,7 @@ const FirstLoginComponent = ({ onComplete }) => {
       if (!response.ok) throw new Error(data.message || "Erro ao atualizar senha");
   
       // Exibe uma mensagem de sucesso
-      toast.success("Senha alterada com sucesso! Faça login novamente.");
+      toast.success("Senha alterada com sucesso!");
   
       // Limpar dados do localStorage e redirecionar
       setTimeout(() => {

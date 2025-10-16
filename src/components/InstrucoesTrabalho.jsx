@@ -19,6 +19,31 @@ const InstrucoesTrabalho = ({
   const [showVideoForm, setShowVideoForm] = useState(false);
 
   const [currentFolderPath, setCurrentFolderPath] = useState('');
+  
+  // Sistema de notificações toast
+  const [notifications, setNotifications] = useState([]);
+  
+  // Modal de confirmação
+  const [confirmDialog, setConfirmDialog] = useState({ show: false, message: '', onConfirm: null });
+
+  const showNotification = (message, type = 'info') => {
+    const id = Date.now();
+    setNotifications(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 4000);
+  };
+
+  const showConfirmDialog = (message, onConfirm) => {
+    setConfirmDialog({ show: true, message, onConfirm });
+  };
+
+  const handleConfirmDialog = (confirmed) => {
+    if (confirmed && confirmDialog.onConfirm) {
+      confirmDialog.onConfirm();
+    }
+    setConfirmDialog({ show: false, message: '', onConfirm: null });
+  };
 
   // Função para verificar se uma entrada é um vídeo
   const isVideoEntry = (entry) => {
@@ -74,12 +99,12 @@ const InstrucoesTrabalho = ({
   // Função para adicionar link de vídeo
   const handleAddVideoLink = async () => {
     if (!videoLink.trim()) {
-      alert('Por favor, insira um link de vídeo válido.');
+      showNotification('Por favor, insira um link de vídeo válido.', 'warning');
       return;
     }
 
     if (!isValidVideoUrl(videoLink)) {
-      alert('URL de vídeo não suportada. Suporte: YouTube, Vimeo, Dailymotion, Twitch, Loom, Wistia ou arquivos de vídeo diretos.');
+      showNotification('URL de vídeo não suportada. Suporte: YouTube, Vimeo, Dailymotion, Twitch, Loom, Wistia ou arquivos de vídeo diretos.', 'error');
       return;
     }
 
@@ -288,8 +313,15 @@ const InstrucoesTrabalho = ({
     const file = event.target.files[0];
     if (!file) return;
 
+    // Verifica se o arquivo é PDF
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      showNotification('Apenas arquivos PDF são permitidos nas Instruções de Trabalho.', 'warning');
+      event.target.value = ''; // Limpa o input
+      return;
+    }
+
     if (!originalFilename) {
-      alert('Não foi possível determinar a pasta de destino.');
+      showNotification('Não foi possível determinar a pasta de destino.', 'error');
       return;
     }
 
@@ -324,14 +356,14 @@ const InstrucoesTrabalho = ({
         // Adiciona automaticamente a instrução aos selecionados
         toggleInstrucao(file.name);
         
-        alert('Instrução de trabalho enviada com sucesso!');
+        showNotification('Instrução de trabalho enviada com sucesso!', 'success');
       } else {
         console.error('Erro no upload:', response.statusText);
-        alert('Erro ao enviar instrução de trabalho. Tente novamente.');
+        showNotification('Erro ao enviar instrução de trabalho. Tente novamente.', 'error');
       }
     } catch (error) {
       console.error('Erro no upload:', error);
-      alert('Erro ao enviar instrução de trabalho. Tente novamente.');
+      showNotification('Erro ao enviar instrução de trabalho. Tente novamente.', 'error');
     } finally {
       setUploading(false);
       // Limpa o input file
@@ -403,40 +435,39 @@ const InstrucoesTrabalho = ({
     if (instrucao && typeof instrucao === 'object') {
       const fullPath = instrucao.fullPath;
       
-      // Confirma a ação
-      const confirmDelete = window.confirm(`Tem certeza que deseja apagar permanentemente o arquivo "${instrucaoName}"?\nEsta ação não pode ser desfeita.`);
-      
-      if (!confirmDelete) {
-        return;
-      }
-      
-      try {
-        console.log('Apagando arquivo:', fullPath);
-        
-        const response = await fetch(`https://api9001.duckdns.org/files/delete/${encodeURIComponent(fullPath)}`, {
-          method: 'DELETE'
-        });
-        
-        if (response.ok) {
-          console.log('Arquivo apagado com sucesso');
-          
-          // Remove da lista de selecionados se estiver selecionado
-          if (instrucoesSelecionadas.includes(instrucaoName)) {
-            removeInstrucao(instrucaoName);
+      // Confirma a ação com modal personalizado
+      showConfirmDialog(
+        `Tem a certeza que deseja apagar permanentemente o arquivo "${instrucaoName}"?\n\nEsta ação não pode ser desfeita.`,
+        async () => {
+          try {
+            console.log('Apagando arquivo:', fullPath);
+            
+            const response = await fetch(`https://api9001.duckdns.org/files/delete/${encodeURIComponent(fullPath)}`, {
+              method: 'DELETE'
+            });
+            
+            if (response.ok) {
+              console.log('Arquivo apagado com sucesso');
+              
+              // Remove da lista de selecionados se estiver selecionado
+              if (instrucoesSelecionadas.includes(instrucaoName)) {
+                removeInstrucao(instrucaoName);
+              }
+              
+              // Recarrega a lista de instruções
+              await fetchInstrucoes();
+              
+              showNotification('Arquivo apagado com sucesso!', 'success');
+            } else {
+              console.error('Erro ao apagar arquivo:', response.statusText);
+              showNotification('Erro ao apagar arquivo. Tente novamente.', 'error');
+            }
+          } catch (error) {
+            console.error('Erro ao apagar arquivo:', error);
+            showNotification('Erro ao apagar arquivo. Tente novamente.', 'error');
           }
-          
-          // Recarrega a lista de instruções
-          await fetchInstrucoes();
-          
-          alert('Arquivo apagado com sucesso!');
-        } else {
-          console.error('Erro ao apagar arquivo:', response.statusText);
-          alert('Erro ao apagar arquivo. Tente novamente.');
         }
-      } catch (error) {
-        console.error('Erro ao apagar arquivo:', error);
-        alert('Erro ao apagar arquivo. Tente novamente.');
-      }
+      );
     }
   };
 
@@ -652,6 +683,7 @@ const InstrucoesTrabalho = ({
                 <div style={{ padding: '16px', borderBottom: '1px solid #eee', backgroundColor: '#f0f8f0' }}>
                   <input
                     type="file"
+                    accept=".pdf,application/pdf"
                     onChange={handleFileUpload}
                     disabled={uploading}
                     style={{ display: 'none' }}
@@ -964,6 +996,180 @@ const InstrucoesTrabalho = ({
           </div>
         </>
       )}
+      
+      {/* Modal de Confirmação */}
+      {confirmDialog.show && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.6)',
+          zIndex: 10001,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+            width: '90%',
+            maxWidth: '450px',
+            padding: '0',
+            overflow: 'hidden',
+            animation: 'modalFadeIn 0.3s ease-out'
+          }}>
+            {/* Cabeçalho */}
+            <div style={{
+              padding: '20px 24px',
+              backgroundColor: '#fff3cd',
+              borderBottom: '2px solid #ffc107',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <span style={{ fontSize: '28px' }}>⚠️</span>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#856404' }}>
+                Confirmação Necessária
+              </h3>
+            </div>
+            
+            {/* Conteúdo */}
+            <div style={{
+              padding: '24px',
+              fontSize: '15px',
+              lineHeight: '1.6',
+              color: '#333',
+              whiteSpace: 'pre-line'
+            }}>
+              {confirmDialog.message}
+            </div>
+            
+            {/* Botões */}
+            <div style={{
+              padding: '16px 24px',
+              backgroundColor: '#f8f9fa',
+              borderTop: '1px solid #dee2e6',
+              display: 'flex',
+              gap: '12px',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={() => handleConfirmDialog(false)}
+                style={{
+                  padding: '10px 24px',
+                  fontSize: '14px',
+                  backgroundColor: '#6c757d',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#5a6268'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#6c757d'}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleConfirmDialog(true)}
+                style={{
+                  padding: '10px 24px',
+                  fontSize: '14px',
+                  backgroundColor: '#dc3545',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#c82333'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#dc3545'}
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Sistema de Notificações Toast */}
+      <div style={{
+        position: 'fixed',
+        top: '20px',
+        right: '20px',
+        zIndex: 10000,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px'
+      }}>
+        {notifications.map(notification => (
+          <div
+            key={notification.id}
+            style={{
+              minWidth: '300px',
+              maxWidth: '400px',
+              padding: '16px 20px',
+              backgroundColor: 
+                notification.type === 'success' ? '#d4edda' :
+                notification.type === 'error' ? '#f8d7da' :
+                notification.type === 'warning' ? '#fff3cd' : '#d1ecf1',
+              color: 
+                notification.type === 'success' ? '#155724' :
+                notification.type === 'error' ? '#721c24' :
+                notification.type === 'warning' ? '#856404' : '#0c5460',
+              border: `1px solid ${
+                notification.type === 'success' ? '#c3e6cb' :
+                notification.type === 'error' ? '#f5c6cb' :
+                notification.type === 'warning' ? '#ffeaa7' : '#bee5eb'}`,
+              borderRadius: '8px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              fontSize: '14px',
+              fontWeight: '500',
+              animation: 'slideIn 0.3s ease-out',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}
+          >
+            <span style={{ fontSize: '20px' }}>
+              {notification.type === 'success' ? '✅' :
+               notification.type === 'error' ? '❌' :
+               notification.type === 'warning' ? '⚠️' : 'ℹ️'}
+            </span>
+            <span style={{ flex: 1 }}>{notification.message}</span>
+          </div>
+        ))}
+      </div>
+      
+      {/* Estilos para animação */}
+      <style>{`
+        @keyframes slideIn {
+          from {
+            transform: translateX(400px);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        
+        @keyframes modalFadeIn {
+          from {
+            transform: scale(0.9);
+            opacity: 0;
+          }
+          to {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+      `}</style>
     </div>
   );
 };

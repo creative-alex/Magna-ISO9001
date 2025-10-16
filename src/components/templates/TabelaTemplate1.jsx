@@ -4,12 +4,13 @@ import PreviewPdfButton from "../Buttons/previewPDF";
 import DocumentosAssociados from "../DocumentosAssociados";
 import InstrucoesTrabalho from "../InstrucoesTrabalho";
 import useRowContextMenu from "../ContextMenu/useRowContextMenu";
+import { parseFormattedText } from "../../utils/textFormatting";
 import "./styleTemplates.css";
 
 export default function Template1({ 
-  isEditable = false, // Nova prop para controlar editabilidade (começa não-editável)
-  setIsEditable, // Nova prop para alterar estado de editabilidade
-  canEdit = true, // Nova prop para controlar se pode editar (permissões)
+  isEditable = false, 
+  setIsEditable, 
+  canEdit = true, 
   data = [["", "", "", "", ""]],
   dataObs = [[""]],
   handleChange, 
@@ -85,17 +86,22 @@ export default function Template1({
       bodyRows.forEach((row, rowIdx) => {
         const cells = row.querySelectorAll('td');
         cells.forEach((cell, colIdx) => {
+          // Aplica formatação a todas as colunas
+          const value = data[rowIdx] ? data[rowIdx][colIdx] : '';
+          
           // Coluna 3 - Documentos Associados
           if (colIdx === 3) {
-            const value = data[rowIdx] ? data[rowIdx][colIdx] : '';
             console.log(`🔍 DEBUG Template1 - Linha ${rowIdx}, Coluna ${colIdx} (Documentos):`, value);
-            cell.innerHTML = value.split('\n').join('<br>');
+            cell.innerHTML = parseFormattedText(value);
           }
           // Coluna 4 - Instruções de trabalho
           else if (colIdx === 4) {
-            const value = data[rowIdx] ? data[rowIdx][colIdx] : '';
             console.log(`🔍 DEBUG Template1 - Linha ${rowIdx}, Coluna ${colIdx} (Instruções):`, value);
-            cell.innerHTML = value.split('\n').join('<br>');
+            cell.innerHTML = parseFormattedText(value);
+          }
+          // Outras colunas também suportam formatação
+          else {
+            cell.innerHTML = parseFormattedText(value);
           }
         });
       });
@@ -107,18 +113,12 @@ export default function Template1({
       obsTableHtml = obsTableRef.current.outerHTML;
     }
 
-    console.log("🔍 DEBUG Template1 - HTML gerado:");
-    console.log("  Main Table HTML (primeiros 200 chars):", mainTableHtml.substring(0, 200));
-    console.log("  Obs Table HTML (primeiros 200 chars):", obsTableHtml.substring(0, 200));
-    console.log("  Histórico NÃO incluído no HTML - será passado diretamente");
-
     return { 
       mainTableHtml, 
       obsTableHtml 
     };
   };
 
-  console.log("PathFileName:", pathFilename);
 
   return (
     <div className="template1-container" style={{alignItems: 'flex-start'}}>
@@ -196,6 +196,22 @@ export default function Template1({
           </button>
         )}
       </div>
+      
+      {/* Helper de formatação - só aparece quando está a editar */}
+      {isEditable && (
+        <div className="formatting-helper" style={{
+          backgroundColor: '#f0f8ff',
+          border: '1px solid #4a90e2',
+          borderRadius: '4px',
+          padding: '12px',
+          marginBottom: '15px',
+          fontSize: '13px',
+          width: '100%'
+        }}>
+          <strong>💡 Dica de Formatação:</strong> Use <code>**texto**</code> para <strong>bold</strong>, 
+          <code>*texto*</code> para <em>itálico</em>, e <code>__texto__</code> para <u>sublinhado</u>
+        </div>
+      )}
     
       {/* Tabela de Observações */}
       <div ref={obsTableRef} className="primeira-tabela">
@@ -216,15 +232,10 @@ export default function Template1({
                   ref={el => textAreaRefs.current[`obj-0-0`] = el}
                   className="editable-table-textarea tabela-observacoes-textarea"
                   value={dataObs[0] ? dataObs[0][0] : ''}
-                  onChange={isEditable ? e => handleChangeObs(0, 0, e.target.value) : undefined}
-                  onInput={isEditable ? handleTextareaResize : undefined}
-                  placeholder={isEditable ? "Digite os objetivos do documento..." : ""}
-                  readOnly={!isEditable}
-                  style={{
-                    backgroundColor: isEditable ? 'white' : '#f5f5f5',
-                    cursor: isEditable ? 'text' : 'default',
-                    border: isEditable ? '1px solid #ddd' : '1px solid #e0e0e0'
-                  }}
+                  onChange={e => handleChangeObs(0, 0, e.target.value)}
+                  onInput={handleTextareaResize}
+                  placeholder="Digite os objetivos do documento..."
+                  disabled={!isEditable}
                 />
               </td>
             </tr>
@@ -239,15 +250,10 @@ export default function Template1({
                   ref={el => textAreaRefs.current[`campo-1-0`] = el}
                   className="editable-table-textarea tabela-observacoes-textarea"
                   value={dataObs[1] ? dataObs[1][0] : ''}
-                  onChange={isEditable ? e => handleChangeObs(1, 0, e.target.value) : undefined}
-                  onInput={isEditable ? handleTextareaResize : undefined}
-                  placeholder={isEditable ? "Digite o campo de aplicação..." : ""}
-                  readOnly={!isEditable}
-                  style={{
-                    backgroundColor: isEditable ? 'white' : '#f5f5f5',
-                    cursor: isEditable ? 'text' : 'default',
-                    border: isEditable ? '1px solid #ddd' : '1px solid #e0e0e0'
-                  }}
+                  onChange={e => handleChangeObs(1, 0, e.target.value)}
+                  onInput={handleTextareaResize}
+                  placeholder="Digite o campo de aplicação..."
+                  disabled={!isEditable}
                 />
               </td>
             </tr>
@@ -262,15 +268,10 @@ export default function Template1({
                   ref={el => textAreaRefs.current[`def-2-0`] = el}
                   className="editable-table-textarea tabela-observacoes-textarea"
                   value={dataObs[2] ? dataObs[2][0] : ''}
-                  onChange={isEditable ? e => handleChangeObs(2, 0, e.target.value) : undefined} 
-                  onInput={isEditable ? handleTextareaResize : undefined}
-                  placeholder={isEditable ? "Digite as definições relevantes..." : ""}
-                  readOnly={!isEditable}
-                  style={{
-                    backgroundColor: isEditable ? 'white' : '#f5f5f5',
-                    cursor: isEditable ? 'text' : 'default',
-                    border: isEditable ? '1px solid #ddd' : '1px solid #e0e0e0'
-                  }}
+                  onChange={e => handleChangeObs(2, 0, e.target.value)}
+                  onInput={handleTextareaResize}
+                  placeholder="Digite as definições relevantes..."
+                  disabled={!isEditable}
                 />
               </td>
             </tr>
@@ -285,15 +286,10 @@ export default function Template1({
                   ref={el => textAreaRefs.current[`abrev-3-0`] = el}
                   className="editable-table-textarea tabela-observacoes-textarea"
                   value={dataObs[3] ? dataObs[3][0] : ''}
-                  onChange={isEditable ? e => handleChangeObs(3, 0, e.target.value) : undefined}
-                  onInput={isEditable ? handleTextareaResize : undefined}
-                  placeholder={isEditable ? "Digite as abreviaturas utilizadas..." : ""}
-                  readOnly={!isEditable}
-                  style={{
-                    backgroundColor: isEditable ? 'white' : '#f5f5f5',
-                    cursor: isEditable ? 'text' : 'default',
-                    border: isEditable ? '1px solid #ddd' : '1px solid #e0e0e0'
-                  }}
+                  onChange={e => handleChangeObs(3, 0, e.target.value)}
+                  onInput={handleTextareaResize}
+                  placeholder="Digite as abreviaturas utilizadas..."
+                  disabled={!isEditable}
                 />
               </td>
             </tr>
@@ -308,15 +304,10 @@ export default function Template1({
                   ref={el => textAreaRefs.current[`obs-4-0`] = el}
                   className="editable-table-textarea tabela-observacoes-textarea"
                   value={dataObs[4] ? dataObs[4][0] : ''}
-                  onChange={isEditable ? e => handleChangeObs(4, 0, e.target.value) : undefined}
-                  onInput={isEditable ? handleTextareaResize : undefined}
-                  placeholder={isEditable ? "Digite observações adicionais..." : ""}
-                  readOnly={!isEditable}
-                  style={{
-                    backgroundColor: isEditable ? 'white' : '#f5f5f5',
-                    cursor: isEditable ? 'text' : 'default',
-                    border: isEditable ? '1px solid #ddd' : '1px solid #e0e0e0'
-                  }}
+                  onChange={e => handleChangeObs(4, 0, e.target.value)}
+                  onInput={handleTextareaResize}
+                  placeholder="Digite observações adicionais..."
+                  disabled={!isEditable}
                 />
               </td>
             </tr>
@@ -369,21 +360,16 @@ export default function Template1({
                         ref={el => textAreaRefs.current[`main-${rowIdx}-${colIdx}`] = el}
                         className="editable-table-textarea tabela-principal-textarea"                      
                         value={cell}
-                        onChange={isEditable ? e => handleChange(rowIdx, colIdx, e.target.value) : undefined}
-                        onInput={isEditable ? handleTextareaResize : undefined}
-                        readOnly={!isEditable}
-                        placeholder={isEditable ? (
+                        onChange={e => handleChange(rowIdx, colIdx, e.target.value)}
+                        onInput={handleTextareaResize}
+                        disabled={!isEditable}
+                        placeholder={
                           colIdx === 0 ? 'Fluxo' :
                           colIdx === 1 ? 'Descrição' :
                           colIdx === 2 ? 'Responsável' :
                           colIdx === 3 ? 'Documentos' :
                           'Instruções'
-                        ) : ""}
-                        style={{
-                          backgroundColor: isEditable ? 'white' : '#f5f5f5',
-                          cursor: isEditable ? 'text' : 'default',
-                          border: isEditable ? '1px solid #ddd' : '1px solid #e0e0e0'
-                        }}
+                        }
                       />
                     )}
                   </td>

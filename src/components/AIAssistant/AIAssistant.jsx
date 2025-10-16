@@ -529,30 +529,51 @@ const AIAssistant = ({
         </div>
         
         {/* Botão "Começar" apenas no passo inicial */}
-        {stepData.showStartButton && (
-          <button
-            onClick={() => {
-              console.log('🚀 Utilizador clicou em "Começar"');
-              tutorial.nextStep();
-            }}
-            style={{
-              marginTop: '12px',
-              padding: '8px 16px',
-              backgroundColor: '#22c55e',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '13px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              width: '100%'
-            }}
-            onMouseOver={(e) => e.target.style.backgroundColor = '#16a34a'}
-            onMouseOut={(e) => e.target.style.backgroundColor = '#22c55e'}
-          >
-            🚀 Começar Tutorial
-          </button>
-        )}
+        {stepData.showStartButton && (() => {
+          // Verificar se o user tem processos atribuídos antes de mostrar o botão
+          const userOwnsProcess = isSuperAdmin || Object.values(processOwners).includes(username);
+          
+          if (!userOwnsProcess) {
+            return (
+              <div style={{
+                marginTop: '12px',
+                padding: '10px',
+                backgroundColor: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: '6px',
+                fontSize: '12px',
+                color: '#991b1b'
+              }}>
+                🔒 Não pode iniciar o tutorial porque não é proprietário de nenhum processo. Contacte um Super Admin.
+              </div>
+            );
+          }
+          
+          return (
+            <button
+              onClick={() => {
+                console.log('🚀 Utilizador clicou em "Começar"');
+                tutorial.nextStep();
+              }}
+              style={{
+                marginTop: '12px',
+                padding: '8px 16px',
+                backgroundColor: '#22c55e',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '13px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                width: '100%'
+              }}
+              onMouseOver={(e) => e.target.style.backgroundColor = '#16a34a'}
+              onMouseOut={(e) => e.target.style.backgroundColor = '#22c55e'}
+            >
+              🚀 Começar Tutorial
+            </button>
+          );
+        })()}
       </div>
     );
   };
@@ -628,7 +649,7 @@ const AIAssistant = ({
               '• Não pode criar utilizadores/processos'
             ];
           } else {
-            // Verifica se o usuário tem processos atribuídos
+            // Verifica se o user tem processos atribuídos
             const userHasProcess = Object.values(processOwners).includes(username);
             capabilities = [
               '👤 Utilizador - Acesso limitado:',
@@ -642,17 +663,33 @@ const AIAssistant = ({
           response = capabilities.join('\n');
           actionType = 'permissions';
       } else if (question.includes('anexo') || question.includes('documento') || question.includes('ficheiro') || question.includes('anexar')) {
-        response = '📎 Vou iniciar o tutorial de anexos! Siga os 6 passos para aprender a anexar documentos corretamente.';
-        actionType = 'attachment';
-        setTimeout(() => {
-          tutorial.startTutorial();
-        }, 1500);
+        // Verificar se o user tem processos atribuídos
+        const userOwnsProcess = isSuperAdmin || Object.values(processOwners).includes(username);
+        
+        if (!userOwnsProcess) {
+          response = '🔒 Não pode anexar documentos porque não é proprietário de nenhum processo. Apenas proprietários de processos ou Super Admins podem anexar documentos. Contacte um Super Admin para ter processos atribuídos.';
+          actionType = 'permissions';
+        } else {
+          response = '📎 Vou iniciar o tutorial de anexos! Siga os 6 passos para aprender a anexar documentos corretamente.';
+          actionType = 'attachment';
+          setTimeout(() => {
+            tutorial.startTutorial();
+          }, 1500);
+        }
       } else if (question.includes('tutorial') || question.includes('ajuda') || question.includes('como')) {
-        response = '🎯 Iniciando tutorial de anexos! Vou guiá-lo através do processo completo passo a passo.';
-        actionType = 'tutorial';
-        setTimeout(() => {
-          tutorial.startTutorial();
-        }, 1500);
+        // Verificar se o user tem processos atribuídos
+        const userOwnsProcess = isSuperAdmin || Object.values(processOwners).includes(username);
+        
+        if (!userOwnsProcess) {
+          response = '🔒 Não pode iniciar o tutorial de anexos porque não é proprietário de nenhum processo. Apenas proprietários de processos ou Super Admins podem anexar documentos. Contacte um Super Admin para ter processos atribuídos.';
+          actionType = 'permissions';
+        } else {
+          response = '🎯 Iniciando tutorial de anexos! Vou guiá-lo através do processo completo passo a passo.';
+          actionType = 'tutorial';
+          setTimeout(() => {
+            tutorial.startTutorial();
+          }, 1500);
+        }
       } else {
         response = `🤖 Ah, não te consigo ajudar com essa pergunta... mas eis onde consigo dar uma mão:
                      • Pesquisa

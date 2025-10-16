@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useContext } from 'react';
-import DeleteButton from './Buttons/delete';
 import { UserContext } from '../context/userContext';
 
 const DocumentosAssociados = ({ 
@@ -18,6 +17,31 @@ const DocumentosAssociados = ({
   const [uploading, setUploading] = useState(false);
 
   const [currentFolderPath, setCurrentFolderPath] = useState('');
+  
+  // Sistema de notificações toast
+  const [notifications, setNotifications] = useState([]);
+  
+  // Modal de confirmação
+  const [confirmDialog, setConfirmDialog] = useState({ show: false, message: '', onConfirm: null });
+
+  const showNotification = (message, type = 'info') => {
+    const id = Date.now();
+    setNotifications(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 4000);
+  };
+
+  const showConfirmDialog = (message, onConfirm) => {
+    setConfirmDialog({ show: true, message, onConfirm });
+  };
+
+  const handleConfirmDialog = (confirmed) => {
+    if (confirmed && confirmDialog.onConfirm) {
+      confirmDialog.onConfirm();
+    }
+    setConfirmDialog({ show: false, message: '', onConfirm: null });
+  };
 
   // Busca documentos da subpasta específica baseada no prefixo do ficheiro atual
   const fetchDocumentos = async () => {
@@ -153,7 +177,7 @@ const DocumentosAssociados = ({
     if (!file) return;
 
     if (!originalFilename) {
-      alert('Não foi possível determinar a pasta de destino.');
+      showNotification('Não foi possível determinar a pasta de destino.', 'error');
       return;
     }
 
@@ -189,14 +213,14 @@ const DocumentosAssociados = ({
         // Adiciona automaticamente o documento aos selecionados
         toggleDocumento(file.name);
         
-        alert('Documento enviado com sucesso!');
+        showNotification('Documento enviado com sucesso!', 'success');
       } else {
         console.error('Erro no upload:', response.statusText);
-        alert('Erro ao enviar documento. Tente novamente.');
+        showNotification('Erro ao enviar documento. Tente novamente.', 'error');
       }
     } catch (error) {
       console.error('Erro no upload:', error);
-      alert('Erro ao enviar documento. Tente novamente.');
+      showNotification('Erro ao enviar documento. Tente novamente.', 'error');
     } finally {
       setUploading(false);
       // Limpa o input file
@@ -217,6 +241,58 @@ const DocumentosAssociados = ({
     } finally {
       // Recarrega documentos da subpasta
       await fetchDocumentos();
+    }
+  };
+
+  // Função para apagar documento da base de dados
+  const handleDelete = async (documentoName) => {
+    // Busca o documento na lista disponível para obter o caminho completo
+    const documento = documentosDisponiveis.find(
+      doc => (typeof doc === 'object' ? doc.displayName : doc) === documentoName
+    );
+    
+    if (documento && typeof documento === 'object') {
+      const fullPath = documento.fullPath;
+      
+      // Confirma a ação com modal personalizado
+      showConfirmDialog(
+        `Tem a certeza que deseja apagar permanentemente o arquivo "${documentoName}"?\n\nEsta ação não pode ser desfeita.`,
+        async () => {
+          try {
+            console.log('Apagando arquivo:', fullPath);
+            
+            const response = await fetch(`https://api9001.duckdns.org/files/delete`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ filename: encodeURIComponent(fullPath) }),
+            });
+            
+            if (response.ok) {
+              console.log('Arquivo apagado com sucesso');
+              
+              // Remove da lista de selecionados se estiver selecionado
+              if (documentosSelecionados.includes(documentoName)) {
+                const novos = documentosSelecionados.filter(d => d !== documentoName);
+                setDocumentosSelecionados(novos);
+                onChange(novos.join('\n'));
+              }
+              
+              // Recarrega a lista de documentos
+              await fetchDocumentos();
+              
+              showNotification('Arquivo apagado com sucesso!', 'success');
+            } else {
+              console.error('Erro ao apagar arquivo:', response.statusText);
+              showNotification('Erro ao apagar arquivo. Tente novamente.', 'error');
+            }
+          } catch (error) {
+            console.error('Erro ao apagar arquivo:', error);
+            showNotification('Erro ao apagar arquivo. Tente novamente.', 'error');
+          }
+        }
+      );
     }
   };
 
@@ -247,7 +323,7 @@ const DocumentosAssociados = ({
     );
     
     if (!docObject) {
-      alert('Documento não encontrado.');
+      showNotification('Documento não encontrado.', 'error');
       return;
     }
     
@@ -270,18 +346,18 @@ const DocumentosAssociados = ({
         // Abre o documento numa nova janela
         const newWindow = window.open(url, '_blank');
         if (!newWindow) {
-          alert('Pop-ups bloqueados. Por favor, permita pop-ups para visualizar o documento.');
+          showNotification('Pop-ups bloqueados. Por favor, permita pop-ups para visualizar o documento.', 'warning');
         } else {
           // Limpa o URL após um tempo para libertar memória
           setTimeout(() => URL.revokeObjectURL(url), 5000);
         }
       } else {
         const errorText = await response.text();
-        alert(`Erro ao carregar o documento para preview: ${errorText}`);
+        showNotification(`Erro ao carregar o documento para preview: ${errorText}`, 'error');
       }
     } catch (error) {
       console.error('🚨 Erro no preview:', error);
-      alert('Erro ao fazer preview do documento.');
+      showNotification('Erro ao fazer preview do documento.', 'error');
     }
   };
 
@@ -292,7 +368,7 @@ const DocumentosAssociados = ({
     );
     
     if (!docObject) {
-      alert('Documento não encontrado.');
+      showNotification('Documento não encontrado.', 'error');
       return;
     }
     
@@ -324,11 +400,11 @@ const DocumentosAssociados = ({
         URL.revokeObjectURL(url);
       } else {
         const errorText = await response.text();
-        alert(`Erro ao fazer download do documento: ${errorText}`);
+        showNotification(`Erro ao fazer download do documento: ${errorText}`, 'error');
       }
     } catch (error) {
       console.error('🚨 Erro no download:', error);
-      alert('Erro ao fazer download do documento.');
+      showNotification('Erro ao fazer download do documento.', 'error');
     }
   };
 
@@ -686,20 +762,27 @@ const DocumentosAssociados = ({
                               ⬇️ Baixar
                             </button>
                             {isSuperAdmin && (
-                              (() => {
-                                // Determina caminho completo e partes para o botão de eliminar
-                                const fullPath = typeof documento === 'object' ? documento.fullPath : (currentFolderPath ? `${currentFolderPath}/${docName}` : docName);
-                                const parts = fullPath.split('/');
-                                const fileNameOnly = parts.pop();
-                                const currentPathParts = parts; // caminho sem o ficheiro
-                                return (
-                                  <DeleteButton
-                                    file={{ name: fileNameOnly }}
-                                    currentPath={currentPathParts}
-                                    onDelete={handleDeleteAssociated}
-                                  />
-                                );
-                              })()
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDelete(docName);
+                                }}
+                                style={{
+                                  padding: '6px 12px',
+                                  backgroundColor: '#d32f2f',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  fontSize: '11px',
+                                  fontWeight: 'bold'
+                                }}
+                                title="Apagar documento permanentemente"
+                                onMouseEnter={(e) => e.target.style.backgroundColor = '#c62828'}
+                                onMouseLeave={(e) => e.target.style.backgroundColor = '#d32f2f'}
+                              >
+                                🗑️ Apagar
+                              </button>
                             )}
                           </div>
                         </div>
@@ -743,6 +826,180 @@ const DocumentosAssociados = ({
           </div>
         </>
       )}
+      
+      {/* Modal de Confirmação */}
+      {confirmDialog.show && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.6)',
+          zIndex: 10001,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+            width: '90%',
+            maxWidth: '450px',
+            padding: '0',
+            overflow: 'hidden',
+            animation: 'modalFadeIn 0.3s ease-out'
+          }}>
+            {/* Cabeçalho */}
+            <div style={{
+              padding: '20px 24px',
+              backgroundColor: '#fff3cd',
+              borderBottom: '2px solid #ffc107',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <span style={{ fontSize: '28px' }}>⚠️</span>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#856404' }}>
+                Confirmação Necessária
+              </h3>
+            </div>
+            
+            {/* Conteúdo */}
+            <div style={{
+              padding: '24px',
+              fontSize: '15px',
+              lineHeight: '1.6',
+              color: '#333',
+              whiteSpace: 'pre-line'
+            }}>
+              {confirmDialog.message}
+            </div>
+            
+            {/* Botões */}
+            <div style={{
+              padding: '16px 24px',
+              backgroundColor: '#f8f9fa',
+              borderTop: '1px solid #dee2e6',
+              display: 'flex',
+              gap: '12px',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={() => handleConfirmDialog(false)}
+                style={{
+                  padding: '10px 24px',
+                  fontSize: '14px',
+                  backgroundColor: '#6c757d',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#5a6268'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#6c757d'}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleConfirmDialog(true)}
+                style={{
+                  padding: '10px 24px',
+                  fontSize: '14px',
+                  backgroundColor: '#dc3545',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#c82333'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#dc3545'}
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Sistema de Notificações Toast */}
+      <div style={{
+        position: 'fixed',
+        top: '20px',
+        right: '20px',
+        zIndex: 10000,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px'
+      }}>
+        {notifications.map(notification => (
+          <div
+            key={notification.id}
+            style={{
+              minWidth: '300px',
+              maxWidth: '400px',
+              padding: '16px 20px',
+              backgroundColor: 
+                notification.type === 'success' ? '#d4edda' :
+                notification.type === 'error' ? '#f8d7da' :
+                notification.type === 'warning' ? '#fff3cd' : '#d1ecf1',
+              color: 
+                notification.type === 'success' ? '#155724' :
+                notification.type === 'error' ? '#721c24' :
+                notification.type === 'warning' ? '#856404' : '#0c5460',
+              border: `1px solid ${
+                notification.type === 'success' ? '#c3e6cb' :
+                notification.type === 'error' ? '#f5c6cb' :
+                notification.type === 'warning' ? '#ffeaa7' : '#bee5eb'}`,
+              borderRadius: '8px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              fontSize: '14px',
+              fontWeight: '500',
+              animation: 'slideIn 0.3s ease-out',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}
+          >
+            <span style={{ fontSize: '20px' }}>
+              {notification.type === 'success' ? '✅' :
+               notification.type === 'error' ? '❌' :
+               notification.type === 'warning' ? '⚠️' : 'ℹ️'}
+            </span>
+            <span style={{ flex: 1 }}>{notification.message}</span>
+          </div>
+        ))}
+      </div>
+      
+      {/* Estilos para animação */}
+      <style>{`
+        @keyframes slideIn {
+          from {
+            transform: translateX(400px);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        
+        @keyframes modalFadeIn {
+          from {
+            transform: scale(0.9);
+            opacity: 0;
+          }
+          to {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+      `}</style>
     </div>
   );
 };

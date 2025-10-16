@@ -1,7 +1,7 @@
 import React from "react";
 import Bin from "../../icons/bin.ico"; 
 
-const DeleteButton = ({ file, currentPath, onDelete }) => {
+const DeleteButton = ({ file, currentPath, onDelete, showNotification, showConfirmDialog }) => {
     if (!file || !file.name) {
         return null; // Retorna null se não houver arquivo ou nome
     }
@@ -10,12 +10,12 @@ const DeleteButton = ({ file, currentPath, onDelete }) => {
         e.stopPropagation(); // Evita trigger do onClick do div pai
         
         // Confirma se o utilizador quer realmente apagar o ficheiro
-        const confirmDelete = window.confirm(`Tem a certeza que deseja eliminar o ficheiro "${file.name}"?`);
-        
-        if (!confirmDelete) {
-            return;
-        }
+        showConfirmDialog(`Tem a certeza que deseja eliminar o ficheiro "${file.name}"?`, async () => {
+            await performDelete();
+        });
+    };
 
+    const performDelete = async () => {
         try {
             const filePath = [...currentPath, file.name].join("/");
             
@@ -36,11 +36,11 @@ const DeleteButton = ({ file, currentPath, onDelete }) => {
                 onDelete(filePath);
             }
 
-            alert("Ficheiro eliminado com sucesso!");
+            showNotification("Ficheiro eliminado com sucesso!", "success");
 
         } catch (error) {
             console.error("Erro ao eliminar o arquivo:", error);
-            alert("Erro ao eliminar o ficheiro. Tente novamente.");
+            showNotification("Erro ao eliminar o ficheiro. Tente novamente.", "error");
         }
     };
 

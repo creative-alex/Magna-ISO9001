@@ -26,7 +26,7 @@ export default function CreateProcess() {
     indicadores_r2: '',
     indicadores_r3: ''
   }); // Objeto com 3 campos de indicadores
-  const [users, setUsers] = useState([]); // Lista de usuários para o dropdown
+  const [users, setUsers] = useState([]); // Lista de users para o dropdown
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -85,7 +85,7 @@ export default function CreateProcess() {
     fetchNextProcessNumber();
   }, []);
 
-  // Buscar lista de usuários quando o componente carregar
+  // Buscar lista de users quando o componente carregar
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -94,10 +94,10 @@ export default function CreateProcess() {
           const usersData = await response.json();
           setUsers(usersData);
         } else {
-          console.warn('Erro ao buscar usuários:', response.statusText);
+          console.warn('Erro ao buscar users:', response.statusText);
         }
       } catch (error) {
-        console.warn('Erro ao buscar usuários:', error);
+        console.warn('Erro ao buscar users:', error);
       }
     };
 

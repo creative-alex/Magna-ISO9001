@@ -47,7 +47,7 @@ const Login = ({onLoginSuccess}) => {
         }
     };
     
-    // Reset do componente quando o usuário faz logout
+    // Reset do componente quando o user faz logout
     useEffect(() => {
         if (!isAuthenticated) {
             hasShownToast.current = false;
