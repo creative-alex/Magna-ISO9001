@@ -919,9 +919,6 @@ export async function generateNonEditablePdf(data, headers, dataObs, title = "Pr
   }
 
   // Sanitiza conteúdo apenas para PDF não editável:
-  // - Em Documentos Associados (col 3) e Instruções (col 4):
-  //   converte "[FORM] Título||url" -> "Título" e "[VIDEO] Título||url" -> "Título"
-  //   preserva múltiplas linhas
   function sanitizeNonEditableCell(text, colIndex) {
     const s = (text || '').toString();
     // Apenas tratar as colunas específicas (indexes 3 e 4, zero-based)
