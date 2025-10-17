@@ -489,48 +489,26 @@ const DocumentosAssociados = ({
     // Verifica se é um link de formulário
     if (isFormLink(documento)) {
       const url = getFormUrl(documento);
-      if (url) {
-        window.open(url, '_blank');
+      const title = getFormTitle(documento); // Obtém o nome do formulário
+      console.log(`Abrindo formulário em nova aba: ${title}`);
+      const newWindow = window.open(url, '_blank');
+      if (!newWindow) {
+        showNotification('Pop-ups bloqueados. Por favor, permita pop-ups para abrir o formulário.', 'warning');
       }
       return;
     }
 
-    // Para ficheiros normais, busca o caminho e abre preview
+    // Para ficheiros normais, exibe apenas o nome
     const docObject = typeof documento === 'object' ? documento : documentosDisponiveis.find(d => d.displayName === documento);
-    const fullPath = typeof documento === 'object' ? documento.fullPath : docObject?.fullPath;
+    const displayName = typeof documento === 'object' ? documento.displayName : docObject?.displayName;
 
-    if (!fullPath) {
-      console.error('Caminho não encontrado para:', documento);
-      showNotification('Erro: Caminho do documento não encontrado.', 'error');
+    if (!displayName) {
+      console.error('Nome não encontrado para:', documento);
+      showNotification('Erro: Nome do documento não encontrado.', 'error');
       return;
     }
-    
-    try {
-      const response = await fetch('https://api9001.duckdns.org/files/download', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ path: encodeURIComponent(fullPath) }),
-      });
-
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        
-        // Abre em nova tab
-        window.open(url, '_blank');
-        
-        // Limpa o URL após um tempo
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
-      } else {
-        const errorText = await response.text();
-        showNotification(`Erro ao visualizar o documento: ${errorText}`, 'error');
-      }
-    } catch (error) {
-      console.error('🚨 Erro na visualização:', error);
-      showNotification('Erro ao visualizar o documento.', 'error');
-    }
+    console.log(`Abrindo documento em nova aba: ${displayName}`);
+    await handlePreview(displayName);
   };
 
   // Função para fazer download do documento
@@ -580,12 +558,19 @@ const DocumentosAssociados = ({
     }
   };
 
+  // Valor processado para o PDF (apenas títulos; remove URLs de formulários)
+  const hiddenValueForPdf = (documentosSelecionados && documentosSelecionados.length > 0)
+    ? documentosSelecionados
+        .map((doc) => (isFormLink(doc) ? getFormTitle(doc) : doc))
+        .join('\n')
+    : '';
+
   return (
     <div className="documentos-associados-container" style={{ position: 'relative', width: '100%', height: '100%' }}>
       {/* Input hidden para permitir extração do valor em PDFs */}
       <input 
         type="hidden" 
-        value={currentValue || ''} 
+        value={hiddenValueForPdf} 
         data-component="documentos-associados"
         readOnly
       />

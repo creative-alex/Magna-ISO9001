@@ -213,6 +213,13 @@ const InstrucoesTrabalho = ({
     return parts.length > 1 ? parts[1] : '';
   };
 
+  // Valor processado para o PDF (apenas títulos; remove URLs de vídeos)
+  const hiddenValueForPdf = (instrucoesSelecionadas && instrucoesSelecionadas.length > 0)
+    ? instrucoesSelecionadas
+        .map((it) => (isVideoLink(it) ? getVideoTitle(it) : it))
+        .join('\n')
+    : '';
+
   // Busca Instruções de trabalho procedimento da subpasta específica baseada no prefixo do ficheiro atual
   const fetchInstrucoes = async () => {
     if (!originalFilename) return;
@@ -525,7 +532,7 @@ const InstrucoesTrabalho = ({
       {/* Input hidden para permitir extração do valor em PDFs */}
       <input 
         type="hidden" 
-        value={currentValue || ''} 
+        value={hiddenValueForPdf} 
         data-component="instrucoes-trabalho"
         readOnly
       />

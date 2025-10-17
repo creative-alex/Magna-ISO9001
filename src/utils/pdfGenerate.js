@@ -918,27 +918,42 @@ export async function generateNonEditablePdf(data, headers, dataObs, title = "Pr
     return text.replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '');
   }
 
+  // Sanitiza conteúdo apenas para PDF não editável:
+  // - Em Documentos Associados (col 3) e Instruções (col 4):
+  //   converte "[FORM] Título||url" -> "Título" e "[VIDEO] Título||url" -> "Título"
+  //   preserva múltiplas linhas
+  function sanitizeNonEditableCell(text, colIndex) {
+    const s = (text || '').toString();
+    // Apenas tratar as colunas específicas (indexes 3 e 4, zero-based)
+    const isDocsCol = colIndex === 3;
+    const isInstrCol = colIndex === 4;
+    if (!isDocsCol && !isInstrCol) {
+      return removeEmojis(s);
+    }
+    const lines = s.split('\n');
+    const cleaned = lines.map((line) => {
+      const t = line.trim();
+      if (t.startsWith('[FORM]')) {
+        return t.replace('[FORM] ', '').split('||')[0].trim();
+      }
+      if (t.startsWith('[VIDEO]')) {
+        return t.replace('[VIDEO] ', '').split('||')[0].trim();
+      }
+      return t;
+    });
+    return removeEmojis(cleaned.join('\n'));
+  }
+
   // Calcula as linhas quebradas e alturas de cada linha
   const wrappedData = safeData.map((row, rowIdx) =>
     row.map((cell, col) => {
       const cellText = (cell || '').toString();
-      
-      // Debug para documentos associados (coluna 3)
+      // Debug para Documentos Associados
       if (col === 3 && cellText.trim() !== '') {
-        console.log(`🔍 DEBUG - Documentos Associados linha ${rowIdx}:`, cellText);
+        console.log(`🔍 DEBUG - Documentos Associados (não editável) linha ${rowIdx}:`, cellText);
       }
-      
-      // Se é um link de vídeo, usa título + URL para calcular quebras
-      let textForWrapping = cellText;
-      if (cellText.startsWith('[VIDEO]') && cellText.includes('||')) {
-        const parts = cellText.split('||');
-        const title = parts[0].replace('[VIDEO] ', '').trim();
-        const url = parts[1];
-        textForWrapping = `${title} (${url})`; // Formato final que será exibido
-      } else {
-        textForWrapping = removeEmojis(cellText); // Remove emojis de texto normal
-      }
-      
+      // Aplica sanitização específica para não editável
+      const textForWrapping = sanitizeNonEditableCell(cellText, col);
       const maxWidth = maxWidths[col] || 100;
       return wrapText(textForWrapping, font, fontSize, maxWidth);
     })
