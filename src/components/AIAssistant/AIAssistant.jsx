@@ -16,9 +16,56 @@ const AIAssistant = ({
   const [isTyping, setIsTyping] = useState(false);
   const [bubbleResponse, setBubbleResponse] = useState('');
   const [highlightedElements, setHighlightedElements] = useState([]);
+  const [currentPage, setCurrentPage] = useState('unknown');
 
   // Hook do tutorial persistente
   const tutorial = useTutorial();
+
+  // Detectar página atual
+  useEffect(() => {
+    const detectCurrentPage = () => {
+      const path = window.location.pathname;
+      
+      if (path === '/file' || path === '/home' || path === '/') {
+        setCurrentPage('selectPdf');
+      } else if (path.startsWith('/file/') || path.startsWith('/table/')) {
+        // Rotas /file/:filename ou /table/:filename são páginas de template
+        setCurrentPage('template');
+      } else if (path === '/novo-procedimento' || path === '/newtable') {
+        setCurrentPage('createProcedure');
+      } else if (path === '/novo-processo') {
+        setCurrentPage('createProcess');
+      } else if (path === '/create-user') {
+        setCurrentPage('createUser');
+      } else if (path === '/first-login') {
+        setCurrentPage('firstLogin');
+      } else {
+        setCurrentPage('unknown');
+      }
+      
+      console.log('📍 Página atual detectada:', currentPage, '(path:', path, ')');
+    };
+
+    detectCurrentPage();
+    
+    // Detectar mudanças de navegação
+    const handleNavigation = () => {
+      setTimeout(detectCurrentPage, 300);
+    };
+    
+    window.addEventListener('popstate', handleNavigation);
+    
+    const originalPushState = window.history.pushState;
+    window.history.pushState = function(...args) {
+      originalPushState.apply(window.history, args);
+      handleNavigation();
+    };
+    
+    return () => {
+      window.removeEventListener('popstate', handleNavigation);
+      window.history.pushState = originalPushState;
+    };
+  }, [currentPage]);
 
   // Funções para realce de elementos
   const highlightElement = (selector, scrollIntoView = true) => {
@@ -588,8 +635,25 @@ const AIAssistant = ({
     setTimeout(() => {
       let response = '';
       let actionType = null;
-      // Verificação explícita para perguntas sobre como criar processos
-      if (
+      
+      // Respostas contextuais baseadas na página atual
+      if (question.includes('pesquis') || question.includes('procur') || question.includes('encontr') || question.includes('search')) {
+        if (currentPage !== 'selectPdf') {
+          response = '🔍 Para pesquisar ficheiros, precisa voltar à página principal!\n\n📂 Clique no logotipo ISO 9001 no topo esquerdo para voltar à lista de ficheiros onde está a barra de pesquisa.';
+          actionType = 'searchFromOther';
+        } else {
+          response = '🔍 Use a barra de pesquisa no topo para encontrar ficheiros rapidamente!';
+          actionType = 'search';
+        }
+      } else if (question.includes('ficheiro') || question.includes('file') || question.includes('documento') || question.includes('pdf')) {
+        if (currentPage !== 'selectPdf') {
+          response = '📄 Para ver ficheiros, volte à página principal:\n\n🏠 Clique no logotipo ISO 9001 no topo para voltar à lista completa\n🔍 Lá pode usar a pesquisa para encontrar o que precisa';
+          actionType = 'fileNavigationFromOther';
+        } else {
+          response = '📁 Clique nas pastas "PROCESSO X:" para expandir e ver os ficheiros disponíveis.';
+          actionType = 'folder';
+        }
+      } else if (
         (question.includes('processo') || question.includes('processos'))
       ) {
         if (isSuperAdmin) {
@@ -599,34 +663,38 @@ const AIAssistant = ({
           response = '🔐 Apenas Super Admins podem criar novos processos. Contacte um Super Admin se precisar de um novo processo.';
           actionType = 'permissions';
         }
-      } else if (question.includes('pesquis') || question.includes('procur') || question.includes('encontr')) {
-        response = '🔍 Use a barra de pesquisa no topo para encontrar ficheiros rapidamente!';
-        actionType = 'search';
       } else if (question.includes('pasta') || question.includes('abrir') || question.includes('naveg')) {
-        response = '📁 Clique nas pastas "PROCESSO X:" para expandir e ver os ficheiros.';
-        actionType = 'folder';
+        if (currentPage === 'selectPdf') {
+          response = '� Clique nas pastas "PROCESSO X:" para expandir e ver os ficheiros.';
+          actionType = 'folder';
+        } else {
+          response = '📁 Para navegar pelas pastas, volte à página principal clicando no logotipo ISO 9001 no topo.';
+          actionType = 'folderFromOther';
+        }
       } else if (question.includes('criar') || question.includes('novo') || question.includes('adicion') || question.includes('procedimento')) {
         if (isSuperAdmin) {
           response = '⚡ Como Super Admin, pode criar:\n• ➕ Novos procedimentos\n• 👥 Novos utilizadores\n• 🏢 Novos processos\n• 🔧 Configurações do sistema';
           actionType = 'superAdminCreate';
         } else {
-          response = '👉➕ Use o botão + ao lado das pastas para criar novos procedimentos.';
-          actionType = 'create';
+          if (currentPage !== 'selectPdf') {
+            response = '➕ Para criar procedimentos, volte à página principal e clique no botão + ao lado da pasta desejada.';
+            actionType = 'createFromOther';
+          } else {
+            response = '👉➕ Use o botão + ao lado das pastas para criar novos procedimentos.';
+            actionType = 'create';
+          }
         }
       } else if (question.includes('utilizador') || question.includes('user') || question.includes('conta')) {
         if (isSuperAdmin) {
-          response = '👥 Como Super Admin, pode gerir utilizadores:\n• ➕ Criar novos utilizadores\n• ✏️ Editar perfis\n• 🔒 Gerir permissões\n• 🗑️ Remover utilizadores';
-          actionType = 'userManagement';
+          if (currentPage !== 'selectPdf') {
+            response = '👥 Para gerir utilizadores, vá à página de gestão:\n\n1️⃣ Use o menu de navegação\n2️⃣ Ou clique no link de gestão de utilizadores\n3️⃣ Lá pode criar/editar/remover utilizadores';
+            actionType = 'userManagementNavigation';
+          } else {
+            response = '👥 Como Super Admin, pode gerir utilizadores:\n• ➕ Criar novos utilizadores\n• ✏️ Editar perfis\n• 🔒 Gerir permissões\n• 🗑️ Remover utilizadores';
+            actionType = 'userManagement';
+          }
         } else {
           response = '🔐 Apenas Super Admins podem gerir utilizadores.';
-          actionType = 'permissions';
-        }
-      } else if (question.includes('processo') && (question.includes('criar') || question.includes('novo'))) {
-        if (isSuperAdmin) {
-          response = '🏢 Como Super Admin, pode criar novos processos:\n• 📋 Definir estrutura\n• 👤 Atribuir responsáveis\n• 📄 Configurar templates\n• 🔧 Definir permissões';
-          actionType = 'processManagement';
-        } else {
-          response = '🔐 Apenas Super Admins podem criar novos processos. Contacte um Super Admin se precisar de um novo processo.';
           actionType = 'permissions';
         }
       } else if (question.includes('permiss') || question.includes('edit') || question.includes('posso')) {
@@ -638,7 +706,7 @@ const AIAssistant = ({
               '• Gerir utilizadores e permissões',
               '• Configurar sistema',
               '• Criar novos processos',
-              '• Acesso a todas as funcionalidades'
+              '• Acesso a todas as funcionalidades',
             ];
           } else if (isAdmin) {
             capabilities = [
@@ -662,19 +730,22 @@ const AIAssistant = ({
           }
           response = capabilities.join('\n');
           actionType = 'permissions';
-      } else if (question.includes('anexo') || question.includes('documento') || question.includes('ficheiro') || question.includes('anexar')) {
+      } else if (question.includes('anexo') || question.includes('documento') || question.includes('anexar')) {
         // Verificar se o user tem processos atribuídos
         const userOwnsProcess = isSuperAdmin || Object.values(processOwners).includes(username);
         
         if (!userOwnsProcess) {
           response = '🔒 Não pode anexar documentos porque não é proprietário de nenhum processo. Apenas proprietários de processos ou Super Admins podem anexar documentos. Contacte um Super Admin para ter processos atribuídos.';
           actionType = 'permissions';
-        } else {
-          response = '📎 Vou iniciar o tutorial de anexos! Siga os 6 passos para aprender a anexar documentos corretamente.';
+        } else if (currentPage !== 'selectPdf' && (currentPage === 'template' || document.querySelector('table.main-table, .tabela-template'))) {
+          response = '📎 Está na página certa! Vou iniciar o tutorial de anexos. Siga os passos para aprender a anexar documentos corretamente.';
           actionType = 'attachment';
           setTimeout(() => {
             tutorial.startTutorial();
           }, 1500);
+        } else {
+          response = '📎 Para anexar documentos:\n\n1️⃣ Primeiro vá à página principal (clique no logotipo)\n2️⃣ Selecione um procedimento para abrir\n3️⃣ Depois pode anexar documentos nas tabelas\n\nOu posso iniciar o tutorial de anexos que o guiará por todo o processo!';
+          actionType = 'attachmentFromOther';
         }
       } else if (question.includes('tutorial') || question.includes('ajuda') || question.includes('como')) {
         // Verificar se o user tem processos atribuídos
@@ -690,10 +761,30 @@ const AIAssistant = ({
             tutorial.startTutorial();
           }, 1500);
         }
+      } else if (question.includes('onde') || question.includes('página') || question.includes('pagina') || question.includes('estou')) {
+        let pageDescription = '';
+        switch (currentPage) {
+          case 'selectPdf':
+            pageDescription = '📂 Está na página principal (lista de ficheiros).\n\nAqui pode:\n• 🔍 Pesquisar ficheiros\n• 📁 Navegar pelas pastas\n• ➕ Criar novos procedimentos\n• 👁️ Visualizar ficheiros';
+            break;
+          case 'template':
+            pageDescription = '📄 Está a visualizar um procedimento/template.\n\nAqui pode:\n• ✏️ Editar tabelas\n• 📎 Anexar documentos\n• 💾 Guardar alterações\n• 🏠 Voltar à lista (clique no logotipo)';
+            break;
+          case 'createProcedure':
+            pageDescription = '➕ Está na página de criar novo procedimento.\n\nAqui pode:\n• 📝 Definir nome e detalhes\n• 📊 Escolher template\n• 💾 Criar o procedimento';
+            break;
+          case 'createProcess':
+            pageDescription = '🏢 Está na página de criar novo processo.\n\nAqui pode:\n• 📋 Definir estrutura\n• 👤 Atribuir responsáveis\n• 💾 Criar o processo';
+            break;
+          default:
+            pageDescription = '❓ Página não identificada. Use o logotipo no topo para navegar para a página principal.';
+        }
+        response = pageDescription;
+        actionType = 'pageInfo';
       } else {
         response = `🤖 Ah, não te consigo ajudar com essa pergunta... mas eis onde consigo dar uma mão:
-                     • Pesquisa
-                     • Navegação
+                     • Pesquisa e navegação
+                     • Localização atual
                      • Criação de procedimentos
                      • Permissões
                      • Anexos
@@ -706,9 +797,9 @@ const AIAssistant = ({
       setIsTyping(false);
       setUserInput('');
       
-      if (actionType && actionType !== 'attachment' && actionType !== 'tutorial') {
+      if (actionType && actionType !== 'attachment' && actionType !== 'tutorial' && actionType !== 'attachmentFromOther') {
         setupResponseDetector(actionType);
-      } else if (actionType === 'general') {
+      } else if (actionType === 'general' || actionType === 'pageInfo') {
         setTimeout(() => setBubbleResponse(''), 15000);
       }
     }, 1000);
@@ -742,6 +833,52 @@ const AIAssistant = ({
           searchInput.addEventListener('focus', handleSearchInteraction);
           searchInput.addEventListener('input', handleSearchInteraction);
         }
+        break;
+      
+      case 'searchFromTemplate':
+      case 'searchOther':
+        // Destacar logotipo para voltar à página principal
+        const logo = document.querySelector('.navbar-brand, .logo, a[href="/file"], a[href="/home"]');
+        if (logo) {
+          highlightElement('.navbar-brand, .logo, a[href="/file"], a[href="/home"]', true);
+          
+          const handleLogoClick = () => {
+            clearResponse();
+            removeAllHighlights();
+            logo.removeEventListener('click', handleLogoClick);
+          };
+          logo.addEventListener('click', handleLogoClick, { once: true });
+        }
+        setTimeout(clearResponse, 20000);
+        break;
+      
+      case 'fileNavigation':
+      case 'folderFromOther':
+      case 'createFromOther':
+      case 'fileNavigationOther':
+        // Destacar logotipo para navegação
+        const navLogo = document.querySelector('.navbar-brand, .logo, a[href="/file"], a[href="/home"]');
+        if (navLogo) {
+          highlightElement('.navbar-brand, .logo, a[href="/file"], a[href="/home"]', true);
+          
+          const handleNavClick = () => {
+            clearResponse();
+            removeAllHighlights();
+            navLogo.removeEventListener('click', handleNavClick);
+          };
+          navLogo.addEventListener('click', handleNavClick, { once: true });
+        }
+        setTimeout(clearResponse, 20000);
+        break;
+      
+      case 'attachmentFromOther':
+        // Sugerir voltar à página principal ou iniciar tutorial
+        setTimeout(() => {
+          if (bubbleResponse.includes('tutorial')) {
+            setBubbleResponse(prev => prev + '\n\n🚀 Quer iniciar o tutorial agora? Digite "tutorial"');
+          }
+        }, 3000);
+        setTimeout(clearResponse, 25000);
         break;
         
       case 'folder':
@@ -797,6 +934,11 @@ const AIAssistant = ({
           };
           button.addEventListener('click', handleCreateClick);
         });
+        break;
+      
+      case 'pageInfo':
+        // Não fazer nada especial, apenas limpar após timeout
+        setTimeout(clearResponse, 15000);
         break;
         
       default:
