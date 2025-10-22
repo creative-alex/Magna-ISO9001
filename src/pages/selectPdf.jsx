@@ -31,7 +31,7 @@ function filterTree(nodes, searchTerm) {
     .filter(Boolean);
 }
 
-function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners, currentUser, isAdmin, onDelete }) {
+function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners, currentUser, isAdmin, onDelete, onToggleFavorite, isFavorite }) {
   const [expandedFolder, setExpandedFolder] = useState(null);
 
   // Função para ordenar nós: arquivos primeiro, depois pastas "Informação documentada" correspondentes
@@ -142,6 +142,8 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
                   currentUser={currentUser}
                   isAdmin={isAdmin}
                   onDelete={onDelete}
+                  onToggleFavorite={onToggleFavorite}
+                  isFavorite={isFavorite}
                 />
               </div>
             )}
@@ -162,17 +164,33 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
           const processOwnerString = processOwners[currentPath[0]];
           const isProcessOwner = processOwnerString && processOwnerString.split(',').map(nome => nome.trim()).includes(currentUser);
           const canDelete = isAdmin ;
+          const isFav = isFavorite && isFavorite(filePath);
           
           return (
             <div 
               key={node.name} 
               className={`file ${isClickableFile ? 'file-clickable' : ''}`}
-              onClick={isClickableFile ? () => onSelectFile(filePath) : undefined}
               style={{ cursor: isClickableFile ? 'pointer' : 'default' }}
             >
-              <span className="file-name">{displayName}</span>
+              <span 
+                className="file-name"
+                onClick={isClickableFile ? () => onSelectFile(filePath) : undefined}
+              >
+                {displayName}
+              </span>
               <div className="file-actions">
-                {/* <button style={{ title:'Ver'}}><img src={Ver} alt="Ver" style={{ width: '100%', height: '35px' }} /></button> */}
+                {isClickableFile && onToggleFavorite && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleFavorite(filePath, displayName);
+                    }}
+                    className="favorite-button"
+                    title={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                  >
+                    {isFav ? '⭐' : '☆'}
+                  </button>
+                )}
                 <FilePreviewButton file={node} currentPath={currentPath} />
                 {canDelete && (
                   <DeleteButton 
@@ -195,11 +213,57 @@ export default function SelecionarPdf() {
   const [searchTerm, setSearchTerm] = useState(""); 
   const [processOwners, setProcessOwners] = useState({});
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [favorites, setFavorites] = useState([]);
+  const [showFavoritesDropdown, setShowFavoritesDropdown] = useState(false);
+  const [showResourcesDropdown, setShowResourcesDropdown] = useState(false);
+  const [resourcesFiles, setResourcesFiles] = useState([]);
   const navigate = useNavigate();
   const { username, logout } = useContext(UserContext);
 
   // Verifica se é SuperAdmin
   const isAdmin = username === "superadmin" || username === "SuperAdmin";
+
+  // Carregar favoritos do localStorage quando o componente monta
+  useEffect(() => {
+    if (username) {
+      const savedFavorites = localStorage.getItem(`favorites_${username}`);
+      if (savedFavorites) {
+        try {
+          setFavorites(JSON.parse(savedFavorites));
+        } catch (e) {
+          console.error('Erro ao carregar favoritos:', e);
+          setFavorites([]);
+        }
+      }
+    }
+  }, [username]);
+
+  // Salvar favoritos no localStorage sempre que mudarem
+  useEffect(() => {
+    if (username && favorites.length >= 0) {
+      localStorage.setItem(`favorites_${username}`, JSON.stringify(favorites));
+    }
+  }, [favorites, username]);
+
+  // Funções para gerenciar favoritos
+  const toggleFavorite = (filePath, fileName) => {
+    setFavorites(prev => {
+      const exists = prev.find(fav => fav.path === filePath);
+      if (exists) {
+        return prev.filter(fav => fav.path !== filePath);
+      } else {
+        return [...prev, { path: filePath, name: fileName, addedAt: new Date().toISOString() }];
+      }
+    });
+  };
+
+  const isFavorite = (filePath) => {
+    return favorites.some(fav => fav.path === filePath);
+  };
+
+  const removeFavorite = (filePath) => {
+    setFavorites(prev => prev.filter(fav => fav.path !== filePath));
+  };
 
   // Função para fazer logout
   const handleLogout = async () => {
@@ -220,7 +284,25 @@ export default function SelecionarPdf() {
     // Busca a árvore de ficheiros
     fetch("https://api9001.duckdns.org/files/list-files-tree")
       .then(res => res.json())
-      .then(setFileTree)
+      .then(data => {
+        setFileTree(data);
+        // Extrai ficheiros da pasta "PROCESSO 6: Gestão de Recursos Humanos"
+        const resourcesFolder = data.find(node => 
+          node.name === "PROCESSO 6: Gestão de Recursos Humanos" || 
+          node.name.includes("PROCESSO 6") ||
+          node.name.toLowerCase().includes("gestão de recursos humanos") ||
+          node.name.toLowerCase().includes("gestao de recursos humanos")
+        );
+        if (resourcesFolder && resourcesFolder.children) {
+          const files = resourcesFolder.children
+            .filter(child => child.type === "file")
+            .map(file => ({
+              name: file.name.endsWith('.pdf') ? file.name.slice(0, -4) : file.name,
+              path: `${resourcesFolder.name}/${file.name}`
+            }));
+          setResourcesFiles(files);
+        }
+      })
       .catch(() => setFileTree([]));
 
     // Busca os donos dos processos
@@ -271,10 +353,110 @@ export default function SelecionarPdf() {
 
   return (
     <div className="file-container">
-      <div className="header">
+      <div style={{ borderBottom: "2px solid #C8932F", paddingBottom: "20px", marginBottom: "30px" }}>
+        <div className="header">
         <img src={Logo} alt="Logo" className="logo" />
         <h2 className="title">Magna ISO90001</h2>
+        </div>
+        {/* menus dropdown */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Menu Gestão de Recursos Humanos */}
+          {resourcesFiles.length > 0 && (
+            <>
+              <div className="favorites-dropdown-container">
+                <button 
+                  className="resources-dropdown-button"
+                  onClick={() => setShowResourcesDropdown(!showResourcesDropdown)}
+                >
+                  👥 Recursos Humanos
+                  <span className={`dropdown-arrow ${showResourcesDropdown ? 'open' : ''}`}>▼</span>
+                </button>
+                
+                {showResourcesDropdown && (
+                  <>
+                    <div 
+                      className="favorites-dropdown-overlay"
+                      onClick={() => setShowResourcesDropdown(false)}
+                    />
+                    <div className="favorites-dropdown-menu">
+                      {resourcesFiles.map(file => (
+                        <div key={file.path} className="favorites-dropdown-item">
+                          <span 
+                            className="favorites-dropdown-name"
+                            onClick={() => {
+                              handleSelectFile(file.path);
+                              setShowResourcesDropdown(false);
+                            }}
+                            title={file.path}
+                          >
+                            📄 {file.name}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+              
+              <button
+                className="resources-register-button"
+                onClick={() => window.open('https://docs.google.com/forms/d/e/1FAIpQLSePnbZJUGv7J_YW0MKXn-E61t_naMr25TO2nk_GRDdR8Z13MQ/viewform', '_blank')}
+              >
+                📝 Registar Não Conformidade
+              </button>
+            </>
+          )}
+          
+          {/* Menu Favoritos */}
+          {favorites.length > 0 && (
+            <div className="favorites-dropdown-container">
+              <button 
+                className="favorites-dropdown-button"
+                onClick={() => setShowFavoritesDropdown(!showFavoritesDropdown)}
+              >
+                ⭐ Favoritos ({favorites.length})
+                <span className={`dropdown-arrow ${showFavoritesDropdown ? 'open' : ''}`}>▼</span>
+              </button>
+            
+            {showFavoritesDropdown && (
+              <>
+                <div 
+                  className="favorites-dropdown-overlay"
+                  onClick={() => setShowFavoritesDropdown(false)}
+                />
+                <div className="favorites-dropdown-menu">
+                  {favorites.map(fav => (
+                    <div key={fav.path} className="favorites-dropdown-item">
+                      <span 
+                        className="favorites-dropdown-name"
+                        onClick={() => {
+                          handleSelectFile(fav.path);
+                          setShowFavoritesDropdown(false);
+                        }}
+                        title={fav.path}
+                      >
+                        📄 {fav.name}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeFavorite(fav.path);
+                        }}
+                        className="favorites-dropdown-remove"
+                        title="Remover dos favoritos"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            </div>
+          )}
+        </div>
       </div>
+      
       <input
         type="text"
         placeholder="Encontrar arquivo ou pasta..."
@@ -283,7 +465,9 @@ export default function SelecionarPdf() {
       />
       <div className="file-panel">
        <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-        <div className="panel-title">Índice</div>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <div className="panel-title">Índice</div>
+        </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           {username && (
             <span style={{ fontSize: '14px', color: '#666' }}>
@@ -321,6 +505,8 @@ export default function SelecionarPdf() {
           currentUser={username}
           isAdmin={isAdmin}
           onDelete={reloadFileTree}
+          onToggleFavorite={toggleFavorite}
+          isFavorite={isFavorite}
         />
       </div>
 

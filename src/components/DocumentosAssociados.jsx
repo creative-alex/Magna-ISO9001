@@ -163,12 +163,10 @@ const DocumentosAssociados = ({
   const fetchDocumentos = async () => {
     if (!originalFilename) return;
 
-    console.log('🔍 Procurando documentos para:', originalFilename);
     
     // Extrai a pasta principal do originalFilename
     const parts = originalFilename.split('/');
     if (parts.length < 2) {
-      console.log('❌ Caminho inválido, deve ter pelo menos pasta/ficheiro');
       return;
     }
     
@@ -176,12 +174,9 @@ const DocumentosAssociados = ({
     const mainFolder = parts[0];
     const currentFileName = parts[parts.length - 1]; // Nome do ficheiro atual
     
-    console.log('📁 Pasta principal:', mainFolder);
-    console.log('📄 Nome do ficheiro atual:', currentFileName);
     
     // Extrai o prefixo do nome do ficheiro (parte antes do primeiro espaço)
     const filePrefix = currentFileName.split(' ')[0];
-    console.log('🏷️ Prefixo do ficheiro:', filePrefix);
 
     setLoading(true);
     try {
@@ -193,7 +188,6 @@ const DocumentosAssociados = ({
       }
       
       const fileTree = await response.json();
-      console.log('🌳 Árvore de ficheiros recebida');
       
       // Encontra a pasta principal na árvore
       const mainFolderNode = fileTree.find(node => 
@@ -201,7 +195,6 @@ const DocumentosAssociados = ({
       );
       
       if (!mainFolderNode || !mainFolderNode.children) {
-        console.log('❌ Pasta principal não encontrada ou vazia');
         setDocumentosDisponiveis([]);
         setCurrentFolderPath(mainFolder);
         return;
@@ -214,13 +207,11 @@ const DocumentosAssociados = ({
       );
       
       if (!targetSubfolder || !targetSubfolder.children) {
-        console.log(`❌ Subpasta "${expectedSubfolderName}" não encontrada ou vazia`);
         setDocumentosDisponiveis([]);
         setCurrentFolderPath(`${mainFolder}/${expectedSubfolderName}`);
         return;
       }
       
-      console.log(`📂 Subpasta encontrada: ${targetSubfolder.name}`);
       
       // Função recursiva para extrair todos os ficheiros da subpasta específica
       const extractAllFiles = (nodes, currentPath = '') => {
@@ -248,7 +239,6 @@ const DocumentosAssociados = ({
       
       // Extrai todos os ficheiros da subpasta específica
       const allFiles = extractAllFiles(targetSubfolder.children);
-      console.log(`📋 ${allFiles.length} ficheiros encontrados na subpasta "${targetSubfolder.name}"`);
       
       // Filtra para mostrar apenas ficheiros (remove extensões para display)
       const documentos = allFiles.map(file => ({
@@ -310,7 +300,6 @@ const DocumentosAssociados = ({
     setUploading(true);
     
     try {
-      console.log('Fazendo upload para:', folderPath);
       
       const formData = new FormData();
       formData.append('file', file);
@@ -322,7 +311,6 @@ const DocumentosAssociados = ({
       });
 
       if (response.ok) {
-        console.log('Upload realizado com sucesso');
         // Recarrega a lista de documentos
         await fetchDocumentos();
         
@@ -375,7 +363,6 @@ const DocumentosAssociados = ({
         `Tem a certeza que deseja apagar permanentemente o arquivo "${documentoName}"?\n\nEsta ação não pode ser desfeita.`,
         async () => {
           try {
-            console.log('Apagando arquivo:', fullPath);
             
             const response = await fetch(`https://api9001.duckdns.org/files/delete`, {
               method: 'POST',
@@ -386,7 +373,6 @@ const DocumentosAssociados = ({
             });
             
             if (response.ok) {
-              console.log('Arquivo apagado com sucesso');
               
               // Remove da lista de selecionados se estiver selecionado
               if (documentosSelecionados.includes(documentoName)) {
@@ -451,7 +437,6 @@ const DocumentosAssociados = ({
     }
     
     const fullPath = typeof docObject === 'object' ? docObject.fullPath : documento;
-    console.log('👁️ Preview:', fullPath);
     
     try {
       const response = await fetch('https://api9001.duckdns.org/files/get-pdf', {
@@ -490,7 +475,6 @@ const DocumentosAssociados = ({
     if (isFormLink(documento)) {
       const url = getFormUrl(documento);
       const title = getFormTitle(documento); // Obtém o nome do formulário
-      console.log(`Abrindo formulário em nova aba: ${title}`);
       const newWindow = window.open(url, '_blank');
       if (!newWindow) {
         showNotification('Pop-ups bloqueados. Por favor, permita pop-ups para abrir o formulário.', 'warning');
@@ -507,7 +491,6 @@ const DocumentosAssociados = ({
       showNotification('Erro: Nome do documento não encontrado.', 'error');
       return;
     }
-    console.log(`Abrindo documento em nova aba: ${displayName}`);
     await handlePreview(displayName);
   };
 
@@ -523,7 +506,6 @@ const DocumentosAssociados = ({
     }
     
     const fullPath = typeof docObject === 'object' ? docObject.fullPath : documento;
-    console.log('⬇️ Download:', fullPath);
     
     try {
       const response = await fetch('https://api9001.duckdns.org/files/download', {

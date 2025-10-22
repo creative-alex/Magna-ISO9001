@@ -224,12 +224,10 @@ const InstrucoesTrabalho = ({
   const fetchInstrucoes = async () => {
     if (!originalFilename) return;
 
-    console.log('🔍 Procurando Instruções de trabalho procedimento para:', originalFilename);
     
     // Extrai a pasta principal do originalFilename
     const parts = originalFilename.split('/');
     if (parts.length < 2) {
-      console.log('❌ Caminho inválido, deve ter pelo menos pasta/ficheiro');
       return;
     }
     
@@ -239,7 +237,6 @@ const InstrucoesTrabalho = ({
     
     // Extrai o prefixo do nome do ficheiro (parte antes do primeiro espaço)
     const filePrefix = currentFileName.split(' ')[0];
-    console.log('🏷️ Prefixo do ficheiro:', filePrefix);
 
     setLoading(true);
     try {
@@ -258,19 +255,10 @@ const InstrucoesTrabalho = ({
       );
       
       if (!mainFolderNode || !mainFolderNode.children) {
-        console.log('❌ Pasta principal não encontrada ou vazia');
         setInstrucoesDisponiveis([]);
         setCurrentFolderPath(mainFolder);
         return;
       }
-      
-      mainFolderNode.children.forEach(node => {
-        if (node.type === 'folder') {
-          console.log(`   - "${node.name}" (toLowerCase: "${node.name.toLowerCase()}")`)
-          console.log(`     Contém "instruções": ${node.name.toLowerCase().includes('instruções de trabalho procedimento')}`)
-          console.log(`     Termina com "${filePrefix}": ${node.name.endsWith(filePrefix)}`)
-        }
-      });
       
       let targetSubfolder = mainFolderNode.children.find(node => 
         node.type === 'folder' && 
@@ -282,7 +270,6 @@ const InstrucoesTrabalho = ({
       if (!targetSubfolder || !targetSubfolder.children) {
         
         // Tenta uma busca alternativa mais flexível
-        console.log('🔄 Tentando busca alternativa...');
         const alternativeSubfolder = mainFolderNode.children.find(node => 
           node.type === 'folder' && 
           (node.name.toLowerCase().includes('instruções de trabalho') || 
@@ -393,8 +380,6 @@ const InstrucoesTrabalho = ({
     setUploading(true);
     
     try {
-      console.log('Fazendo upload para:', folderPath);
-      
       const formData = new FormData();
       formData.append('file', file);
       formData.append('folderPath', folderPath + '/');
@@ -405,7 +390,6 @@ const InstrucoesTrabalho = ({
       });
 
       if (response.ok) {
-        console.log('Upload realizado com sucesso');
         // Recarrega a lista de instruções
         await fetchInstrucoes();
         
@@ -466,7 +450,6 @@ const InstrucoesTrabalho = ({
     
     if (instrucao && typeof instrucao === 'object') {
       const fullPath = instrucao.fullPath;
-      console.log('Fazendo download de:', fullPath);
       
       // URL para download
       const downloadUrl = `https://api9001.duckdns.org/files/download/${encodeURIComponent(fullPath)}`;
@@ -496,14 +479,12 @@ const InstrucoesTrabalho = ({
         `Tem a certeza que deseja apagar permanentemente o arquivo "${instrucaoName}"?\n\nEsta ação não pode ser desfeita.`,
         async () => {
           try {
-            console.log('Apagando arquivo:', fullPath);
             
             const response = await fetch(`https://api9001.duckdns.org/files/delete/${encodeURIComponent(fullPath)}`, {
               method: 'DELETE'
             });
             
             if (response.ok) {
-              console.log('Arquivo apagado com sucesso');
               
               // Remove da lista de selecionados se estiver selecionado
               if (instrucoesSelecionadas.includes(instrucaoName)) {

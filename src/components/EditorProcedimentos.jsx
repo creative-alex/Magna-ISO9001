@@ -6,6 +6,7 @@ import TabelaPdf from "../pages/tableDisplay";
 import Template1 from "./templates/TabelaTemplate1";
 import ExportPdfButton from "./Buttons/exportPdf";
 import PreviewPdfButton from "./Buttons/previewPDF";
+import LoadingPage from "../pages/loading";
 
 // Definição dos dois templates
 const tabelas = [
@@ -117,11 +118,13 @@ const tabelasTemplate2 = [
 export default function TablePageUnified() {
   // Estado para histórico de alterações - só adiciona quando guarda
   const [history, setHistory] = useState([]);
-  console.log('🔍 DEBUG Estado do histórico:', history);
   const { user } = useContext(UserContext);
   const { filename } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  
+  // Estado de loading
+  const [isLoading, setIsLoading] = useState(true);
   
   // Context do usuário para verificar permissões
   const { username } = useContext(UserContext);
@@ -463,8 +466,6 @@ useEffect(() => {
   // Função para atualizar donoProcesso no backend
   const updateDonoProcessoBackend = async (newDonoProcesso) => {
     try {
-      console.log("Atualizando donoProcesso no backend:", { originalFilename, nomeProcesso, newDonoProcesso });
-      
       const response = await fetch("https://api9001.duckdns.org/files/update-dono-processo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -479,10 +480,8 @@ useEffect(() => {
       }
 
       const result = await response.json();
-      console.log("donoProcesso atualizado com sucesso:", result);
       return true;
     } catch (error) {
-      console.error("Erro ao atualizar donoProcesso:", error);
       return false;
     }
   };
@@ -568,9 +567,11 @@ useEffect(() => {
   // Buscar dados do PDF selecionado (opcional, pode remover se não usar)
   useEffect(() => {
     if (!filename) {
+      setIsLoading(false);
       return;
     }
 
+    setIsLoading(true);
     let currentTemplate = template;
 
     fetch("https://api9001.duckdns.org/files/pdf-form-data", {
@@ -703,6 +704,9 @@ useEffect(() => {
 
         // Reset do estado de mudanças após carregar dados
         setHasUnsavedChanges(false);
+        
+        // Desativa o loading após carregar todos os dados
+        setIsLoading(false);
       })
       .catch(err => {
         console.error("Erro ao carregar dados do PDF:", err);
@@ -714,6 +718,9 @@ useEffect(() => {
         } else {
           console.log("Erro ao carregar dados - continuando com dados em branco");
         }
+        
+        // Desativa o loading mesmo em caso de erro
+        setIsLoading(false);
       });
   }, [filename, originalFilename]);
 
@@ -846,7 +853,6 @@ useEffect(() => {
 
   // Função para adicionar registo ao histórico
   const addHistoryEntry = (acao, descricao, valorAnterior = null, valorNovo = null) => {
-    console.log('🔍 DEBUG addHistoryEntry chamada:', { acao, descricao, valorAnterior, valorNovo });
     
     const data = new Date().toLocaleString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     
@@ -854,7 +860,6 @@ useEffect(() => {
     if (valorAnterior !== null && valorNovo !== null) {
       // Não registra se os valores são idênticos
       if (valorAnterior === valorNovo) {
-        console.log('🔍 DEBUG Valores idênticos, não registrando no histórico:', { valorAnterior, valorNovo });
         return;
       }
       
@@ -874,7 +879,6 @@ useEffect(() => {
     });
     
     if (entradaRecente) {
-      console.log('🔍 DEBUG Entrada duplicada detectada, não adicionando ao histórico');
       return;
     }
     
@@ -885,11 +889,9 @@ useEffect(() => {
       descricao: descricaoCompleta
     };
     
-    console.log('🔍 DEBUG Nova entrada de histórico criada:', novaEntrada);
     
     setHistory(prev => {
       const novoHistorico = [...prev, novaEntrada];
-      console.log('🔍 DEBUG Histórico atualizado:', novoHistorico);
       return novoHistorico;
     });
   };
@@ -898,15 +900,12 @@ useEffect(() => {
   const clearHistory = () => {
     if (window.confirm('Tem a certeza que quer limpar todo o histórico? Esta ação não pode ser desfeita.')) {
       setHistory([]);
-      console.log('Histórico limpo pelo utilizador:', username);
     }
   };
 
   // Nova função para salvar histórico no backend
   const saveHistoryToBackend = async (historyData) => {
     try {
-      console.log('💾 Salvando histórico no backend para:', nomeProcesso);
-      
       const response = await fetch("https://api9001.duckdns.org/files/save-process-history", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -921,7 +920,6 @@ useEffect(() => {
       }
 
       const result = await response.json();
-      console.log('✅ Histórico salvo no backend:', result);
       return true;
     } catch (error) {
       console.error('❌ Erro ao salvar histórico no backend:', error);
@@ -934,7 +932,6 @@ useEffect(() => {
     try {
       if (!nomeProcesso) return;
       
-      console.log('📥 Carregando histórico do backend para:', nomeProcesso);
       
       const response = await fetch("https://api9001.duckdns.org/files/get-process-data", {
         method: "POST",
@@ -949,13 +946,13 @@ useEffect(() => {
       const result = await response.json();
       
       if (result.exists && result.data && result.data.history) {
-        console.log('✅ Histórico carregado do backend:', result.data.history.length, 'entradas');
+        console.log('✅ Histórico carregado:', result.data.history.length, 'entradas');
         setHistory(result.data.history);
       } else {
-        console.log('ℹ️ Nenhum histórico encontrado no backend para:', nomeProcesso);
+        console.log('ℹ️ Nenhum histórico encontrado para:', nomeProcesso);
       }
     } catch (error) {
-      console.error('❌ Erro ao carregar histórico do backend:', error);
+      console.error('❌ Erro ao carregar histórico:', error);
     }
   };
 
@@ -1125,9 +1122,6 @@ useEffect(() => {
           else if (colIdx === 4) {
             const rowData = tableData.main[rowIdx];
             const value = rowData ? rowData[colIdx] : '';
-            console.log(`🔍 DEBUG PDF - Linha ${rowIdx}, Coluna ${colIdx} (Instruções):`, value);
-            console.log(`🔍 DEBUG PDF - Row Data Completa:`, rowData);
-            console.log(`🔍 DEBUG PDF - tableData.main completo:`, tableData.main);
             cell.innerHTML = value.split('\n').join('<br>');
           }
         });
@@ -1177,6 +1171,12 @@ useEffect(() => {
   };
 
   // Logs do estado atual a cada render
+  
+  // Mostra loading page enquanto carrega os dados
+  if (isLoading) {
+    return <LoadingPage />;
+  }
+  
   return (
     <div>
       {isTemplate2 ? (
