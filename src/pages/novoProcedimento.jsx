@@ -28,7 +28,7 @@ export default function NewTable() {
     const fetchNextTableNumber = async () => {
       try {
         // Buscar a árvore de ficheiros para contar tabelas existentes
-        const response = await fetch('https://api9001.duckdns.org/files/list-files-tree');
+        const response = await fetch('https://api-iso-9001.onrender.com/files/list-files-tree');
         if (response.ok) {
           const pdfTree = await response.json();
           
@@ -272,7 +272,7 @@ export default function NewTable() {
       console.log('Enviando dados para o backend...');
 
       // 3. Enviar para o backend
-      const response = await fetch('https://api9001.duckdns.org/files/upload-pdf', {
+      const response = await fetch('https://api-iso-9001.onrender.com/files/upload-pdf', {
         method: 'POST',
         body: formData
       });

@@ -127,7 +127,6 @@
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   border: 1px solid #e5e7eb;
-  margin: 20px;
 }
 
 .header{
@@ -237,6 +236,26 @@
   width: 100%;
   overflow-x: auto;
   overflow-y: visible;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+  
+@media screen and (max-width: 480px) {
+  .primeira-tabela,
+  .segunda-tabela,
+  .tabela-processo,
+  .tabela-atividades,
+  .tabela-indicadores {
+    width: 100%;
+    display: block;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  
+  .editable-table-cell {
+    max-width: none;
+    min-width: 80px;
+  }
 }
 
 /* Estilos específicos para Template 2 */
@@ -266,6 +285,8 @@
   background: white;
   table-layout: fixed;
   min-width: 100%;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .editable-table tr {
@@ -351,7 +372,10 @@
   background: inherit;
   position: relative;
   height: auto;
-  overflow: visible;
+  overflow: hidden;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 0;
 }
 
 .editable-table-textarea {
@@ -359,31 +383,33 @@
   height: 100%;
   border: none;
   background: transparent;
-  padding: 14px 18px;
+  padding: 8px 12px;
   font-family: inherit;
   font-size: 14px;
   color: #374151;
-  line-height: 1.5;
+  line-height: 1.3;
   resize: none;
   overflow: hidden;
-  min-height: 50px;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+  min-height: 32px;
   max-height: none;
   box-sizing: border-box;
   transition: all 0.2s ease;
   display: block;
-  word-wrap: break-word;
   white-space: pre-wrap;
   margin: 0;
 }
 
 .tabela-observacoes-textarea {
   /* Específico para textarea da tabela de observações */
-  min-height: 80px;
+  min-height: 45px;
 }
 
 .tabela-principal-textarea {
   /* Específico para textarea da tabela principal */
-  min-height: 60px;
+  min-height: 35px;
 }
 
 .editable-table-textarea:focus {
@@ -392,7 +418,7 @@
   box-shadow: inset 0 0 0 2px #C8932F;
   border-radius: 4px;
   margin: 0;
-  padding: 14px 18px;
+  padding: 8px 12px;
 }
 
 .editable-table-textarea::placeholder {
@@ -453,6 +479,8 @@
 
 }
 
+
+
 /* Textareas e Inputs - Estilo base unificado */
 .editable-table-textarea,
 .tabela-processo-textarea,
@@ -502,7 +530,7 @@
   box-shadow: inset 0 0 0 2px #C8932F;
   border-radius: 4px;
   margin: 2px;
-  padding: 12px 16px;
+  padding: 6px 10px;
 }
 
 /* Estilos específicos para inputs da tabela de atividades */
@@ -599,7 +627,7 @@
 
 @media (max-width: 480px) {
   .pdf-container input {
-    font-size: 16px; /* Evita zoom no iOS */
+    font-size: 16px; 
     padding: 12px 15px;
     margin: 15px 0 20px 0;
   }
@@ -613,25 +641,31 @@
   }
   
   .editable-table {
-    min-width: 400px;
+    min-width: 350px;
     font-size: 13px;
+    table-layout: fixed;
   }
   
   .editable-table-header {
-    padding: 10px 12px;
-    font-size: 11px;
-    letter-spacing: 0.3px;
+    padding: 8px 10px;
+    font-size: 10px;
+    letter-spacing: 0.2px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
   }
   
   .editable-table-textarea {
-    padding: 10px 12px;
-    font-size: 12px;
-    min-height: 40px;
-    line-height: 1.4;
+    padding: 8px 10px;
+    font-size: 11px;
+    min-height: 35px;
+    line-height: 1.3;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
   }
   
   .editable-table-textarea:focus {
-    padding: 8px 10px;
+    padding: 6px 8px;
     margin: 1px;
   }
   
@@ -639,25 +673,46 @@
   .tabela-atividades {
     display: block;
     overflow-x: auto;
+    width: 100% !important;
   }
   
   .tabela-atividades thead {
-    display: none; /* Esconde cabeçalhos em mobile */
+    display: none; 
   }
   
   .tabela-atividades tbody,
   .tabela-atividades tr,
   .tabela-atividades td {
     display: block;
-    width: 100%;
+    width: 100% !important;
+    box-sizing: border-box;
+  }
+  
+  /* Segunda tabela em mobile - layout empilhado APENAS para segunda tabela */
+  .segunda-tabela {
+    display: block;
+    overflow-x: auto;
+    width: 100% !important;
+  }
+  
+  .segunda-tabela thead {
+    display: none; 
+  }
+  
+  .segunda-tabela tbody,
+  .segunda-tabela tr,
+  .segunda-tabela td {
+    display: block;
+    width: 100% !important;
   } 
   
   .tabela-atividades tr {
-    border: 1px solid transparent;
+    border: 1px solid #e5e7eb;
     margin-bottom: 15px;
     padding: 10px;
     border-radius: 6px;
     background: #fff;
+    width: 100% !important;
   }
   
   .tabela-atividades td {
@@ -665,13 +720,15 @@
     padding: 8px 0;
     position: relative;
     min-width: auto;
+    width: 100% !important;
   }
   
   .tabela-atividades td:before {
     content: attr(data-label);
-    position: absolute;
+    position: relative;
+    display: block;
     left: 0;
-    top: 8px;
+    top: 0;
     width: 100%;
     font-weight: 600;
     color: #C8932F;
@@ -679,12 +736,16 @@
     text-transform: uppercase;
     margin-bottom: 5px;
   }
+
   
   .tabela-atividades-input {
-    margin-top: 20px;
+    margin-top: 5px;
     font-size: 14px;
     min-height: 40px;
+    width: 100% !important;
+    box-sizing: border-box;
   }
+
 }
 
 /* ===== CLASSES ESPECÍFICAS PARA TEMPLATE 2 ===== */
@@ -990,4 +1051,45 @@
   font-size: 12px;
   color: #6c757d;
   font-style: italic;
+}
+
+
+
+/* Estilos adicionais para melhorar o comportamento do texto em mobile */
+@media (max-width: 480px) {
+  /* Força a quebra de palavras longas que possam sair da célula */
+  .editable-table-cell,
+  .editable-table-textarea {
+    word-break: break-all;
+    overflow-wrap: anywhere;
+    hyphens: auto;
+  }
+
+  /* Ajusta o container principal para evitar overflow horizontal */
+  .pdf-container, .template1-container {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  .editable-table {
+    font-size: 12px;
+    min-width: 320px; /* Largura mínima mais adequada para mobile */
+  }
+
+  .editable-table-header {
+    font-size: 9px;
+    padding: 6px 4px;
+    line-height: 1.2;
+  }
+
+  .editable-table-textarea {
+    font-size: 11px;
+    padding: 6px 4px;
+    line-height: 1.3;
+  }
+
+  .action-buttons-container {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }

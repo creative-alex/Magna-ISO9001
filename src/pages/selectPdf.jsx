@@ -282,7 +282,7 @@ export default function SelecionarPdf() {
 
   useEffect(() => {
     // Busca a árvore de ficheiros
-    fetch("https://api9001.duckdns.org/files/list-files-tree")
+    fetch("https://api-iso-9001.onrender.com/files/list-files-tree")
       .then(res => res.json())
       .then(data => {
         setFileTree(data);
@@ -306,7 +306,7 @@ export default function SelecionarPdf() {
       .catch(() => setFileTree([]));
 
     // Busca os donos dos processos
-        fetch("https://api9001.duckdns.org/files/process-owners")
+        fetch("https://api-iso-9001.onrender.com/files/process-owners")
       .then(res => res.json())
       .then(setProcessOwners)
       .catch(() => setProcessOwners({}));
@@ -314,7 +314,7 @@ export default function SelecionarPdf() {
 
   // Função para recarregar a árvore de ficheiros após eliminação
   const reloadFileTree = () => {
-    fetch("https://api9001.duckdns.org/files/list-files-tree")
+    fetch("https://api-iso-9001.onrender.com/files/list-files-tree")
       .then(res => res.json())
       .then(setFileTree)
       .catch(() => setFileTree([]));
@@ -359,11 +359,18 @@ export default function SelecionarPdf() {
         <h2 className="title">Magna ISO90001</h2>
         </div>
         {/* menus dropdown */}
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: 'row',
+          gap: '10px', 
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          marginTop: '15px'
+        }}>
           {/* Menu Gestão de Recursos Humanos */}
           {resourcesFiles.length > 0 && (
             <>
-              <div className="favorites-dropdown-container">
+              <div style={{ position: 'relative', display: 'inline-block' }}>
                 <button 
                   className="resources-dropdown-button"
                   onClick={() => setShowResourcesDropdown(!showResourcesDropdown)}
@@ -409,7 +416,7 @@ export default function SelecionarPdf() {
           
           {/* Menu Favoritos */}
           {favorites.length > 0 && (
-            <div className="favorites-dropdown-container">
+            <div style={{ position: 'relative', display: 'inline-block' }}>
               <button 
                 className="favorites-dropdown-button"
                 onClick={() => setShowFavoritesDropdown(!showFavoritesDropdown)}

@@ -79,7 +79,7 @@ const Login = ({onLoginSuccess}) => {
             const token = await user.getIdToken(true);
             
             
-                        const response = await fetch("https://api9001.duckdns.org/users/verifyTokenAndGetUserInfo", {
+                        const response = await fetch("https://api-iso-9001.onrender.com/users/verifyTokenAndGetUserInfo", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

@@ -56,7 +56,7 @@ export default function Template1({
   const handleTextareaResize = (e) => {
     const textarea = e.target;
     textarea.style.height = 'auto';
-    textarea.style.height = `${Math.max(textarea.scrollHeight, 50)}px`;
+    textarea.style.height = `${Math.max(textarea.scrollHeight, 32)}px`;
   };
 
   // Redimensiona todos os textareas quando os dados mudam
@@ -64,7 +64,7 @@ export default function Template1({
     Object.values(textAreaRefs.current).forEach(textarea => {
       if (textarea) {
         textarea.style.height = 'auto';
-        textarea.style.height = `${Math.max(textarea.scrollHeight, 50)}px`;
+        textarea.style.height = `${Math.max(textarea.scrollHeight, 32)}px`;
       }
     });
   }, [data, dataObs]);
@@ -145,7 +145,6 @@ export default function Template1({
       </div>
       {/* Action buttons at top right */}
       <div className="action-buttons-container">
-        {/* Botão Editar/Guardar integrado - só aparece se canEdit for true */}
         {setIsEditable && canEdit && (
           <>
             {!isEditable ? (
