@@ -367,56 +367,124 @@ export default function Template2({
               </h2>
       {/* Action buttons at top right */}
       <div className="action-buttons-container">
-        {/* Botão Editar/Guardar integrado */}
-        {setIsEditable && canEdit && (
+        {/* Desktop: normal placement */}
+        {typeof window !== 'undefined' && window.innerWidth > 600 ? (
           <>
-            {!isEditable ? (
-              <button 
-                className="edit-button"
-                onClick={() => setIsEditable(true)}
-                title="Ativar modo de edição"
-              >
-                ✏️ Editar
-              </button>
-            ) : (
-              <ExportPdfButton
-                templateType={2}
-                data={data}
-                headers={[]}
-                dataObs={[]}
-                headersObs={[]}
-                atividades={atividades}
-                donoProcesso={donoProcesso}
-                donoProcessoOriginal={donoProcessoOriginal}
-                objetivoProcesso={objetivoProcesso}
-                indicadores={indicadores}
-                pathFilename={pathFilename}
-                servicosEntrada={servicosEntrada}
-                servicoSaida={servicoSaida}
-                mergedSpans={mergedSpans}
-                hiddenCells={hiddenCells}
-                onSaveSuccess={() => {
-                  onSaveSuccess && onSaveSuccess();
-                  setIsEditable(false); // Desativa edição após guardar
-                }}
-                history={history}
-              />
+            {setIsEditable && canEdit && (
+              !isEditable ? (
+                <button 
+                  className="edit-button"
+                  onClick={() => setIsEditable(true)}
+                  title="Ativar modo de edição"
+                >
+                  ✏️ Editar
+                </button>
+              ) : (
+                <ExportPdfButton
+                  templateType={2}
+                  data={data}
+                  headers={[]}
+                  dataObs={[]}
+                  headersObs={[]}
+                  atividades={atividades}
+                  donoProcesso={donoProcesso}
+                  donoProcessoOriginal={donoProcessoOriginal}
+                  objetivoProcesso={objetivoProcesso}
+                  indicadores={indicadores}
+                  pathFilename={pathFilename}
+                  servicosEntrada={servicosEntrada}
+                  servicoSaida={servicoSaida}
+                  mergedSpans={mergedSpans}
+                  hiddenCells={hiddenCells}
+                  onSaveSuccess={() => {
+                    onSaveSuccess && onSaveSuccess();
+                    setIsEditable(false);
+                  }}
+                  history={history}
+                />
+              )
             )}
+            <PreviewPdfButton 
+              templateType={2}
+              atividades={atividades}
+              donoProcesso={donoProcesso}
+              objetivoProcesso={objetivoProcesso}
+              indicadores={indicadores}
+              servicosEntrada={servicosEntrada}
+              servicoSaida={servicoSaida}
+              pathFilename={pathFilename}
+              history={history}
+              mergedSpans={mergedSpans}
+              hiddenCells={hiddenCells}
+            />
           </>
+        ) : null}
+        {/* Mobile: absolute placement near AI Assistant */}
+        {typeof window !== 'undefined' && window.innerWidth <= 600 && (
+          <div style={{ position: 'fixed', bottom: 90, right: 20, zIndex: 1001, display: 'flex', gap: '12px' }}>
+            {setIsEditable && canEdit && (
+              !isEditable ? (
+                <button
+                  className="edit-button"
+                  onClick={() => setIsEditable(true)}
+                  title="Ativar modo de edição"
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: '50%',
+                    backgroundColor: '#1976d2',
+                    color: 'white',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '22px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ✏️
+                </button>
+              ) : (
+                <ExportPdfButton
+                  templateType={2}
+                  data={data}
+                  headers={[]}
+                  dataObs={[]}
+                  headersObs={[]}
+                  atividades={atividades}
+                  donoProcesso={donoProcesso}
+                  donoProcessoOriginal={donoProcessoOriginal}
+                  objetivoProcesso={objetivoProcesso}
+                  indicadores={indicadores}
+                  pathFilename={pathFilename}
+                  servicosEntrada={servicosEntrada}
+                  servicoSaida={servicoSaida}
+                  mergedSpans={mergedSpans}
+                  hiddenCells={hiddenCells}
+                  onSaveSuccess={() => {
+                    onSaveSuccess && onSaveSuccess();
+                    setIsEditable(false);
+                  }}
+                  history={history}
+                />
+              )
+            )}
+            <PreviewPdfButton 
+              templateType={2}
+              atividades={atividades}
+              donoProcesso={donoProcesso}
+              objetivoProcesso={objetivoProcesso}
+              indicadores={indicadores}
+              servicosEntrada={servicosEntrada}
+              servicoSaida={servicoSaida}
+              pathFilename={pathFilename}
+              history={history}
+              mergedSpans={mergedSpans}
+              hiddenCells={hiddenCells}
+            />
+          </div>
         )}
-        <PreviewPdfButton 
-          templateType={2}
-          atividades={atividades}
-          donoProcesso={donoProcesso}
-          objetivoProcesso={objetivoProcesso}
-          indicadores={indicadores}
-          servicosEntrada={servicosEntrada}
-          servicoSaida={servicoSaida}
-          pathFilename={pathFilename}
-          history={history}
-          mergedSpans={mergedSpans}
-          hiddenCells={hiddenCells}
-        />
         
         {/* Botão de debug para limpar histórico - só aparece quando está a editar */}
         {isEditable && clearHistory && (

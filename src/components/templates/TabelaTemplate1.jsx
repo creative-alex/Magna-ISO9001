@@ -144,46 +144,119 @@ export default function Template1({
         </h2>
       </div>
       {/* Action buttons at top right */}
-      <div className="action-buttons-container">
-        {setIsEditable && canEdit && (
+      <div className="action-buttons-container" style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'flex-end', position: 'relative' }}>
+        {/* Desktop: normal placement */}
+        {typeof window !== 'undefined' && window.innerWidth > 600 ? (
           <>
-            {!isEditable ? (
-              <button 
-                className="edit-button"
-                onClick={() => setIsEditable(true)}
-                title="Ativar modo de edição"
-              >
-                ✏️ Editar
-              </button>
-            ) : (
-              <ExportPdfButton
-                templateType={templateType}
-                data={data}
-                headers={['Fluxo\ndas Ações', 'Descrição', 'Responsável', 'Documentos\nAssociados', 'Instruções\nde Trabalho']}
-                dataObs={dataObs}
-                headersObs={['Observações']}
-                atividades={atividades}
-                donoProcesso={donoProcesso}
-                objetivoProcesso={objetivoProcesso}
-                indicadores={indicadores}
-                pathFilename={pathFilename}
-                servicosEntrada={servicosEntrada}
-                servicoSaida={servicoSaida}
-                fieldNames={fieldNames}
-                history={history}
-                onSaveSuccess={() => {
-                  onSaveSuccess && onSaveSuccess();
-                  setIsEditable(false); // Desativa edição após guardar
-                }}
-              />
+            {setIsEditable && canEdit && (
+              !isEditable ? (
+                <button 
+                  className="edit-button"
+                  onClick={() => setIsEditable(true)}
+                  title="Ativar modo de edição"
+                >
+                  ✏️ Editar
+                </button>
+              ) : (
+                <ExportPdfButton
+                  templateType={templateType}
+                  data={data}
+                  headers={['Fluxo\ndas Ações', 'Descrição', 'Responsável', 'Documentos\nAssociados', 'Instruções\nde Trabalho']}
+                  dataObs={dataObs}
+                  headersObs={['Observações']}
+                  atividades={atividades}
+                  donoProcesso={donoProcesso}
+                  objetivoProcesso={objetivoProcesso}
+                  indicadores={indicadores}
+                  pathFilename={pathFilename}
+                  servicosEntrada={servicosEntrada}
+                  servicoSaida={servicoSaida}
+                  fieldNames={fieldNames}
+                  history={history}
+                  onSaveSuccess={() => {
+                    onSaveSuccess && onSaveSuccess();
+                    setIsEditable(false);
+                  }}
+                />
+              )
             )}
+            <PreviewPdfButton 
+              getTablesHtml={getTemplate1TablesHtml} 
+              pathFilename={pathFilename}
+              history={history}
+              templateType={templateType}
+              atividades={atividades}
+              donoProcesso={donoProcesso}
+              objetivoProcesso={objetivoProcesso}
+              indicadores={indicadores}
+              servicosEntrada={servicosEntrada}
+              servicoSaida={servicoSaida}
+            />
           </>
+        ) : null}
+        {/* Mobile: absolute placement near AI Assistant */}
+        {typeof window !== 'undefined' && window.innerWidth <= 600 && (
+          <div style={{ position: 'fixed', bottom: 90, right: 20, zIndex: 1001, display: 'flex', gap: '12px' }}>
+            {setIsEditable && canEdit && (
+              !isEditable ? (
+                <button
+                  className="edit-button"
+                  onClick={() => setIsEditable(true)}
+                  title="Ativar modo de edição"
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: '50%',
+                    backgroundColor: '#1976d2',
+                    color: 'white',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '22px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ✏️
+                </button>
+              ) : (
+                <ExportPdfButton
+                  templateType={templateType}
+                  data={data}
+                  headers={['Fluxo\ndas Ações', 'Descrição', 'Responsável', 'Documentos\nAssociados', 'Instruções\nde Trabalho']}
+                  dataObs={dataObs}
+                  headersObs={['Observações']}
+                  atividades={atividades}
+                  donoProcesso={donoProcesso}
+                  objetivoProcesso={objetivoProcesso}
+                  indicadores={indicadores}
+                  pathFilename={pathFilename}
+                  servicosEntrada={servicosEntrada}
+                  servicoSaida={servicoSaida}
+                  fieldNames={fieldNames}
+                  history={history}
+                  onSaveSuccess={() => {
+                    onSaveSuccess && onSaveSuccess();
+                    setIsEditable(false);
+                  }}
+                />
+              )
+            )}
+            <PreviewPdfButton 
+              getTablesHtml={getTemplate1TablesHtml} 
+              pathFilename={pathFilename}
+              history={history}
+              templateType={templateType}
+              atividades={atividades}
+              donoProcesso={donoProcesso}
+              objetivoProcesso={objetivoProcesso}
+              indicadores={indicadores}
+              servicosEntrada={servicosEntrada}
+              servicoSaida={servicoSaida}
+            />
+          </div>
         )}
-        <PreviewPdfButton 
-          getTablesHtml={getTemplate1TablesHtml} 
-          pathFilename={pathFilename}
-          history={history}
-        />
         
         {/* Botão de debug para limpar histórico - só aparece quando está a editar */}
         {isEditable && clearHistory && (
@@ -207,21 +280,6 @@ export default function Template1({
         )}
       </div>
       
-      {/* Helper de formatação - só aparece quando está a editar */}
-      {isEditable && (
-        <div className="formatting-helper" style={{
-          backgroundColor: '#f0f8ff',
-          border: '1px solid #4a90e2',
-          borderRadius: '4px',
-          padding: '12px',
-          marginBottom: '15px',
-          fontSize: '13px',
-          width: '100%'
-        }}>
-          <strong>💡 Dica de Formatação:</strong> Use <code>**texto**</code> para <strong>bold</strong>, 
-          <code>*texto*</code> para <em>itálico</em>, e <code>__texto__</code> para <u>sublinhado</u>
-        </div>
-      )}
     
       {/* Tabela de Observações */}
       <div ref={obsTableRef} className="primeira-tabela">
@@ -344,46 +402,56 @@ export default function Template1({
                 className="editable-table-row"
                 onContextMenu={isEditable ? (e) => contextMenu.handleContextMenuEvent(e, rowIdx) : undefined}
               >
-                {row.map((cell, colIdx) => (
-                  <td key={colIdx} className="editable-table-cell">
-                    {colIdx === 3 ? (
-                      // Coluna de Documentos Associados - usa componente especial
-                      <DocumentosAssociados
-                        currentValue={cell}
-                        onChange={isEditable ? (value) => handleChange(rowIdx, colIdx, value) : undefined}
-                        originalFilename={originalFilename}
-                        isEditable={isEditable}
-                        canEdit={canEdit}
-                      />
-                    ) : colIdx === 4 ? (
-                      // Coluna de Instruções de trabalho procedimento - usa componente especial
-                      <InstrucoesTrabalho
-                        currentValue={cell}
-                        onChange={isEditable ? (value) => handleChange(rowIdx, colIdx, value) : undefined}
-                        originalFilename={originalFilename}
-                        isEditable={isEditable}
-                        canEdit={canEdit}
-                      />
-                    ) : (
-                      // Outras colunas - usa textarea normal
-                      <textarea
-                        ref={el => textAreaRefs.current[`main-${rowIdx}-${colIdx}`] = el}
-                        className="editable-table-textarea tabela-principal-textarea"                      
-                        value={cell}
-                        onChange={e => handleChange(rowIdx, colIdx, e.target.value)}
-                        onInput={handleTextareaResize}
-                        disabled={!isEditable}
-                        placeholder={
-                          colIdx === 0 ? 'Fluxo' :
-                          colIdx === 1 ? 'Descrição' :
-                          colIdx === 2 ? 'Responsável' :
-                          colIdx === 3 ? 'Documentos' :
-                          'Instruções'
-                        }
-                      />
-                    )}
-                  </td>
-                ))}
+                {row.map((cell, colIdx) => {
+                  const dataLabels = [
+                    "Fluxo das Ações",
+                    "Descrição",
+                    "Responsável",
+                    "Documentos Associados",
+                    "Instruções de Trabalho"
+                  ];
+                  return (
+                    <td
+                      key={colIdx}
+                      className={`editable-table-cell col-${["fluxo","descricao","responsavel","documentos","instrucoes"][colIdx]}`}
+                      data-label={dataLabels[colIdx]}
+                    >
+                      {colIdx === 3 ? (
+                        <DocumentosAssociados
+                          currentValue={cell}
+                          onChange={isEditable ? (value) => handleChange(rowIdx, colIdx, value) : undefined}
+                          originalFilename={originalFilename}
+                          isEditable={isEditable}
+                          canEdit={canEdit}
+                        />
+                      ) : colIdx === 4 ? (
+                        <InstrucoesTrabalho
+                          currentValue={cell}
+                          onChange={isEditable ? (value) => handleChange(rowIdx, colIdx, value) : undefined}
+                          originalFilename={originalFilename}
+                          isEditable={isEditable}
+                          canEdit={canEdit}
+                        />
+                      ) : (
+                        <textarea
+                          ref={el => textAreaRefs.current[`main-${rowIdx}-${colIdx}`] = el}
+                          className="editable-table-textarea tabela-principal-textarea"
+                          value={cell}
+                          onChange={e => handleChange(rowIdx, colIdx, e.target.value)}
+                          onInput={handleTextareaResize}
+                          disabled={!isEditable}
+                          placeholder={
+                            colIdx === 0 ? 'Fluxo' :
+                            colIdx === 1 ? 'Descrição' :
+                            colIdx === 2 ? 'Responsável' :
+                            colIdx === 3 ? 'Documentos' :
+                            'Instruções'
+                          }
+                        />
+                      )}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>

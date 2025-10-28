@@ -216,9 +216,29 @@ export default function ExportPdfButton({
     }
   }, [exportRef, handleSendToBackend]);
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 600;
   return (
-    <button className="save-button" onClick={handleSendToBackend}>
-      Guardar Mudanças
+    <button
+      className="save-button"
+      onClick={handleSendToBackend}
+      style={isMobile ? {
+        width: 44,
+        height: 44,
+        borderRadius: '50%',
+        backgroundColor: '#1976d2',
+        color: 'white',
+        border: 'none',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '22px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+        cursor: 'pointer',
+        padding: 0
+      } : {}}
+      title="Guardar Mudanças"
+    >
+      {isMobile ? '' : 'Guardar Mudanças'}
     </button>
   );
 }

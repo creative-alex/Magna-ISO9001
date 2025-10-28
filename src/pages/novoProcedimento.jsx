@@ -1,4 +1,5 @@
 import React, { useState, useContext, useEffect } from 'react';
+import './novoProcedimento.css';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { UserContext } from '../context/userContext';
 import { generateEditablePdfTemplate1 } from '../utils/pdfGenerate';
@@ -295,22 +296,16 @@ export default function NewTable() {
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto' }}>
-      <h2>Criar novo procedimento</h2>     
+    <div className="novo-procedimento-container">
+      <h2>Criar novo procedimento</h2>
       {error && (
-        <div style={{ 
-          color: 'red', 
-          backgroundColor: '#ffe6e6', 
-          padding: '10px', 
-          borderRadius: '5px', 
-          marginBottom: '20px' 
-        }}>
+        <div className="novo-procedimento-error">
           {error}
         </div>
       )}
-    
+
       <div style={{ marginBottom: '20px' }}>
-        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+        <label className="novo-procedimento-label">
           Nome do Procedimento:
         </label>
         <input
@@ -318,13 +313,7 @@ export default function NewTable() {
           value={processName}
           onChange={(e) => setProcessName(e.target.value)}
           placeholder="Ex: Gestão de Recursos Humanos"
-          style={{ 
-            width: '100%', 
-            padding: '8px', 
-            border: '1px solid #ccc', 
-            borderRadius: '4px',
-            fontSize: '14px'
-          }}
+          className="novo-procedimento-input"
         />
         <small style={{ color: '#666' }}>
           {processFolder
@@ -345,7 +334,7 @@ export default function NewTable() {
       </div>
 
       <div style={{ marginBottom: '20px' }}>
-        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+        <label className="novo-procedimento-label">
           Prefixo do Ficheiro (opcional):
         </label>
         <input
@@ -353,13 +342,7 @@ export default function NewTable() {
           value={manualPrefix}
           onChange={(e) => setManualPrefix(e.target.value)}
           placeholder="Ex: 01, 02, 03, 04, etc. (deixe vazio para numeração automática)"
-          style={{ 
-            width: '100%', 
-            padding: '8px', 
-            border: '1px solid #ccc', 
-            borderRadius: '4px',
-            fontSize: '14px'
-          }}
+          className="novo-procedimento-input"
         />
         <small style={{ color: '#666' }}>
           Se não especificar, será usado o próximo número disponível automaticamente
@@ -370,7 +353,7 @@ export default function NewTable() {
       <div style={{ marginBottom: '20px' }}>
         {/* 1. Objetivos */}
         <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', color: '#333' }}>
+          <label className="novo-procedimento-label" style={{ color: '#333' }}>
             1. Objetivos:
           </label>
           <textarea
@@ -378,20 +361,13 @@ export default function NewTable() {
             onChange={(e) => handleObservacoesChange(0, e.target.value)}
             placeholder="Digite os objetivos do documento..."
             rows={3}
-            style={{ 
-              width: '100%', 
-              padding: '8px', 
-              border: '1px solid #ccc', 
-              borderRadius: '4px',
-              fontSize: '14px',
-              resize: 'vertical'
-            }}
+            className="novo-procedimento-textarea"
           />
         </div>
 
         {/* 2. Campo de Aplicação */}
         <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', color: '#333' }}>
+          <label className="novo-procedimento-label" style={{ color: '#333' }}>
             2. Campo de Aplicação:
           </label>
           <textarea
@@ -399,20 +375,13 @@ export default function NewTable() {
             onChange={(e) => handleObservacoesChange(1, e.target.value)}
             placeholder="Digite o campo de aplicação..."
             rows={3}
-            style={{ 
-              width: '100%', 
-              padding: '8px', 
-              border: '1px solid #ccc', 
-              borderRadius: '4px',
-              fontSize: '14px',
-              resize: 'vertical'
-            }}
+            className="novo-procedimento-textarea"
           />
         </div>
 
         {/* 3. Definições */}
         <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', color: '#333' }}>
+          <label className="novo-procedimento-label" style={{ color: '#333' }}>
             3. Definições:
           </label>
           <textarea
@@ -420,20 +389,13 @@ export default function NewTable() {
             onChange={(e) => handleObservacoesChange(2, e.target.value)}
             placeholder="Digite as definições relevantes..."
             rows={3}
-            style={{ 
-              width: '100%', 
-              padding: '8px', 
-              border: '1px solid #ccc', 
-              borderRadius: '4px',
-              fontSize: '14px',
-              resize: 'vertical'
-            }}
+            className="novo-procedimento-textarea"
           />
         </div>
 
         {/* 4. Abreviaturas */}
         <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', color: '#333' }}>
+          <label className="novo-procedimento-label" style={{ color: '#333' }}>
             4. Abreviaturas:
           </label>
           <textarea
@@ -441,20 +403,13 @@ export default function NewTable() {
             onChange={(e) => handleObservacoesChange(3, e.target.value)}
             placeholder="Digite as abreviaturas utilizadas..."
             rows={3}
-            style={{ 
-              width: '100%', 
-              padding: '8px', 
-              border: '1px solid #ccc', 
-              borderRadius: '4px',
-              fontSize: '14px',
-              resize: 'vertical'
-            }}
+            className="novo-procedimento-textarea"
           />
         </div>
 
         {/* 5. Observações */}
         <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', color: '#333' }}>
+          <label className="novo-procedimento-label" style={{ color: '#333' }}>
             5. Observações:
           </label>
           <textarea
@@ -462,68 +417,47 @@ export default function NewTable() {
             onChange={(e) => handleObservacoesChange(4, e.target.value)}
             placeholder="Digite observações adicionais..."
             rows={3}
-            style={{ 
-              width: '100%', 
-              padding: '8px', 
-              border: '1px solid #ccc', 
-              borderRadius: '4px',
-              fontSize: '14px',
-              resize: 'vertical'
-            }}
+            className="novo-procedimento-textarea"
           />
         </div>
       </div>
 
       {/* Tabela Principal */}
       <div style={{ marginBottom: '20px' }}>
-        <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>
+        <label className="novo-procedimento-label">
           Tabela Principal:
         </label>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #ccc' }}>
+        <div className="novo-procedimento-table-wrapper">
+          <table className="novo-procedimento-table">
             <thead>
-              <tr style={{ backgroundColor: '#f5f5f5' }}>
-                <th style={{ border: '1px solid #ccc', padding: '8px', minWidth: '120px' }}>Fluxo das Ações</th>
-                <th style={{ border: '1px solid #ccc', padding: '8px', minWidth: '200px' }}>Descrição</th>
-                <th style={{ border: '1px solid #ccc', padding: '8px', minWidth: '120px' }}>Responsável</th>
-                <th style={{ border: '1px solid #ccc', padding: '8px', minWidth: '150px' }}>Documentos Associados</th>
-                <th style={{ border: '1px solid #ccc', padding: '8px', minWidth: '150px' }}>Instruções de trabalho</th>
-                <th style={{ border: '1px solid #ccc', padding: '8px', width: '80px' }}>Ações</th>
+              <tr>
+                <th>Fluxo das Ações</th>
+                <th>Descrição</th>
+                <th>Responsável</th>
+                <th>Documentos Associados</th>
+                <th>Instruções de trabalho</th>
+                <th>Ações</th>
               </tr>
             </thead>
             <tbody>
               {tabelaPrincipal.map((row, rowIdx) => (
                 <tr key={rowIdx}>
                   {row.map((cell, colIdx) => (
-                    <td key={colIdx} style={{ border: '1px solid #ccc', padding: '4px' }}>
+                    <td key={colIdx}>
                       <textarea
                         value={cell}
                         onChange={(e) => handleTabelaPrincipalChange(rowIdx, colIdx, e.target.value)}
-                        style={{ 
-                          width: '100%', 
-                          minHeight: '40px', 
-                          border: 'none', 
-                          resize: 'vertical',
-                          fontSize: '12px'
-                        }}
+                        className="novo-procedimento-textarea"
                         placeholder={headers[colIdx]?.replace('\n', ' ')}
                       />
                     </td>
                   ))}
-                  <td style={{ border: '1px solid #ccc', padding: '4px', textAlign: 'center' }}>
+                  <td style={{ textAlign: 'center' }}>
                     {tabelaPrincipal.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeTabelaPrincipalRow(rowIdx)}
-                        style={{ 
-                          padding: '4px 8px', 
-                          backgroundColor: '#dc3545', 
-                          color: 'white', 
-                          border: 'none', 
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '12px'
-                        }}
+                        className="novo-procedimento-button novo-procedimento-remove"
                       >
                         Remover
                       </button>
@@ -537,51 +471,26 @@ export default function NewTable() {
         <button
           type="button"
           onClick={addTabelaPrincipalRow}
-          style={{ 
-            padding: '8px 16px', 
-            backgroundColor: '#28a745', 
-            color: 'white', 
-            border: 'none', 
-            borderRadius: '4px',
-            cursor: 'pointer',
-            marginTop: '10px'
-          }}
+          className="novo-procedimento-button novo-procedimento-add-row"
         >
           Adicionar Linha
         </button>
       </div>
 
       {/* Botões de ação */}
-      <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+      <div className="novo-procedimento-actions">
         <button
           type="button"
           onClick={() => navigate('/file')}
-          style={{ 
-            padding: '12px 24px', 
-            backgroundColor: '#6c757d', 
-            color: 'white', 
-            border: 'none', 
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '16px'
-          }}
+          className="novo-procedimento-button novo-procedimento-cancel"
         >
           Cancelar
         </button>
-        
         <button
           type="button"
           onClick={handleCreateTable}
           disabled={loading}
-          style={{ 
-            padding: '12px 24px', 
-            backgroundColor: loading ? '#ccc' : '#007bff', 
-            color: 'white', 
-            border: 'none', 
-            borderRadius: '4px',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            fontSize: '16px'
-          }}
+          className="novo-procedimento-button"
         >
           {loading ? 'A criar...' : 'Criar Procedimento'}
         </button>

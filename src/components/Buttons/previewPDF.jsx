@@ -75,9 +75,29 @@ export default function PreviewPdfButton({
     }
   };
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 600;
   return (
-    <button className="preview-button" onClick={handlePreviewNonEditable}>
-      Download
+    <button
+      className="preview-button"
+      onClick={handlePreviewNonEditable}
+      style={isMobile ? {
+        width: 44,
+        height: 44,
+        borderRadius: '50%',
+        backgroundColor: '#388e3c',
+        color: 'white',
+        border: 'none',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '22px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+        cursor: 'pointer',
+        padding: 0
+      } : {}}
+      title="Visualizar PDF"
+    >
+      {isMobile ? '' : 'Download'}
     </button>
   );
 }

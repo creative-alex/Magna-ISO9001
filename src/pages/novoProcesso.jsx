@@ -1,4 +1,5 @@
 import React, { useState, useContext, useEffect } from 'react';
+import './novoProcedimento.css';
 import { useNavigate } from 'react-router-dom';
 import { UserContext } from '../context/userContext';
 import { generateEditablePdfTemplate2 } from '../utils/pdfGenerate';
@@ -249,26 +250,16 @@ export default function CreateProcess() {
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
+    <div className="novo-procedimento-container">
       <h2>Criar Novo Processo</h2>
-      
-      
       {error && (
-        <div style={{ 
-          color: 'red', 
-          backgroundColor: '#ffe6e6', 
-          padding: '10px', 
-          borderRadius: '5px', 
-          marginBottom: '20px' 
-        }}>
+        <div className="novo-procedimento-error">
           {error}
         </div>
       )}
 
-    
-
       <div style={{ marginBottom: '20px' }}>
-        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+        <label className="novo-procedimento-label">
           Nome do Processo:
         </label>
         <input
@@ -276,13 +267,7 @@ export default function CreateProcess() {
           value={processName}
           onChange={(e) => setProcessName(e.target.value)}
           placeholder="Ex: Gestão de Recursos Humanos"
-          style={{ 
-            width: '100%', 
-            padding: '8px', 
-            border: '1px solid #ccc', 
-            borderRadius: '4px',
-            fontSize: '14px'
-          }}
+          className="novo-procedimento-input"
         />
         <small style={{ color: '#666' }}>
           {nextProcessNumber !== null 
@@ -293,20 +278,14 @@ export default function CreateProcess() {
       </div>
 
       <div style={{ marginBottom: '20px' }}>
-        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+        <label className="novo-procedimento-label">
           Dono do Processo:
         </label>
         <select
           value={donoProcesso}
           onChange={(e) => setDonoProcesso(e.target.value)}
-          style={{ 
-            width: '100%', 
-            padding: '8px', 
-            border: '1px solid #ccc', 
-            borderRadius: '4px',
-            fontSize: '14px',
-            backgroundColor: 'white'
-          }}
+          className="novo-procedimento-input"
+          style={{ backgroundColor: 'white' }}
         >
           <option value="">-</option>
           {users.map((user) => (
@@ -318,7 +297,7 @@ export default function CreateProcess() {
       </div>
 
       <div style={{ marginBottom: '20px' }}>
-        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+        <label className="novo-procedimento-label">
           Objetivo do Processo:
         </label>
         <textarea
@@ -326,20 +305,13 @@ export default function CreateProcess() {
           onChange={(e) => setObjetivoProcesso(e.target.value)}
           placeholder="Descreva o objetivo principal do processo"
           rows={3}
-          style={{ 
-            width: '100%', 
-            padding: '8px', 
-            border: '1px solid #ccc', 
-            borderRadius: '4px',
-            fontSize: '14px',
-            resize: 'vertical'
-          }}
+          className="novo-procedimento-textarea"
         />
       </div>
 
-      <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
-        <div style={{ flex: 1 }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+      <div style={{ display: 'flex', gap: '20px', marginBottom: '20px', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: '250px' }}>
+          <label className="novo-procedimento-label">
             Serviços de Entrada:
           </label>
           <textarea
@@ -347,19 +319,12 @@ export default function CreateProcess() {
             onChange={(e) => setServicosEntrada(e.target.value)}
             placeholder="Recursos, informações ou serviços necessários"
             rows={4}
-            style={{ 
-              width: '100%', 
-              padding: '8px', 
-              border: '1px solid #ccc', 
-              borderRadius: '4px',
-              fontSize: '14px',
-              resize: 'vertical'
-            }}
+            className="novo-procedimento-textarea"
           />
         </div>
 
-        <div style={{ flex: 1 }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+        <div style={{ flex: 1, minWidth: '250px' }}>
+          <label className="novo-procedimento-label">
             Serviço de Saída:
           </label>
           <textarea
@@ -367,67 +332,46 @@ export default function CreateProcess() {
             onChange={(e) => setServicoSaida(e.target.value)}
             placeholder="Resultado ou produto final do processo"
             rows={4}
-            style={{ 
-              width: '100%', 
-              padding: '8px', 
-              border: '1px solid #ccc', 
-              borderRadius: '4px',
-              fontSize: '14px',
-              resize: 'vertical'
-            }}
+            className="novo-procedimento-textarea"
           />
         </div>
       </div>
 
       <div style={{ marginBottom: '20px' }}>
-        <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>
+        <label className="novo-procedimento-label">
           Atividades do Processo:
         </label>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #ccc' }}>
+        <div className="novo-procedimento-table-wrapper">
+          <table className="novo-procedimento-table">
             <thead>
-              <tr style={{ backgroundColor: '#f5f5f5' }}>
-                <th style={{ border: '1px solid #ccc', padding: '8px' }}>Atividade</th>
-                <th style={{ border: '1px solid #ccc', padding: '8px' }}>Responsável</th>
-                <th style={{ border: '1px solid #ccc', padding: '8px' }}>Input</th>
-                <th style={{ border: '1px solid #ccc', padding: '8px' }}>Output</th>
-                <th style={{ border: '1px solid #ccc', padding: '8px' }}>Método</th>
-                <th style={{ border: '1px solid #ccc', padding: '8px' }}>Requisitos CQCQ</th>
-                <th style={{ border: '1px solid #ccc', padding: '8px', width: '80px' }}>Ações</th>
+              <tr>
+                <th>Atividade</th>
+                <th>Responsável</th>
+                <th>Input</th>
+                <th>Output</th>
+                <th>Método</th>
+                <th>Requisitos CQCQ</th>
+                <th>Ações</th>
               </tr>
             </thead>
             <tbody>
               {atividades.map((row, rowIdx) => (
                 <tr key={rowIdx}>
                   {row.map((cell, colIdx) => (
-                    <td key={colIdx} style={{ border: '1px solid #ccc', padding: '4px' }}>
+                    <td key={colIdx}>
                       <textarea
                         value={cell}
                         onChange={(e) => handleAtividadesChange(rowIdx, colIdx, e.target.value)}
-                        style={{ 
-                          width: '100%', 
-                          minHeight: '40px', 
-                          border: 'none', 
-                          resize: 'vertical',
-                          fontSize: '12px'
-                        }}
+                        className="novo-procedimento-textarea"
                       />
                     </td>
                   ))}
-                  <td style={{ border: '1px solid #ccc', padding: '4px', textAlign: 'center' }}>
+                  <td style={{ textAlign: 'center' }}>
                     {atividades.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeAtividadeRow(rowIdx)}
-                        style={{ 
-                          padding: '4px 8px', 
-                          backgroundColor: '#dc3545', 
-                          color: 'white', 
-                          border: 'none', 
-                          borderRadius: '3px',
-                          cursor: 'pointer',
-                          fontSize: '12px'
-                        }}
+                        className="novo-procedimento-button novo-procedimento-remove"
                       >
                         X
                       </button>
@@ -438,31 +382,22 @@ export default function CreateProcess() {
             </tbody>
           </table>
         </div>
-        <div style={{ marginTop: '10px' }}>
-          <button
-            type="button"
-            onClick={addAtividadeRow}
-            style={{ 
-              padding: '8px 16px', 
-              backgroundColor: '#28a745', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Adicionar Atividade
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={addAtividadeRow}
+          className="novo-procedimento-button novo-procedimento-add-row"
+        >
+          Adicionar Atividade
+        </button>
       </div>
 
       <div style={{ marginBottom: '20px' }}>
-        <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>
+        <label className="novo-procedimento-label">
           Indicadores:
         </label>
-        
+
         <div style={{ marginBottom: '10px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontSize: '14px', color: '#666' }}>
+          <label className="novo-procedimento-label" style={{ fontSize: '14px', color: '#666' }}>
             Indicador R1:
           </label>
           <input
@@ -470,18 +405,12 @@ export default function CreateProcess() {
             value={indicadores.indicadores_r1}
             onChange={(e) => handleIndicadoresChange('indicadores_r1', e.target.value)}
             placeholder="Primeiro indicador"
-            style={{ 
-              width: '100%', 
-              padding: '8px', 
-              border: '1px solid #ccc', 
-              borderRadius: '4px',
-              fontSize: '14px'
-            }}
+            className="novo-procedimento-input"
           />
         </div>
 
         <div style={{ marginBottom: '10px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontSize: '14px', color: '#666' }}>
+          <label className="novo-procedimento-label" style={{ fontSize: '14px', color: '#666' }}>
             Indicador R2:
           </label>
           <input
@@ -489,18 +418,12 @@ export default function CreateProcess() {
             value={indicadores.indicadores_r2}
             onChange={(e) => handleIndicadoresChange('indicadores_r2', e.target.value)}
             placeholder="Segundo indicador"
-            style={{ 
-              width: '100%', 
-              padding: '8px', 
-              border: '1px solid #ccc', 
-              borderRadius: '4px',
-              fontSize: '14px'
-            }}
+            className="novo-procedimento-input"
           />
         </div>
 
         <div style={{ marginBottom: '10px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontSize: '14px', color: '#666' }}>
+          <label className="novo-procedimento-label" style={{ fontSize: '14px', color: '#666' }}>
             Indicador R3:
           </label>
           <input
@@ -508,47 +431,24 @@ export default function CreateProcess() {
             value={indicadores.indicadores_r3}
             onChange={(e) => handleIndicadoresChange('indicadores_r3', e.target.value)}
             placeholder="Terceiro indicador"
-            style={{ 
-              width: '100%', 
-              padding: '8px', 
-              border: '1px solid #ccc', 
-              borderRadius: '4px',
-              fontSize: '14px'
-            }}
+            className="novo-procedimento-input"
           />
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+      <div className="novo-procedimento-actions">
         <button
           type="button"
           onClick={() => navigate('/file')}
-          style={{ 
-            padding: '12px 24px', 
-            backgroundColor: '#6c757d', 
-            color: 'white', 
-            border: 'none', 
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '16px'
-          }}
+          className="novo-procedimento-button novo-procedimento-cancel"
         >
           Cancelar
         </button>
-        
         <button
           type="button"
           onClick={handleCreateProcess}
           disabled={loading}
-          style={{ 
-            padding: '12px 24px', 
-            backgroundColor: loading ? '#ccc' : '#007bff', 
-            color: 'white', 
-            border: 'none', 
-            borderRadius: '4px',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            fontSize: '16px'
-          }}
+          className="novo-procedimento-button"
         >
           {loading ? 'A criar...' : 'Criar Processo'}
         </button>
