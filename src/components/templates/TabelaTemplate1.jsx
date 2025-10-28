@@ -143,144 +143,103 @@ export default function Template1({
           ))}
         </h2>
       </div>
-      {/* Action buttons at top right */}
-      <div className="action-buttons-container" style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'flex-end', position: 'relative' }}>
-        {/* Desktop: normal placement */}
-        {typeof window !== 'undefined' && window.innerWidth > 600 ? (
-          <>
-            {setIsEditable && canEdit && (
-              !isEditable ? (
-                <button 
-                  className="edit-button"
-                  onClick={() => setIsEditable(true)}
-                  title="Ativar modo de edição"
-                >
-                  ✏️ Editar
-                </button>
-              ) : (
-                <ExportPdfButton
-                  templateType={templateType}
-                  data={data}
-                  headers={['Fluxo\ndas Ações', 'Descrição', 'Responsável', 'Documentos\nAssociados', 'Instruções\nde Trabalho']}
-                  dataObs={dataObs}
-                  headersObs={['Observações']}
-                  atividades={atividades}
-                  donoProcesso={donoProcesso}
-                  objetivoProcesso={objetivoProcesso}
-                  indicadores={indicadores}
-                  pathFilename={pathFilename}
-                  servicosEntrada={servicosEntrada}
-                  servicoSaida={servicoSaida}
-                  fieldNames={fieldNames}
-                  history={history}
-                  onSaveSuccess={() => {
-                    onSaveSuccess && onSaveSuccess();
-                    setIsEditable(false);
-                  }}
-                />
-              )
-            )}
-            <PreviewPdfButton 
-              getTablesHtml={getTemplate1TablesHtml} 
-              pathFilename={pathFilename}
-              history={history}
+      {/* Action buttons sempre fixos no canto inferior direito */}
+      <div style={{ position: 'fixed', bottom: 90, right: 20, zIndex: 1001, display: 'flex', gap: '12px' }}>
+        {setIsEditable && canEdit && (
+          !isEditable ? (
+            <button
+              className="edit-button"
+              onClick={() => setIsEditable(true)}
+              title="Ativar modo de edição"
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: '50%',
+                backgroundColor: '#1976d2',
+                color: 'white',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '22px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+                cursor: 'pointer',
+              }}
+            >
+              ✏️
+            </button>
+          ) : (
+            <ExportPdfButton
               templateType={templateType}
+              data={data}
+              headers={['Fluxo\ndas Ações', 'Descrição', 'Responsável', 'Documentos\nAssociados', 'Instruções\nde Trabalho']}
+              dataObs={dataObs}
+              headersObs={['Observações']}
               atividades={atividades}
               donoProcesso={donoProcesso}
               objetivoProcesso={objetivoProcesso}
               indicadores={indicadores}
-              servicosEntrada={servicosEntrada}
-              servicoSaida={servicoSaida}
-            />
-          </>
-        ) : null}
-        {/* Mobile: absolute placement near AI Assistant */}
-        {typeof window !== 'undefined' && window.innerWidth <= 600 && (
-          <div style={{ position: 'fixed', bottom: 90, right: 20, zIndex: 1001, display: 'flex', gap: '12px' }}>
-            {setIsEditable && canEdit && (
-              !isEditable ? (
-                <button
-                  className="edit-button"
-                  onClick={() => setIsEditable(true)}
-                  title="Ativar modo de edição"
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: '50%',
-                    backgroundColor: '#1976d2',
-                    color: 'white',
-                    border: 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '22px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  ✏️
-                </button>
-              ) : (
-                <ExportPdfButton
-                  templateType={templateType}
-                  data={data}
-                  headers={['Fluxo\ndas Ações', 'Descrição', 'Responsável', 'Documentos\nAssociados', 'Instruções\nde Trabalho']}
-                  dataObs={dataObs}
-                  headersObs={['Observações']}
-                  atividades={atividades}
-                  donoProcesso={donoProcesso}
-                  objetivoProcesso={objetivoProcesso}
-                  indicadores={indicadores}
-                  pathFilename={pathFilename}
-                  servicosEntrada={servicosEntrada}
-                  servicoSaida={servicoSaida}
-                  fieldNames={fieldNames}
-                  history={history}
-                  onSaveSuccess={() => {
-                    onSaveSuccess && onSaveSuccess();
-                    setIsEditable(false);
-                  }}
-                />
-              )
-            )}
-            <PreviewPdfButton 
-              getTablesHtml={getTemplate1TablesHtml} 
               pathFilename={pathFilename}
-              history={history}
-              templateType={templateType}
-              atividades={atividades}
-              donoProcesso={donoProcesso}
-              objetivoProcesso={objetivoProcesso}
-              indicadores={indicadores}
               servicosEntrada={servicosEntrada}
               servicoSaida={servicoSaida}
+              fieldNames={fieldNames}
+              history={history}
+              onSaveSuccess={() => {
+                onSaveSuccess && onSaveSuccess();
+                setIsEditable(false);
+              }}
             />
-          </div>
+          )
         )}
-        
-        {/* Botão de debug para limpar histórico - só aparece quando está a editar */}
-        {isEditable && clearHistory && (
-          <button 
-            className="clear-history-button"
-            onClick={clearHistory}
-            title="Limpar histórico (Debug)"
-            style={{
-              backgroundColor: '#ff4444',
-              color: 'white',
-              border: 'none',
-              padding: '8px 12px',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '12px',
-              marginLeft: '10px'
-            }}
-          >
-            🗑️ Limpar Histórico
-          </button>
-        )}
+        <PreviewPdfButton 
+          getTablesHtml={getTemplate1TablesHtml} 
+          pathFilename={pathFilename}
+          history={history}
+          templateType={templateType}
+          atividades={atividades}
+          donoProcesso={donoProcesso}
+          objetivoProcesso={objetivoProcesso}
+          indicadores={indicadores}
+          servicosEntrada={servicosEntrada}
+          servicoSaida={servicoSaida}
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: '50%',
+            backgroundColor: '#ff9800',
+            color: 'white',
+            border: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '22px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+            cursor: 'pointer',
+          }}
+        />
       </div>
-      
-    
+
+      {/* Botão de debug para limpar histórico - só aparece quando está a editar */}
+      {isEditable && clearHistory && (
+        <button 
+          className="clear-history-button"
+          onClick={clearHistory}
+          title="Limpar histórico (Debug)"
+          style={{
+            backgroundColor: '#ff4444',
+            color: 'white',
+            border: 'none',
+            padding: '8px 12px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '12px',
+            marginLeft: '10px'
+          }}
+        >
+          🗑️ Limpar Histórico
+        </button>
+      )}
+
       {/* Tabela de Observações */}
       <div ref={obsTableRef} className="primeira-tabela">
         <table className="editable-table tabela-observacoes" border="1" cellPadding={4}>

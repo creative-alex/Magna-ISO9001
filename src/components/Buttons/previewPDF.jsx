@@ -80,7 +80,7 @@ export default function PreviewPdfButton({
     <button
       className="preview-button"
       onClick={handlePreviewNonEditable}
-      style={isMobile ? {
+      style={{
         width: 44,
         height: 44,
         borderRadius: '50%',
@@ -94,10 +94,11 @@ export default function PreviewPdfButton({
         boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
         cursor: 'pointer',
         padding: 0
-      } : {}}
+      }
+      }
       title="Visualizar PDF"
     >
-      {isMobile ? '' : 'Download'}
+      
     </button>
   );
 }

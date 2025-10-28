@@ -68,6 +68,21 @@
 }
 
 
+.preview-button {
+  height: 44px;
+  border-radius: 50%;
+  background-color: #ff9800;
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+  cursor: pointer;
+  width: 44px;
+}
+
 /* ===== CONTAINER GERAL DOS TEMPLATES ===== */
 .pdf-container, .template2-container, .template1-container {
   display: flex;

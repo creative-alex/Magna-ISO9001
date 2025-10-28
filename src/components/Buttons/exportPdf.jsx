@@ -221,7 +221,7 @@ export default function ExportPdfButton({
     <button
       className="save-button"
       onClick={handleSendToBackend}
-      style={isMobile ? {
+      style={{
         width: 44,
         height: 44,
         borderRadius: '50%',
@@ -235,10 +235,9 @@ export default function ExportPdfButton({
         boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
         cursor: 'pointer',
         padding: 0
-      } : {}}
+      }}
       title="Guardar Mudanças"
-    >
-      {isMobile ? '' : 'Guardar Mudanças'}
+    >      
     </button>
   );
 }
