@@ -357,222 +357,105 @@ export default function Template2({
 
   return (
     <div className="template2-container">
-       <h2 style={{textAlign: 'left', margin: 0, paddingLeft: 0, width: '100%'}}>
-                {Title.map((line, index) => (
-                  <React.Fragment key={index}>
-                    {line}
-                    {index < Title.length - 1 && <br />}
-                  </React.Fragment>
-                ))}
-              </h2>
-      {/* Action buttons at top right */}
-      <div className="action-buttons-container">
-        {/* Desktop: normal placement */}
-        {typeof window !== 'undefined' && window.innerWidth > 600 ? (
-          <>
-            {setIsEditable && canEdit && (
-              !isEditable ? (
-                <button 
-                  className="edit-button"
-                  onClick={() => setIsEditable(true)}
-                  title="Ativar modo de edição"
-                >
-                  ✏️ Editar
-                </button>
-              ) : (
-                <ExportPdfButton
-                  templateType={2}
-                  data={data}
-                  headers={[]}
-                  dataObs={[]}
-                  headersObs={[]}
-                  atividades={atividades}
-                  donoProcesso={donoProcesso}
-                  donoProcessoOriginal={donoProcessoOriginal}
-                  objetivoProcesso={objetivoProcesso}
-                  indicadores={indicadores}
-                  pathFilename={pathFilename}
-                  servicosEntrada={servicosEntrada}
-                  servicoSaida={servicoSaida}
-                  mergedSpans={mergedSpans}
-                  hiddenCells={hiddenCells}
-                  onSaveSuccess={() => {
-                    onSaveSuccess && onSaveSuccess();
-                    setIsEditable(false);
-                  }}
-                  history={history}
-                />
-              )
-            )}
-            <PreviewPdfButton 
+      <h2 style={{textAlign: 'left', margin: 0, paddingLeft: 0, width: '100%'}}>
+        {Title.map((line, index) => (
+          <React.Fragment key={index}>
+            {line}
+            {index < Title.length - 1 && <br />}
+          </React.Fragment>
+        ))}
+      </h2>
+      <div style={{ position: 'fixed', bottom: 150, right: 20, zIndex: 1002, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {setIsEditable && canEdit && (
+          !isEditable ? (
+            <button
+              className="edit-button"
+              onClick={() => setIsEditable(true)}
+              title="Ativar modo de edição"
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: '50%',
+                backgroundColor: '#1976d2',
+                color: 'white',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '22px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+                cursor: 'pointer',
+              }}
+            >
+              ✏️
+            </button>
+          ) : (
+            <ExportPdfButton
               templateType={2}
+              data={data}
+              headers={[]}
+              dataObs={[]}
+              headersObs={[]}
               atividades={atividades}
               donoProcesso={donoProcesso}
+              donoProcessoOriginal={donoProcessoOriginal}
               objetivoProcesso={objetivoProcesso}
               indicadores={indicadores}
+              pathFilename={pathFilename}
               servicosEntrada={servicosEntrada}
               servicoSaida={servicoSaida}
-              pathFilename={pathFilename}
-              history={history}
               mergedSpans={mergedSpans}
               hiddenCells={hiddenCells}
-            />
-          </>
-        ) : null}
-        {/* Mobile: absolute placement near AI Assistant */}
-        {typeof window !== 'undefined' && window.innerWidth <= 600 && (
-          <div style={{ position: 'fixed', bottom: 90, right: 20, zIndex: 1001, display: 'flex', gap: '12px' }}>
-            {setIsEditable && canEdit && (
-              !isEditable ? (
-                <button
-                  className="edit-button"
-                  onClick={() => setIsEditable(true)}
-                  title="Ativar modo de edição"
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: '50%',
-                    backgroundColor: '#1976d2',
-                    color: 'white',
-                    border: 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '22px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  ✏️
-                </button>
-              ) : (
-                <ExportPdfButton
-                  templateType={2}
-                  data={data}
-                  headers={[]}
-                  dataObs={[]}
-                  headersObs={[]}
-                  atividades={atividades}
-                  donoProcesso={donoProcesso}
-                  donoProcessoOriginal={donoProcessoOriginal}
-                  objetivoProcesso={objetivoProcesso}
-                  indicadores={indicadores}
-                  pathFilename={pathFilename}
-                  servicosEntrada={servicosEntrada}
-                  servicoSaida={servicoSaida}
-                  mergedSpans={mergedSpans}
-                  hiddenCells={hiddenCells}
-                  onSaveSuccess={() => {
-                    onSaveSuccess && onSaveSuccess();
-                    setIsEditable(false);
-                  }}
-                  history={history}
-                />
-              )
-            )}
-            <PreviewPdfButton 
-              templateType={2}
-              atividades={atividades}
-              donoProcesso={donoProcesso}
-              objetivoProcesso={objetivoProcesso}
-              indicadores={indicadores}
-              servicosEntrada={servicosEntrada}
-              servicoSaida={servicoSaida}
-              pathFilename={pathFilename}
+              onSaveSuccess={() => {
+                onSaveSuccess && onSaveSuccess();
+                setIsEditable(false);
+              }}
               history={history}
-              mergedSpans={mergedSpans}
-              hiddenCells={hiddenCells}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: '50%',
+                backgroundColor: '#4caf50',
+                color: 'white',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '22px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+                cursor: 'pointer',
+              }}
             />
-          </div>
+          )
         )}
-        
-        {/* Botão de debug para limpar histórico - só aparece quando está a editar */}
-        {isEditable && clearHistory && (
-          <button 
-            className="clear-history-button"
-            onClick={clearHistory}
-            title="Limpar histórico (Debug)"
-            style={{
-              backgroundColor: '#ff4444',
-              color: 'white',
-              border: 'none',
-              padding: '8px 12px',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '12px',
-              marginLeft: '10px'
-            }}
-          >
-            🗑️ Limpar Histórico
-          </button>
-        )}
-      </div>
-      
-      {/* Tabela principal */}
-<table className="tabela-processo">
-  <thead>
-    <tr>
-      <th colSpan={2} className="header-left">DONO DO PROCESSO<br/>(nomeado):</th>
-      <td colSpan={4} className="cell-left">
-        <MultiSelectDonos
-          funcionarios={funcionarios}
+        <PreviewPdfButton 
+          templateType={2}
+          atividades={atividades}
           donoProcesso={donoProcesso}
-          setDonoProcesso={setDonoProcesso}
-          isEditable={isEditable}
-          isSuperAdmin={isSuperAdmin}
-          donoProcessoAlterado={donoProcessoAlterado}
+          objetivoProcesso={objetivoProcesso}
+          indicadores={indicadores}
+          servicosEntrada={servicosEntrada}
+          servicoSaida={servicoSaida}
+          pathFilename={pathFilename}
+          history={history}
+          mergedSpans={mergedSpans}
+          hiddenCells={hiddenCells}
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: '50%',
+            backgroundColor: '#ff9800',
+            color: 'white',
+            border: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '22px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+            cursor: 'pointer',
+          }}
         />
-      </td>
-    </tr>
-    <tr>
-      <th colSpan={2} className="header-left">OBJETIVO DO PROCESSO:</th>
-      <td colSpan={4} className="cell-left">
-        <textarea
-          ref={(el) => textAreaRefs.current['objetivo-processo'] = el}
-          className="tabela-processo-textarea"
-          value={objetivoProcesso}
-          onChange={e => setObjetivoProcesso(e.target.value)}
-          onInput={handleTextareaResize}
-          placeholder="Descreva o objetivo principal do processo..."
-          style={{ resize: 'none' }}
-          readOnly={!isEditable}
-        />
-      </td>
-    </tr>
-    <tr>
-      <th colSpan={3} className="header-center">SERVIÇOS DE ENTRADAS</th>
-      <th colSpan={3} className="header-center">SERVIÇO DE SAÍDA</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td colSpan={3} className="cell-top">
-        <textarea
-          ref={(el) => textAreaRefs.current['servicos-entrada'] = el}
-          className="tabela-processo-textarea large"
-          value={servicosEntrada}
-          onChange={e => setServicosEntrada(e.target.value)}
-          onInput={handleTextareaResize}
-          placeholder="Descreva os serviços de entrada necessários..."
-          style={{ resize: 'none' }}
-          readOnly={!isEditable}
-        />
-      </td>
-      <td colSpan={3} className="cell-top">
-        <textarea
-          ref={(el) => textAreaRefs.current['servico-saida'] = el}
-          className="tabela-processo-textarea large"
-          value={servicoSaida}
-          onChange={e => setServicoSaida(e.target.value)}
-          onInput={handleTextareaResize}
-          placeholder="Descreva o serviço de saída resultante..."
-          style={{ resize: 'none' }}
-          readOnly={!isEditable}
-        />
-      </td>
-    </tr>
-  </tbody>
-</table>
+      </div>
 
 {/* Tabela Principais Atividades */}
 <table className="tabela-atividades">
@@ -750,7 +633,7 @@ export default function Template2({
           border: '2px solid #28a745', 
           borderRadius: '8px',
           backgroundColor: '#d4edda',
-          display: 'none' // Mudar para 'block' para ver o histórico na interface
+          display: 'none' 
         }}>
           <h3 style={{ color: '#155724', marginBottom: '15px' }}>
             🔍 DEBUG Template2 - Histórico de Alterações ({history.length} entradas)
@@ -812,6 +695,99 @@ export default function Template2({
           <p>History prop: {JSON.stringify(history)}</p>
         </div>
       )}
+
+      {/* Action buttons - sempre fixos no canto inferior direito */}
+      <div style={{ position: 'fixed', bottom: 150, right: 20, zIndex: 1002, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {setIsEditable && canEdit && (
+          !isEditable ? (
+            <button
+              className="edit-button"
+              onClick={() => setIsEditable(true)}
+              title="Ativar modo de edição"
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: '50%',
+                backgroundColor: '#1976d2',
+                color: 'white',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '22px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+                cursor: 'pointer',
+              }}
+            >
+              ✏️
+            </button>
+          ) : (
+            <ExportPdfButton
+              templateType={2}
+              data={data}
+              headers={[]}
+              dataObs={[]}
+              headersObs={[]}
+              atividades={atividades}
+              donoProcesso={donoProcesso}
+              donoProcessoOriginal={donoProcessoOriginal}
+              objetivoProcesso={objetivoProcesso}
+              indicadores={indicadores}
+              pathFilename={pathFilename}
+              servicosEntrada={servicosEntrada}
+              servicoSaida={servicoSaida}
+              mergedSpans={mergedSpans}
+              hiddenCells={hiddenCells}
+              onSaveSuccess={() => {
+                onSaveSuccess && onSaveSuccess();
+                setIsEditable(false);
+              }}
+              history={history}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: '50%',
+                backgroundColor: '#4caf50',
+                color: 'white',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '22px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+                cursor: 'pointer',
+              }}
+            />
+          )
+        )}
+        <PreviewPdfButton 
+          templateType={2}
+          atividades={atividades}
+          donoProcesso={donoProcesso}
+          objetivoProcesso={objetivoProcesso}
+          indicadores={indicadores}
+          servicosEntrada={servicosEntrada}
+          servicoSaida={servicoSaida}
+          pathFilename={pathFilename}
+          history={history}
+          mergedSpans={mergedSpans}
+          hiddenCells={hiddenCells}
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: '50%',
+            backgroundColor: '#ff9800',
+            color: 'white',
+            border: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '22px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+            cursor: 'pointer',
+          }}
+        />
+      </div>
     </div>
   );
 }
