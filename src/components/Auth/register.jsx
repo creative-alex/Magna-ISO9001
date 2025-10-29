@@ -43,7 +43,7 @@ const Register = () => {
       };
 
       // Criar no backend
-      const response = await fetch('https://api-iso-9001.onrender.com/users/createUser', {
+      const response = await fetch('https://api9001.duckdns.org/users/createUser', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

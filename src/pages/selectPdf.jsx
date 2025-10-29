@@ -282,7 +282,7 @@ export default function SelecionarPdf() {
 
   useEffect(() => {
     // Busca a árvore de ficheiros
-    fetch("https://api-iso-9001.onrender.com/files/list-files-tree")
+    fetch("https://api9001.duckdns.org/files/list-files-tree")
       .then(res => res.json())
       .then(data => {
         setFileTree(data);
@@ -306,7 +306,7 @@ export default function SelecionarPdf() {
       .catch(() => setFileTree([]));
 
     // Busca os donos dos processos
-        fetch("https://api-iso-9001.onrender.com/files/process-owners")
+        fetch("https://api9001.duckdns.org/files/process-owners")
       .then(res => res.json())
       .then(setProcessOwners)
       .catch(() => setProcessOwners({}));
@@ -314,7 +314,7 @@ export default function SelecionarPdf() {
 
   // Função para recarregar a árvore de ficheiros após eliminação
   const reloadFileTree = () => {
-    fetch("https://api-iso-9001.onrender.com/files/list-files-tree")
+    fetch("https://api9001.duckdns.org/files/list-files-tree")
       .then(res => res.json())
       .then(setFileTree)
       .catch(() => setFileTree([]));

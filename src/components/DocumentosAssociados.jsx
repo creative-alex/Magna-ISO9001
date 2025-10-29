@@ -181,7 +181,7 @@ const DocumentosAssociados = ({
     setLoading(true);
     try {
       // Busca todos os ficheiros na pasta principal e suas subpastas
-      const response = await fetch('https://api-iso-9001.onrender.com/files/list-files-tree');
+      const response = await fetch('https://api9001.duckdns.org/files/list-files-tree');
       
       if (!response.ok) {
         throw new Error('Erro ao buscar árvore de ficheiros');
@@ -305,7 +305,7 @@ const DocumentosAssociados = ({
       formData.append('file', file);
       formData.append('folderPath', folderPath + '/');
 
-      const response = await fetch('https://api-iso-9001.onrender.com/files/upload-document', {
+      const response = await fetch('https://api9001.duckdns.org/files/upload-document', {
         method: 'POST',
         body: formData,
       });
@@ -364,7 +364,7 @@ const DocumentosAssociados = ({
         async () => {
           try {
             
-            const response = await fetch(`https://api-iso-9001.onrender.com/files/delete`, {
+            const response = await fetch(`https://api9001.duckdns.org/files/delete`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -439,7 +439,7 @@ const DocumentosAssociados = ({
     const fullPath = typeof docObject === 'object' ? docObject.fullPath : documento;
     
     try {
-      const response = await fetch('https://api-iso-9001.onrender.com/files/get-pdf', {
+      const response = await fetch('https://api9001.duckdns.org/files/get-pdf', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -508,7 +508,7 @@ const DocumentosAssociados = ({
     const fullPath = typeof docObject === 'object' ? docObject.fullPath : documento;
     
     try {
-      const response = await fetch('https://api-iso-9001.onrender.com/files/download', {
+      const response = await fetch('https://api9001.duckdns.org/files/download', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

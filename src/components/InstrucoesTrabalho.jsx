@@ -167,7 +167,7 @@ const InstrucoesTrabalho = ({
     }
     
     try {
-      const response = await fetch('https://api-iso-9001.onrender.com/files/download', {
+      const response = await fetch('https://api9001.duckdns.org/files/download', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -241,7 +241,7 @@ const InstrucoesTrabalho = ({
     setLoading(true);
     try {
       // Busca todos os ficheiros na pasta principal e suas subpastas
-      const response = await fetch('https://api-iso-9001.onrender.com/files/list-files-tree');
+      const response = await fetch('https://api9001.duckdns.org/files/list-files-tree');
       
       if (!response.ok) {
         throw new Error('Erro ao buscar árvore de ficheiros');
@@ -384,7 +384,7 @@ const InstrucoesTrabalho = ({
       formData.append('file', file);
       formData.append('folderPath', folderPath + '/');
 
-      const response = await fetch('https://api-iso-9001.onrender.com/files/upload-document', {
+      const response = await fetch('https://api9001.duckdns.org/files/upload-document', {
         method: 'POST',
         body: formData,
       });
@@ -452,7 +452,7 @@ const InstrucoesTrabalho = ({
       const fullPath = instrucao.fullPath;
       
       // URL para download
-      const downloadUrl = `https://api-iso-9001.onrender.com/files/download/${encodeURIComponent(fullPath)}`;
+      const downloadUrl = `https://api9001.duckdns.org/files/download/${encodeURIComponent(fullPath)}`;
       
       // Cria um link temporário para download
       const link = document.createElement('a');
@@ -480,7 +480,7 @@ const InstrucoesTrabalho = ({
         async () => {
           try {
             
-            const response = await fetch(`https://api-iso-9001.onrender.com/files/delete/${encodeURIComponent(fullPath)}`, {
+            const response = await fetch(`https://api9001.duckdns.org/files/delete/${encodeURIComponent(fullPath)}`, {
               method: 'DELETE'
             });
             
