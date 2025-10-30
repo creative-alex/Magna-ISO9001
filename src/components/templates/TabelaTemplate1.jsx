@@ -133,8 +133,8 @@ export default function Template1({
 
   return (
     <div className="template1-container" style={{alignItems: 'flex-start'}}>
-      <div className="template1-header" style={{textAlign: 'left', margin: 0, padding: 0, width: '100%', alignSelf: 'flex-start'}}>
-        <h2 style={{textAlign: 'left', margin: 0, paddingLeft: 0, width: '100%'}}>
+      <div className="template1-header">
+        <h2>
           {Title.map((line, index) => (
             <React.Fragment key={index}>
               {line}
@@ -142,6 +142,15 @@ export default function Template1({
             </React.Fragment>
           ))}
         </h2>
+        {/* Botão de retroceder página */}
+        <button
+          onClick={() => history && history.length > 0 ? window.history.back() : null}
+          title="Voltar à página anterior"
+          className="back-button"
+        >
+          <span className="back-arrow">←</span>
+          <span className="back-text">Retroceder</span>
+        </button>
       </div>
       {/* Action buttons sempre fixos no canto inferior direito */}
       <div style={{ position: 'fixed', bottom: 90, right: 20, zIndex: 1001, display: 'flex', gap: '12px' }}>

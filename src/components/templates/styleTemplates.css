@@ -1,4 +1,4 @@
-  .segunda-tabela {
+.segunda-tabela {
     border: none !important;
     box-shadow: none !important;
   }
@@ -1101,5 +1101,49 @@
   .action-buttons-container {
     flex-direction: column;
     align-items: stretch;
+  }
+}
+
+/* Estilo para o cabeçalho do Template 1 */
+.template1-header {
+  text-align: left;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  align-self: flex-start;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Estilo para o botão de retroceder */
+.back-button {
+  width: auto;
+  height: auto;
+  color: #ff9800;
+  border: none;
+  background: none;
+  cursor: pointer;
+  margin-right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 16px;
+}
+
+.back-arrow {
+  font-size: 18px;
+}
+
+@media (max-width: 768px) {
+  .template1-header {
+    font-size: 10px;
+  }
+  .back-button {
+    display:none;
+  }
+
+  .back-arrow {
+    font-size: 16px;
   }
 }

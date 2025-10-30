@@ -203,11 +203,11 @@ export default function Template2({
       <table>
         <tr>
           <th colspan="2" style="width: 30%;">DONO DO PROCESSO (nomeado):</th>
-          <td colspan="4">${escapeHtml(donoProcesso)}</td>
+          <td colspan="4>${escapeHtml(donoProcesso)}</td>
         </tr>
         <tr>
           <th colspan="2">OBJETIVO DO PROCESSO:</th>
-          <td colspan="4">${escapeHtml(objetivoProcesso)}</td>
+          <td colspan="4>${escapeHtml(objetivoProcesso)}</td>
         </tr>
         <tr>
           <th colspan="3" class="center">SERVIÇOS DE ENTRADAS</th>
@@ -356,15 +356,26 @@ export default function Template2({
   console.log("PathFileName:", pathFilename);
 
   return (
-    <div className="template2-container">
-      <h2 style={{textAlign: 'left', margin: 0, paddingLeft: 0, width: '100%'}}>
-        {Title.map((line, index) => (
-          <React.Fragment key={index}>
-            {line}
-            {index < Title.length - 1 && <br />}
-          </React.Fragment>
-        ))}
-      </h2>
+    <div className="template1-container">
+      <div className="template1-header" style={{textAlign: 'left', margin: 0, padding: 0, width: '100%', alignSelf: 'flex-start', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+        <h2 style={{textAlign: 'left', margin: 0, paddingLeft: 0}}>
+          {Title.map((line, index) => (
+            <React.Fragment key={index}>
+              {line}
+              {index < Title.length - 1 && <br />}
+            </React.Fragment>
+          ))}
+        </h2>
+        {/* Botão de retroceder página */}
+        <button
+          onClick={() => history && history.length > 0 ? window.history.back() : null}
+          title="Voltar à página anterior"
+          className="back-button"
+        >
+          <span className="back-arrow">←</span>
+          <span className="back-text">Retroceder</span>
+        </button>
+      </div>
       <div style={{ position: 'fixed', bottom: 150, right: 20, zIndex: 1002, display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {setIsEditable && canEdit && (
           !isEditable ? (
