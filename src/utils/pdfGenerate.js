@@ -336,7 +336,6 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
   console.log("🔍 DEBUG generateNonEditablePdfTemplate2 - history length:", history?.length);
   
   const { pdfDoc, page, font } = await createBasePdf(title, imageBytes, pathFilename);
-  let activePage = page; // Para controle de páginas no histórico
 
   // Validações de entrada
   const safeAtividades = Array.isArray(atividades) && atividades.length > 0 ? atividades : [['', '', '', '', '', '']];
@@ -666,18 +665,16 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
     yPos -= 60; // Mais espaço antes do histórico
     
     // Se não há espaço suficiente, criar nova página
-    const marginBottom = 50;
     const espacoNecessario = 150; // Espaço mínimo para título + algumas linhas
     
     if (yPos - espacoNecessario < marginBottom) {
       console.log("📄 Template2 - Criando nova página para histórico");
-      const newPage = pdfDoc.addPage([pageSize[0], pageSize[1]]);
+      currentPage = await createNewPage();
       yPos = yStart - 80; // Começar mais abaixo na nova página
-      activePage = newPage;
     }
     
     // Linha separadora antes do histórico
-    activePage.drawLine({
+    currentPage.drawLine({
       start: { x: xStart, y: yPos + 20 },
       end: { x: xStart + 540, y: yPos + 20 },
       thickness: 1,
@@ -685,7 +682,7 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
     });
     
     // Título do histórico com destaque
-    activePage.drawText('Histórico de Alterações', {
+    currentPage.drawText('Histórico de Alterações', {
       x: xStart,
       y: yPos,
       size: 14,
@@ -768,7 +765,7 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
     // Desenha cabeçalhos
     historyHeaders.forEach((header, col) => {
       // Fundo cinza para cabeçalho
-      activePage.drawRectangle({
+      currentPage.drawRectangle({
         x: xPos,
         y: yPos - 18,
         width: historyColWidths[col],
@@ -777,7 +774,7 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
       });
       
       // Borda do cabeçalho
-      activePage.drawRectangle({
+      currentPage.drawRectangle({
         x: xPos,
         y: yPos - 18,
         width: historyColWidths[col],
@@ -787,7 +784,7 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
       });
       
       // Texto do cabeçalho
-      activePage.drawText(header, {
+      currentPage.drawText(header, {
         x: xPos + 4,
         y: yPos - 12,
         size: 10,
@@ -801,7 +798,8 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
     yPos -= 18;
     
     // Desenha linhas de histórico
-    history.forEach((entry, rowIdx) => {
+    for (let rowIdx = 0; rowIdx < history.length; rowIdx++) {
+      const entry = history[rowIdx];
       // Processar descrição para separar "de" e "para"
       const descricao = entry.descricao || '';
       let mudouDe = '';
@@ -836,23 +834,20 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
         maxLinesInRow = Math.max(maxLinesInRow, cellLines[col].length);
       });
         
-      // ...existing code...
-      
       // Calcular altura baseada no número real de linhas + padding generoso
       const rowHeight = Math.max(35, maxLinesInRow * 15 + 20); // Altura mínima 35, 15px por linha + 20px padding
       
       // Verifica se há espaço para a linha
       if (yPos - rowHeight < marginBottom) {
-        const newPage = pdfDoc.addPage([pageSize[0], pageSize[1]]);
+        currentPage = await createNewPage();
         yPos = yStart - 30;
-        activePage = newPage;
       }
       
       xPos = xStart;
       
       historyData.forEach((cellData, col) => {
         // Borda da célula
-        activePage.drawRectangle({
+        currentPage.drawRectangle({
           x: xPos,
           y: yPos - rowHeight,
           width: historyColWidths[col],
@@ -865,7 +860,7 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
         const lines = cellLines[col];
         // Desenhar cada linha de texto com espaçamento adequado
         lines.forEach((line, lineIdx) => {
-          activePage.drawText(line, {
+          currentPage.drawText(line, {
             x: xPos + 4,
             y: yPos - 16 - (lineIdx * 14), // Começar mais baixo e mais espaço entre linhas
             size: fontSize,
@@ -878,7 +873,7 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
       });
       
       yPos -= rowHeight;
-    });
+    }
     
     console.log("✅ Template2 - Histórico desenhado com", history.length, "entradas");
   } else {

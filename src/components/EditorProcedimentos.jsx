@@ -153,7 +153,14 @@ export default function TablePageUnified() {
 
   // Estado das tabelas
   const [tableData, setTableData] = useState(() => {
-    const initial = template.reduce((acc, t) => ({ ...acc, [t.key]: Array.from({ length: t.rows }, () => Array(t.cols).fill("")) }), {});
+    const initial = template.reduce((acc, t) => {
+      // Para a tabela principal (main) do Template 1, garantir pelo menos 1 linha
+      const minRows = t.key === 'main' && !isTemplate2 ? Math.max(t.rows, 1) : t.rows;
+      return { 
+        ...acc, 
+        [t.key]: Array.from({ length: minRows }, () => Array(t.cols).fill("")) 
+      };
+    }, {});
     return initial;
   });
   const [mainFieldNames, setMainFieldNames] = useState(() => {
@@ -530,10 +537,14 @@ useEffect(() => {
 
   // Reinicializa estado quando o template muda
   useEffect(() => {
-    const initial = template.reduce((acc, t) => ({
-      ...acc,
-      [t.key]: Array.from({ length: t.rows }, () => Array(t.cols).fill(""))
-    }), {});
+    const initial = template.reduce((acc, t) => {
+      // Para a tabela principal (main) do Template 1, garantir pelo menos 1 linha
+      const minRows = t.key === 'main' && !isTemplate2 ? Math.max(t.rows, 1) : t.rows;
+      return {
+        ...acc,
+        [t.key]: Array.from({ length: minRows }, () => Array(t.cols).fill(""))
+      };
+    }, {});
     setTableData(initial);
     setMainFieldNames([...template[1].fieldNames]);
     // Reinicializa também os estados extra do Template2
@@ -551,7 +562,7 @@ useEffect(() => {
     setServicoSaida("");
     // Reset do estado de mudanças não guardadas
     setHasUnsavedChanges(false);
-  }, [template]);
+  }, [template, isTemplate2]);
 
   // Refs para exportação/preview
   const mainTableRef = useRef(null);
@@ -633,6 +644,11 @@ useEffect(() => {
                 )
               : Array.from({ length: currentTemplate[0].rows }, () => Array(currentTemplate[0].cols).fill(""))
           };
+          
+          // Garantir que a tabela principal (main) tenha pelo menos 1 linha no Template 1
+          if (currentTemplate === tabelas && newState.main.length === 0) {
+            newState.main = [["", "", "", "", ""]];
+          }
           
           // Definir valores originais das tabelas para comparação
           setObsTableOriginal(JSON.parse(JSON.stringify(newState.obs)));
@@ -780,7 +796,9 @@ useEffect(() => {
       
       setTableData(prev => {
         const newData = [...prev[tableKey]];
-        if (newData.length > 1) {
+        // Para a tabela principal (main), garantir que sempre haja pelo menos 1 linha
+        const minRows = isMainTable ? 1 : 1;
+        if (newData.length > minRows) {
           newData.splice(rowIdx, 1);
         }
         return { ...prev, [tableKey]: newData };
