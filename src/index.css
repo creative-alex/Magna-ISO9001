@@ -571,7 +571,8 @@ body {
 
 .favorites-dropdown-button,
 .resources-dropdown-button,
-.resources-register-button {
+.resources-register-button,
+.resources-request-button {
   background: linear-gradient(135deg, #C8932F 0%, #b8832a 100%);
   color: white;
   border: none;
@@ -605,13 +606,14 @@ body {
 }
 
 .resources-register-button {
-  background: linear-gradient(135deg, #28a745 0%, #218838 100%);
+  background: linear-gradient(135deg, #a72828 0%, #882121 100%);
   box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
 }
 
 .favorites-dropdown-button:hover,
 .resources-dropdown-button:hover,
-.resources-register-button:hover {
+.resources-register-button:hover,
+.resources-request-button:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(200, 147, 47, 0.4);
 }
@@ -626,15 +628,27 @@ body {
 }
 
 .resources-register-button:hover {
-  background: linear-gradient(135deg, #218838 0%, #1e7e34 100%);
+  background: linear-gradient(135deg, #882121 0%, #7e1e1e 100%);
   box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
 }
 
 .favorites-dropdown-button:active,
 .resources-dropdown-button:active,
-.resources-register-button:active {
+.resources-register-button:active,
+.resources-request-button:active {
   transform: translateY(0);
 }
+
+.resources-request-button {
+  background: linear-gradient(135deg, #10b981 0%, #0e9f6e 100%);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.resources-request-button:hover {
+  background: linear-gradient(135deg, #0e9f6e 0%, #0c8560 100%);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
 
 .dropdown-arrow {
   font-size: 10px;

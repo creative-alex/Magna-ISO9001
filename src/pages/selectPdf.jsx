@@ -223,46 +223,122 @@ export default function SelecionarPdf() {
   // Verifica se é SuperAdmin
   const isAdmin = username === "superadmin" || username === "SuperAdmin";
 
-  // Carregar favoritos do localStorage quando o componente monta
+  // Carregar favoritos da BD quando o componente monta
   useEffect(() => {
     if (username) {
-      const savedFavorites = localStorage.getItem(`favorites_${username}`);
-      if (savedFavorites) {
-        try {
-          setFavorites(JSON.parse(savedFavorites));
-        } catch (e) {
-          console.error('Erro ao carregar favoritos:', e);
+      fetch(`https://api9001.duckdns.org/users/favorites/${username}`)
+        .then(res => res.json())
+        .then(data => {
+          console.log('Favoritos recebidos da BD:', data);
+          
+          // Aceita diferentes formatos de resposta
+          let favoritosArray = [];
+          
+          if (Array.isArray(data)) {
+            favoritosArray = data;
+          } else if (data.favorites && Array.isArray(data.favorites)) {
+            favoritosArray = data.favorites;
+          } else if (data.message === 'No favorites found') {
+            favoritosArray = [];
+          }
+          
+          // Garante que cada favorito tem a estrutura correta {path, name}
+          const formattedFavorites = favoritosArray.map(fav => {
+            if (typeof fav === 'string') {
+              // Se for apenas string (path), extrai o nome do path
+              const namePart = fav.split('/').pop().replace('.pdf', '');
+              return { path: fav, name: namePart };
+            } else if (fav.filePath && !fav.path) {
+              // Se usar 'filePath' em vez de 'path'
+              return { 
+                path: fav.filePath, 
+                name: fav.fileName || fav.filePath.split('/').pop().replace('.pdf', '')
+              };
+            } else {
+              // Já tem a estrutura correta ou próxima
+              return { 
+                path: fav.path || fav.filePath, 
+                name: fav.name || fav.fileName || (fav.path || fav.filePath).split('/').pop().replace('.pdf', '')
+              };
+            }
+          });
+          
+          console.log('Favoritos formatados:', formattedFavorites);
+          setFavorites(formattedFavorites);
+        })
+        .catch(error => {
+          console.error('Erro ao carregar favoritos:', error);
           setFavorites([]);
-        }
-      }
+        });
     }
   }, [username]);
 
-  // Salvar favoritos no localStorage sempre que mudarem
-  useEffect(() => {
-    if (username && favorites.length >= 0) {
-      localStorage.setItem(`favorites_${username}`, JSON.stringify(favorites));
-    }
-  }, [favorites, username]);
-
   // Funções para gerenciar favoritos
-  const toggleFavorite = (filePath, fileName) => {
-    setFavorites(prev => {
-      const exists = prev.find(fav => fav.path === filePath);
-      if (exists) {
-        return prev.filter(fav => fav.path !== filePath);
+  const toggleFavorite = async (filePath, fileName) => {
+    const exists = favorites.find(fav => fav.path === filePath);
+    
+    console.log('toggleFavorite chamado:', { filePath, fileName, exists, action: exists ? 'remove' : 'add' });
+    
+    try {
+      const response = await fetch("https://api9001.duckdns.org/users/favorites", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ 
+          username, 
+          filePath, 
+          fileName,
+          action: exists ? 'remove' : 'add'
+        })
+      });
+
+      if (response.ok) {
+        const responseData = await response.json();
+        console.log('Resposta da BD:', responseData);
+        
+        // Atualiza o estado local apenas se a BD foi atualizada com sucesso
+        setFavorites(prev => {
+          if (exists) {
+            return prev.filter(fav => fav.path !== filePath);
+          } else {
+            return [...prev, { path: filePath, name: fileName, addedAt: new Date().toISOString() }];
+          }
+        });
       } else {
-        return [...prev, { path: filePath, name: fileName, addedAt: new Date().toISOString() }];
+        console.error('Erro ao atualizar favorito na BD');
       }
-    });
+    } catch (error) {
+      console.error('Erro ao atualizar favorito:', error);
+    }
   };
 
   const isFavorite = (filePath) => {
     return favorites.some(fav => fav.path === filePath);
   };
 
-  const removeFavorite = (filePath) => {
-    setFavorites(prev => prev.filter(fav => fav.path !== filePath));
+  const removeFavorite = async (filePath) => {
+    try {
+      const response = await fetch("https://api9001.duckdns.org/users/favorites", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ 
+          username, 
+          filePath,
+          action: 'remove'
+        })
+      });
+
+      if (response.ok) {
+        setFavorites(prev => prev.filter(fav => fav.path !== filePath));
+      } else {
+        console.error('Erro ao remover favorito da BD');
+      }
+    } catch (error) {
+      console.error('Erro ao remover favorito:', error);
+    }
   };
 
   // Função para fazer logout
@@ -410,6 +486,12 @@ export default function SelecionarPdf() {
                 onClick={() => window.open('https://docs.google.com/forms/d/e/1FAIpQLSePnbZJUGv7J_YW0MKXn-E61t_naMr25TO2nk_GRDdR8Z13MQ/viewform', '_blank')}
               >
                 📝 Registar Não Conformidade
+              </button>
+              <button
+                className="resources-request-button"
+                onClick={() => window.open('https://docs.google.com/forms/d/e/1FAIpQLScrMQcU-waZqVtapeChdN3cQOl8SRQtZkWZEUJNvAYvvYLIJw/viewform', '_blank')}
+              >
+                📩 Tratamento de Nao Conformidade
               </button>
             </>
           )}
