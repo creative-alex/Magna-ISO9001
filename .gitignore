@@ -73,3 +73,5 @@ temp/
 # OS generated files
 Thumbs.db
 ehthumbs.db
+
+console.log
