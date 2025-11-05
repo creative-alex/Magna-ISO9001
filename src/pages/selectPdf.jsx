@@ -605,6 +605,7 @@ export default function SelecionarPdf() {
         searchTerm={searchTerm}
         username={username}
         isAdmin={isAdmin}
+        isSuperAdmin={isAdmin}
         processOwners={processOwners}
         onSuggestion={(suggestion) => {
           console.log('AI Suggestion:', suggestion);

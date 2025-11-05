@@ -577,7 +577,8 @@ const AIAssistant = ({
         {/* Botão "Começar" apenas no passo inicial */}
         {stepData.showStartButton && (() => {
           // Verificar se o user tem processos atribuídos antes de mostrar o botão
-          const userOwnsProcess = isSuperAdmin || Object.values(processOwners).includes(username);
+          // SuperAdmin tem acesso a todos os processos
+          const userOwnsProcess = isSuperAdmin || (processOwners && Object.values(processOwners).includes(username));
           
           if (!userOwnsProcess) {
             return (
@@ -624,16 +625,40 @@ const AIAssistant = ({
     );
   };
 
+  // Função auxiliar para enviar dados da pergunta para a API
+  const logQuestionToAPI = async (question, hasLocalAnswer = false, responseType = null) => {
+    try {
+      await fetch("https://api9001.duckdns.org/api/assistant/log", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          question: question.trim(),
+          username: username,
+          currentPage: currentPage,
+          hasLocalAnswer: hasLocalAnswer,
+          responseType: responseType,
+          timestamp: new Date().toISOString()
+        })
+      });
+    } catch (error) {
+      console.error('Erro ao registar pergunta na API:', error);
+    }
+  };
+
   // Processar pergunta simples no balão
   const handleBubbleQuestion = () => {
     if (!userInput.trim()) return;
     
     setIsTyping(true);
     const question = userInput.toLowerCase();
+    const userOwnsProcess = isSuperAdmin || (processOwners && Object.values(processOwners).includes(username));
     
     setTimeout(() => {
       let response = '';
       let actionType = null;
+      let hasLocalAnswer = true;
       
       // Respostas contextuais baseadas na página atual
       if (question.includes('pesquis') || question.includes('procur') || question.includes('encontr') || question.includes('search')) {
@@ -644,6 +669,7 @@ const AIAssistant = ({
           response = '🔍 Use a barra de pesquisa no topo para encontrar ficheiros rapidamente!';
           actionType = 'search';
         }
+        logQuestionToAPI(userInput, true, actionType);
       } else if (question.includes('ficheiro') || question.includes('file') || question.includes('documento') || question.includes('pdf')) {
         if (currentPage !== 'selectPdf') {
           response = '📄 Para ver ficheiros, volte à página principal:\n\n🏠 Clique no logotipo ISO 9001 no topo para voltar à lista completa\n🔍 Lá pode usar a pesquisa para encontrar o que precisa';
@@ -652,6 +678,25 @@ const AIAssistant = ({
           response = '📁 Clique nas pastas "PROCESSO X:" para expandir e ver os ficheiros disponíveis.';
           actionType = 'folder';
         }
+        logQuestionToAPI(userInput, true, actionType);
+      } else if (question.includes('favorito') || question.includes('favoritos')) {
+        if (currentPage !== 'selectPdf') {
+          response = '⭐ Para gerir favoritos, volte à página principal:\n\n🏠 Clique no botão retroceder no topo para voltar à lista completa\n🔍 Lá pode usar a pesquisa para encontrar o que precisa';
+          actionType = 'favoritesNavigation';
+        } else {
+          response = '⭐ Clique no ícone de estrela ao lado dos ficheiros para adicionar/remover dos favoritos.';
+          actionType = 'favorites';
+        }
+        logQuestionToAPI(userInput, true, actionType);
+      } else if (question.includes('adicionar linha') || question.includes('nova linha')) {
+        if (!userOwnsProcess) {
+          response = '🔒 Não pode adicionar linhas porque não é proprietário de nenhum processo. Apenas proprietários de processos ou Super Admins podem editar procedimentos. Contacte um Super Admin para ter processos atribuídos.';
+          actionType = 'addTableRow';
+        } else if (currentPage === 'template') {
+          response = ' ➕ Para adicionar uma nova linha, ative o modo edição clicando no botão "Editar" e depois use o botão direito do rato na tabela para adicionar, remover ou mover uma linha.';
+          actionType = 'addTableRowFromOther';
+        }
+        logQuestionToAPI(userInput, true, actionType);
       } else if (
         (question.includes('processo') || question.includes('processos'))
       ) {
@@ -662,14 +707,16 @@ const AIAssistant = ({
           response = '🔐 Apenas Super Admins podem criar novos processos. Contacte um Super Admin se precisar de um novo processo.';
           actionType = 'permissions';
         }
+        logQuestionToAPI(userInput, true, actionType);
       } else if (question.includes('pasta') || question.includes('abrir') || question.includes('naveg')) {
         if (currentPage === 'selectPdf') {
-          response = '� Clique nas pastas "PROCESSO X:" para expandir e ver os ficheiros.';
+          response = '📁 Clique nas pastas "PROCESSO X:" para expandir e ver os ficheiros.';
           actionType = 'folder';
         } else {
           response = '📁 Para navegar pelas pastas, volte à página principal clicando no logotipo ISO 9001 no topo.';
           actionType = 'folderFromOther';
         }
+        logQuestionToAPI(userInput, true, actionType);
       } else if (question.includes('criar') || question.includes('novo') || question.includes('adicion') || question.includes('procedimento')) {
         if (isSuperAdmin) {
           response = '⚡ Como Super Admin, pode criar:\n• ➕ Novos procedimentos\n• 👥 Novos utilizadores\n• 🏢 Novos processos\n• 🔧 Configurações do sistema';
@@ -683,6 +730,7 @@ const AIAssistant = ({
             actionType = 'create';
           }
         }
+        logQuestionToAPI(userInput, true, actionType);
       } else if (question.includes('utilizador') || question.includes('user') || question.includes('conta')) {
         if (isSuperAdmin) {
           if (currentPage !== 'selectPdf') {
@@ -696,7 +744,8 @@ const AIAssistant = ({
           response = '🔐 Apenas Super Admins podem gerir utilizadores.';
           actionType = 'permissions';
         }
-      } else if (question.includes('permiss') || question.includes('edit') || question.includes('posso')) {
+        logQuestionToAPI(userInput, true, actionType);
+      } else if (question.includes('permiss') || question.includes('ajuda') || question.includes('posso')) {
           let capabilities = [];
           if (isSuperAdmin) {
             capabilities = [
@@ -729,10 +778,8 @@ const AIAssistant = ({
           }
           response = capabilities.join('\n');
           actionType = 'permissions';
+          logQuestionToAPI(userInput, true, actionType);
       } else if (question.includes('anexo') || question.includes('documento') || question.includes('anexar')) {
-        // Verificar se o user tem processos atribuídos
-        const userOwnsProcess = isSuperAdmin || Object.values(processOwners).includes(username);
-        
         if (!userOwnsProcess) {
           response = '🔒 Não pode anexar documentos porque não é proprietário de nenhum processo. Apenas proprietários de processos ou Super Admins podem anexar documentos. Contacte um Super Admin para ter processos atribuídos.';
           actionType = 'permissions';
@@ -746,10 +793,8 @@ const AIAssistant = ({
           response = '📎 Para anexar documentos:\n\n1️⃣ Primeiro vá à página principal (clique no logotipo)\n2️⃣ Selecione um procedimento para abrir\n3️⃣ Depois pode anexar documentos nas tabelas\n\nOu posso iniciar o tutorial de anexos que o guiará por todo o processo!';
           actionType = 'attachmentFromOther';
         }
-      } else if (question.includes('tutorial') || question.includes('ajuda') || question.includes('como')) {
-        // Verificar se o user tem processos atribuídos
-        const userOwnsProcess = isSuperAdmin || Object.values(processOwners).includes(username);
-        
+        logQuestionToAPI(userInput, true, actionType);
+      } else if (question.includes('tutorial') || question.includes('anexar') || question.includes('como')) {
         if (!userOwnsProcess) {
           response = '🔒 Não pode iniciar o tutorial de anexos porque não é proprietário de nenhum processo. Apenas proprietários de processos ou Super Admins podem anexar documentos. Contacte um Super Admin para ter processos atribuídos.';
           actionType = 'permissions';
@@ -760,6 +805,7 @@ const AIAssistant = ({
             tutorial.startTutorial();
           }, 1500);
         }
+        logQuestionToAPI(userInput, true, actionType);
       } else if (question.includes('onde') || question.includes('página') || question.includes('pagina') || question.includes('estou')) {
         let pageDescription = '';
         switch (currentPage) {
@@ -780,18 +826,74 @@ const AIAssistant = ({
         }
         response = pageDescription;
         actionType = 'pageInfo';
+        logQuestionToAPI(userInput, true, actionType);
       } else {
-        response = `🤖 Ah, não te consigo ajudar com essa pergunta... mas eis onde consigo dar uma mão:
-                     • Pesquisa e navegação
-                     • Localização atual
-                     • Criação de procedimentos
-                     • Permissões
-                     • Anexos
-                     
-                     Diz-me em qual destas áreas precisas de ajuda!`;
-        actionType = 'general';
+        // Enviar pergunta para API para guardar e tentar obter resposta
+        fetch("https://api9001.duckdns.org/api/assistant", {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            question: userInput.trim(),
+            username: username,
+            currentPage: currentPage,
+            timestamp: new Date().toISOString()
+          })
+        })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.answer) {
+            response = data.answer;
+            actionType = 'api';
+          } else {
+            response = `🤖 Ah, não te consigo ajudar com essa pergunta... mas eis onde consigo dar uma mão:
+                         • Pesquisa e navegação
+                         • Localização atual
+                         • Criação de procedimentos
+                         • Permissões
+                         • Anexos
+                         
+                         Diz-me em qual destas áreas precisas de ajuda!`;
+            actionType = 'general';
+          }
+          
+          setBubbleResponse(response);
+          setIsTyping(false);
+          setUserInput('');
+          
+          if (actionType && actionType !== 'attachment' && actionType !== 'tutorial' && actionType !== 'attachmentFromOther') {
+            setupResponseDetector(actionType);
+          } else if (actionType === 'general' || actionType === 'pageInfo') {
+            setTimeout(() => setBubbleResponse(''), 15000);
+          }
+        })
+        .catch((error) => {
+          console.error('Erro ao enviar pergunta para API:', error);
+          response = `🤖 Ah, não te consigo ajudar com essa pergunta... mas eis onde consigo dar uma mão:
+                       • Pesquisa e navegação
+                       • Localização atual
+                       • Criação de procedimentos
+                       • Permissões
+                       • Anexos
+                       
+                       Diz-me em qual destas áreas precisas de ajuda!`;
+          actionType = 'general';
+          
+          setBubbleResponse(response);
+          setIsTyping(false);
+          setUserInput('');
+          
+          if (actionType && actionType !== 'attachment' && actionType !== 'tutorial' && actionType !== 'attachmentFromOther') {
+            setupResponseDetector(actionType);
+          } else if (actionType === 'general' || actionType === 'pageInfo') {
+            setTimeout(() => setBubbleResponse(''), 15000);
+          }
+        });
+        return; // Sair aqui para não executar o código abaixo
       }
       
+      // Para outras perguntas com respostas locais
       setBubbleResponse(response);
       setIsTyping(false);
       setUserInput('');
