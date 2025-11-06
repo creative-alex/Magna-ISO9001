@@ -688,9 +688,9 @@ const AIAssistant = ({
           actionType = 'favorites';
         }
         logQuestionToAPI(userInput, true, actionType);
-      } else if (question.includes('adicionar linha') || question.includes('nova linha')) {
+      } else if (question.includes('adicionar linha') || question.includes('nova linha') || question.includes('linha')) {
         if (!userOwnsProcess) {
-          response = '🔒 Não pode adicionar linhas porque não é proprietário de nenhum processo. Apenas proprietários de processos ou Super Admins podem editar procedimentos. Contacte um Super Admin para ter processos atribuídos.';
+          response = '🔒 Não pode adicionar linhas, remover ou mover porque não é proprietário de nenhum processo. Apenas proprietários de processos ou Super Admins podem editar procedimentos. Contacte um Super Admin para ter processos atribuídos.';
           actionType = 'addTableRow';
         } else if (currentPage === 'template') {
           response = ' ➕ Para adicionar uma nova linha, ative o modo edição clicando no botão "Editar" e depois use o botão direito do rato na tabela para adicionar, remover ou mover uma linha.';
