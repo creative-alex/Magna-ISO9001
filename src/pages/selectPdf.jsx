@@ -432,7 +432,7 @@ export default function SelecionarPdf() {
       <div style={{ borderBottom: "2px solid #C8932F", paddingBottom: "20px", marginBottom: "30px" }}>
         <div className="header">
         <img src={Logo} alt="Logo" className="logo" />
-        <h2 className="title">Magna ISO90001</h2>
+        <h2 className="title">Magna ISO9001</h2>
         </div>
         {/* menus dropdown */}
         <div style={{ 
@@ -491,7 +491,7 @@ export default function SelecionarPdf() {
                 className="resources-request-button"
                 onClick={() => window.open('https://docs.google.com/forms/d/e/1FAIpQLScrMQcU-waZqVtapeChdN3cQOl8SRQtZkWZEUJNvAYvvYLIJw/viewform', '_blank')}
               >
-                📩 Tratamento de Nao Conformidade
+                📩 Tratamento de Não Conformidade
               </button>
             </>
           )}

@@ -216,6 +216,20 @@ export default function NewTable() {
     }
   };
 
+  // Função para validar e substituir barras por pipe
+  const handleProcessNameChange = (value) => {
+    // Substituir barras por pipe automaticamente
+    const cleanValue = value.replace(/[\/\\]/g, '|');
+    setProcessName(cleanValue);
+    
+    // Mostrar aviso se houve substituição
+    if (value !== cleanValue) {
+      setError('Caracteres "/" e "\\" foram substituídos por "|" para evitar problemas de ficheiro');
+      // Limpar o erro após 3 segundos
+      setTimeout(() => setError(''), 3000);
+    }
+  };
+
   // Função para criar a tabela (Template 1)
   const handleCreateTable = async () => {
     // Validações
@@ -252,11 +266,14 @@ export default function NewTable() {
       
       // Nome do ficheiro - usar prefixo manual se fornecido, senão usar numeração automática
       let fileName;
+      // Substituir barras por pipe (|) para evitar criação de pastas
+      const cleanProcessName = processName.trim().replace(/[\/\\]/g, '|');
+      
       if (manualPrefix.trim()) {
-        fileName = `${manualPrefix.trim()} ${processName.trim()}.pdf`;
+        fileName = `${manualPrefix.trim()} ${cleanProcessName}.pdf`;
       } else {
         const formattedNumber = nextTableNumber.toString().padStart(2, '0');
-        fileName = `${formattedNumber} ${processName.trim()}.pdf`;
+        fileName = `${formattedNumber} ${cleanProcessName}.pdf`;
       }
       const folderPath = processFolder.trim();
       
@@ -311,7 +328,7 @@ export default function NewTable() {
         <input
           type="text"
           value={processName}
-          onChange={(e) => setProcessName(e.target.value)}
+          onChange={(e) => handleProcessNameChange(e.target.value)}
           placeholder="Ex: Gestão de Recursos Humanos"
           className="novo-procedimento-input"
         />
@@ -326,7 +343,9 @@ export default function NewTable() {
                 } else {
                   return 'Aguardando carregamento do número...';
                 }
-                return `Nome do ficheiro será: Procedimento ${prefix} ${processName || '[Nome da Matriz]'}.pdf`;
+                // Substituir barras por pipe para pré-visualização
+                const cleanProcessName = processName.replace(/[\/\\]/g, '|');
+                return `Nome do ficheiro será: ${prefix} ${cleanProcessName || '[Nome do Procedimento]'}.pdf`;
               })()
             : 'Selecione uma pasta para ver o nome do ficheiro'
           }

@@ -89,7 +89,7 @@ const Register = () => {
     <div className="file-container">
       <div className="header">
         <img src={Logo} alt="Logo" className="logo" />
-        <h2 className="title">Magna ISO90001</h2>
+        <h2 className="title">Magna ISO9001</h2>
       </div>
       <div className="file-panel">
         <div className="panel-title">Criar Nova Conta</div>

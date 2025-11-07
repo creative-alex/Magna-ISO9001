@@ -37,7 +37,7 @@ const AIAssistant = ({
         setCurrentPage('createProcess');
       } else if (path === '/create-user') {
         setCurrentPage('createUser');
-      } else if (path === '/first-login') {
+      } else if (path === '/reset-password') {
         setCurrentPage('firstLogin');
       } else {
         setCurrentPage('unknown');
@@ -573,7 +573,6 @@ const AIAssistant = ({
         }}>
           {stepData.action}
         </div>
-        
         {/* Botão "Começar" apenas no passo inicial */}
         {stepData.showStartButton && (() => {
           // Verificar se o user tem processos atribuídos antes de mostrar o botão

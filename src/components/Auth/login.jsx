@@ -100,7 +100,7 @@ const Login = ({onLoginSuccess}) => {
                     setUserEmail(data.email);
                     
                     // Redirecionar para a página de first login
-                    navigate("/first-login", { replace: true });
+                    navigate("/reset-password", { replace: true });
                     return; // Não continuar com o login normal
                 } else {
                 }
@@ -141,7 +141,7 @@ const Login = ({onLoginSuccess}) => {
                 <div className="file-container">
                     <div className="header">
                         <img src={Logo} alt="Logo" className="logo" />
-                        <h2 className="title">Magna ISO90001</h2>
+                        <h2 className="title">Magna ISO9001</h2>
                     </div>
                     <div className="file-panel">
                         <form onSubmit={handleSubmit} className="auth-form">
@@ -180,6 +180,24 @@ const Login = ({onLoginSuccess}) => {
                             <button type="submit" className="auth-button" disabled={loading}>
                                 Entrar
                             </button>
+                            
+                            {/* Link para recuperar senha */}
+                            <div style={{ marginTop: '16px', textAlign: 'center' }}>
+                                <button 
+                                    type="button" 
+                                    onClick={() => navigate("/forgot-password")}
+                                    style={{ 
+                                        background: 'none', 
+                                        border: 'none', 
+                                        color: '#007bff', 
+                                        textDecoration: 'underline',
+                                        cursor: 'pointer',
+                                        fontSize: '14px'
+                                    }}
+                                >
+                                    Esqueci a minha password
+                                </button>
+                            </div>
                         </form>
                     </div>
                 </div>

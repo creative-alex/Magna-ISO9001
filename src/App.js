@@ -11,6 +11,7 @@ import { UserContext } from "./context/userContext";
 import { TutorialProvider } from "./context/tutorialContext";
 import NewTable from "./pages/novoProcedimento"
 import FirstLogin from "./components/Auth/firstLogin";
+import ForgotPassword from "./components/Auth/forgotPassword";
 import { ToastContainer } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
 import './App.css';
@@ -105,8 +106,12 @@ function App() {
           } 
         />
         <Route 
-          path="/first-login"
-          element={<FirstLogin />}
+          path="/reset-password"
+          element={<FirstLogin mode="reset" />}
+        />
+        <Route 
+          path="/forgot-password"
+          element={<ForgotPassword />}
         />
       </Routes>
       <ToastContainer 
