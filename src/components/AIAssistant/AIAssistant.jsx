@@ -627,7 +627,7 @@ const AIAssistant = ({
   // Função auxiliar para enviar dados da pergunta para a API
   const logQuestionToAPI = async (question, hasLocalAnswer = false, responseType = null) => {
     try {
-      await fetch("https://api9001.duckdns.org/api/assistant/log", {
+      await fetch("https://api-iso-9001.onrender.com/api/assistant/log", {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -828,7 +828,7 @@ const AIAssistant = ({
         logQuestionToAPI(userInput, true, actionType);
       } else {
         // Enviar pergunta para API para guardar e tentar obter resposta
-        fetch("https://api9001.duckdns.org/api/assistant", {
+        fetch("https://api-iso-9001.onrender.com/api/assistant", {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

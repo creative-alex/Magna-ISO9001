@@ -159,6 +159,49 @@ const DocumentosAssociados = ({
     return parts.length > 1 ? parts[1] : '';
   };
 
+  // Função para remover acentos e caracteres especiais (para compatibilidade com PDF)
+  const removeAccents = (text) => {
+    if (!text) return '';
+    
+    // Primeiro, corrige encoding UTF-8 mal interpretado como Windows-1252
+    let fixed = text
+      .replace(/Ã¡/g, 'a')
+      .replace(/Ã¢/g, 'a')
+      .replace(/Ã£/g, 'a')
+      .replace(/Ã /g, 'a')
+      .replace(/Ã§/g, 'c')
+      .replace(/Ã©/g, 'e')
+      .replace(/Ãª/g, 'e')
+      .replace(/Ã­/g, 'i')
+      .replace(/Ã³/g, 'o')
+      .replace(/Ã´/g, 'o')
+      .replace(/Ãµ/g, 'o')
+      .replace(/Ãº/g, 'u')
+      .replace(/Ã\u0081/g, 'A')
+      .replace(/Ã\u0082/g, 'A')
+      .replace(/Ã\u0083/g, 'A')
+      .replace(/Ã\u0087/g, 'C')
+      .replace(/Ã\u0089/g, 'E')
+      .replace(/Ã\u008a/g, 'E')
+      .replace(/Ã\u008d/g, 'I')
+      .replace(/Ã\u0093/g, 'O')
+      .replace(/Ã\u0094/g, 'O')
+      .replace(/Ã\u0095/g, 'O')
+      .replace(/Ã\u009a/g, 'U');
+    
+    // Depois, remove acentos normais que possam existir
+    fixed = fixed
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    
+    // Remove caracteres problemáticos
+    fixed = fixed
+      .replace(/[\u0080-\u009F]/g, '')
+      .replace(/[^\x20-\x7E\xA0-\xFF]/g, '');
+    
+    return fixed;
+  };
+
   // Busca documentos da subpasta específica baseada no prefixo do ficheiro atual
   const fetchDocumentos = async () => {
     if (!originalFilename) return;
@@ -181,7 +224,7 @@ const DocumentosAssociados = ({
     setLoading(true);
     try {
       // Busca todos os ficheiros na pasta principal e suas subpastas
-      const response = await fetch('https://api9001.duckdns.org/files/list-files-tree');
+      const response = await fetch('https://api-iso-9001.onrender.com/files/list-files-tree');
       
       if (!response.ok) {
         throw new Error('Erro ao buscar árvore de ficheiros');
@@ -242,7 +285,7 @@ const DocumentosAssociados = ({
       
       // Filtra para mostrar apenas ficheiros (remove extensões para display)
       const documentos = allFiles.map(file => ({
-        displayName: file.name,
+        displayName: removeAccents(file.name), // Remove acentos para evitar problemas de encoding
         fullPath: `${mainFolder}/${targetSubfolder.name}/${file.path}`,
         folder: file.folder
       }));
@@ -305,7 +348,7 @@ const DocumentosAssociados = ({
       formData.append('file', file);
       formData.append('folderPath', folderPath + '/');
 
-      const response = await fetch('https://api9001.duckdns.org/files/upload-document', {
+      const response = await fetch('https://api-iso-9001.onrender.com/files/upload-document', {
         method: 'POST',
         body: formData,
       });
@@ -364,12 +407,12 @@ const DocumentosAssociados = ({
         async () => {
           try {
             
-            const response = await fetch(`https://api9001.duckdns.org/files/delete`, {
+            const response = await fetch(`https://api-iso-9001.onrender.com/files/delete`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify({ filename: encodeURIComponent(fullPath) }),
+              body: JSON.stringify({ filename: fullPath }),
             });
             
             if (response.ok) {
@@ -402,13 +445,14 @@ const DocumentosAssociados = ({
   const toggleDocumento = (documento) => {
     let novosDocumentos;
     const docName = typeof documento === 'string' ? documento : documento.displayName;
+    const cleanDocName = removeAccents(docName); // Remove acentos antes de guardar
     
-    if (documentosSelecionados.includes(docName)) {
+    if (documentosSelecionados.includes(cleanDocName)) {
       // Remove o documento se já estiver selecionado
-      novosDocumentos = documentosSelecionados.filter(doc => doc !== docName);
+      novosDocumentos = documentosSelecionados.filter(doc => doc !== cleanDocName);
     } else {
       // Adiciona o documento se não estiver selecionado
-      novosDocumentos = [...documentosSelecionados, docName];
+      novosDocumentos = [...documentosSelecionados, cleanDocName];
     }
     
     setDocumentosSelecionados(novosDocumentos);
@@ -439,12 +483,12 @@ const DocumentosAssociados = ({
     const fullPath = typeof docObject === 'object' ? docObject.fullPath : documento;
     
     try {
-      const response = await fetch('https://api9001.duckdns.org/files/get-pdf', {
+      const response = await fetch('https://api-iso-9001.onrender.com/files/get-pdf', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ path: encodeURIComponent(fullPath) }),
+        body: JSON.stringify({ path: fullPath }),
       });
 
       if (response.ok) {
@@ -508,12 +552,12 @@ const DocumentosAssociados = ({
     const fullPath = typeof docObject === 'object' ? docObject.fullPath : documento;
     
     try {
-      const response = await fetch('https://api9001.duckdns.org/files/download', {
+      const response = await fetch('https://api-iso-9001.onrender.com/files/download', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ path: encodeURIComponent(fullPath) }),
+        body: JSON.stringify({ path: fullPath }),
       });
 
       if (response.ok) {
@@ -540,10 +584,13 @@ const DocumentosAssociados = ({
     }
   };
 
-  // Valor processado para o PDF (apenas títulos; remove URLs de formulários)
+  // Valor processado para o PDF (apenas títulos; remove URLs de formulários e acentos)
   const hiddenValueForPdf = (documentosSelecionados && documentosSelecionados.length > 0)
     ? documentosSelecionados
-        .map((doc) => (isFormLink(doc) ? getFormTitle(doc) : doc))
+        .map((doc) => {
+          const title = isFormLink(doc) ? getFormTitle(doc) : doc;
+          return removeAccents(title);
+        })
         .join('\n')
     : '';
 

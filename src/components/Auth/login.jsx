@@ -79,7 +79,7 @@ const Login = ({onLoginSuccess}) => {
             const token = await user.getIdToken(true);
             
             
-                        const response = await fetch("https://api9001.duckdns.org/users/verifyTokenAndGetUserInfo", {
+                        const response = await fetch("https://api-iso-9001.onrender.com/users/verifyTokenAndGetUserInfo", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -111,8 +111,12 @@ const Login = ({onLoginSuccess}) => {
                     toast.success("Login bem-sucedido!");
                 }
                 
-                onLoginSuccess(data);
-                const redirectPath = location.state?.from?.pathname || "/file";
+                // Chamar onLoginSuccess apenas se existir
+                if (onLoginSuccess && typeof onLoginSuccess === 'function') {
+                    onLoginSuccess(data);
+                }
+                
+                const redirectPath = location.state?.from?.pathname || "/";
                 navigate(redirectPath, { replace: true });
             } else {
                 setError(data.message || "Erro ao verificar token");

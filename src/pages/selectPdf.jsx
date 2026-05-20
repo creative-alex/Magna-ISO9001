@@ -11,6 +11,51 @@ import Logo from "../logo.svg"
 import Ver from "../icons/ver.ico"
 import "../index.css";
 
+// Função para corrigir encoding UTF-8 mal interpretado
+function fixEncoding(text) {
+  if (!text) return '';
+  
+  return text
+    .replace(/Ã¡/g, 'á')
+    .replace(/Ã¢/g, 'â')
+    .replace(/Ã£/g, 'ã')
+    .replace(/Ã /g, 'à')
+    .replace(/Ã§/g, 'ç')
+    .replace(/Ã©/g, 'é')
+    .replace(/Ãª/g, 'ê')
+    .replace(/Ã­/g, 'í')
+    .replace(/Ã³/g, 'ó')
+    .replace(/Ã´/g, 'ô')
+    .replace(/Ãµ/g, 'õ')
+    .replace(/Ãº/g, 'ú')
+    .replace(/Ã\u0081/g, 'Á')
+    .replace(/Ã\u0082/g, 'Â')
+    .replace(/Ã\u0083/g, 'Ã')
+    .replace(/Ã\u0087/g, 'Ç')
+    .replace(/Ã\u0089/g, 'É')
+    .replace(/Ã\u008a/g, 'Ê')
+    .replace(/Ã\u008d/g, 'Í')
+    .replace(/Ã\u0093/g, 'Ó')
+    .replace(/Ã\u0094/g, 'Ô')
+    .replace(/Ã\u0095/g, 'Õ')
+    .replace(/Ã\u009a/g, 'Ú')
+    .replace(/[\u0080-\u009F]/g, '');
+}
+
+// Função recursiva para corrigir encoding em toda a árvore
+// Mantém o nome original para chamadas à API e adiciona displayName para exibição
+function fixTreeEncoding(nodes) {
+  if (!Array.isArray(nodes)) return nodes;
+  
+  return nodes.map(node => ({
+    ...node,
+    originalName: node.originalName || node.name, // Guarda o nome original da API
+    displayName: fixEncoding(node.name), // Nome corrigido para exibição
+    name: node.originalName || node.name, // Mantém o nome original para compatibilidade
+    children: node.children ? fixTreeEncoding(node.children) : undefined
+  }));
+}
+
 // Função recursiva para filtrar nodes por nome
 function filterTree(nodes, searchTerm) {
   if (!searchTerm) return nodes;
@@ -121,7 +166,7 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
                 onClick={() => toggleFolder(node.name)}
               >
                 <span className="folder-name">
-                  {node.name}
+                  {node.displayName || node.name}
                 </span>
                 <div className="folder-actions" style={{ display: 'flex', alignItems: 'center' }}>
                   {currentPath.length === 0 && (isAdmin || (folderOwner && folderOwner.split(',').map(nome => nome.trim()).includes(currentUser))) ? (
@@ -157,8 +202,9 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
           // Ficheiros em subpastas (nível 2+) NÃO podem ser clicáveis
           const isClickableFile = currentPath.length <= 1;
           
-          // Remove a extensão apenas para PDFs para manter compatibilidade
-          const displayName = node.name.endsWith('.pdf') ? node.name.slice(0, -4) : node.name;
+          // Usa displayName corrigido, removendo extensão para PDFs
+          const nameToDisplay = node.displayName || node.name;
+          const displayName = nameToDisplay.endsWith('.pdf') ? nameToDisplay.slice(0, -4) : nameToDisplay;
           
           // Verifica se o user pode deletar o arquivo
           const processOwnerString = processOwners[currentPath[0]];
@@ -226,7 +272,7 @@ export default function SelecionarPdf() {
   // Carregar favoritos da BD quando o componente monta
   useEffect(() => {
     if (username) {
-      fetch(`https://api9001.duckdns.org/users/favorites/${username}`)
+      fetch(`https://api-iso-9001.onrender.com/users/favorites/${username}`)
         .then(res => res.json())
         .then(data => {
           console.log('Favoritos recebidos da BD:', data);
@@ -280,7 +326,7 @@ export default function SelecionarPdf() {
     console.log('toggleFavorite chamado:', { filePath, fileName, exists, action: exists ? 'remove' : 'add' });
     
     try {
-      const response = await fetch("https://api9001.duckdns.org/users/favorites", {
+      const response = await fetch("https://api-iso-9001.onrender.com/users/favorites", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -319,7 +365,7 @@ export default function SelecionarPdf() {
 
   const removeFavorite = async (filePath) => {
     try {
-      const response = await fetch("https://api9001.duckdns.org/users/favorites", {
+      const response = await fetch("https://api-iso-9001.onrender.com/users/favorites", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -358,12 +404,14 @@ export default function SelecionarPdf() {
 
   useEffect(() => {
     // Busca a árvore de ficheiros
-    fetch("https://api9001.duckdns.org/files/list-files-tree")
+    fetch("https://api-iso-9001.onrender.com/files/list-files-tree")
       .then(res => res.json())
       .then(data => {
-        setFileTree(data);
+        // Corrige encoding dos nomes dos ficheiros
+        const fixedData = fixTreeEncoding(data);
+        setFileTree(fixedData);
         // Extrai ficheiros da pasta "PROCESSO 6: Gestão de Recursos Humanos"
-        const resourcesFolder = data.find(node => 
+        const resourcesFolder = fixedData.find(node => 
           node.name === "PROCESSO 6: Gestão de Recursos Humanos" || 
           node.name.includes("PROCESSO 6") ||
           node.name.toLowerCase().includes("gestão de recursos humanos") ||
@@ -382,7 +430,7 @@ export default function SelecionarPdf() {
       .catch(() => setFileTree([]));
 
     // Busca os donos dos processos
-        fetch("https://api9001.duckdns.org/files/process-owners")
+        fetch("https://api-iso-9001.onrender.com/files/process-owners")
       .then(res => res.json())
       .then(setProcessOwners)
       .catch(() => setProcessOwners({}));
@@ -390,9 +438,13 @@ export default function SelecionarPdf() {
 
   // Função para recarregar a árvore de ficheiros após eliminação
   const reloadFileTree = () => {
-    fetch("https://api9001.duckdns.org/files/list-files-tree")
+    fetch("https://api-iso-9001.onrender.com/files/list-files-tree")
       .then(res => res.json())
-      .then(setFileTree)
+      .then(data => {
+        // Corrige encoding dos nomes dos ficheiros
+        const fixedData = fixTreeEncoding(data);
+        setFileTree(fixedData);
+      })
       .catch(() => setFileTree([]));
   };
 

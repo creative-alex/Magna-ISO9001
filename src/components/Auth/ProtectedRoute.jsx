@@ -14,7 +14,7 @@ const ProtectedRoute = ({ children }) => {
 
   // Se não estiver autenticado, redirecionar para login
   if (!isAuthenticated) {
-    return <Navigate to="/" state={{ from: location }} replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   return children;

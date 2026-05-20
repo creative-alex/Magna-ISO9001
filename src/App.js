@@ -11,7 +11,6 @@ import { UserContext } from "./context/userContext";
 import { TutorialProvider } from "./context/tutorialContext";
 import NewTable from "./pages/novoProcedimento"
 import FirstLogin from "./components/Auth/firstLogin";
-import ForgotPassword from "./components/Auth/forgotPassword";
 import { ToastContainer } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
 import './App.css';
@@ -35,20 +34,12 @@ function App() {
           path="/" 
           element={
             isAuthenticated ? 
-              <SelecionarPdf /> : 
+              <ProtectedRoute><SelecionarPdf /></ProtectedRoute> : 
               <Login onLoginSuccess={handleLoginSuccess} />
           } 
         />
         
         {/* Rotas protegidas */}
-        <Route 
-          path="/home" 
-          element={
-            <ProtectedRoute>
-              <SelecionarPdf />
-            </ProtectedRoute>
-          } 
-        />
         <Route 
           path="/file" 
           element={
@@ -111,7 +102,7 @@ function App() {
         />
         <Route 
           path="/forgot-password"
-          element={<ForgotPassword />}
+          element={<FirstLogin mode="forgot" />}
         />
       </Routes>
       <ToastContainer 

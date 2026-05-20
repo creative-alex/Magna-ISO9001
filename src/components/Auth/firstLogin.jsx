@@ -168,7 +168,7 @@ const FirstLoginComponent = ({ onComplete, mode = "firstLogin" }) => {
         throw new Error("As senhas não coincidem.");
       }
 
-      const response = await fetch(`https://api9001.duckdns.org/users/update-first-login`, {
+      const response = await fetch(`https://api-iso-9001.onrender.com/users/update-first-login`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",

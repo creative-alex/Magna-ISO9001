@@ -133,7 +133,7 @@ export default function ExportPdfButton({
       }
           }
 
-    await fetch("https://api9001.duckdns.org/files/upload-pdf", {
+    await fetch("https://api-iso-9001.onrender.com/files/upload-pdf", {
       method: "POST",
       body: formData,
     });
@@ -144,7 +144,7 @@ export default function ExportPdfButton({
         console.log("Atualizando dono do processo:", donoProcesso);
         const processId = pathFilename; // Usando o filename como processId
         
-        await fetch("https://api9001.duckdns.org/files/update-dono-processo", {
+        await fetch("https://api-iso-9001.onrender.com/files/update-dono-processo", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
