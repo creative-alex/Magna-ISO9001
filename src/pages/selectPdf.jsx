@@ -7,56 +7,9 @@ import AddProcessButton from "../components/Buttons/addProcessButton";
 import DeleteButton from "../components/Buttons/delete";
 import CreateTableButton from "../components/Buttons/createTableButton";
 import AIAssistant from "../components/AIAssistant/AIAssistant";
-import Logo from "../logo.svg"
-import Ver from "../icons/ver.ico"
+import Logo from "../logo.svg";
 import "../index.css";
 
-// Função para corrigir encoding UTF-8 mal interpretado
-function fixEncoding(text) {
-  if (!text) return '';
-  
-  return text
-    .replace(/Ã¡/g, 'á')
-    .replace(/Ã¢/g, 'â')
-    .replace(/Ã£/g, 'ã')
-    .replace(/Ã /g, 'à')
-    .replace(/Ã§/g, 'ç')
-    .replace(/Ã©/g, 'é')
-    .replace(/Ãª/g, 'ê')
-    .replace(/Ã­/g, 'í')
-    .replace(/Ã³/g, 'ó')
-    .replace(/Ã´/g, 'ô')
-    .replace(/Ãµ/g, 'õ')
-    .replace(/Ãº/g, 'ú')
-    .replace(/Ã\u0081/g, 'Á')
-    .replace(/Ã\u0082/g, 'Â')
-    .replace(/Ã\u0083/g, 'Ã')
-    .replace(/Ã\u0087/g, 'Ç')
-    .replace(/Ã\u0089/g, 'É')
-    .replace(/Ã\u008a/g, 'Ê')
-    .replace(/Ã\u008d/g, 'Í')
-    .replace(/Ã\u0093/g, 'Ó')
-    .replace(/Ã\u0094/g, 'Ô')
-    .replace(/Ã\u0095/g, 'Õ')
-    .replace(/Ã\u009a/g, 'Ú')
-    .replace(/[\u0080-\u009F]/g, '');
-}
-
-// Função recursiva para corrigir encoding em toda a árvore
-// Mantém o nome original para chamadas à API e adiciona displayName para exibição
-function fixTreeEncoding(nodes) {
-  if (!Array.isArray(nodes)) return nodes;
-  
-  return nodes.map(node => ({
-    ...node,
-    originalName: node.originalName || node.name, // Guarda o nome original da API
-    displayName: fixEncoding(node.name), // Nome corrigido para exibição
-    name: node.originalName || node.name, // Mantém o nome original para compatibilidade
-    children: node.children ? fixTreeEncoding(node.children) : undefined
-  }));
-}
-
-// Função recursiva para filtrar nodes por nome
 function filterTree(nodes, searchTerm) {
   if (!searchTerm) return nodes;
   return nodes
@@ -68,9 +21,7 @@ function filterTree(nodes, searchTerm) {
         }
         return null;
       }
-      if (node.name.toLowerCase().includes(searchTerm.toLowerCase())) {
-        return node;
-      }
+      if (node.name.toLowerCase().includes(searchTerm.toLowerCase())) return node;
       return null;
     })
     .filter(Boolean);
@@ -79,172 +30,107 @@ function filterTree(nodes, searchTerm) {
 function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners, currentUser, isAdmin, onDelete, onToggleFavorite, isFavorite }) {
   const [expandedFolder, setExpandedFolder] = useState(null);
 
-  // Função para ordenar nós: arquivos primeiro, depois pastas "Informação documentada" correspondentes
   const sortNodes = (nodes) => {
     const folders = nodes.filter(n => n.type === "folder");
     const files = nodes.filter(n => n.type === "file");
-    
-    // Função para extrair número de um nome
     const extractNumber = (name) => {
-      // Primeiro tenta encontrar número no início
       let match = name.match(/^(\d+)/);
       if (match) return match[1];
-      
-      // Se não encontrar no início, procura por "procedimento XX" ou similar
       match = name.match(/procedimento\s+(\d+)/i);
       if (match) return match[1];
-      
-      // Procura qualquer número no nome
       match = name.match(/(\d+)/);
       if (match) return match[1];
-      
       return 'other';
     };
-    
-    // Cria grupos baseados nos números (ex: "00", "01", etc.)
     const groups = new Map();
-    
-    // Adiciona arquivos aos grupos
     files.forEach(file => {
       const number = extractNumber(file.name);
-      if (!groups.has(number)) {
-        groups.set(number, { files: [], folders: [] });
-      }
+      if (!groups.has(number)) groups.set(number, { files: [], folders: [] });
       groups.get(number).files.push(file);
     });
-    
-    // Adiciona pastas aos grupos
     folders.forEach(folder => {
       const number = extractNumber(folder.name);
-      if (!groups.has(number)) {
-        groups.set(number, { files: [], folders: [] });
-      }
+      if (!groups.has(number)) groups.set(number, { files: [], folders: [] });
       groups.get(number).folders.push(folder);
     });
-    
-    // Ordena os grupos numericamente
     const sortedGroups = Array.from(groups.entries()).sort((a, b) => {
       if (a[0] === 'other') return 1;
       if (b[0] === 'other') return -1;
       return parseInt(a[0]) - parseInt(b[0]);
     });
-    
-    // Constrói a lista final: para cada grupo, arquivos primeiro, depois pastas
     const result = [];
-    sortedGroups.forEach(([number, group]) => {
-      // Ordena arquivos dentro do grupo
+    sortedGroups.forEach(([, group]) => {
       group.files.sort((a, b) => a.name.localeCompare(b.name));
       result.push(...group.files);
-      
-      // Ordena pastas dentro do grupo
       group.folders.sort((a, b) => a.name.localeCompare(b.name));
       result.push(...group.folders);
     });
-    
     return result;
   };
 
   const sortedNodes = sortNodes(nodes);
-
-  const toggleFolder = (folderName) => {
-    setExpandedFolder(expandedFolder === folderName ? null : folderName);
-  };
+  const toggleFolder = (folderName) => setExpandedFolder(expandedFolder === folderName ? null : folderName);
 
   return (
     <div className="folder-structure">
       {sortedNodes.map(node => {
         if (node.type === "folder") {
-          // Para pastas de primeiro nível, mostra o dono se existir
           const isTopLevel = currentPath.length === 0;
           const folderOwner = isTopLevel ? processOwners[node.name] : null;
-          const isOwnerFolder = isTopLevel && folderOwner && folderOwner.split(',').map(nome => nome.trim()).includes(currentUser);
-          
+          const isOwnerFolder = isTopLevel && folderOwner && folderOwner.split(',').map(n => n.trim()).includes(currentUser);
           return (
             <div key={node.name} className={`folder ${isOwnerFolder ? 'owner-folder' : ''}`}>
               <div
                 className={`folder-header ${expandedFolder === node.name ? 'active' : ''}`}
                 onClick={() => toggleFolder(node.name)}
               >
-                <span className="folder-name">
-                  {node.displayName || node.name}
-                </span>
-                <div className="folder-actions" style={{ display: 'flex', alignItems: 'center' }}>
-                  {currentPath.length === 0 && (isAdmin || (folderOwner && folderOwner.split(',').map(nome => nome.trim()).includes(currentUser))) ? (
-                    <CreateTableButton
-                      folderName={node.name}
-                      currentPath={currentPath}
-                    />
+                <span className="folder-name">{node.name}</span>
+                <div className="folder-actions">
+                  {currentPath.length === 0 && (isAdmin || (folderOwner && folderOwner.split(',').map(n => n.trim()).includes(currentUser))) ? (
+                    <CreateTableButton folderName={node.name} currentPath={currentPath} />
                   ) : null}
                 </div>
               </div>
-            {expandedFolder === node.name && (
-              <div className="folder-content">
-                <FolderStructure
-                  nodes={node.children || []}
-                  onSelectFile={onSelectFile}
-                  currentPath={[...currentPath, node.name]}
-                  processOwners={processOwners}
-                  currentUser={currentUser}
-                  isAdmin={isAdmin}
-                  onDelete={onDelete}
-                  onToggleFavorite={onToggleFavorite}
-                  isFavorite={isFavorite}
-                />
-              </div>
-            )}
-          </div>
+              {expandedFolder === node.name && (
+                <div className="folder-content">
+                  <FolderStructure
+                    nodes={node.children || []}
+                    onSelectFile={onSelectFile}
+                    currentPath={[...currentPath, node.name]}
+                    processOwners={processOwners}
+                    currentUser={currentUser}
+                    isAdmin={isAdmin}
+                    onDelete={onDelete}
+                    onToggleFavorite={onToggleFavorite}
+                    isFavorite={isFavorite}
+                  />
+                </div>
+              )}
+            </div>
           );
         } else {
-          // node.type === "file"
           const filePath = [...currentPath, node.name].join("/");
-          
-          // Ficheiros na raiz (nível 0) e dentro de pastas (nível 1) podem ser clicáveis
-          // Ficheiros em subpastas (nível 2+) NÃO podem ser clicáveis
           const isClickableFile = currentPath.length <= 1;
-          
-          // Usa displayName corrigido, removendo extensão para PDFs
-          const nameToDisplay = node.displayName || node.name;
-          const displayName = nameToDisplay.endsWith('.pdf') ? nameToDisplay.slice(0, -4) : nameToDisplay;
-          
-          // Verifica se o user pode deletar o arquivo
-          const processOwnerString = processOwners[currentPath[0]];
-          const isProcessOwner = processOwnerString && processOwnerString.split(',').map(nome => nome.trim()).includes(currentUser);
-          const canDelete = isAdmin ;
+          const displayName = node.name.endsWith('.pdf') ? node.name.slice(0, -4) : node.name;
+          const canDelete = isAdmin;
           const isFav = isFavorite && isFavorite(filePath);
-          
           return (
-            <div 
-              key={node.name} 
+            <div
+              key={node.name}
               className={`file ${isClickableFile ? 'file-clickable' : ''}`}
               style={{ cursor: isClickableFile ? 'pointer' : 'default' }}
             >
-              <span 
-                className="file-name"
-                onClick={isClickableFile ? () => onSelectFile(filePath) : undefined}
-              >
+              <span className="file-name" onClick={isClickableFile ? () => onSelectFile(filePath) : undefined}>
                 {displayName}
               </span>
               <div className="file-actions">
                 {isClickableFile && onToggleFavorite && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleFavorite(filePath, displayName);
-                    }}
-                    className="favorite-button"
-                    title={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
-                  >
+                  <button onClick={(e) => { e.stopPropagation(); onToggleFavorite(filePath, displayName); }} className="favorite-button" title={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}>
                     {isFav ? '⭐' : '☆'}
                   </button>
                 )}
                 <FilePreviewButton file={node} currentPath={currentPath} />
-                {canDelete && (
-                  <DeleteButton 
-                    file={node} 
-                    currentPath={currentPath} 
-                    onDelete={onDelete} 
-                  />
-                )}
+                {canDelete && <DeleteButton file={node} currentPath={currentPath} onDelete={onDelete} />}
               </div>
             </div>
           );
@@ -256,525 +142,265 @@ function FolderStructure({ nodes, onSelectFile, currentPath = [], processOwners,
 
 export default function SelecionarPdf() {
   const [fileTree, setFileTree] = useState([]);
-  const [searchTerm, setSearchTerm] = useState(""); 
+  const [searchTerm, setSearchTerm] = useState("");
   const [processOwners, setProcessOwners] = useState({});
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [favorites, setFavorites] = useState([]);
   const [showFavoritesDropdown, setShowFavoritesDropdown] = useState(false);
   const [showResourcesDropdown, setShowResourcesDropdown] = useState(false);
   const [resourcesFiles, setResourcesFiles] = useState([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
   const { username, logout } = useContext(UserContext);
-
-  // Verifica se é SuperAdmin
   const isAdmin = username === "superadmin" || username === "SuperAdmin";
 
-  // Carregar favoritos da BD quando o componente monta
+  // Iniciais do utilizador para avatar
+  const initials = username ? username.slice(0, 2).toUpperCase() : "??";
+
   useEffect(() => {
     if (username) {
       fetch(`https://api-iso-9001.onrender.com/users/favorites/${username}`)
         .then(res => res.json())
         .then(data => {
-          console.log('Favoritos recebidos da BD:', data);
-          
-          // Aceita diferentes formatos de resposta
           let favoritosArray = [];
-          
-          if (Array.isArray(data)) {
-            favoritosArray = data;
-          } else if (data.favorites && Array.isArray(data.favorites)) {
-            favoritosArray = data.favorites;
-          } else if (data.message === 'No favorites found') {
-            favoritosArray = [];
-          }
-          
-          // Garante que cada favorito tem a estrutura correta {path, name}
+          if (Array.isArray(data)) favoritosArray = data;
+          else if (data.favorites && Array.isArray(data.favorites)) favoritosArray = data.favorites;
           const formattedFavorites = favoritosArray.map(fav => {
-            if (typeof fav === 'string') {
-              // Se for apenas string (path), extrai o nome do path
-              const namePart = fav.split('/').pop().replace('.pdf', '');
-              return { path: fav, name: namePart };
-            } else if (fav.filePath && !fav.path) {
-              // Se usar 'filePath' em vez de 'path'
-              return { 
-                path: fav.filePath, 
-                name: fav.fileName || fav.filePath.split('/').pop().replace('.pdf', '')
-              };
-            } else {
-              // Já tem a estrutura correta ou próxima
-              return { 
-                path: fav.path || fav.filePath, 
-                name: fav.name || fav.fileName || (fav.path || fav.filePath).split('/').pop().replace('.pdf', '')
-              };
-            }
+            if (typeof fav === 'string') return { path: fav, name: fav.split('/').pop().replace('.pdf', '') };
+            if (fav.filePath && !fav.path) return { path: fav.filePath, name: fav.fileName || fav.filePath.split('/').pop().replace('.pdf', '') };
+            return { path: fav.path || fav.filePath, name: fav.name || fav.fileName || (fav.path || fav.filePath).split('/').pop().replace('.pdf', '') };
           });
-          
-          console.log('Favoritos formatados:', formattedFavorites);
           setFavorites(formattedFavorites);
         })
-        .catch(error => {
-          console.error('Erro ao carregar favoritos:', error);
-          setFavorites([]);
-        });
+        .catch(() => setFavorites([]));
     }
   }, [username]);
 
-  // Funções para gerenciar favoritos
   const toggleFavorite = async (filePath, fileName) => {
     const exists = favorites.find(fav => fav.path === filePath);
-    
-    console.log('toggleFavorite chamado:', { filePath, fileName, exists, action: exists ? 'remove' : 'add' });
-    
     try {
       const response = await fetch("https://api-iso-9001.onrender.com/users/favorites", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ 
-          username, 
-          filePath, 
-          fileName,
-          action: exists ? 'remove' : 'add'
-        })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, filePath, fileName, action: exists ? 'remove' : 'add' })
       });
-
       if (response.ok) {
-        const responseData = await response.json();
-        console.log('Resposta da BD:', responseData);
-        
-        // Atualiza o estado local apenas se a BD foi atualizada com sucesso
-        setFavorites(prev => {
-          if (exists) {
-            return prev.filter(fav => fav.path !== filePath);
-          } else {
-            return [...prev, { path: filePath, name: fileName, addedAt: new Date().toISOString() }];
-          }
-        });
-      } else {
-        console.error('Erro ao atualizar favorito na BD');
+        setFavorites(prev => exists ? prev.filter(fav => fav.path !== filePath) : [...prev, { path: filePath, name: fileName, addedAt: new Date().toISOString() }]);
       }
-    } catch (error) {
-      console.error('Erro ao atualizar favorito:', error);
-    }
+    } catch (error) { console.error('Erro ao atualizar favorito:', error); }
   };
 
-  const isFavorite = (filePath) => {
-    return favorites.some(fav => fav.path === filePath);
-  };
+  const isFavorite = (filePath) => favorites.some(fav => fav.path === filePath);
 
   const removeFavorite = async (filePath) => {
     try {
       const response = await fetch("https://api-iso-9001.onrender.com/users/favorites", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ 
-          username, 
-          filePath,
-          action: 'remove'
-        })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, filePath, action: 'remove' })
       });
-
-      if (response.ok) {
-        setFavorites(prev => prev.filter(fav => fav.path !== filePath));
-      } else {
-        console.error('Erro ao remover favorito da BD');
-      }
-    } catch (error) {
-      console.error('Erro ao remover favorito:', error);
-    }
-  };
-
-  // Função para fazer logout
-  const handleLogout = async () => {
-    setShowLogoutModal(true);
-  };
-
-  const confirmLogout = async () => {
-    setShowLogoutModal(false);
-    await logout();
-    navigate("/", { replace: true });
-  };
-
-  const cancelLogout = () => {
-    setShowLogoutModal(false);
+      if (response.ok) setFavorites(prev => prev.filter(fav => fav.path !== filePath));
+    } catch (error) { console.error('Erro ao remover favorito:', error); }
   };
 
   useEffect(() => {
-    // Busca a árvore de ficheiros
     fetch("https://api-iso-9001.onrender.com/files/list-files-tree")
       .then(res => res.json())
       .then(data => {
-        // Corrige encoding dos nomes dos ficheiros
-        const fixedData = fixTreeEncoding(data);
-        setFileTree(fixedData);
-        // Extrai ficheiros da pasta "PROCESSO 6: Gestão de Recursos Humanos"
-        const resourcesFolder = fixedData.find(node => 
-          node.name === "PROCESSO 6: Gestão de Recursos Humanos" || 
-          node.name.includes("PROCESSO 6") ||
-          node.name.toLowerCase().includes("gestão de recursos humanos") ||
-          node.name.toLowerCase().includes("gestao de recursos humanos")
-        );
+        setFileTree(data);
+        const resourcesFolder = data.find(node => node.name.includes("PROCESSO 6") || node.name.toLowerCase().includes("gestão de recursos humanos"));
         if (resourcesFolder && resourcesFolder.children) {
-          const files = resourcesFolder.children
-            .filter(child => child.type === "file")
-            .map(file => ({
-              name: file.name.endsWith('.pdf') ? file.name.slice(0, -4) : file.name,
-              path: `${resourcesFolder.name}/${file.name}`
-            }));
+          const files = resourcesFolder.children.filter(child => child.type === "file").map(file => ({ name: file.name.endsWith('.pdf') ? file.name.slice(0, -4) : file.name, path: `${resourcesFolder.name}/${file.name}` }));
           setResourcesFiles(files);
         }
       })
       .catch(() => setFileTree([]));
-
-    // Busca os donos dos processos
-        fetch("https://api-iso-9001.onrender.com/files/process-owners")
+    fetch("https://api-iso-9001.onrender.com/files/process-owners")
       .then(res => res.json())
       .then(setProcessOwners)
       .catch(() => setProcessOwners({}));
   }, []);
 
-  // Função para recarregar a árvore de ficheiros após eliminação
   const reloadFileTree = () => {
     fetch("https://api-iso-9001.onrender.com/files/list-files-tree")
       .then(res => res.json())
-      .then(data => {
-        // Corrige encoding dos nomes dos ficheiros
-        const fixedData = fixTreeEncoding(data);
-        setFileTree(fixedData);
-      })
+      .then(setFileTree)
       .catch(() => setFileTree([]));
   };
 
   const handleSelectFile = (filePath) => {
-    // Substituir espaços por '-', barras por '__'
     const formattedPath = filePath.replace(/\s/g, '-').replace(/\//g, '__');
-    
-    // Determinar processo a partir do caminho do ficheiro
-    const pathParts = filePath.split('/');
-    const processName = pathParts[0]; // Assume que primeiro nível é o processo
-    
-    // Função utilitária para verificar se um user está na lista de donos do processo
-    const isUserProcessOwner = (processOwnerString, username) => {
-      if (!processOwnerString || !username) return false;
-      const donosArray = processOwnerString.split(',').map(nome => nome.trim()).filter(nome => nome);
-      return donosArray.includes(username);
+    const processName = filePath.split('/')[0];
+    const isUserProcessOwner = (ownerStr, uname) => {
+      if (!ownerStr || !uname) return false;
+      return ownerStr.split(',').map(n => n.trim()).includes(uname);
     };
-    
-    // Verificar se user pode editar este processo
-    const processOwner = processOwners[processName];
-    const canEdit = isAdmin || isUserProcessOwner(processOwner, username);
-    
-    navigate(`/file/${formattedPath}`, { 
-      state: { 
-        originalFilename: filePath,
-        canEdit: canEdit,
-        isSuperAdmin: isAdmin
-      } 
-    });
+    const canEdit = isAdmin || isUserProcessOwner(processOwners[processName], username);
+    navigate(`/file/${formattedPath}`, { state: { originalFilename: filePath, canEdit, isSuperAdmin: isAdmin } });
   };
 
-  // Filtra a árvore conforme o termo de busca
   const filteredTree = filterTree(fileTree, searchTerm);
 
   return (
-    <div className="file-container">
-      <div style={{ borderBottom: "2px solid #C8932F", paddingBottom: "20px", marginBottom: "30px" }}>
-        <div className="header">
-        <img src={Logo} alt="Logo" className="logo" />
-        <h2 className="title">Magna ISO9001</h2>
+    <div className="app-shell">
+      {/* SIDEBAR */}
+      <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+        <div className="sidebar-logo">
+          <div className="logo-badge">C</div>
+          <div>
+            <div className="logo-text">Magna ISO9001</div>
+            <div className="logo-sub">Cooperativa Comenius</div>
+          </div>
         </div>
-        {/* menus dropdown */}
-        <div style={{ 
-          display: 'flex', 
-          flexDirection: 'row',
-          gap: '10px', 
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          marginTop: '15px'
-        }}>
-          {/* Menu Gestão de Recursos Humanos */}
-          {resourcesFiles.length > 0 && (
-            <>
-              <div style={{ position: 'relative', display: 'inline-block' }}>
-                <button 
-                  className="resources-dropdown-button"
-                  onClick={() => setShowResourcesDropdown(!showResourcesDropdown)}
-                >
-                  👥 Recursos Humanos
-                  <span className={`dropdown-arrow ${showResourcesDropdown ? 'open' : ''}`}>▼</span>
-                </button>
-                
-                {showResourcesDropdown && (
-                  <>
-                    <div 
-                      className="favorites-dropdown-overlay"
-                      onClick={() => setShowResourcesDropdown(false)}
-                    />
-                    <div className="favorites-dropdown-menu">
-                      {resourcesFiles.map(file => (
-                        <div key={file.path} className="favorites-dropdown-item">
-                          <span 
-                            className="favorites-dropdown-name"
-                            onClick={() => {
-                              handleSelectFile(file.path);
-                              setShowResourcesDropdown(false);
-                            }}
-                            title={file.path}
-                          >
-                            📄 {file.name}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-              
-              <button
-                className="resources-register-button"
-                onClick={() => window.open('https://docs.google.com/forms/d/e/1FAIpQLSePnbZJUGv7J_YW0MKXn-E61t_naMr25TO2nk_GRDdR8Z13MQ/viewform', '_blank')}
-              >
-                📝 Registar Não Conformidade
-              </button>
-              <button
-                className="resources-request-button"
-                onClick={() => window.open('https://docs.google.com/forms/d/e/1FAIpQLScrMQcU-waZqVtapeChdN3cQOl8SRQtZkWZEUJNvAYvvYLIJw/viewform', '_blank')}
-              >
-                📩 Tratamento de Não Conformidade
-              </button>
-            </>
-          )}
-          
-          {/* Menu Favoritos */}
-          {favorites.length > 0 && (
-            <div style={{ position: 'relative', display: 'inline-block' }}>
-              <button 
-                className="favorites-dropdown-button"
-                onClick={() => setShowFavoritesDropdown(!showFavoritesDropdown)}
-              >
-                ⭐ Favoritos ({favorites.length})
-                <span className={`dropdown-arrow ${showFavoritesDropdown ? 'open' : ''}`}>▼</span>
-              </button>
-            
-            {showFavoritesDropdown && (
+
+        <div className="sidebar-section">Principal</div>
+        <div className="nav-item active">
+          <span style={{fontSize:17,color:'var(--gold)'}}>🗂</span> Índice de Documentos
+        </div>
+        {resourcesFiles.length > 0 && (
+          <div className="nav-item" style={{position:'relative'}} onClick={() => setShowResourcesDropdown(!showResourcesDropdown)}>
+            <span style={{fontSize:17,color:'var(--gold)'}}>👥</span> Recursos Humanos
+            <span className={`dropdown-arrow ${showResourcesDropdown ? 'open' : ''}`} style={{marginLeft:'auto',fontSize:10}}>▼</span>
+            {showResourcesDropdown && (
               <>
-                <div 
-                  className="favorites-dropdown-overlay"
-                  onClick={() => setShowFavoritesDropdown(false)}
-                />
-                <div className="favorites-dropdown-menu">
-                  {favorites.map(fav => (
-                    <div key={fav.path} className="favorites-dropdown-item">
-                      <span 
-                        className="favorites-dropdown-name"
-                        onClick={() => {
-                          handleSelectFile(fav.path);
-                          setShowFavoritesDropdown(false);
-                        }}
-                        title={fav.path}
-                      >
-                        📄 {fav.name}
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeFavorite(fav.path);
-                        }}
-                        className="favorites-dropdown-remove"
-                        title="Remover dos favoritos"
-                      >
-                        ×
-                      </button>
+                <div className="favorites-dropdown-overlay" onClick={(e) => { e.stopPropagation(); setShowResourcesDropdown(false); }} />
+                <div className="favorites-dropdown-menu" style={{top:'100%',left:0,minWidth:200}}>
+                  {resourcesFiles.map(file => (
+                    <div key={file.path} className="favorites-dropdown-item">
+                      <span className="favorites-dropdown-name" onClick={() => { handleSelectFile(file.path); setShowResourcesDropdown(false); }}>📄 {file.name}</span>
                     </div>
                   ))}
                 </div>
               </>
             )}
+          </div>
+        )}
+        {favorites.length > 0 && (
+          <div className="nav-item" style={{position:'relative'}} onClick={() => setShowFavoritesDropdown(!showFavoritesDropdown)}>
+            <span style={{fontSize:17,color:'var(--gold)'}}>⭐</span> Favoritos ({favorites.length})
+            <span className={`dropdown-arrow ${showFavoritesDropdown ? 'open' : ''}`} style={{marginLeft:'auto',fontSize:10}}>▼</span>
+            {showFavoritesDropdown && (
+              <>
+                <div className="favorites-dropdown-overlay" onClick={(e) => { e.stopPropagation(); setShowFavoritesDropdown(false); }} />
+                <div className="favorites-dropdown-menu" style={{top:'100%',left:0,minWidth:200}}>
+                  {favorites.map(fav => (
+                    <div key={fav.path} className="favorites-dropdown-item">
+                      <span className="favorites-dropdown-name" onClick={() => { handleSelectFile(fav.path); setShowFavoritesDropdown(false); }}>📄 {fav.name}</span>
+                      <button onClick={(e) => { e.stopPropagation(); removeFavorite(fav.path); }} className="favorites-dropdown-remove" title="Remover">×</button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        <div className="sidebar-section">Ações rápidas</div>
+        <div className="nav-item" onClick={() => window.open('https://docs.google.com/forms/d/e/1FAIpQLSePnbZJUGv7J_YW0MKXn-E61t_naMr25TO2nk_GRDdR8Z13MQ/viewform', '_blank')}>
+          <span style={{fontSize:17,color:'var(--gold)'}}>⚠️</span> Registar Não Conformidade
+        </div>
+        <div className="nav-item" onClick={() => window.open('https://docs.google.com/forms/d/e/1FAIpQLScrMQcU-waZqVtapeChdN3cQOl8SRQtZkWZEUJNvAYvvYLIJw/viewform', '_blank')}>
+          <span style={{fontSize:17,color:'var(--gold)'}}>🔄</span> Tratar Não Conformidade
+        </div>
+
+        {isAdmin && (
+          <>
+            <div className="sidebar-section">Administração</div>
+            <div className="nav-item" onClick={() => navigate('/create-user')}>
+              <span style={{fontSize:17,color:'var(--gold)'}}>👤</span> Novo Utilizador
             </div>
-          )}
+            <div className="nav-item" onClick={() => navigate('/novo-processo')}>
+              <span style={{fontSize:17,color:'var(--gold)'}}>📋</span> Novo Processo
+            </div>
+          </>
+        )}
+
+        <div className="sidebar-bottom">
+          <div className="user-pill" onClick={() => setShowLogoutModal(true)}>
+            <div className="user-avatar">{initials}</div>
+            <div>
+              <div className="user-name">{username}</div>
+              <div className="user-role">{isAdmin ? 'SuperAdmin' : 'Utilizador'}</div>
+            </div>
+            <span style={{marginLeft:'auto',fontSize:13,color:'var(--section-label)'}}>↗</span>
+          </div>
         </div>
-      </div>
-      
-      <input
-        type="text"
-        placeholder="Encontrar arquivo ou pasta..."
-        value={searchTerm}
-        onChange={e => setSearchTerm(e.target.value)}
-      />
-      <div className="file-panel">
-       <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <div className="panel-title">Índice</div>
-        </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          {username && (
-            <span style={{ fontSize: '14px', color: '#666' }}>
-              Olá, {username}
-            </span>
-          )}
+      </aside>
+
+      {/* ÁREA PRINCIPAL */}
+      <div className="main-area">
+        {/* TOPBAR */}
+        <div className="topbar">
+          <div className="breadcrumb">
+            <span>🗂</span>
+            <span className="sep">›</span>
+            <span className="current">Índice de Documentos</span>
+          </div>
+          <div className="topbar-search">
+            <span style={{position:'absolute',left:10,fontSize:15,color:'#9ca3af'}}>🔍</span>
+            <input
+              type="text"
+              placeholder="Pesquisar arquivos..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              style={{paddingLeft:34}}
+            />
+          </div>
           {isAdmin && (
-            <div className="admin-buttons" style={{ display: 'flex', gap: '10px' }}>
+            <div className="admin-buttons">
               <AddUserButton />
               <AddProcessButton />
             </div>
           )}
-          <button 
-            onClick={handleLogout}
-            style={{
-              padding: '8px 12px',
-              backgroundColor: '#dc3545',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '14px'
-            }}
-            onMouseOver={(e) => e.target.style.backgroundColor = '#c82333'}
-            onMouseOut={(e) => e.target.style.backgroundColor = '#dc3545'}
-          >
-            Sair
-          </button>
+          <span className="topbar-user">Olá, {username}</span>
+          <button className="topbar-logout" onClick={() => setShowLogoutModal(true)}>Sair</button>
+        </div>
+
+        {/* CONTEÚDO */}
+        <div className="page-content">
+          <div className="file-panel">
+            <div className="panel-header" style={{display:'flex',justifyContent:'space-between',alignItems:'center',width:'100%'}}>
+              <div className="panel-title">Índice</div>
+            </div>
+            <FolderStructure
+              nodes={filteredTree}
+              onSelectFile={handleSelectFile}
+              processOwners={processOwners}
+              currentUser={username}
+              isAdmin={isAdmin}
+              onDelete={reloadFileTree}
+              onToggleFavorite={toggleFavorite}
+              isFavorite={isFavorite}
+            />
+          </div>
         </div>
       </div>
-        <FolderStructure 
-          nodes={filteredTree} 
-          onSelectFile={handleSelectFile} 
-          processOwners={processOwners}
-          currentUser={username}
-          isAdmin={isAdmin}
-          onDelete={reloadFileTree}
-          onToggleFavorite={toggleFavorite}
-          isFavorite={isFavorite}
-        />
-      </div>
 
-      {/* AI Assistant */}
-      <AIAssistant 
+      {/* AI ASSISTANT */}
+      <AIAssistant
         fileTree={filteredTree}
         searchTerm={searchTerm}
         username={username}
         isAdmin={isAdmin}
         isSuperAdmin={isAdmin}
         processOwners={processOwners}
-        onSuggestion={(suggestion) => {
-          console.log('AI Suggestion:', suggestion);
-        }}
+        onSuggestion={(suggestion) => console.log('AI Suggestion:', suggestion)}
       />
 
-      {/* Modal de Confirmação de Logout */}
+      {/* MODAL LOGOUT */}
       {showLogoutModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 1000,
-          animation: 'fadeIn 0.2s ease-out'
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            padding: '24px',
-            minWidth: '320px',
-            maxWidth: '400px',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-            animation: 'slideIn 0.3s ease-out',
-            textAlign: 'center'
-          }}>
-            <div style={{
-              fontSize: '48px',
-              marginBottom: '16px'
-            }}>
-              👋
-            </div>
-            <h3 style={{
-              margin: '0 0 8px 0',
-              fontSize: '18px',
-              fontWeight: '600',
-              color: '#1f2937'
-            }}>
-              Confirmar Saída
-            </h3>
-            <p style={{
-              margin: '0 0 24px 0',
-              color: '#6b7280',
-              fontSize: '14px',
-              lineHeight: '1.5'
-            }}>
-              Tem certeza que deseja terminar a sua sessão?
-            </p>
-            <div style={{
-              display: 'flex',
-              gap: '12px',
-              justifyContent: 'center'
-            }}>
-              <button
-                onClick={cancelLogout}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#f3f4f6',
-                  color: '#374151',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseOver={(e) => e.target.style.backgroundColor = '#e5e7eb'}
-                onMouseOut={(e) => e.target.style.backgroundColor = '#f3f4f6'}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmLogout}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#dc3545',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseOver={(e) => e.target.style.backgroundColor = '#c82333'}
-                onMouseOut={(e) => e.target.style.backgroundColor = '#dc3545'}
-              >
-                Sim, Sair
-              </button>
+        <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,backgroundColor:'rgba(0,0,0,0.4)',display:'flex',justifyContent:'center',alignItems:'center',zIndex:1000}}>
+          <div style={{backgroundColor:'white',borderRadius:12,padding:28,minWidth:300,maxWidth:380,textAlign:'center',boxShadow:'0 20px 40px rgba(0,0,0,0.15)'}}>
+            <div style={{fontSize:44,marginBottom:14}}>👋</div>
+            <h3 style={{margin:'0 0 8px',fontSize:17,fontWeight:600,color:'#111827'}}>Confirmar saída</h3>
+            <p style={{margin:'0 0 22px',color:'#6b7280',fontSize:14,lineHeight:1.5}}>Tem a certeza que pretende terminar a sessão?</p>
+            <div style={{display:'flex',gap:10,justifyContent:'center'}}>
+              <button onClick={() => setShowLogoutModal(false)} style={{padding:'9px 20px',backgroundColor:'#f3f4f6',color:'#374151',border:'none',borderRadius:8,cursor:'pointer',fontSize:14,fontWeight:500}}>Cancelar</button>
+              <button onClick={async () => { setShowLogoutModal(false); await logout(); navigate("/", { replace: true }); }} style={{padding:'9px 20px',backgroundColor:'#dc2626',color:'white',border:'none',borderRadius:8,cursor:'pointer',fontSize:14,fontWeight:500}}>Sair</button>
             </div>
           </div>
         </div>
       )}
-
-      {/* Estilos para animações */}
-      <style jsx>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        
-        @keyframes slideIn {
-          from { 
-            opacity: 0;
-            transform: translateY(-20px) scale(0.95);
-          }
-          to { 
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-        }
-      `}</style>
     </div>
   );
-};
+}
