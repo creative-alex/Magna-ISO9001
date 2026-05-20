@@ -1,4 +1,4 @@
-/* ===== VARIÁVEIS DE DESIGN — MAGNA ISO9001 ===== */
+/* ===== VARIÁVEIS DE DESIGN — MAGNA ISO9001 v2 ===== */
 :root {
   --gold: #C8932F;
   --gold-hover: #b8832a;
@@ -26,6 +26,11 @@ body {
   background: #f4f4f0;
   margin: 0;
   padding: 0;
+  min-height: 100vh;
+  display: block;
+}
+
+#root {
   min-height: 100vh;
 }
 
