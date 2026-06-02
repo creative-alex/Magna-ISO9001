@@ -3,6 +3,7 @@ import Login from './components/Auth/login';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import { Routes, Route, useNavigate } from "react-router-dom";
 import SelecionarPdf from "./pages/selectPdf";
+import DashboardPage from "./pages/Dashboard";
 import TablePage from "./components/EditorProcedimentos"; 
 import CreateProcess from "./pages/novoProcesso";
 import CreateProcedimento from "./pages/novoProcedimento";
@@ -40,13 +41,21 @@ function App() {
         />
         
         {/* Rotas protegidas */}
-        <Route 
-          path="/file" 
+        <Route
+          path="/file"
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/indice"
           element={
             <ProtectedRoute>
               <SelecionarPdf />
             </ProtectedRoute>
-          } 
+          }
         />
         <Route 
           path="/file/:filename" 

@@ -1,193 +1,66 @@
 import React, { useEffect, useState } from 'react';
-import Logo from '../logo.svg';
 
 const LoadingPage = () => {
-  const [loadingText, setLoadingText] = useState('A carregar');
-  const [dots, setDots] = useState('');
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    // Animação dos pontos
-    const dotsInterval = setInterval(() => {
-      setDots(prev => {
-        if (prev === '...') return '';
-        return prev + '.';
-      });
-    }, 500);
-
-    // Rotação do texto de carregamento
-    const textInterval = setInterval(() => {
-      setLoadingText(prev => {
-        const texts = [
-          'A carregar',
-          'A verificar autenticação',
-          'A inicializar sistema',
-          'A conectar ao servidor',
-          'Quase pronto'
-        ];
-        const currentIndex = texts.indexOf(prev);
-        return texts[(currentIndex + 1) % texts.length];
-      });
-    }, 2000);
-
-    return () => {
-      clearInterval(dotsInterval);
-      clearInterval(textInterval);
-    };
+    const steps = [15, 35, 55, 72, 88, 95];
+    let i = 0;
+    const interval = setInterval(() => {
+      if (i < steps.length) {
+        setProgress(steps[i]);
+        i++;
+      } else {
+        clearInterval(interval);
+      }
+    }, 400);
+    return () => clearInterval(interval);
   }, []);
 
   return (
-    <div className="file-container">
-      <div className="header">
-        <img src={Logo} alt="Logo" className="logo" />
-        <h2 className="title">Magna ISO9001</h2>
-      </div>
-      
-      <div className="file-panel">
-        <div className="loading-content">
-          {/* Spinner de Loading */}
-          <div className="loading-spinner">
-            <div className="spinner-ring"></div>
-            <div className="spinner-pulse"></div>
-          </div>
+    <div style={{
+      position: 'fixed', inset: 0,
+      background: '#f9fafb',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      gap: 0,
+    }}>
 
-          {/* Texto de Loading */}
-          <div className="loading-text">
-            <p>
-              {loadingText}<span className="loading-dots">{dots}</span>
-            </p>
-          </div>
-
-          {/* Barra de Progresso */}
-          <div className="loading-progress">
-            <div className="progress-bar"></div>
-          </div>
-
-          {/* Mensagem adicional */}
-          <p className="loading-message">
-            Por favor aguarde...
-          </p>
+      {/* Marca */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 40 }}>
+        <div style={{
+          width: 44, height: 44, borderRadius: 10,
+          background: '#C8932F',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 20, fontWeight: 700, color: '#fff',
+          flexShrink: 0,
+        }}>C</div>
+        <div>
+          <div style={{ fontSize: 17, fontWeight: 700, color: '#111827', lineHeight: 1.2 }}>Magna ISO9001</div>
+          <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Cooperativa Comenius</div>
         </div>
       </div>
 
-      <style jsx>{`
-        .loading-content {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 3rem 2rem;
-          text-align: center;
-          max-width: 400px;
-          margin: 0 auto;
-        }
+      {/* Spinner */}
+      <div style={{ position: 'relative', width: 48, height: 48, marginBottom: 32 }}>
+        <svg viewBox="0 0 48 48" style={{ width: 48, height: 48, animation: 'spin 1s linear infinite' }}>
+          <circle cx="24" cy="24" r="20" fill="none" stroke="#e5e7eb" strokeWidth="4" />
+          <circle cx="24" cy="24" r="20" fill="none" stroke="#C8932F" strokeWidth="4"
+            strokeDasharray="30 96" strokeLinecap="round" />
+        </svg>
+      </div>
 
-        .loading-spinner {
-          position: relative;
-          margin-bottom: 2rem;
-        }
+      {/* Barra de progresso */}
+      <div style={{ width: 220, height: 3, background: '#e5e7eb', borderRadius: 2, overflow: 'hidden' }}>
+        <div style={{
+          height: '100%', background: '#C8932F', borderRadius: 2,
+          width: `${progress}%`, transition: 'width 0.4s ease',
+        }} />
+      </div>
 
-        .spinner-ring {
-          width: 64px;
-          height: 64px;
-          border: 4px solid #e5e7eb;
-          border-top: 4px solid #C8932F;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-        }
+      <div style={{ marginTop: 14, fontSize: 12, color: '#9ca3af' }}>A carregar...</div>
 
-        .spinner-pulse {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 64px;
-          height: 64px;
-          border: 4px solid transparent;
-          border-right: 4px solid rgba(200, 147, 47, 0.3);
-          border-radius: 50%;
-          animation: pulse 2s ease-in-out infinite;
-        }
-
-        .loading-text {
-          margin-bottom: 1.5rem;
-        }
-
-        .loading-text p {
-          font-size: 18px;
-          font-weight: 600;
-          color: #374151;
-          margin: 0;
-        }
-
-        .loading-dots {
-          color: #C8932F;
-          font-weight: bold;
-        }
-
-        .loading-progress {
-          width: 100%;
-          max-width: 300px;
-          height: 8px;
-          background: #e5e7eb;
-          border-radius: 4px;
-          overflow: hidden;
-          margin-bottom: 1rem;
-        }
-
-        .progress-bar {
-          height: 100%;
-          background: linear-gradient(90deg, #C8932F, #b8832a);
-          border-radius: 4px;
-          animation: loading-bar 3s ease-in-out infinite;
-        }
-
-        .loading-message {
-          font-size: 14px;
-          color: #6b7280;
-          margin: 0;
-          font-style: italic;
-        }
-
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-
-        @keyframes pulse {
-          0%, 100% {
-            transform: scale(1);
-            opacity: 1;
-          }
-          50% {
-            transform: scale(1.1);
-            opacity: 0.3;
-          }
-        }
-
-        @keyframes loading-bar {
-          0% { width: 0%; }
-          25% { width: 30%; }
-          50% { width: 60%; }
-          75% { width: 85%; }
-          100% { width: 100%; }
-        }
-
-        /* Responsividade */
-        @media (max-width: 768px) {
-          .loading-content {
-            padding: 2rem 1rem;
-          }
-          
-          .spinner-ring,
-          .spinner-pulse {
-            width: 48px;
-            height: 48px;
-          }
-          
-          .loading-text p {
-            font-size: 16px;
-          }
-        }
-      `}</style>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };

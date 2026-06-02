@@ -5,6 +5,7 @@ import DocumentosAssociados from "../DocumentosAssociados";
 import InstrucoesTrabalho from "../InstrucoesTrabalho";
 import useRowContextMenu from "../ContextMenu/useRowContextMenu";
 import { parseFormattedText } from "../../utils/textFormatting";
+import { FaXmark } from "react-icons/fa6";
 import "./styleTemplates.css";
 
 export default function Template1({ 
@@ -39,7 +40,6 @@ export default function Template1({
   onAddRowObs,
   onDeleteRowObs,
   history = [],
-  clearHistory
 }) {
   const textAreaRefs = useRef({});
   
@@ -200,8 +200,8 @@ export default function Template1({
             />
           )
         )}
-        <PreviewPdfButton 
-          getTablesHtml={getTemplate1TablesHtml} 
+        <PreviewPdfButton
+          getTablesHtml={getTemplate1TablesHtml}
           pathFilename={pathFilename}
           history={history}
           templateType={templateType}
@@ -226,28 +226,30 @@ export default function Template1({
             cursor: 'pointer',
           }}
         />
+        {isEditable && setIsEditable && (
+          <button
+            onClick={() => setIsEditable(false)}
+            title="Cancelar Edição"
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: '50%',
+              border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '22px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+              cursor: 'pointer',
+              backgroundColor: '#e53935',
+              color: 'white',
+            }}
+          >
+            <FaXmark size={20} />
+          </button>
+        )}
       </div>
 
-      {/* Botão de debug para limpar histórico - só aparece quando está a editar */}
-      {isEditable && clearHistory && (
-        <button 
-          className="clear-history-button"
-          onClick={clearHistory}
-          title="Limpar histórico (Debug)"
-          style={{
-            backgroundColor: '#ff4444',
-            color: 'white',
-            border: 'none',
-            padding: '8px 12px',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            marginLeft: '10px'
-          }}
-        >
-          🗑️ Limpar Histórico
-        </button>
-      )}
 
       {/* Tabela de Observações */}
       <div ref={obsTableRef} className="primeira-tabela">

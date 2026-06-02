@@ -451,6 +451,7 @@ body {
   text-transform: uppercase; letter-spacing: 0.4px;
   display: flex; align-items: center; gap: 8px;
   color: #374151;
+  flex: 1;
 }
 
 .folder-name::before { content: "📁"; font-size: 15px; }
@@ -460,7 +461,6 @@ body {
 .folder-header::after {
   content: "▶"; color: #9ca3af; font-size: 11px;
   transition: transform 0.25s ease;
-  margin-left: auto;
 }
 
 .folder-header.active::after { transform: rotate(90deg); }
@@ -545,7 +545,7 @@ body {
 
 .folder-actions {
   display: flex !important; align-items: center !important;
-  gap: 10px !important; margin-left: auto !important;
+  gap: 10px !important;
 }
 
 /* ===== FAVORITOS E DROPDOWNS ===== */

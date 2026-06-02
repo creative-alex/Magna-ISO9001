@@ -1,6 +1,6 @@
 import React from "react";
-import Template1 from "../components/templates/TabelaTemplate1";
-import Template2 from "../components/templates/TabelaTemplate2";
+import Template1 from "../components/templates/tabelaProcedimento";
+import Template2 from "../components/templates/tabelaMatriz";
 import AIAssistant from "../components/AIAssistant/AIAssistant";
 
 export default function TabelaPdf({
@@ -58,7 +58,8 @@ export default function TabelaPdf({
   onDeleteIndicador,
   funcionarios = [], // Nova prop para funcionários
   history = [], // Nova prop para histórico
-  clearHistory // Nova prop para função de limpar histórico
+  clearHistory, // Nova prop para função de limpar histórico
+  onRenameFile, // Nova prop para renomear ficheiro (só template2 / superadmin)
 }) {
   const isTemplate2 = templateType === 2;
 
@@ -126,6 +127,7 @@ export default function TabelaPdf({
           onDeleteIndicador={handleDeleteIndicador}
           pathFilename={pathFilename}
           onSaveSuccess={onSaveSuccess}
+          onRenameFile={onRenameFile}
           history={history}
           clearHistory={clearHistory}
         />

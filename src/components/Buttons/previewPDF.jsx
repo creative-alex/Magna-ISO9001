@@ -1,5 +1,6 @@
 import React from "react";
 import { generateNonEditablePdfFromHtml, generateNonEditablePdfTemplate2 } from "../../utils/pdfGenerate";
+import { FaEye } from "react-icons/fa";
 
 export default function PreviewPdfButton({ 
   getTablesHtml, 
@@ -98,7 +99,7 @@ export default function PreviewPdfButton({
       }
       title="Visualizar PDF"
     >
-      
+      <FaEye size={20} />
     </button>
   );
 }

@@ -3,7 +3,7 @@ import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { UserContext } from "../context/userContext";
 import AIAssistant from "./AIAssistant/AIAssistant";
 import TabelaPdf from "../pages/tableDisplay";
-import Template1 from "./templates/TabelaTemplate1";
+import Template1 from "./templates/tabelaProcedimento";
 import ExportPdfButton from "./Buttons/exportPdf";
 import PreviewPdfButton from "./Buttons/previewPDF";
 import LoadingPage from "../pages/loading";
@@ -204,24 +204,22 @@ const [newFilename, setNewFilename] = useState("");
 const [isSavingFilename, setIsSavingFilename] = useState(false);
 
 // Função para renomear ficheiro (apenas superadmin)
-const handleRenameFile = async () => {
-  if (!newFilename.trim() || !isSuperAdmin) {
+const handleRenameFile = async (nameParam) => {
+  const targetName = (nameParam !== undefined ? nameParam : newFilename).trim();
+  if (!targetName || !isSuperAdmin) {
     alert("Nome do ficheiro não pode estar vazio ou não tem permissões suficientes.");
     return;
   }
 
-  console.log("Renomeando ficheiro de", originalFilename, "para", newFilename.trim());
-  
   setIsSavingFilename(true);
 
-  
   try {
     const response = await fetch("https://api-iso-9001.onrender.com/files/rename-file", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         oldFilename: originalFilename,
-        newFilename: newFilename.trim()
+        newFilename: targetName
       }),
     });
 
@@ -230,26 +228,21 @@ const handleRenameFile = async () => {
       throw new Error(errorData.message || "Erro ao renomear ficheiro");
     }
 
-    const result = await response.json();
-    
-    // Adiciona entrada no histórico
-    addHistoryEntry('Renomeou', `Ficheiro renomeado`, originalFilename, newFilename.trim());
-    
-    // Atualiza a URL e navega para o novo nome
-    const encodedNewFilename = newFilename.trim().replace(/\//g, '__').replace(/ /g, '-');
-    
+    addHistoryEntry('Renomeou', `Ficheiro renomeado`, originalFilename, targetName);
+
+    const encodedNewFilename = targetName.replace(/\//g, '__').replace(/ /g, '-');
+
     alert("Ficheiro renomeado com sucesso!");
-    
-    // Navega para a nova URL
+
     navigate(`/editor/${encodeURIComponent(encodedNewFilename)}`, {
-      state: { 
-        originalFilename: newFilename.trim(),
+      state: {
+        originalFilename: targetName,
         canEdit: canEditFromState,
         isSuperAdmin: isSuperAdminFromState
       },
       replace: true
     });
-    
+
   } catch (error) {
     console.error("Erro ao renomear ficheiro:", error);
     alert(`Erro ao renomear ficheiro: ${error.message}`);
@@ -1275,132 +1268,6 @@ useEffect(() => {
   
   return (
     <div>
-      {/* Seção para mostrar/editar nome do ficheiro (apenas para superadmin) */}
-      {isSuperAdmin ? (
-        <div style={{ 
-          marginBottom: '15px', 
-          padding: '10px', 
-          backgroundColor: '#f8f9fa', 
-          border: '1px solid #dee2e6', 
-          borderRadius: '5px' 
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, marginRight: '10px' }}>
-              <strong>Ficheiro: </strong>
-              {!isEditingFilename ? (
-                <span style={{ fontSize: '16px' }}>{originalFilename}</span>
-              ) : (
-                <input
-                  type="text"
-                  value={newFilename}
-                  onChange={(e) => setNewFilename(e.target.value)}
-                  style={{
-                    padding: '5px 8px',
-                    border: '1px solid #ccc',
-                    borderRadius: '3px',
-                    fontSize: '16px',
-                    width: '100%',
-                    maxWidth: '500px'
-                  }}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      handleRenameFile();
-                    }
-                    if (e.key === 'Escape') {
-                      cancelEditingFilename();
-                    }
-                  }}
-                  autoFocus
-                />
-              )}
-            </div>
-            
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              {!isEditingFilename ? (
-                <button
-                  onClick={startEditingFilename}
-                  style={{
-                    padding: '6px 12px',
-                    backgroundColor: '#007bff',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '14px'
-                  }}
-                  title="Renomear ficheiro"
-                >
-                  ✏️ Renomear
-                </button>
-              ) : (
-                <>
-                  <button
-                    onClick={handleRenameFile}
-                    disabled={isSavingFilename || !newFilename.trim()}
-                    style={{
-                      padding: '6px 12px',
-                      backgroundColor: isSavingFilename ? '#6c757d' : '#28a745',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: isSavingFilename ? 'not-allowed' : 'pointer',
-                      fontSize: '14px'
-                    }}
-                  >
-                    {isSavingFilename ? '💾 A guardar...' : '✅ Confirmar'}
-                  </button>
-                  <button
-                    onClick={cancelEditingFilename}
-                    disabled={isSavingFilename}
-                    style={{
-                      padding: '6px 12px',
-                      backgroundColor: '#dc3545',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: isSavingFilename ? 'not-allowed' : 'pointer',
-                      fontSize: '14px'
-                    }}
-                  >
-                    ❌ Cancelar
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-          
-          {isEditingFilename && (
-            <div style={{ 
-              marginTop: '8px', 
-              fontSize: '12px', 
-              color: '#6c757d' 
-            }}>
-              💡 <strong>Dica:</strong> Pressione Enter para confirmar ou Escape para cancelar
-            </div>
-          )}
-        </div>
-      ) : (
-        /* Versão simplificada para utilizadores normais - apenas mostra o nome sem opção de editar */
-        <div style={{ 
-          marginBottom: '15px', 
-          padding: '10px', 
-          backgroundColor: '#f8f9fa', 
-          border: '1px solid #dee2e6', 
-          borderRadius: '5px' 
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <strong>Ficheiro: </strong>
-            <span style={{ fontSize: '16px', marginLeft: '8px' }}>{originalFilename}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Botão para cancelar o modo edição */}
-      {isEditable && (
-        <button onClick={() => setIsEditable(false)} style={{ marginBottom: '10px', backgroundColor: 'red', color: 'white', padding: '5px 10px', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
-          Cancelar Edição
-        </button>
-      )}
       {isTemplate2 ? (
         <>
           <TabelaPdf
@@ -1437,6 +1304,7 @@ useEffect(() => {
             onDeleteIndicador={handleDeleteIndicador}
             pathFilename={originalFilename}
             onSaveSuccess={handleSave}
+            onRenameFile={isSuperAdmin ? handleRenameFile : undefined}
             history={history}
             clearHistory={clearHistory}
             handleChange={

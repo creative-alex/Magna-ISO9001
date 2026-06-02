@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { generateEditablePdf } from "../../utils/pdfGenerate";
+import { FaFloppyDisk } from "react-icons/fa6";
 
 export default function ExportPdfButton({
   templateType = 1,
@@ -237,7 +238,8 @@ export default function ExportPdfButton({
         padding: 0
       }}
       title="Guardar Mudanças"
-    >      
+    >
+      <FaFloppyDisk size={20} />
     </button>
   );
 }
