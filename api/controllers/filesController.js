@@ -29,7 +29,7 @@ const uploadPdf = async (req, res) => {
     }
 
     const folders = req.body.folders ? JSON.parse(req.body.folders) : [];
-    const filename = req.body.filename || req.file.originalname;
+    const filename = req.body.filename || Buffer.from(req.file.originalname, 'latin1').toString('utf8');
     const filePath = [...folders, filename].join("/");
 
     const blob = bucket.file(filePath);
@@ -531,7 +531,7 @@ const uploadDocument = async (req, res) => {
     console.log("Tamanho:", req.file.size);
 
     const folderPath = req.body.folderPath || '';
-    const filename = req.file.originalname;
+    const filename = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
     const filePath = folderPath + filename;
     
     console.log("Caminho completo do ficheiro:", filePath);
@@ -563,7 +563,7 @@ const uploadDocument = async (req, res) => {
 const deleteFile = async (req, res) => {
   try {
     console.log("deleteFile chamado");
-    const { filePath } = req.params;
+    const filePath = req.params.filePath;
     
     if (!filePath) {
       console.log("FilePath não fornecido");
@@ -599,7 +599,7 @@ const deleteFile = async (req, res) => {
 const downloadFile = async (req, res) => {
   try {
     console.log("downloadFile chamado");
-    const { filePath } = req.params;
+    const filePath = req.params.filePath;
     
     if (!filePath) {
       console.log("FilePath não fornecido");
@@ -641,7 +641,7 @@ const downloadFile = async (req, res) => {
 const previewFile = async (req, res) => {
   try {
     console.log("previewFile chamado");
-    const { filePath } = req.params;
+    const filePath = req.params.filePath;
     
     if (!filePath) {
       console.log("FilePath não fornecido");

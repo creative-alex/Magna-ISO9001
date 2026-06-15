@@ -199,6 +199,52 @@ const getAllUsers = async (req, res) => {
 };
 
 
+const getFavorites = async (req, res) => {
+  try {
+    const { username } = req.params;
+    const snapshot = await db.collection('users').where('nome', '==', username).get();
+    if (snapshot.empty) return res.json([]);
+    const userData = snapshot.docs[0].data();
+    return res.json(userData.favorites || []);
+  } catch (error) {
+    console.error('Erro ao buscar favoritos:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+};
+
+const updateFavorite = async (req, res) => {
+  try {
+    const { username, filePath, fileName, action } = req.body;
+    if (!username || !filePath || !action) {
+      return res.status(400).json({ error: 'username, filePath e action são obrigatórios' });
+    }
+
+    const snapshot = await db.collection('users').where('nome', '==', username).get();
+    if (snapshot.empty) return res.status(404).json({ error: 'Utilizador não encontrado' });
+
+    const userDocRef = snapshot.docs[0].ref;
+    const favorites = snapshot.docs[0].data().favorites || [];
+
+    let updatedFavorites;
+    if (action === 'add') {
+      if (favorites.some(f => (f.path || f.filePath) === filePath)) {
+        return res.json({ message: 'Já está nos favoritos' });
+      }
+      updatedFavorites = [...favorites, { path: filePath, name: fileName || filePath.split('/').pop().replace('.pdf', '') }];
+    } else if (action === 'remove') {
+      updatedFavorites = favorites.filter(f => (f.path || f.filePath) !== filePath);
+    } else {
+      return res.status(400).json({ error: 'Action deve ser "add" ou "remove"' });
+    }
+
+    await userDocRef.update({ favorites: updatedFavorites });
+    return res.json({ favorites: updatedFavorites });
+  } catch (error) {
+    console.error('Erro ao atualizar favoritos:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+};
+
 module.exports = {
-  verifyTokenAndGetUserInfo, createUser, getAllUsers
+  verifyTokenAndGetUserInfo, createUser, getAllUsers, getFavorites, updateFavorite
 };

@@ -70,7 +70,7 @@ const savePdfOnly = async (req, res) => {
     
     // Obter dados do formulário
     const folders = req.body.folders ? JSON.parse(req.body.folders) : [];
-    const filename = req.body.filename || req.file.originalname;
+    const filename = req.body.filename || Buffer.from(req.file.originalname, 'latin1').toString('utf8');
     const filePath = [...folders, filename].join("/");
     
     // Conectar ao Firebase Storage
