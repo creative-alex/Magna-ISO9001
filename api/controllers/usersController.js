@@ -10,28 +10,43 @@ const verifyTokenAndGetUserInfo = async (req, res) => {
       return res.status(400).json({ message: 'Token não fornecido' });
     }
 
+    console.log('📍 Iniciando verificação de token...');
+    console.log('📍 Token recebido (primeiros 50 chars):', token.substring(0, 50) + '...');
+
     // Verifica o token e obtém o utilizador do Firebase Auth
+    console.log('📍 Tentando verificar token com Firebase...');
     const decodedToken = await admin.auth().verifyIdToken(token);
+    console.log('✅ Token verificado com sucesso. UID:', decodedToken.uid);
+    
+    console.log('📍 Buscando dados do usuário no Firebase Auth...');
     const userRecord = await admin.auth().getUser(decodedToken.uid);
+    console.log('✅ Dados do usuário obtidos do Auth. Email:', userRecord.email);
 
     // Busca informações adicionais do utilizador no Firestore
     // Primeiro tenta buscar por UID (documento)
+    console.log('📍 Buscando dados adicionais no Firestore...');
     let userDoc = await db.collection('users').doc(decodedToken.uid).get();
     let userData = {};
     
     if (userDoc.exists) {
       userData = userDoc.data();
+      console.log('✅ Dados encontrados no Firestore por UID');
     } else {
       // Se não encontrar por UID, tenta buscar por email (compatibilidade com dados antigos)
+      console.log('📍 Não encontrado por UID, tentando buscar por email...');
       const querySnapshot = await db.collection('users').where('email', '==', userRecord.email).get();
       if (!querySnapshot.empty) {
         userData = querySnapshot.docs[0].data();
+        console.log('✅ Dados encontrados no Firestore por email');
+      } else {
+        console.log('⚠️ Nenhum dado adicional encontrado no Firestore');
       }
     }
 
     const isSuperAdmin = userData.role === "SuperAdmin" || userData.role === "superadmin";
+    console.log('📍 Role do usuário:', userData.role || 'user');
 
-    res.json({
+    const responseData = {
       message: 'Token válido',
       uid: decodedToken.uid,
       email: decodedToken.email,
@@ -39,7 +54,10 @@ const verifyTokenAndGetUserInfo = async (req, res) => {
       role: userData.role || 'user',
       nome: userData.nome || userRecord.displayName || 'N/A',
       isFirstLogin: isSuperAdmin ? false : (userData.isFirstLogin ?? true),
-    });
+    };
+
+    console.log('✅ Retornando dados do usuário:', JSON.stringify(responseData, null, 2));
+    res.json(responseData);
 
   } catch (error) {
     console.error('Erro ao verificar token e buscar user:', error);
@@ -198,6 +216,96 @@ const getAllUsers = async (req, res) => {
   }
 };
 
+const updateFirstLogin = async (req, res) => {
+  try {
+    const { userEmail, newPassword, isFirstLogin } = req.body;
+
+    // Validação básica
+    if (!userEmail) {
+      return res.status(400).json({ error: 'Email do usuário é obrigatório' });
+    }
+
+    if (!newPassword) {
+      return res.status(400).json({ error: 'Nova senha é obrigatória' });
+    }
+
+    console.log('📍 Iniciando atualização de primeiro login para:', userEmail);
+
+    // Buscar usuário no Firebase Auth pelo email
+    let userRecord;
+    try {
+      userRecord = await admin.auth().getUserByEmail(userEmail);
+      console.log('✅ Usuário encontrado no Auth. UID:', userRecord.uid);
+    } catch (authError) {
+      console.error('❌ Usuário não encontrado no Auth:', authError);
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+
+    // Atualizar senha no Firebase Auth
+    try {
+      await admin.auth().updateUser(userRecord.uid, {
+        password: newPassword
+      });
+      console.log('✅ Senha atualizada no Firebase Auth');
+    } catch (passwordError) {
+      console.error('❌ Erro ao atualizar senha:', passwordError);
+      return res.status(500).json({ error: 'Erro ao atualizar senha' });
+    }
+
+    // Atualizar isFirstLogin no Firestore
+    try {
+      // Primeiro tenta buscar por UID (documento)
+      let userDocRef = db.collection('users').doc(userRecord.uid);
+      let userDoc = await userDocRef.get();
+      
+      if (userDoc.exists) {
+        // Atualiza documento existente por UID
+        await userDocRef.update({
+          isFirstLogin: isFirstLogin !== undefined ? isFirstLogin : false,
+          lastPasswordChange: admin.firestore.FieldValue.serverTimestamp()
+        });
+        console.log('✅ isFirstLogin atualizado no Firestore (por UID)');
+      } else {
+        // Se não encontrar por UID, tenta buscar por email (compatibilidade)
+        const querySnapshot = await db.collection('users').where('email', '==', userEmail).get();
+        if (!querySnapshot.empty) {
+          const docRef = querySnapshot.docs[0].ref;
+          await docRef.update({
+            isFirstLogin: isFirstLogin !== undefined ? isFirstLogin : false,
+            lastPasswordChange: admin.firestore.FieldValue.serverTimestamp()
+          });
+          console.log('✅ isFirstLogin atualizado no Firestore (por email)');
+        } else {
+          // Se não existe no Firestore, criar documento
+          await userDocRef.set({
+            email: userEmail,
+            nome: userRecord.displayName || 'N/A',
+            role: 'user',
+            isFirstLogin: isFirstLogin !== undefined ? isFirstLogin : false,
+            lastPasswordChange: admin.firestore.FieldValue.serverTimestamp(),
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+          console.log('✅ Documento criado no Firestore com isFirstLogin atualizado');
+        }
+      }
+    } catch (firestoreError) {
+      console.error('❌ Erro ao atualizar Firestore:', firestoreError);
+      return res.status(500).json({ error: 'Erro ao atualizar dados do usuário' });
+    }
+
+    console.log('✅ Primeiro login atualizado com sucesso para:', userEmail);
+    res.json({ 
+      message: 'Primeiro login e senha atualizados com sucesso',
+      email: userEmail,
+      isFirstLogin: isFirstLogin !== undefined ? isFirstLogin : false
+    });
+
+  } catch (error) {
+    console.error('❌ Erro geral ao atualizar primeiro login:', error);
+    res.status(500).json({ error: 'Erro interno do servidor', details: error.message });
+  }
+};
+
 
 const getFavorites = async (req, res) => {
   try {
@@ -246,5 +354,5 @@ const updateFavorite = async (req, res) => {
 };
 
 module.exports = {
-  verifyTokenAndGetUserInfo, createUser, getAllUsers, getFavorites, updateFavorite
+  verifyTokenAndGetUserInfo, createUser, getAllUsers, getFavorites, updateFavorite, updateFirstLogin
 };

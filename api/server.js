@@ -22,5 +22,5 @@ app.use("/files", pdfRoute);
 app.use("/api/assistant", assistantRoute);
 
 
-const PORT = 8080;
+const PORT = 1080;
 app.listen(PORT, '0.0.0.0', () => console.log(`Servidor rodando na porta ${PORT}`));
