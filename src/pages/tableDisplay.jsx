@@ -60,6 +60,8 @@ export default function TabelaPdf({
   history = [], // Nova prop para histórico
   clearHistory, // Nova prop para função de limpar histórico
   onRenameFile, // Nova prop para renomear ficheiro (só template2 / superadmin)
+  initialMergedSpans, // Nova prop: união de células recuperada da API
+  initialHiddenCells, // Nova prop: união de células recuperada da API
 }) {
   const isTemplate2 = templateType === 2;
 
@@ -130,6 +132,8 @@ export default function TabelaPdf({
           onRenameFile={onRenameFile}
           history={history}
           clearHistory={clearHistory}
+          initialMergedSpans={initialMergedSpans}
+          initialHiddenCells={initialHiddenCells}
         />
       ) : (
         <Template1

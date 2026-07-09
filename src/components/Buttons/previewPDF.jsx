@@ -76,27 +76,10 @@ export default function PreviewPdfButton({
     }
   };
 
-  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 600;
   return (
     <button
-      className="preview-button"
+      className="w-11 h-11 rounded-full bg-[#388e3c] text-white border-0 flex items-center justify-center text-[22px] shadow-[0_2px_8px_rgba(0,0,0,0.10)] cursor-pointer p-0 transition-colors duration-200 hover:bg-[#2e7d32]"
       onClick={handlePreviewNonEditable}
-      style={{
-        width: 44,
-        height: 44,
-        borderRadius: '50%',
-        backgroundColor: '#388e3c',
-        color: 'white',
-        border: 'none',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: '22px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
-        cursor: 'pointer',
-        padding: 0
-      }
-      }
       title="Visualizar PDF"
     >
       <FaEye size={20} />

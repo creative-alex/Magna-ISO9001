@@ -5,23 +5,22 @@ import DocumentosAssociados from "../DocumentosAssociados";
 import InstrucoesTrabalho from "../InstrucoesTrabalho";
 import useRowContextMenu from "../ContextMenu/useRowContextMenu";
 import { parseFormattedText } from "../../utils/textFormatting";
-import { FaXmark } from "react-icons/fa6";
-import "./styleTemplates.css";
+import { FaXmark, FaArrowLeft, FaPencil } from "react-icons/fa6";
 
-export default function Template1({ 
-  isEditable = false, 
-  setIsEditable, 
-  canEdit = true, 
+export default function Template1({
+  isEditable = false,
+  setIsEditable,
+  canEdit = true,
   data = [["", "", "", "", ""]],
   dataObs = [[""]],
-  handleChange, 
-  handleChangeObs, 
+  handleChange,
+  handleChangeObs,
   templateType = 1,
   servicosEntrada = "",
   servicoSaida = "",
   setServicosEntrada,
   setServicoSaida,
-  originalFilename, 
+  originalFilename,
   atividades,
   donoProcesso,
   objetivoProcesso,
@@ -42,7 +41,7 @@ export default function Template1({
   history = [],
 }) {
   const textAreaRefs = useRef({});
-  
+
   const contextMenu = useRowContextMenu({
     totalRows: data.length,
     onMoveRowUp,
@@ -91,7 +90,7 @@ export default function Template1({
     if (mainTableRef && mainTableRef.current) {
       // Clone da tabela principal
       const mainTableClone = mainTableRef.current.cloneNode(true);
-      
+
       // Substitui o conteúdo das células dos componentes especiais pelos valores reais
       const bodyRows = mainTableClone.querySelectorAll('tbody tr');
       bodyRows.forEach((row, rowIdx) => {
@@ -99,7 +98,7 @@ export default function Template1({
         cells.forEach((cell, colIdx) => {
           // Aplica formatação a todas as colunas
           const value = data[rowIdx] ? data[rowIdx][colIdx] : '';
-          
+
           // Coluna 3 - Documentos Associados
           if (colIdx === 3) {
             console.log(`🔍 DEBUG Template1 - Linha ${rowIdx}, Coluna ${colIdx} (Documentos):`, value);
@@ -116,7 +115,7 @@ export default function Template1({
           }
         });
       });
-      
+
       mainTableHtml = mainTableClone.outerHTML;
     }
 
@@ -124,17 +123,27 @@ export default function Template1({
       obsTableHtml = obsTableRef.current.outerHTML;
     }
 
-    return { 
-      mainTableHtml, 
-      obsTableHtml 
+    return {
+      mainTableHtml,
+      obsTableHtml
     };
   };
 
+  // Tailwind classes reused across table cells/textareas
+  const cellClass = "p-0 bg-[inherit] relative h-auto overflow-hidden break-words w-full max-w-full box-border border border-gray-200 align-top text-[14px]";
+  const textareaClass = "w-full h-full border-0 bg-transparent px-3 py-2 font-[inherit] text-[14px] text-gray-700 leading-[1.3] resize-none overflow-hidden break-words min-h-8 max-w-full box-border block whitespace-pre-wrap m-0 focus:outline-none focus:bg-white focus:shadow-[inset_0_0_0_2px_#C8932F] focus:rounded placeholder:text-gray-400 placeholder:italic";
+  const headerClass = "bg-[#C8932F] text-white px-5 py-4 font-bold uppercase text-[11px] border-0 tracking-[0.8px] text-center border-b-[3px] border-b-[#b8832a] shadow-[inset_0_-2px_4px_rgba(0,0,0,0.1)] relative";
+  const rowClass = "transition-colors duration-200 border-b border-gray-200 hover:bg-gray-50 even:bg-[#fafbfc] even:hover:bg-gray-100";
+  const sectionHeaderClass = "font-bold p-[5px] bg-gray-50 border border-gray-200 text-left";
 
   return (
-    <div className="template1-container" style={{alignItems: 'flex-start'}}>
-      <div className="template1-header">
-        <h2>
+    <div
+      className="flex flex-col items-center justify-start p-10 w-[80vw] max-w-full mx-auto bg-white rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.08)] border border-gray-200 overflow-visible"
+      style={{ alignItems: 'flex-start' }}
+    >
+      {/* Header */}
+      <div className="text-left m-0 p-0 w-full self-start flex justify-between items-center mb-4">
+        <h2 className="text-[1.6rem] font-bold text-gray-900 m-0">
           {Title.map((line, index) => (
             <React.Fragment key={index}>
               {line}
@@ -146,18 +155,18 @@ export default function Template1({
         <button
           onClick={() => history && history.length > 0 ? window.history.back() : null}
           title="Voltar à página anterior"
-          className="back-button"
+          className="text-orange-500 border-0 bg-transparent cursor-pointer mr-2.5 inline-flex items-center gap-[5px] text-base max-md:hidden"
         >
-          <span className="back-arrow">←</span>
-          <span className="back-text">Retroceder</span>
+          <FaArrowLeft size={14} />
+          <span>Retroceder</span>
         </button>
       </div>
+
       {/* Action buttons sempre fixos no canto inferior direito */}
       <div style={{ position: 'fixed', bottom: 90, right: 20, zIndex: 1001, display: 'flex', gap: '12px' }}>
         {setIsEditable && canEdit && (
           !isEditable ? (
             <button
-              className="edit-button"
               onClick={() => setIsEditable(true)}
               title="Ativar modo de edição"
               style={{
@@ -175,7 +184,7 @@ export default function Template1({
                 cursor: 'pointer',
               }}
             >
-              ✏️
+              <FaPencil size={18} />
             </button>
           ) : (
             <ExportPdfButton
@@ -252,23 +261,23 @@ export default function Template1({
 
 
       {/* Tabela de Observações */}
-      <div ref={obsTableRef} className="primeira-tabela">
-        <table className="editable-table tabela-observacoes" border="1" cellPadding={4}>
+      <div ref={obsTableRef} className="mb-5 rounded-md border border-gray-200 shadow-[0_2px_8px_rgba(0,0,0,0.06)] w-full overflow-x-auto">
+        <table className="w-full border-collapse font-sans bg-white table-fixed min-w-full break-words" border="1" cellPadding={4}>
           <thead>
             <tr>
-              <th className="editable-table-header">Seções do Documento</th>
+              <th className={headerClass}>Seções do Documento</th>
             </tr>
           </thead>
           <tbody>
             {/* Objetivos */}
-            <tr className="editable-table-row">
-              <th className="section-header">1. Objetivos:</th>
+            <tr className={rowClass}>
+              <th className={sectionHeaderClass}>1. Objetivos:</th>
             </tr>
-            <tr className="editable-table-row">
-              <td className="editable-table-cell">
+            <tr className={rowClass}>
+              <td className={cellClass}>
                 <textarea
                   ref={el => textAreaRefs.current[`obj-0-0`] = el}
-                  className="editable-table-textarea tabela-observacoes-textarea"
+                  className={`${textareaClass} min-h-[45px]`}
                   value={dataObs[0] ? dataObs[0][0] : ''}
                   onChange={e => handleChangeObs(0, 0, e.target.value)}
                   onInput={handleTextareaResize}
@@ -277,16 +286,16 @@ export default function Template1({
                 />
               </td>
             </tr>
-            
+
             {/* Campo de Aplicação */}
-            <tr className="editable-table-row">
-              <th className="section-header">2. Campo de Aplicação:</th>
+            <tr className={rowClass}>
+              <th className={sectionHeaderClass}>2. Campo de Aplicação:</th>
             </tr>
-            <tr className="editable-table-row">
-              <td className="editable-table-cell">
+            <tr className={rowClass}>
+              <td className={cellClass}>
                 <textarea
                   ref={el => textAreaRefs.current[`campo-1-0`] = el}
-                  className="editable-table-textarea tabela-observacoes-textarea"
+                  className={`${textareaClass} min-h-[45px]`}
                   value={dataObs[1] ? dataObs[1][0] : ''}
                   onChange={e => handleChangeObs(1, 0, e.target.value)}
                   onInput={handleTextareaResize}
@@ -297,14 +306,14 @@ export default function Template1({
             </tr>
 
             {/* Definições */}
-            <tr className="editable-table-row">
-              <th className="section-header">3. Definições:</th>
+            <tr className={rowClass}>
+              <th className={sectionHeaderClass}>3. Definições:</th>
             </tr>
-            <tr className="editable-table-row">
-              <td className="editable-table-cell">
+            <tr className={rowClass}>
+              <td className={cellClass}>
                 <textarea
                   ref={el => textAreaRefs.current[`def-2-0`] = el}
-                  className="editable-table-textarea tabela-observacoes-textarea"
+                  className={`${textareaClass} min-h-[45px]`}
                   value={dataObs[2] ? dataObs[2][0] : ''}
                   onChange={e => handleChangeObs(2, 0, e.target.value)}
                   onInput={handleTextareaResize}
@@ -315,14 +324,14 @@ export default function Template1({
             </tr>
 
             {/* Abreviaturas */}
-            <tr className="editable-table-row">
-              <th className="section-header">4. Abreviaturas:</th>
+            <tr className={rowClass}>
+              <th className={sectionHeaderClass}>4. Abreviaturas:</th>
             </tr>
-            <tr className="editable-table-row">
-              <td className="editable-table-cell">
+            <tr className={rowClass}>
+              <td className={cellClass}>
                 <textarea
                   ref={el => textAreaRefs.current[`abrev-3-0`] = el}
-                  className="editable-table-textarea tabela-observacoes-textarea"
+                  className={`${textareaClass} min-h-[45px]`}
                   value={dataObs[3] ? dataObs[3][0] : ''}
                   onChange={e => handleChangeObs(3, 0, e.target.value)}
                   onInput={handleTextareaResize}
@@ -333,14 +342,14 @@ export default function Template1({
             </tr>
 
             {/* Observações */}
-            <tr className="editable-table-row">
-              <th className="section-header">5. Observações:</th>
+            <tr className={rowClass}>
+              <th className={sectionHeaderClass}>5. Observações:</th>
             </tr>
-            <tr className="editable-table-row">
-              <td className="editable-table-cell">
+            <tr className={rowClass}>
+              <td className={cellClass}>
                 <textarea
                   ref={el => textAreaRefs.current[`obs-4-0`] = el}
-                  className="editable-table-textarea tabela-observacoes-textarea"
+                  className={`${textareaClass} min-h-[45px]`}
                   value={dataObs[4] ? dataObs[4][0] : ''}
                   onChange={e => handleChangeObs(4, 0, e.target.value)}
                   onInput={handleTextareaResize}
@@ -354,22 +363,22 @@ export default function Template1({
       </div>
 
       {/* Tabela Principal */}
-      <div ref={mainTableRef} className="segunda-tabela">
-        <table className="editable-table tabela-principal" border="1" cellPadding={4}>
+      <div ref={mainTableRef} className="mb-5 rounded-md border border-gray-200 shadow-[0_2px_8px_rgba(0,0,0,0.06)] w-full overflow-x-auto">
+        <table className="w-full border-collapse font-sans bg-white table-fixed min-w-full break-words" border="1" cellPadding={4}>
           <thead>
             <tr>
-              <th className="editable-table-header col-fluxo">Fluxo<br />das Ações</th>
-              <th className="editable-table-header col-descricao">Descrição</th>
-              <th className="editable-table-header col-responsavel">Responsável</th>
-              <th className="editable-table-header col-documentos">Documentos<br/>Associados</th>
-              <th className="editable-table-header col-instrucoes">Instruções<br/>de Trabalho</th>
+              <th className={`${headerClass} w-[12%] min-w-[90px]`}>Fluxo<br />das Ações</th>
+              <th className={`${headerClass} w-[40%] min-w-[300px]`}>Descrição</th>
+              <th className={`${headerClass} w-[16%] min-w-[120px]`}>Responsável</th>
+              <th className={`${headerClass} w-[7%] min-w-[120px]`}>Documentos<br/>Associados</th>
+              <th className={`${headerClass} w-[7%] min-w-[120px]`}>Instruções<br/>de Trabalho</th>
             </tr>
           </thead>
           <tbody>
             {data.map((row, rowIdx) => (
-              <tr 
-                key={rowIdx} 
-                className="editable-table-row"
+              <tr
+                key={rowIdx}
+                className={rowClass}
                 onContextMenu={isEditable ? (e) => contextMenu.handleContextMenuEvent(e, rowIdx) : undefined}
               >
                 {row.map((cell, colIdx) => {
@@ -383,7 +392,7 @@ export default function Template1({
                   return (
                     <td
                       key={colIdx}
-                      className={`editable-table-cell col-${["fluxo","descricao","responsavel","documentos","instrucoes"][colIdx]}`}
+                      className={cellClass}
                       data-label={dataLabels[colIdx]}
                     >
                       {colIdx === 3 ? (
@@ -405,7 +414,7 @@ export default function Template1({
                       ) : (
                         <textarea
                           ref={el => textAreaRefs.current[`main-${rowIdx}-${colIdx}`] = el}
-                          className="editable-table-textarea tabela-principal-textarea"
+                          className={`${textareaClass} min-h-[35px]`}
                           value={cell}
                           onChange={e => handleChange(rowIdx, colIdx, e.target.value)}
                           onInput={handleTextareaResize}
@@ -427,7 +436,7 @@ export default function Template1({
           </tbody>
         </table>
       </div>
-      <p style={{ fontSize: '12px', color: '#666', fontStyle: 'italic', marginTop: '-15px', marginBottom: '15px' }}>
+      <p className="text-[12px] text-gray-500 italic mt-[-15px] mb-[15px]">
         Clique com o botão direito para adicionar, mover ou remover uma linha.
       </p>
 
@@ -436,10 +445,10 @@ export default function Template1({
 
       {/* DEBUG: Mostrar tabela de histórico visível na interface */}
       {history && history.length > 0 && (
-        <div style={{ 
-          margin: '20px 0', 
-          padding: '15px', 
-          border: '2px solid #007bff', 
+        <div style={{
+          margin: '20px 0',
+          padding: '15px',
+          border: '2px solid #007bff',
           borderRadius: '8px',
           backgroundColor: '#f8f9fa',
           display: 'none'
@@ -448,8 +457,8 @@ export default function Template1({
             🔍 DEBUG - Histórico de Alterações ({history.length} entradas)
           </h3>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ 
-              width: '100%', 
+            <table style={{
+              width: '100%',
               borderCollapse: 'collapse',
               fontSize: '12px'
             }}>
@@ -473,9 +482,9 @@ export default function Template1({
                     <td style={{ padding: '6px', border: '1px solid #ddd', fontSize: '11px' }}>
                       {entry.acao || 'N/A'}
                     </td>
-                    <td style={{ 
-                      padding: '6px', 
-                      border: '1px solid #ddd', 
+                    <td style={{
+                      padding: '6px',
+                      border: '1px solid #ddd',
                       fontSize: '11px',
                       maxWidth: '300px',
                       wordWrap: 'break-word'
@@ -492,10 +501,10 @@ export default function Template1({
 
       {/* Se não há histórico, mostrar aviso de debug */}
       {(!history || history.length === 0) && (
-        <div style={{ 
-          margin: '20px 0', 
-          padding: '15px', 
-          border: '2px solid #dc3545', 
+        <div style={{
+          margin: '20px 0',
+          padding: '15px',
+          border: '2px solid #dc3545',
           borderRadius: '8px',
           backgroundColor: '#f8d7da',
           color: '#721c24'

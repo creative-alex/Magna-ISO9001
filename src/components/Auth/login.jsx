@@ -3,13 +3,10 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { UserContext } from "../../context/userContext";
-import LoadingPage from "../../pages/loading";
-import FirstLoginComponent from "./firstLogin";
 import Logo from "../../logo.svg";
-import { API_CONFIG } from "../../utils/constants";
-import Ver from "../../icons/ver.ico";
+import { FaEye, FaEyeSlash, FaCircleExclamation } from "react-icons/fa6";
 
-const Login = ({onLoginSuccess}) => {
+const Login = ({ onLoginSuccess }) => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
@@ -18,36 +15,31 @@ const Login = ({onLoginSuccess}) => {
     const navigate = useNavigate();
     const location = useLocation();
     const { auth, isAuthenticated, setUserEmail } = useContext(UserContext);
-    const hasShownToast = useRef(false); // Prevenir múltiplos toasts
-    const isLoginInProgress = useRef(false); // Prevenir re-execução do login
-    
-    // Função para traduzir erros do Firebase para mensagens amigáveis
-    const getFirebaseErrorMessage = (error) => {
-        const errorCode = error.code;
-        
-        switch (errorCode) {
+    const hasShownToast = useRef(false);
+    const isLoginInProgress = useRef(false);
+
+    const getFirebaseErrorMessage = (err) => {
+        switch (err.code) {
             case 'auth/invalid-credential':
-                return 'Email ou senha incorretos. Verifique os seus dados e tente novamente.';
+            case 'auth/invalid-login-credentials':
+                return 'Email ou senha incorretos. Verifique os seus dados.';
             case 'auth/user-not-found':
                 return 'Não existe uma conta associada a este email.';
             case 'auth/wrong-password':
-                return 'Senha incorreta. Verifique a sua senha e tente novamente.';
+                return 'Senha incorreta. Verifique a sua senha.';
             case 'auth/invalid-email':
                 return 'O formato do email não é válido.';
             case 'auth/user-disabled':
                 return 'Esta conta foi desactivada. Contacte o administrador.';
             case 'auth/too-many-requests':
-                return 'Muitas tentativas de login falhadas. Tente novamente mais tarde.';
+                return 'Muitas tentativas falhadas. Tente novamente mais tarde.';
             case 'auth/network-request-failed':
-                return 'Erro de conexão. Verifique a sua ligação à internet.';
-            case 'auth/invalid-login-credentials':
-                return 'Credenciais de login inválidas. Verifique o email e senha.';
+                return 'Erro de ligação. Verifique a sua internet.';
             default:
-                return 'Erro ao fazer login. Verifique os seus dados e tente novamente.';
+                return 'Erro ao fazer login. Verifique os seus dados.';
         }
     };
-    
-    // Reset do componente quando o user faz logout
+
     useEffect(() => {
         if (!isAuthenticated) {
             hasShownToast.current = false;
@@ -61,154 +53,156 @@ const Login = ({onLoginSuccess}) => {
 
     const handleSubmit = async (event) => {
         event.preventDefault();
-        
-        // Verificar se já está carregando para evitar submissões duplas
-        if (loading || isLoginInProgress.current) {
-            return;
-        }
-        
+        if (loading || isLoginInProgress.current) return;
+
         isLoginInProgress.current = true;
         setLoading(true);
         setError("");
-        
+
         try {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            const user = userCredential.user;
-            
-            // Forçar refresh do token para garantir que está atualizado
-            const token = await user.getIdToken(true);
-            
-            
-                        const response = await fetch("https://api-iso-9001.onrender.com/users/verifyTokenAndGetUserInfo", {
+            const token = await userCredential.user.getIdToken(true);
+
+            const response = await fetch("https://api-iso-9001.onrender.com/users/verifyTokenAndGetUserInfo", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`, // Adicionar header Authorization
+                    "Authorization": `Bearer ${token}`,
                 },
                 body: JSON.stringify({ token }),
             });
-            
+
             const data = await response.json();
-            
+
             if (response.ok) {
-                // Verificar se é o primeiro login
                 if (data.isFirstLogin) {
-                    setLoading(false);
-                    isLoginInProgress.current = false;
-                    
-                    // Guardar email no contexto para o first login
-                    setUserEmail(data.email);
-                    
-                    // Redirecionar para a página de first login
-                    navigate("/reset-password", { replace: true });
-                    return; // Não continuar com o login normal
-                } else {
+                    navigate("/first-login", { replace: true, state: { email: data.email } });
+                    return;
                 }
-                
-                // Login bem-sucedido - só mostrar toast se foi um login real, não um redirecionamento
+
                 if (!hasShownToast.current) {
                     hasShownToast.current = true;
                     toast.success("Login bem-sucedido!");
                 }
-                
-                // Chamar onLoginSuccess apenas se existir
+
                 if (onLoginSuccess && typeof onLoginSuccess === 'function') {
                     onLoginSuccess(data);
+                    return;
                 }
-                
+
                 const redirectPath = location.state?.from?.pathname || "/";
                 navigate(redirectPath, { replace: true });
             } else {
                 setError(data.message || "Erro ao verificar token");
                 toast.error("Erro ao verificar token");
-                // Se o token não for válido, fazer logout do Firebase
                 await auth.signOut();
             }
-        }
-        catch (error) {
-            console.error("Erro no login:", error);
-            const friendlyErrorMessage = getFirebaseErrorMessage(error);
-            setError(friendlyErrorMessage);
-            toast.error(friendlyErrorMessage);
-        }
-        finally {
+        } catch (err) {
+            const msg = getFirebaseErrorMessage(err);
+            setError(msg);
+            toast.error(msg);
+        } finally {
             setLoading(false);
             isLoginInProgress.current = false;
         }
-    }
+    };
 
     return (
-        <>
-            {loading ? (
-                <LoadingPage />
-            ) : (
-                <div className="file-container">
-                    <div className="header">
-                        <img src={Logo} alt="Logo" className="logo" />
-                        <h2 className="title">Magna ISO9001</h2>
+        <div className="flex min-h-screen font-sans">
+            {/* Brand panel */}
+            <div className="w-[42%] min-w-[300px] flex flex-col items-center justify-center relative overflow-hidden px-10 py-12 before:content-[''] before:absolute before:-top-[100px] before:-right-[100px] before:w-[420px] before:h-[420px] before:rounded-full before:bg-white/[.06] before:pointer-events-none after:content-[''] after:absolute after:-bottom-[130px] after:-left-[80px] after:w-[400px] after:h-[400px] after:rounded-full after:bg-white/[.05] after:pointer-events-none"
+                style={{ background: 'linear-gradient(145deg,#4A1C00 0%,#7A4010 38%,#C8932F 100%)' }}>
+                <div className="text-center relative z-[1]">
+                    <div className="w-[90px] h-[90px] bg-white/[.18] border border-white/[.28] rounded-[22px] flex items-center justify-center mx-auto mb-7 shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
+                        <img src={Logo} alt="Logo Magna" className="w-[54px] h-[54px] brightness-0 invert" />
                     </div>
-                    <div className="file-panel">
-                        <form onSubmit={handleSubmit} className="auth-form">
-                            <div className="auth-field">
-                                <label className="auth-label">Email:</label>
-                                <input
-                                    type="email"
-                                    className="auth-input"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    required
-                                />
-                            </div>
-                            <div className="auth-field">
-                                <label className="auth-label">Senha:</label>
-                                <div className="auth-input-wrapper">
-                                    <input
-                                        type={showPassword ? "text" : "password"}
-                                        className="auth-input"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        required
-                                    />
-                                    <button
-                                        type="button"
-                                        className="auth-input-toggle"
-                                        onClick={() => setShowPassword((p) => !p)}
-                                        aria-label={showPassword ? "Ocultar password" : "Ver password"}
-                                        title={showPassword ? "Ocultar password" : "Ver password"}
-                                    >
-                                        <img src={Ver} alt="" aria-hidden="true" />
-                                    </button>
-                                </div>
-                            </div>
-                            {error && <div className="auth-error">{error}</div>}
-                            <button type="submit" className="auth-button" disabled={loading}>
-                                Entrar
-                            </button>
-                            
-                            {/* Link para recuperar senha */}
-                            <div style={{ marginTop: '16px', textAlign: 'center' }}>
-                                <button 
-                                    type="button" 
+                    <h1 className="text-[2.7rem] font-extrabold text-white m-0 tracking-[5px] uppercase">Magna</h1>
+                    <p className="text-[0.88rem] text-white/70 mt-[7px] mb-[22px] tracking-[7px] uppercase font-light">ISO&nbsp;9001</p>
+                    <div className="w-[38px] h-[1.5px] bg-white/30 rounded-[2px] mx-auto mb-5" />
+                    <p className="text-[0.85rem] text-white/60 m-0 font-light leading-[1.8] tracking-[0.3px]">
+                        Sistema de Gestão<br />de Qualidade
+                    </p>
+                </div>
+                <span className="absolute bottom-[22px] text-[10.5px] text-white/40 tracking-[0.3px]">© 2026 Magna · Qualidade &amp; Excelência</span>
+            </div>
+
+            {/* Form panel */}
+            <div className="flex-1 flex items-center justify-center px-8 py-12 bg-[#FDFCF9] max-sm:px-5 max-sm:py-7">
+                <div className="w-full max-w-[400px]">
+                    <div className="mb-[38px]">
+                        <h2 className="text-[1.85rem] font-bold text-gray-900 m-0 mb-2 tracking-[-0.3px]">Bem-vindo de volta</h2>
+                        <p className="text-[14px] text-gray-500 m-0">Inicie sessão para aceder ao sistema</p>
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="flex flex-col gap-[22px]">
+                        {/* Email field */}
+                        <div className="flex flex-col gap-[7px]">
+                            <label htmlFor="login-email" className="text-[11px] font-bold text-gray-700 uppercase tracking-[0.8px]">Email</label>
+                            <input
+                                id="login-email"
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder="o.seu@email.com"
+                                autoComplete="email"
+                                required
+                                className="h-[50px] px-4 border-[1.5px] border-gray-200 rounded-[10px] text-[15px] text-gray-900 bg-white w-full box-border transition-all duration-200 focus:outline-none focus:border-[#C8932F] focus:shadow-[0_0_0_3px_rgba(200,147,47,0.12)] placeholder:text-[#c9d0d8]"
+                            />
+                        </div>
+
+                        {/* Password field */}
+                        <div className="flex flex-col gap-[7px]">
+                            <div className="flex justify-between items-center">
+                                <label htmlFor="login-password" className="text-[11px] font-bold text-gray-700 uppercase tracking-[0.8px]">Senha</label>
+                                <button
+                                    type="button"
+                                    className="bg-transparent border-0 p-0 text-xs text-[#C8932F] cursor-pointer font-medium underline underline-offset-2 transition-colors duration-150 hover:text-[#b8832a]"
                                     onClick={() => navigate("/forgot-password")}
-                                    style={{ 
-                                        background: 'none', 
-                                        border: 'none', 
-                                        color: '#007bff', 
-                                        textDecoration: 'underline',
-                                        cursor: 'pointer',
-                                        fontSize: '14px'
-                                    }}
                                 >
-                                    Esqueci a minha password
+                                    Esqueceu a senha?
                                 </button>
                             </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+                            <div className="relative">
+                                <input
+                                    id="login-password"
+                                    type={showPassword ? "text" : "password"}
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="••••••••"
+                                    autoComplete="current-password"
+                                    required
+                                    className="h-[50px] px-4 pr-[50px] border-[1.5px] border-gray-200 rounded-[10px] text-[15px] text-gray-900 bg-white w-full box-border transition-all duration-200 focus:outline-none focus:border-[#C8932F] focus:shadow-[0_0_0_3px_rgba(200,147,47,0.12)] placeholder:text-[#c9d0d8]"
+                                />
+                                <button
+                                    type="button"
+                                    className="absolute right-[13px] top-1/2 -translate-y-1/2 bg-transparent border-0 cursor-pointer p-1 rounded-md text-gray-400 flex items-center justify-center transition-colors duration-150 hover:text-[#C8932F] hover:bg-[#C8932F]/[.08]"
+                                    onClick={() => setShowPassword(p => !p)}
+                                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                                >
+                                    {showPassword ? <FaEyeSlash size={16} /> : <FaEye size={16} />}
+                                </button>
+                            </div>
+                        </div>
 
-        </>
+                        {error && (
+                            <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-[9px] px-[14px] py-[11px] text-[13px] leading-[1.4]" role="alert">
+                                <FaCircleExclamation size={15} style={{ flexShrink: 0 }} />
+                                {error}
+                            </div>
+                        )}
+
+                        <button
+                            type="submit"
+                            className="h-[52px] w-full bg-gradient-to-br from-[#C8932F] to-[#DFA847] text-white border-0 rounded-[10px] text-[14px] font-bold cursor-pointer tracking-[1.8px] uppercase mt-1 flex items-center justify-center shadow-[0_4px_18px_rgba(200,147,47,0.38)] transition-all duration-200 hover:enabled:opacity-[.92] hover:enabled:-translate-y-px active:enabled:translate-y-0 disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
+                            disabled={loading}
+                        >
+                            {loading ? <span className="inline-block w-5 h-5 border-[2.5px] border-white/30 border-t-white rounded-full animate-loginSpin" /> : "Entrar"}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
     );
-}
+};
 
 export default Login;

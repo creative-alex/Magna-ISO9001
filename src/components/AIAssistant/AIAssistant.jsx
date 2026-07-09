@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTutorial, TUTORIAL_TYPES } from '../../context/tutorialContext';
-import './AIAssistant.css';
+import { FaRobot, FaXmark } from 'react-icons/fa6';
 
 const AIAssistant = ({ 
   fileTree, 
@@ -624,285 +624,80 @@ const AIAssistant = ({
     );
   };
 
-  // Função auxiliar para enviar dados da pergunta para a API
-  const logQuestionToAPI = async (question, hasLocalAnswer = false, responseType = null) => {
-    try {
-      await fetch("https://api-iso-9001.onrender.com/api/assistant/log", {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          question: question.trim(),
-          username: username,
-          currentPage: currentPage,
-          hasLocalAnswer: hasLocalAnswer,
-          responseType: responseType,
-          timestamp: new Date().toISOString()
-        })
+  const buildPageContext = () => {
+    const ctx = {};
+
+    if (searchTerm) ctx.searchTerm = searchTerm;
+
+    if (currentPage === 'selectPdf' && fileTree && fileTree.length > 0) {
+      ctx.documentTree = fileTree.map(node => {
+        if (node.type === 'folder') {
+          return {
+            process: node.name,
+            procedures: (node.children || []).map(c => c.name),
+          };
+        }
+        return { file: node.name };
       });
-    } catch (error) {
-      console.error('Erro ao registar pergunta na API:', error);
     }
+
+    if (currentPage === 'template') {
+      const parts = window.location.pathname.split('/');
+      const filename = parts[parts.length - 1];
+      if (filename) ctx.openFile = decodeURIComponent(filename);
+    }
+
+    const ownedProcesses = Object.entries(processOwners)
+      .filter(([, owners]) => owners && String(owners).split(',').map(o => o.trim()).includes(username))
+      .map(([proc]) => proc);
+    if (ownedProcesses.length > 0) ctx.userProcesses = ownedProcesses;
+
+    return ctx;
   };
 
-  // Processar pergunta simples no balão
-  const handleBubbleQuestion = () => {
+  const handleBubbleQuestion = async () => {
     if (!userInput.trim()) return;
-    
-    setIsTyping(true);
-    const question = userInput.toLowerCase();
+
+    const question = userInput.toLowerCase().trim();
+    const inputText = userInput.trim();
     const userOwnsProcess = isSuperAdmin || (processOwners && Object.values(processOwners).includes(username));
-    
-    setTimeout(() => {
-      let response = '';
-      let actionType = null;
-      let hasLocalAnswer = true;
-      
-      // Respostas contextuais baseadas na página atual
-      if (question.includes('pesquis') || question.includes('procur') || question.includes('encontr') || question.includes('search')) {
-        if (currentPage !== 'selectPdf') {
-          response = '🔍 Para pesquisar ficheiros, precisa voltar à página principal!\n\n📂 Clique no logotipo ISO 9001 no topo esquerdo para voltar à lista de ficheiros onde está a barra de pesquisa.';
-          actionType = 'searchFromOther';
-        } else {
-          response = '🔍 Use a barra de pesquisa no topo para encontrar ficheiros rapidamente!';
-          actionType = 'search';
-        }
-        logQuestionToAPI(userInput, true, actionType);
-      } else if (question.includes('ficheiro') || question.includes('file') || question.includes('documento') || question.includes('pdf')) {
-        if (currentPage !== 'selectPdf') {
-          response = '📄 Para ver ficheiros, volte à página principal:\n\n🏠 Clique no logotipo ISO 9001 no topo para voltar à lista completa\n🔍 Lá pode usar a pesquisa para encontrar o que precisa';
-          actionType = 'fileNavigationFromOther';
-        } else {
-          response = '📁 Clique nas pastas "PROCESSO X:" para expandir e ver os ficheiros disponíveis.';
-          actionType = 'folder';
-        }
-        logQuestionToAPI(userInput, true, actionType);
-      } else if (question.includes('favorito') || question.includes('favoritos')) {
-        if (currentPage !== 'selectPdf') {
-          response = '⭐ Para gerir favoritos, volte à página principal:\n\n🏠 Clique no botão retroceder no topo para voltar à lista completa\n🔍 Lá pode usar a pesquisa para encontrar o que precisa';
-          actionType = 'favoritesNavigation';
-        } else {
-          response = '⭐ Clique no ícone de estrela ao lado dos ficheiros para adicionar/remover dos favoritos.';
-          actionType = 'favorites';
-        }
-        logQuestionToAPI(userInput, true, actionType);
-      } else if (question.includes('adicionar linha') || question.includes('nova linha') || question.includes('linha')) {
-        if (!userOwnsProcess) {
-          response = '🔒 Não pode adicionar linhas, remover ou mover porque não é proprietário de nenhum processo. Apenas proprietários de processos ou Super Admins podem editar procedimentos. Contacte um Super Admin para ter processos atribuídos.';
-          actionType = 'addTableRow';
-        } else if (currentPage === 'template') {
-          response = ' ➕ Para adicionar uma nova linha, ative o modo edição clicando no botão "Editar" e depois use o botão direito do rato na tabela para adicionar, remover ou mover uma linha.';
-          actionType = 'addTableRowFromOther';
-        }
-        logQuestionToAPI(userInput, true, actionType);
-      } else if (
-        (question.includes('processo') || question.includes('processos'))
-      ) {
-        if (isSuperAdmin) {
-          response = '🏢 Como Super Admin, pode criar novos processos:\n• 📋 Definir estrutura\n• 👤 Atribuir responsáveis\n• 📄 Configurar templates\n• 🔧 Definir permissões';
-          actionType = 'processManagement';
-        } else {
-          response = '🔐 Apenas Super Admins podem criar novos processos. Contacte um Super Admin se precisar de um novo processo.';
-          actionType = 'permissions';
-        }
-        logQuestionToAPI(userInput, true, actionType);
-      } else if (question.includes('pasta') || question.includes('abrir') || question.includes('naveg')) {
-        if (currentPage === 'selectPdf') {
-          response = '📁 Clique nas pastas "PROCESSO X:" para expandir e ver os ficheiros.';
-          actionType = 'folder';
-        } else {
-          response = '📁 Para navegar pelas pastas, volte à página principal clicando no logotipo ISO 9001 no topo.';
-          actionType = 'folderFromOther';
-        }
-        logQuestionToAPI(userInput, true, actionType);
-      } else if (question.includes('criar') || question.includes('novo') || question.includes('adicion') || question.includes('procedimento')) {
-        if (isSuperAdmin) {
-          response = '⚡ Como Super Admin, pode criar:\n• ➕ Novos procedimentos\n• 👥 Novos utilizadores\n• 🏢 Novos processos\n• 🔧 Configurações do sistema';
-          actionType = 'superAdminCreate';
-        } else {
-          if (currentPage !== 'selectPdf') {
-            response = '➕ Para criar procedimentos, volte à página principal e clique no botão + ao lado da pasta desejada.';
-            actionType = 'createFromOther';
-          } else {
-            response = '👉➕ Use o botão + ao lado das pastas para criar novos procedimentos.';
-            actionType = 'create';
-          }
-        }
-        logQuestionToAPI(userInput, true, actionType);
-      } else if (question.includes('utilizador') || question.includes('user') || question.includes('conta')) {
-        if (isSuperAdmin) {
-          if (currentPage !== 'selectPdf') {
-            response = '👥 Para gerir utilizadores, vá à página de gestão:\n\n1️⃣ Use o menu de navegação\n2️⃣ Ou clique no link de gestão de utilizadores\n3️⃣ Lá pode criar/editar/remover utilizadores';
-            actionType = 'userManagementNavigation';
-          } else {
-            response = '👥 Como Super Admin, pode gerir utilizadores:\n• ➕ Criar novos utilizadores\n• ✏️ Editar perfis\n• 🔒 Gerir permissões\n• 🗑️ Remover utilizadores';
-            actionType = 'userManagement';
-          }
-        } else {
-          response = '🔐 Apenas Super Admins podem gerir utilizadores.';
-          actionType = 'permissions';
-        }
-        logQuestionToAPI(userInput, true, actionType);
-      } else if (question.includes('permiss') || question.includes('ajuda') || question.includes('posso')) {
-          let capabilities = [];
-          if (isSuperAdmin) {
-            capabilities = [
-              '👑 Super Admin - Acesso total:',
-              '• Criar/editar todos os processos',
-              '• Gerir utilizadores e permissões',
-              '• Configurar sistema',
-              '• Criar novos processos',
-              '• Acesso a todas as funcionalidades',
-            ];
-          } else if (isAdmin) {
-            capabilities = [
-              '🔧 Admin - Acesso avançado:',
-              '• Editar todos os processos',
-              '• Ver todos os documentos',
-              '• Gerir procedimentos',
-              '• Não pode criar utilizadores/processos'
-            ];
-          } else {
-            // Verifica se o user tem processos atribuídos
-            const userHasProcess = Object.values(processOwners).includes(username);
-            capabilities = [
-              '👤 Utilizador - Acesso limitado:',
-              userHasProcess
-                ? '• Editar apenas processos atribuídos (realçados a amarelo)'
-                : '• Não tem processos atribuídos para editar',
-              '• Ver documentos permitidos',
-              '• Anexar documentos'
-            ];
-          }
-          response = capabilities.join('\n');
-          actionType = 'permissions';
-          logQuestionToAPI(userInput, true, actionType);
-      } else if (question.includes('anexo') || question.includes('documento') || question.includes('anexar')) {
-        if (!userOwnsProcess) {
-          response = '🔒 Não pode anexar documentos porque não é proprietário de nenhum processo. Apenas proprietários de processos ou Super Admins podem anexar documentos. Contacte um Super Admin para ter processos atribuídos.';
-          actionType = 'permissions';
-        } else if (currentPage !== 'selectPdf' && (currentPage === 'template' || document.querySelector('table.main-table, .tabela-template'))) {
-          response = '📎 Está na página certa! Vou iniciar o tutorial de anexos. Siga os passos para aprender a anexar documentos corretamente.';
-          actionType = 'attachment';
-          setTimeout(() => {
-            tutorial.startTutorial();
-          }, 1500);
-        } else {
-          response = '📎 Para anexar documentos:\n\n1️⃣ Primeiro vá à página principal (clique no logotipo)\n2️⃣ Selecione um procedimento para abrir\n3️⃣ Depois pode anexar documentos nas tabelas\n\nOu posso iniciar o tutorial de anexos que o guiará por todo o processo!';
-          actionType = 'attachmentFromOther';
-        }
-        logQuestionToAPI(userInput, true, actionType);
-      } else if (question.includes('tutorial') || question.includes('anexar') || question.includes('como')) {
-        if (!userOwnsProcess) {
-          response = '🔒 Não pode iniciar o tutorial de anexos porque não é proprietário de nenhum processo. Apenas proprietários de processos ou Super Admins podem anexar documentos. Contacte um Super Admin para ter processos atribuídos.';
-          actionType = 'permissions';
-        } else {
-          response = '🎯 Iniciando tutorial de anexos! Vou guiá-lo através do processo completo passo a passo.';
-          actionType = 'tutorial';
-          setTimeout(() => {
-            tutorial.startTutorial();
-          }, 1500);
-        }
-        logQuestionToAPI(userInput, true, actionType);
-      } else if (question.includes('onde') || question.includes('página') || question.includes('pagina') || question.includes('estou')) {
-        let pageDescription = '';
-        switch (currentPage) {
-          case 'selectPdf':
-            pageDescription = '📂 Está na página principal (lista de ficheiros).\n\nAqui pode:\n• 🔍 Pesquisar ficheiros\n• 📁 Navegar pelas pastas\n• ➕ Criar novos procedimentos\n• 👁️ Visualizar ficheiros';
-            break;
-          case 'template':
-            pageDescription = '📄 Está a visualizar um procedimento/template.\n\nAqui pode:\n• ✏️ Editar tabelas\n• 📎 Anexar documentos\n• 💾 Guardar alterações\n• 🏠 Voltar à lista (clique no logotipo)';
-            break;
-          case 'createProcedure':
-            pageDescription = '➕ Está na página de criar novo procedimento.\n\nAqui pode:\n• 📝 Definir nome e detalhes\n• 📊 Escolher template\n• 💾 Criar o procedimento';
-            break;
-          case 'createProcess':
-            pageDescription = '🏢 Está na página de criar novo processo.\n\nAqui pode:\n• 📋 Definir estrutura\n• 👤 Atribuir responsáveis\n• 💾 Criar o processo';
-            break;
-          default:
-            pageDescription = '❓ Página não identificada. Use o logotipo no topo para navegar para a página principal.';
-        }
-        response = pageDescription;
-        actionType = 'pageInfo';
-        logQuestionToAPI(userInput, true, actionType);
-      } else {
-        // Enviar pergunta para API para guardar e tentar obter resposta
-        fetch("https://api-iso-9001.onrender.com/api/assistant", {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            question: userInput.trim(),
-            username: username,
-            currentPage: currentPage,
-            timestamp: new Date().toISOString()
-          })
-        })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.answer) {
-            response = data.answer;
-            actionType = 'api';
-          } else {
-            response = `🤖 Ah, não te consigo ajudar com essa pergunta... mas eis onde consigo dar uma mão:
-                         • Pesquisa e navegação
-                         • Localização atual
-                         • Criação de procedimentos
-                         • Permissões
-                         • Anexos
-                         
-                         Diz-me em qual destas áreas precisas de ajuda!`;
-            actionType = 'general';
-          }
-          
-          setBubbleResponse(response);
-          setIsTyping(false);
-          setUserInput('');
-          
-          if (actionType && actionType !== 'attachment' && actionType !== 'tutorial' && actionType !== 'attachmentFromOther') {
-            setupResponseDetector(actionType);
-          } else if (actionType === 'general' || actionType === 'pageInfo') {
-            setTimeout(() => setBubbleResponse(''), 15000);
-          }
-        })
-        .catch((error) => {
-          console.error('Erro ao enviar pergunta para API:', error);
-          response = `🤖 Ah, não te consigo ajudar com essa pergunta... mas eis onde consigo dar uma mão:
-                       • Pesquisa e navegação
-                       • Localização atual
-                       • Criação de procedimentos
-                       • Permissões
-                       • Anexos
-                       
-                       Diz-me em qual destas áreas precisas de ajuda!`;
-          actionType = 'general';
-          
-          setBubbleResponse(response);
-          setIsTyping(false);
-          setUserInput('');
-          
-          if (actionType && actionType !== 'attachment' && actionType !== 'tutorial' && actionType !== 'attachmentFromOther') {
-            setupResponseDetector(actionType);
-          } else if (actionType === 'general' || actionType === 'pageInfo') {
-            setTimeout(() => setBubbleResponse(''), 15000);
-          }
-        });
-        return; // Sair aqui para não executar o código abaixo
+
+    setUserInput('');
+    setIsTyping(true);
+
+    // Tutorial trigger — único caso com efeito de UI local
+    const isTutorialRequest =
+      question.includes('tutorial') ||
+      (question.includes('como') && question.includes('anexo')) ||
+      (question.includes('anexar') && !question.includes('?'));
+
+    if (isTutorialRequest) {
+      if (!userOwnsProcess) {
+        setBubbleResponse('🔒 Não pode iniciar o tutorial porque não é proprietário de nenhum processo. Contacte um Super Admin.');
+        setIsTyping(false);
+        return;
       }
-      
-      // Para outras perguntas com respostas locais
-      setBubbleResponse(response);
+      if (currentPage === 'template' || document.querySelector('table.main-table, .tabela-template')) {
+        setBubbleResponse('🎯 A iniciar tutorial de anexos! Siga os passos indicados.');
+        setIsTyping(false);
+        setTimeout(() => tutorial.startTutorial(), 1500);
+        return;
+      }
+    }
+
+    try {
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/assistant`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: inputText, username, currentPage, pageContext: buildPageContext() }),
+      });
+      const data = await res.json();
+      setBubbleResponse(data.answer || 'Não foi possível obter resposta.');
+    } catch {
+      setBubbleResponse('Erro ao contactar o assistente. Tente novamente.');
+    } finally {
       setIsTyping(false);
-      setUserInput('');
-      
-      if (actionType && actionType !== 'attachment' && actionType !== 'tutorial' && actionType !== 'attachmentFromOther') {
-        setupResponseDetector(actionType);
-      } else if (actionType === 'general' || actionType === 'pageInfo') {
-        setTimeout(() => setBubbleResponse(''), 15000);
-      }
-    }, 1000);
+    }
   };
 
   // Lidar com Enter no input do balão
@@ -910,139 +705,6 @@ const AIAssistant = ({
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleBubbleQuestion();
-    }
-  };
-
-  // Configurar detectores para limpar resposta quando ação é executada
-  const setupResponseDetector = (actionType) => {
-    const clearResponse = () => setBubbleResponse('');
-    
-    switch (actionType) {
-      case 'search':
-        const searchInput = document.querySelector('input[type="text"]');
-        if (searchInput) {
-          // Destacar barra de pesquisa
-          highlightElement('input[type="text"]', true);
-          
-          const handleSearchInteraction = () => {
-            clearResponse();
-            removeAllHighlights();
-            searchInput.removeEventListener('focus', handleSearchInteraction);
-            searchInput.removeEventListener('input', handleSearchInteraction);
-          };
-          searchInput.addEventListener('focus', handleSearchInteraction);
-          searchInput.addEventListener('input', handleSearchInteraction);
-        }
-        break;
-      
-      case 'searchFromTemplate':
-      case 'searchOther':
-        // Destacar logotipo para voltar à página principal
-        const logo = document.querySelector('.navbar-brand, .logo, a[href="/file"], a[href="/home"]');
-        if (logo) {
-          highlightElement('.navbar-brand, .logo, a[href="/file"], a[href="/home"]', true);
-          
-          const handleLogoClick = () => {
-            clearResponse();
-            removeAllHighlights();
-            logo.removeEventListener('click', handleLogoClick);
-          };
-          logo.addEventListener('click', handleLogoClick, { once: true });
-        }
-        setTimeout(clearResponse, 20000);
-        break;
-      
-      case 'fileNavigation':
-      case 'folderFromOther':
-      case 'createFromOther':
-      case 'fileNavigationOther':
-        // Destacar logotipo para navegação
-        const navLogo = document.querySelector('.navbar-brand, .logo, a[href="/file"], a[href="/home"]');
-        if (navLogo) {
-          highlightElement('.navbar-brand, .logo, a[href="/file"], a[href="/home"]', true);
-          
-          const handleNavClick = () => {
-            clearResponse();
-            removeAllHighlights();
-            navLogo.removeEventListener('click', handleNavClick);
-          };
-          navLogo.addEventListener('click', handleNavClick, { once: true });
-        }
-        setTimeout(clearResponse, 20000);
-        break;
-      
-      case 'attachmentFromOther':
-        // Sugerir voltar à página principal ou iniciar tutorial
-        setTimeout(() => {
-          if (bubbleResponse.includes('tutorial')) {
-            setBubbleResponse(prev => prev + '\n\n🚀 Quer iniciar o tutorial agora? Digite "tutorial"');
-          }
-        }, 3000);
-        setTimeout(clearResponse, 25000);
-        break;
-        
-      case 'folder':
-        // Seletores específicos para a estrutura do selectPdf.jsx
-        const folders = document.querySelectorAll('.folder-header');
-        console.log('📁 Detectores de navegação:', folders.length);
-        
-        // Destacar APENAS processos onde o utilizador é proprietário
-        const ownedFolders = [];
-        folders.forEach(folder => {
-          const folderNameSpan = folder.querySelector('.folder-name');
-          const folderName = folderNameSpan ? folderNameSpan.textContent?.trim() : folder.textContent?.trim();
-          console.log('📁 Navegação - verificando pasta:', folderName, 'Owner:', processOwners[folderName]);
-          
-          // Verificar se o utilizador é dono deste processo
-          if (processOwners[folderName] === username || isSuperAdmin) {
-            console.log('✅ Destacando pasta própria para navegação:', folderName);
-            folder.classList.add('tutorial-highlight');
-            ownedFolders.push(folder);
-          }
-        });
-        
-        if (ownedFolders.length > 0) {
-          setHighlightedElements(ownedFolders);
-        }
-        
-        folders.forEach(folder => {
-          const handleFolderClick = () => {
-            clearResponse();
-            removeAllHighlights();
-            folder.removeEventListener('click', handleFolderClick);
-          };
-          folder.addEventListener('click', handleFolderClick);
-        });
-        break;
-        
-      case 'create':
-        const createButtons = document.querySelectorAll('.create-table-btn, [data-action="create"], .add-process-btn, .plus-btn');
-        if (createButtons.length > 0) {
-          // Destacar botões de criar com seta à esquerda
-          createButtons.forEach(button => {
-            button.classList.add('tutorial-highlight');
-            button.classList.add('tutorial-highlight-left');
-          });
-          setHighlightedElements([...createButtons]);
-        }
-        
-        createButtons.forEach(button => {
-          const handleCreateClick = () => {
-            clearResponse();
-            removeAllHighlights();
-            button.removeEventListener('click', handleCreateClick);
-          };
-          button.addEventListener('click', handleCreateClick);
-        });
-        break;
-      
-      case 'pageInfo':
-        // Não fazer nada especial, apenas limpar após timeout
-        setTimeout(clearResponse, 15000);
-        break;
-        
-      default:
-        setTimeout(clearResponse, 15000);
     }
   };
 
@@ -1058,28 +720,28 @@ const AIAssistant = ({
   };
 
   return (
-    <div className="ai-assistant">
+    <div className="fixed bottom-5 right-5 z-[1000] transition-all duration-300">
       {/* Botão flutuante */}
-      <button 
-        className="ai-assistant__toggle"
+      <button
+        className="w-[60px] h-[60px] rounded-full border-2 border-[#a67725] bg-[#C8932F] text-white text-2xl cursor-pointer shadow-[0_4px_20px_rgba(200,147,47,0.3)] transition-all duration-300 flex items-center justify-center hover:-translate-y-0.5 hover:shadow-[0_6px_25px_rgba(200,147,47,0.5)] hover:bg-gradient-to-br hover:from-[#b8832a] hover:to-[#a67725]"
         onClick={toggleWidget}
         title="Assistente de navegação"
       >
-        🤖
+        <FaRobot />
       </button>
 
       {/* Balão de fala do tutorial */}
       {tutorial.isActive && (
-        <div className="ai-assistant__bubble ai-assistant__bubble--info">
-          <button 
-            className="ai-assistant__bubble-close"
+        <div className="absolute bottom-[75px] right-0 min-w-[20vw] max-w-[400px] bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3 shadow-[0_4px_20px_rgba(0,0,0,0.1)] animate-bubbleAppear text-[14px] leading-[1.4] text-blue-900 relative ai-bubble-arrow">
+          <button
+            className="absolute top-2 right-2 bg-transparent border-0 text-base cursor-pointer text-gray-400 p-0 leading-[1] hover:text-gray-600"
             onClick={() => {
               tutorial.stopTutorial();
               removeAllHighlights();
             }}
             title="Fechar tutorial"
           >
-            ✕
+            <FaXmark />
           </button>
           {getCurrentTutorialMessage()}
         </div>
@@ -1087,13 +749,13 @@ const AIAssistant = ({
 
       {/* Balão de fala simples para mensagens normais */}
       {isOpen && !tutorial.isActive && (
-        <div className="ai-assistant__bubble">
-          <button 
-            className="ai-assistant__bubble-close"
+        <div className="absolute bottom-[75px] right-0 min-w-[20vw] max-w-[400px] bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-[0_4px_20px_rgba(0,0,0,0.1)] animate-bubbleAppear text-[14px] leading-[1.4] text-gray-700 relative ai-bubble-arrow">
+          <button
+            className="absolute top-2 right-2 bg-transparent border-0 text-base cursor-pointer text-gray-400 p-0 leading-[1] hover:text-gray-600"
             onClick={() => setIsOpen(false)}
             title="Fechar"
           >
-            ✕
+            <FaXmark />
           </button>
           <div>
             <strong>🤖 Assistente ISO 9001</strong>

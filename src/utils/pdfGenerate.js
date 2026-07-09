@@ -297,6 +297,12 @@ export async function generateEditablePdfTemplate2({ atividades, donoProcesso, o
       const textField = createTextFieldWithAppearance(form, fieldName, atividades[row][col], font, 8, false);
       const height = baseRowHeight * span - 4; // 2px padding top/bottom
       textField.addToPage(page, { x: xPos + 2, y: camposY - (baseRowHeight * (span - 1)) + 2, width: colWidthTemplate2[col] - 4, height });
+      // Campo invisível (sem widget na página) que guarda o número de linhas unidas,
+      // para o merge sobreviver a um reload: é lido de volta em pdf-form-data.
+      if (span >= 2) {
+        form.createTextField(`${fieldName}_span`).setText(String(span));
+        console.log(`🔗 [DEBUG merge] Campo de união gravado no PDF: ${fieldName}_span = ${span}`);
+      }
       xPos += colWidthTemplate2[col];
     }
     // Avança Y pela altura base da linha (as unidas expandem no topo)

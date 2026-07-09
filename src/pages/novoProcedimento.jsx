@@ -1,15 +1,15 @@
 import React, { useState, useContext, useEffect } from 'react';
-import './novoProcedimento.css';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { UserContext } from '../context/userContext';
 import { generateEditablePdfTemplate1 } from '../utils/pdfGenerate';
+import Sidebar from '../components/Sidebar';
+import Topbar from '../components/Topbar';
 
 export default function NewTable() {
   const navigate = useNavigate();
   const location = useLocation();
   const { username } = useContext(UserContext);
-  
-  // Estados para os dados básicos
+
   const [processName, setProcessName] = useState('');
   const [processFolder, setProcessFolder] = useState('');
   const [nextTableNumber, setNextTableNumber] = useState(null);
@@ -17,44 +17,27 @@ export default function NewTable() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Verifica se há uma pasta pré-selecionada
   useEffect(() => {
     if (location.state?.preselectedFolder) {
       setProcessFolder(location.state.preselectedFolder);
     }
   }, [location.state]);
 
-  // Buscar o próximo número de tabela quando o componente carregar
   useEffect(() => {
     const fetchNextTableNumber = async () => {
       try {
-        // Buscar a árvore de ficheiros para contar tabelas existentes
         const response = await fetch('https://api-iso-9001.onrender.com/files/list-files-tree');
         if (response.ok) {
           const pdfTree = await response.json();
-          
-          // Se não há pasta selecionada, não pode determinar numeração
-          if (!processFolder) {
-            setNextTableNumber(null);
-            return;
-          }
-          
-          // Extrair o número do processo da pasta selecionada
-          let processNumber = null;
+          if (!processFolder) { setNextTableNumber(null); return; }
+
+          let processNumber = 0;
           const processMatch = processFolder.match(/^PROCESSO (\d+):/);
-          if (processMatch) {
-            processNumber = parseInt(processMatch[1], 10);
-          } else {
-            // Se não segue o padrão PROCESSO X:, usar 0
-            processNumber = 0;
-          }
-          
-          // Encontrar a pasta específica na árvore
+          if (processMatch) processNumber = parseInt(processMatch[1], 10);
+
           const findFolderInTree = (nodes, targetPath) => {
             for (const node of nodes) {
-              if (node.type === 'folder' && node.name === targetPath) {
-                return node;
-              }
+              if (node.type === 'folder' && node.name === targetPath) return node;
               if (node.type === 'folder' && node.children) {
                 const found = findFolderInTree(node.children, targetPath);
                 if (found) return found;
@@ -62,189 +45,90 @@ export default function NewTable() {
             }
             return null;
           };
-          
+
           const targetFolder = findFolderInTree(pdfTree, processFolder);
-          
-          // Extrair números das tabelas existentes na pasta específica
           const tableNumbers = [];
-          
-          if (targetFolder && targetFolder.children) {
+
+          if (targetFolder?.children) {
             targetFolder.children.forEach(node => {
               if (node.type === 'file') {
-                // Extrair números de diferentes padrões de ficheiros
                 let fileNumber = null;
-                
-                // Padrão XX- (ficheiros sub-processo, ex: 10-, 11-, 30-, 31-)
                 const matchDash = node.name.match(/^(\d{1,2})-/);
-                if (matchDash) {
-                  fileNumber = parseInt(matchDash[1], 10);
-                }
-                // Padrão X (ficheiros matriz, ex: 1, 2, 3)
+                if (matchDash) fileNumber = parseInt(matchDash[1], 10);
                 else {
                   const matchSingle = node.name.match(/^(\d{1,2})\s/);
-                  if (matchSingle) {
-                    fileNumber = parseInt(matchSingle[1], 10);
-                  }
+                  if (matchSingle) fileNumber = parseInt(matchSingle[1], 10);
                 }
-                
-                // Se encontrou um número, verificar se pertence a este processo
                 if (fileNumber !== null) {
                   const fileProcessNumber = Math.floor(fileNumber / 10);
-                  
-                  // Para números de 1 dígito (1-9), considerar como pertencendo ao processo correspondente
-                  if (fileNumber < 10) {
-                    if (fileNumber === processNumber) {
-                      tableNumbers.push(fileNumber);
-                    }
-                  }
-                  // Para números de 2 dígitos, verificar se começam com o número do processo
-                  else if (fileProcessNumber === processNumber) {
-                    tableNumbers.push(fileNumber);
-                  }
+                  if (fileNumber < 10 && fileNumber === processNumber) tableNumbers.push(fileNumber);
+                  else if (fileProcessNumber === processNumber) tableNumbers.push(fileNumber);
                 }
               }
             });
           }
-          
-          // Debug: mostrar números encontrados
-          console.log(`Processo ${processNumber}: números encontrados:`, tableNumbers.sort((a, b) => a - b));
-          console.log(`Pasta: "${processFolder}"`);
-          console.log(`Total de ficheiros analisados na pasta:`, targetFolder?.children?.length || 0);
-          
-          // Determinar o próximo número baseado no processo
+
           let nextNumber;
           if (tableNumbers.length > 0) {
-            const maxExisting = Math.max(...tableNumbers);
-            nextNumber = maxExisting + 1;
+            nextNumber = Math.max(...tableNumbers) + 1;
           } else {
-            // Se não há ficheiros existentes, começar com o número base do processo
-            if (processNumber === 0) {
-              // Para processos sem numeração específica, começar com 01
-              nextNumber = 1;
-            } else {
-              // Para processos numerados (PROCESSO 1:, PROCESSO 2:, etc.), 
-              // começar com X0 (ex: PROCESSO 3: começa com 30)
-              nextNumber = processNumber * 10;
-            }
+            nextNumber = processNumber === 0 ? 1 : processNumber * 10;
           }
-          
-          console.log(`Próximo número para processo ${processNumber}:`, nextNumber);
-          console.log(`Lógica aplicada: ${tableNumbers.length > 0 ? 'incremento do máximo existente' : 'número base da pasta vazia'}`);
-          
           setNextTableNumber(nextNumber);
         } else {
           setNextTableNumber(null);
         }
-      } catch (error) {
-        console.warn('Erro ao buscar próximo número de tabela:', error);
+      } catch {
         setNextTableNumber(null);
       }
     };
-
     fetchNextTableNumber();
-  }, [processFolder]); // Reexecuta quando a pasta muda
+  }, [processFolder]);
 
-  // Estados para a tabela de observações (5 linhas por defeito)
-  const [observacoes, setObservacoes] = useState([
-    [''],
-    [''],
-    [''],
-    [''],
-    ['']
-  ]);
-
-  // Estados para a tabela principal (6 linhas por defeito)
+  const [observacoes, setObservacoes] = useState([[''], [''], [''], [''], ['']]);
   const [tabelaPrincipal, setTabelaPrincipal] = useState([
     ['', '', '', '', ''],
     ['', '', '', '', ''],
     ['', '', '', '', ''],
     ['', '', '', '', ''],
     ['', '', '', '', ''],
-    ['', '', '', '', '']
+    ['', '', '', '', ''],
   ]);
 
-  // Headers da tabela principal
-  const headers = [
-    'Fluxo\ndas Ações',
-    'Descrição', 
-    'Responsável',
-    'Documentos\nAssociados',
-    'Instruções\nde Trabalho'
-  ];
-
+  const mainHeaders = ['Fluxo das Ações', 'Descrição', 'Responsável', 'Documentos Associados', 'Instruções de Trabalho'];
   const headersObs = ['Observações'];
 
-  // Função para atualizar observações
   const handleObservacoesChange = (rowIdx, value) => {
-    setObservacoes(prev => {
-      const novo = [...prev];
-      novo[rowIdx] = [value];
-      return novo;
-    });
+    setObservacoes(prev => { const n = [...prev]; n[rowIdx] = [value]; return n; });
   };
 
-  // Função para atualizar tabela principal
   const handleTabelaPrincipalChange = (rowIdx, colIdx, value) => {
     setTabelaPrincipal(prev => {
-      const novo = prev.map(row => [...row]);
-      novo[rowIdx][colIdx] = value;
-      return novo;
+      const n = prev.map(row => [...row]);
+      n[rowIdx][colIdx] = value;
+      return n;
     });
   };
 
-  // Função para adicionar linha às observações
-  const addObservacaoRow = () => {
-    setObservacoes(prev => [...prev, ['']]);
-  };
-
-  // Função para remover linha das observações
-  const removeObservacaoRow = (index) => {
-    if (observacoes.length > 1) {
-      setObservacoes(prev => prev.filter((_, i) => i !== index));
-    }
-  };
-
-  // Função para adicionar linha à tabela principal
-  const addTabelaPrincipalRow = () => {
-    setTabelaPrincipal(prev => [...prev, ['', '', '', '', '']]);
-  };
-
-  // Função para remover linha da tabela principal
+  const addTabelaPrincipalRow = () => setTabelaPrincipal(prev => [...prev, ['', '', '', '', '']]);
   const removeTabelaPrincipalRow = (index) => {
-    if (tabelaPrincipal.length > 1) {
-      setTabelaPrincipal(prev => prev.filter((_, i) => i !== index));
-    }
+    if (tabelaPrincipal.length > 1) setTabelaPrincipal(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Função para validar e substituir barras por pipe
   const handleProcessNameChange = (value) => {
-    // Substituir barras por pipe automaticamente
     const cleanValue = value.replace(/[\/\\]/g, '|');
     setProcessName(cleanValue);
-    
-    // Mostrar aviso se houve substituição
     if (value !== cleanValue) {
       setError('Caracteres "/" e "\\" foram substituídos por "|" para evitar problemas de ficheiro');
-      // Limpar o erro após 3 segundos
       setTimeout(() => setError(''), 3000);
     }
   };
 
-  // Função para criar a tabela (Template 1)
   const handleCreateTable = async () => {
-    // Validações
-    if (!processName.trim()) {
-      setError('Nome da matriz é obrigatório');
-      return;
-    }
-
-    if (!processFolder.trim()) {
-      setError('Nome da pasta é obrigatório');
-      return;
-    }
-
+    if (!processName.trim()) { setError('Nome do procedimento é obrigatório'); return; }
+    if (!processFolder.trim()) { setError('Pasta do processo é obrigatória'); return; }
     if (nextTableNumber === null && !manualPrefix.trim()) {
-      setError('Aguarde o carregamento do número da tabela ou insira um prefixo manual...');
+      setError('Aguarde o carregamento do número ou insira um prefixo manual');
       return;
     }
 
@@ -252,267 +136,190 @@ export default function NewTable() {
     setError('');
 
     try {
-      // 1. Gerar o PDF com Template 1
-      console.log('Gerando PDF Template 1...');
-      const pdfBytes = await generateEditablePdfTemplate1(
-        tabelaPrincipal, 
-        headers, 
-        observacoes, 
-        headersObs
-      );
+      const pdfBytes = await generateEditablePdfTemplate1(tabelaPrincipal, mainHeaders, observacoes, headersObs);
 
-      // 2. Preparar dados para envio
       const formData = new FormData();
-      
-      // Nome do ficheiro - usar prefixo manual se fornecido, senão usar numeração automática
-      let fileName;
-      // Substituir barras por pipe (|) para evitar criação de pastas
       const cleanProcessName = processName.trim().replace(/[\/\\]/g, '|');
-      
-      if (manualPrefix.trim()) {
-        fileName = `${manualPrefix.trim()} ${cleanProcessName}.pdf`;
-      } else {
-        const formattedNumber = nextTableNumber.toString().padStart(2, '0');
-        fileName = `${formattedNumber} ${cleanProcessName}.pdf`;
-      }
-      const folderPath = processFolder.trim();
-      
-      // Criar blob do PDF
+      const prefix = manualPrefix.trim() || nextTableNumber.toString().padStart(2, '0');
+      const fileName = `${prefix} ${cleanProcessName}.pdf`;
+
       const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
       formData.append('file', pdfBlob, fileName);
       formData.append('filename', fileName);
-      formData.append('folders', JSON.stringify([folderPath]));
-      
-      // Dados específicos do Template 1
+      formData.append('folders', JSON.stringify([processFolder.trim()]));
       formData.append('mainTableData', JSON.stringify(tabelaPrincipal));
       formData.append('obsTableData', JSON.stringify(observacoes));
 
-      console.log('Enviando dados para o backend...');
-
-      // 3. Enviar para o backend
       const response = await fetch('https://api-iso-9001.onrender.com/files/upload-pdf', {
-        method: 'POST',
-        body: formData
+        method: 'POST', body: formData,
       });
+      if (!response.ok) throw new Error('Erro ao criar procedimento');
 
-      if (!response.ok) {
-        throw new Error('Erro ao criar procedimento');
-      }
-
-      console.log('Tabela criada com sucesso!');
-      
-      // 4. Redirecionar para a lista de PDFs
       navigate('/file');
-      
-    } catch (error) {
-      console.error('Erro ao criar procedimento:', error);
-      setError('Erro ao criar procedimento: ' + error.message);
+    } catch (err) {
+      setError('Erro ao criar procedimento: ' + err.message);
     } finally {
       setLoading(false);
     }
   };
 
+  const secoes = [
+    { idx: 0, label: '1. Objetivos', placeholder: 'Digite os objetivos do documento...' },
+    { idx: 1, label: '2. Campo de Aplicação', placeholder: 'Digite o campo de aplicação...' },
+    { idx: 2, label: '3. Definições', placeholder: 'Digite as definições relevantes...' },
+    { idx: 3, label: '4. Abreviaturas', placeholder: 'Digite as abreviaturas utilizadas...' },
+    { idx: 4, label: '5. Observações', placeholder: 'Digite observações adicionais...' },
+  ];
+
   return (
-    <div className="novo-procedimento-container">
-      <h2>Criar novo procedimento</h2>
-      {error && (
-        <div className="novo-procedimento-error">
-          {error}
-        </div>
-      )}
+    <div className="flex min-h-screen">
+      <Sidebar onSelectFile={(path) => navigate(`/file/${path.replace(/\s/g, '-').replace(/\//g, '__')}`)} />
 
-      <div style={{ marginBottom: '20px' }}>
-        <label className="novo-procedimento-label">
-          Nome do Procedimento:
-        </label>
-        <input
-          type="text"
-          value={processName}
-          onChange={(e) => handleProcessNameChange(e.target.value)}
-          placeholder="Ex: Gestão de Recursos Humanos"
-          className="novo-procedimento-input"
-        />
-        <small style={{ color: '#666' }}>
-          {processFolder
-            ? (() => {
-                let prefix;
-                if (manualPrefix.trim()) {
-                  prefix = manualPrefix.trim();
-                } else if (nextTableNumber !== null) {
-                  prefix = nextTableNumber.toString().padStart(2, '0');
-                } else {
-                  return 'Aguardando carregamento do número...';
-                }
-                // Substituir barras por pipe para pré-visualização
-                const cleanProcessName = processName.replace(/[\/\\]/g, '|');
-                return `Nome do ficheiro será: ${prefix} ${cleanProcessName || '[Nome do Procedimento]'}.pdf`;
-              })()
-            : 'Selecione uma pasta para ver o nome do ficheiro'
-          }
-        </small>
-      </div>
+      <div className="ml-[230px] flex-1 flex flex-col min-h-screen">
+        <Topbar icon="📄" title="Novo Procedimento" />
 
-      <div style={{ marginBottom: '20px' }}>
-        <label className="novo-procedimento-label">
-          Prefixo do Ficheiro (opcional):
-        </label>
-        <input
-          type="text"
-          value={manualPrefix}
-          onChange={(e) => setManualPrefix(e.target.value)}
-          placeholder="Ex: 01, 02, 03, 04, etc. (deixe vazio para numeração automática)"
-          className="novo-procedimento-input"
-        />
-        <small style={{ color: '#666' }}>
-          Se não especificar, será usado o próximo número disponível automaticamente
-        </small>
-      </div>
+        <div className="p-6 flex-1">
+          <div className="p-6 max-w-[1100px] mx-auto">
 
-      {/* Seções do Documento (substitui Tabela de Observações) */}
-      <div style={{ marginBottom: '20px' }}>
-        {/* 1. Objetivos */}
-        <div style={{ marginBottom: '15px' }}>
-          <label className="novo-procedimento-label" style={{ color: '#333' }}>
-            1. Objetivos:
-          </label>
-          <textarea
-            value={observacoes[0][0]}
-            onChange={(e) => handleObservacoesChange(0, e.target.value)}
-            placeholder="Digite os objetivos do documento..."
-            rows={3}
-            className="novo-procedimento-textarea"
-          />
-        </div>
+            {error && (
+              <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-[13px] mb-5">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                {error}
+              </div>
+            )}
 
-        {/* 2. Campo de Aplicação */}
-        <div style={{ marginBottom: '15px' }}>
-          <label className="novo-procedimento-label" style={{ color: '#333' }}>
-            2. Campo de Aplicação:
-          </label>
-          <textarea
-            value={observacoes[1][0]}
-            onChange={(e) => handleObservacoesChange(1, e.target.value)}
-            placeholder="Digite o campo de aplicação..."
-            rows={3}
-            className="novo-procedimento-textarea"
-          />
-        </div>
+            {/* Configuração */}
+            <div className="bg-white border border-gray-200 rounded-[10px] p-6 mb-5">
+              <p className="text-[11px] font-bold text-[#4A2E08] uppercase tracking-[0.8px] m-0 mb-5 pb-3 border-b border-gray-100">Configuração do Procedimento</p>
 
-        {/* 3. Definições */}
-        <div style={{ marginBottom: '15px' }}>
-          <label className="novo-procedimento-label" style={{ color: '#333' }}>
-            3. Definições:
-          </label>
-          <textarea
-            value={observacoes[2][0]}
-            onChange={(e) => handleObservacoesChange(2, e.target.value)}
-            placeholder="Digite as definições relevantes..."
-            rows={3}
-            className="novo-procedimento-textarea"
-          />
-        </div>
+              {/* Pasta do processo */}
+              <div className="flex flex-col gap-1.5 mb-4 last:mb-0">
+                <label className="text-[11px] font-bold text-gray-700 uppercase tracking-[0.7px]">Processo</label>
+                {processFolder ? (
+                  <div className="inline-flex items-center gap-2 bg-[#FAF3E6] border border-[#E8D0A0] rounded-lg px-4 py-2.5 text-[13px] font-semibold text-[#4A2E08]">
+                    <svg className="text-[#C8932F] shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    {processFolder}
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    className="w-full px-[14px] py-2.5 border-[1.5px] border-gray-200 rounded-lg text-[14px] text-gray-900 bg-white box-border transition-all duration-200 focus:outline-none focus:border-[#C8932F] focus:shadow-[0_0_0_3px_rgba(200,147,47,0.1)] placeholder:text-[#c9d0d8]"
+                    value={processFolder}
+                    onChange={(e) => setProcessFolder(e.target.value)}
+                    placeholder="Nome da pasta do processo"
+                  />
+                )}
+              </div>
 
-        {/* 4. Abreviaturas */}
-        <div style={{ marginBottom: '15px' }}>
-          <label className="novo-procedimento-label" style={{ color: '#333' }}>
-            4. Abreviaturas:
-          </label>
-          <textarea
-            value={observacoes[3][0]}
-            onChange={(e) => handleObservacoesChange(3, e.target.value)}
-            placeholder="Digite as abreviaturas utilizadas..."
-            rows={3}
-            className="novo-procedimento-textarea"
-          />
-        </div>
+              <div className="grid grid-cols-2 gap-5 max-sm:grid-cols-1">
+                <div className="flex flex-col gap-1.5 mb-4 last:mb-0">
+                  <label className="text-[11px] font-bold text-gray-700 uppercase tracking-[0.7px]">Nome do Procedimento</label>
+                  <input
+                    type="text"
+                    className="w-full px-[14px] py-2.5 border-[1.5px] border-gray-200 rounded-lg text-[14px] text-gray-900 bg-white box-border transition-all duration-200 focus:outline-none focus:border-[#C8932F] focus:shadow-[0_0_0_3px_rgba(200,147,47,0.1)] placeholder:text-[#c9d0d8]"
+                    value={processName}
+                    onChange={(e) => handleProcessNameChange(e.target.value)}
+                    placeholder="Ex: Gestão de Recursos Humanos"
+                  />
+                  <span className="text-[12px] text-gray-400">
+                    {processFolder
+                      ? (() => {
+                          const prefix = manualPrefix.trim() || (nextTableNumber !== null ? nextTableNumber.toString().padStart(2, '0') : null);
+                          if (!prefix) return 'A carregar número...';
+                          return <>Ficheiro: <strong className="text-[#C8932F] font-semibold">{prefix} {processName || '[Nome]'}.pdf</strong></>;
+                        })()
+                      : 'Selecione um processo para ver o nome do ficheiro'}
+                  </span>
+                </div>
 
-        {/* 5. Observações */}
-        <div style={{ marginBottom: '15px' }}>
-          <label className="novo-procedimento-label" style={{ color: '#333' }}>
-            5. Observações:
-          </label>
-          <textarea
-            value={observacoes[4][0]}
-            onChange={(e) => handleObservacoesChange(4, e.target.value)}
-            placeholder="Digite observações adicionais..."
-            rows={3}
-            className="novo-procedimento-textarea"
-          />
-        </div>
-      </div>
+                <div className="flex flex-col gap-1.5 mb-4 last:mb-0">
+                  <label className="text-[11px] font-bold text-gray-700 uppercase tracking-[0.7px]">Prefixo Manual <span style={{ fontWeight: 400, textTransform: 'none', fontSize: 11, color: '#9ca3af' }}>(opcional)</span></label>
+                  <input
+                    type="text"
+                    className="w-full px-[14px] py-2.5 border-[1.5px] border-gray-200 rounded-lg text-[14px] text-gray-900 bg-white box-border transition-all duration-200 focus:outline-none focus:border-[#C8932F] focus:shadow-[0_0_0_3px_rgba(200,147,47,0.1)] placeholder:text-[#c9d0d8]"
+                    value={manualPrefix}
+                    onChange={(e) => setManualPrefix(e.target.value)}
+                    placeholder="Ex: 01, 02 (vazio = automático)"
+                  />
+                  <span className="text-[12px] text-gray-400">Deixe vazio para numeração automática</span>
+                </div>
+              </div>
+            </div>
 
-      {/* Tabela Principal */}
-      <div style={{ marginBottom: '20px' }}>
-        <label className="novo-procedimento-label">
-          Tabela Principal:
-        </label>
-        <div className="novo-procedimento-table-wrapper">
-          <table className="novo-procedimento-table">
-            <thead>
-              <tr>
-                <th>Fluxo das Ações</th>
-                <th>Descrição</th>
-                <th>Responsável</th>
-                <th>Documentos Associados</th>
-                <th>Instruções de trabalho</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tabelaPrincipal.map((row, rowIdx) => (
-                <tr key={rowIdx}>
-                  {row.map((cell, colIdx) => (
-                    <td key={colIdx}>
-                      <textarea
-                        value={cell}
-                        onChange={(e) => handleTabelaPrincipalChange(rowIdx, colIdx, e.target.value)}
-                        className="novo-procedimento-textarea"
-                        placeholder={headers[colIdx]?.replace('\n', ' ')}
-                      />
-                    </td>
-                  ))}
-                  <td style={{ textAlign: 'center' }}>
-                    {tabelaPrincipal.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeTabelaPrincipalRow(rowIdx)}
-                        className="novo-procedimento-button novo-procedimento-remove"
-                      >
-                        Remover
-                      </button>
-                    )}
-                  </td>
-                </tr>
+            {/* Secções do documento */}
+            <div className="bg-white border border-gray-200 rounded-[10px] p-6 mb-5">
+              <p className="text-[11px] font-bold text-[#4A2E08] uppercase tracking-[0.8px] m-0 mb-5 pb-3 border-b border-gray-100">Secções do Documento</p>
+              {secoes.map(({ idx, label, placeholder }) => (
+                <div className="flex flex-col gap-1.5 mb-4 last:mb-0" key={idx}>
+                  <label className="text-[11px] font-bold text-gray-700 uppercase tracking-[0.7px]">{label}</label>
+                  <textarea
+                    className="w-full px-[14px] py-2.5 border-[1.5px] border-gray-200 rounded-lg text-[14px] text-gray-900 bg-white box-border transition-all duration-200 focus:outline-none focus:border-[#C8932F] focus:shadow-[0_0_0_3px_rgba(200,147,47,0.1)] placeholder:text-[#c9d0d8]"
+                    value={observacoes[idx][0]}
+                    onChange={(e) => handleObservacoesChange(idx, e.target.value)}
+                    placeholder={placeholder}
+                    rows={3}
+                  />
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
-        <button
-          type="button"
-          onClick={addTabelaPrincipalRow}
-          className="novo-procedimento-button novo-procedimento-add-row"
-        >
-          Adicionar Linha
-        </button>
-      </div>
+            </div>
 
-      {/* Botões de ação */}
-      <div className="novo-procedimento-actions">
-        <button
-          type="button"
-          onClick={() => navigate('/file')}
-          className="novo-procedimento-button novo-procedimento-cancel"
-        >
-          Cancelar
-        </button>
-        <button
-          type="button"
-          onClick={handleCreateTable}
-          disabled={loading}
-          className="novo-procedimento-button"
-        >
-          {loading ? 'A criar...' : 'Criar Procedimento'}
-        </button>
+            {/* Tabela principal */}
+            <div className="bg-white border border-gray-200 rounded-[10px] p-6 mb-5">
+              <p className="text-[11px] font-bold text-[#4A2E08] uppercase tracking-[0.8px] m-0 mb-5 pb-3 border-b border-gray-100">Tabela Principal</p>
+              <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <table className="w-full border-collapse text-[13px]">
+                  <thead>
+                    <tr>
+                      {mainHeaders.map(h => (
+                        <th key={h} className="bg-[#FAF3E6] text-[#4A2E08] font-bold text-[11px] uppercase tracking-[0.5px] px-3 py-[11px] border-b-[1.5px] border-b-[#E8D0A0] text-left whitespace-nowrap">{h}</th>
+                      ))}
+                      <th className="bg-[#FAF3E6] text-[#4A2E08] font-bold text-[11px] uppercase tracking-[0.5px] px-3 py-[11px] border-b-[1.5px] border-b-[#E8D0A0] text-left whitespace-nowrap" style={{ width: 42 }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tabelaPrincipal.map((row, rowIdx) => (
+                      <tr key={rowIdx} className="hover:[&>td]:bg-[#fafafa]">
+                        {row.map((cell, colIdx) => (
+                          <td key={colIdx} className="border-b border-gray-100 px-2 py-1.5 align-top">
+                            <textarea
+                              className="w-full min-h-[56px] border-0 bg-transparent resize-y text-[13px] p-1 text-gray-900 focus:outline-none focus:bg-[#fffbf0] focus:rounded"
+                              value={cell}
+                              onChange={(e) => handleTabelaPrincipalChange(rowIdx, colIdx, e.target.value)}
+                              placeholder={mainHeaders[colIdx]}
+                            />
+                          </td>
+                        ))}
+                        <td className="w-[42px] text-center align-middle border-b border-gray-100 px-2 py-1.5">
+                          {tabelaPrincipal.length > 1 && (
+                            <button type="button" className="flex items-center justify-center w-7 h-7 bg-red-50 text-red-600 border border-red-200 rounded-md cursor-pointer text-base font-bold mx-auto transition-colors duration-150 hover:bg-red-100 leading-[1]" onClick={() => removeTabelaPrincipalRow(rowIdx)}>×</button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <button type="button" className="inline-flex items-center gap-1.5 mt-3 px-4 py-2 bg-transparent text-[#C8932F] border-[1.5px] border-dashed border-[#C8932F] rounded-lg text-[13px] font-semibold cursor-pointer transition-colors duration-150 hover:bg-[#FAF3E6]" onClick={addTabelaPrincipalRow}>
+                + Adicionar Linha
+              </button>
+            </div>
+
+            {/* Acções */}
+            <div className="flex gap-3 justify-end py-1 pb-2 max-sm:flex-col-reverse">
+              <button type="button" className="px-6 py-[11px] bg-white text-gray-500 border-[1.5px] border-gray-200 rounded-lg text-[14px] font-semibold cursor-pointer transition-all duration-150 hover:bg-gray-50 hover:border-gray-300 max-sm:w-full max-sm:justify-center" onClick={() => navigate('/file')}>
+                Cancelar
+              </button>
+              <button type="button" className="px-7 py-[11px] bg-gradient-to-br from-[#C8932F] to-[#DFA847] text-white border-0 rounded-lg text-[14px] font-bold cursor-pointer tracking-[0.4px] flex items-center gap-2 shadow-[0_3px_12px_rgba(200,147,47,0.28)] transition-all duration-200 hover:enabled:opacity-[.92] hover:enabled:-translate-y-px disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none max-sm:w-full max-sm:justify-center" onClick={handleCreateTable} disabled={loading}>
+                {loading ? <><span className="inline-block w-[15px] h-[15px] border-2 border-white/35 border-t-white rounded-full animate-spin" /> A criar...</> : 'Criar Procedimento'}
+              </button>
+            </div>
+
+          </div>
+        </div>
       </div>
     </div>
   );

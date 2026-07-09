@@ -1,8 +1,7 @@
 import React, { useContext } from "react";
 import Login from './components/Auth/login';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
-import { Routes, Route, useNavigate } from "react-router-dom";
-import SelecionarPdf from "./pages/selectPdf";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import DashboardPage from "./pages/Dashboard";
 import TablePage from "./components/EditorProcedimentos"; 
 import CreateProcess from "./pages/novoProcesso";
@@ -11,19 +10,21 @@ import Register from "./components/Auth/register";
 import { UserContext } from "./context/userContext";
 import { TutorialProvider } from "./context/tutorialContext";
 import NewTable from "./pages/novoProcedimento"
+import Perfil from "./pages/Perfil"
+import RegistoNaoConformidade from "./pages/RegistoNaoConformidade";
 import FirstLogin from "./components/Auth/firstLogin";
 import { ToastContainer } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
-import './App.css';
 
 function App() {
   const navigate = useNavigate();
-  const { setUsername, setUserEmail, setUserRole, isAuthenticated } = useContext(UserContext);
+  const { setUsername, setUserEmail, setUserRole, setIsAuthenticated, isAuthenticated } = useContext(UserContext);
 
   const handleLoginSuccess = (userData) => {
     setUsername(userData.nome);
     setUserEmail(userData.email);
     setUserRole(userData.role);
+    setIsAuthenticated(true);
     navigate("/file");
   };
 
@@ -31,13 +32,13 @@ function App() {
     <TutorialProvider>
       <Routes>
         {/* Rota pública de login */}
-        <Route 
-          path="/" 
+        <Route
+          path="/"
           element={
-            isAuthenticated ? 
-              <ProtectedRoute><SelecionarPdf /></ProtectedRoute> : 
+            isAuthenticated ?
+              <Navigate to="/file" replace /> :
               <Login onLoginSuccess={handleLoginSuccess} />
-          } 
+          }
         />
         
         {/* Rotas protegidas */}
@@ -50,14 +51,6 @@ function App() {
           }
         />
         <Route
-          path="/indice"
-          element={
-            <ProtectedRoute>
-              <SelecionarPdf />
-            </ProtectedRoute>
-          }
-        />
-        <Route 
           path="/file/:filename" 
           element={
             <ProtectedRoute>
@@ -89,23 +82,43 @@ function App() {
             </ProtectedRoute>
           } 
         />
-        <Route 
-          path="/novo-processo" 
+        <Route
+          path="/novo-processo"
           element={
             <ProtectedRoute>
               <CreateProcess />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/newtable" 
+        <Route
+          path="/newtable"
           element={
             <ProtectedRoute>
               <NewTable />
             </ProtectedRoute>
           } 
         />
-        <Route 
+        <Route
+          path="/perfil"
+          element={
+            <ProtectedRoute>
+              <Perfil />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/nao-conformidade"
+          element={
+            <ProtectedRoute>
+              <RegistoNaoConformidade />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/first-login"
+          element={<FirstLogin mode="firstLogin" />}
+        />
+        <Route
           path="/reset-password"
           element={<FirstLogin mode="reset" />}
         />

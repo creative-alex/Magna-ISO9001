@@ -45,6 +45,12 @@ export const UserProvider = ({ children }) => {
       
       if (response.ok) {
         const userData = await response.json();
+
+        if (userData.isFirstLogin) {
+          // Não autenticar — login.jsx redireciona para /first-login
+          return false;
+        }
+
         setUsername(userData.nome);
         setUserEmail(userData.email);
         setUserRole(userData.role);
@@ -111,6 +117,7 @@ export const UserProvider = ({ children }) => {
     userRole,
     setUserRole,
     isAuthenticated,
+    setIsAuthenticated,
     isLoading,
     logout,
     validateUserToken,

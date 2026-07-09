@@ -63,44 +63,63 @@ export async function addHeader(page, font, title, imageBytes = null, pathFilena
     });
   }
   
-  // Desenhar pathFilename no canto extremo direito em duas linhas
+  // Desenhar pathFilename no canto direito com wrap se necessário
     if (pathFilename) {
-      const fileFontSize = 12;
-      // Normaliza separadores (Windows \ -> /) e divide em pasta/arquivo
+      const fileFontSize = 10;
       const normalizedPath = pathFilename.replace(/\\/g, '/');
       const parts = normalizedPath.split('/');
-      const filename = parts.pop() || normalizedPath; // Nome do arquivo
-      const folder = parts.join('/'); // Pasta(s)
-      
-      const marginRight = 50; // Mais para a esquerda (era 10, agora 50)
-      
-      // Primeira linha (pasta) - mais em baixo
-      if (folder) {
-        const folderWidth = font.widthOfTextAtSize(folder, fileFontSize);
-        const folderX = width - folderWidth - marginRight;
-        const folderY = height - 60; // Mais em baixo (era -20, agora -60)
-      
-      page.drawText(folder, {
-        x: folderX,
-        y: folderY,
-        size: fileFontSize,
-        font: font,
-        color: rgb(0.6, 0.6, 0.6), // Cinzento mais claro para a pasta
+      const filename = parts.pop() || normalizedPath;
+      const folder = parts.join('/');
+
+      const marginRight = 50;
+      const maxTextWidth = width / 2 - marginRight;
+      const lineHeight = fileFontSize + 4;
+
+      const wrapText = (text) => {
+        const lines = [];
+        let remaining = text;
+        while (font.widthOfTextAtSize(remaining, fileFontSize) > maxTextWidth) {
+          let i = remaining.length;
+          while (i > 0 && font.widthOfTextAtSize(remaining.slice(0, i), fileFontSize) > maxTextWidth) {
+            i--;
+          }
+          const spaceIdx = remaining.lastIndexOf(' ', i);
+          if (spaceIdx > 0) i = spaceIdx + 1;
+          lines.push(remaining.slice(0, i).trimEnd());
+          remaining = remaining.slice(i).trimStart();
+        }
+        if (remaining) lines.push(remaining);
+        return lines;
+      };
+
+      const folderLines = folder ? wrapText(folder) : [];
+      const filenameLines = wrapText(filename);
+
+      let currentY = height - 55;
+
+      folderLines.forEach(line => {
+        const lw = font.widthOfTextAtSize(line, fileFontSize);
+        page.drawText(line, {
+          x: width - lw - marginRight,
+          y: currentY,
+          size: fileFontSize,
+          font,
+          color: rgb(0.6, 0.6, 0.6),
+        });
+        currentY -= lineHeight;
       });
-    }
-    
-    // Segunda linha (nome do arquivo) - ainda mais em baixo
-  const filenameWidth = font.widthOfTextAtSize(filename, fileFontSize);
-    const filenameX = width - filenameWidth - marginRight;
-    const filenameY = height - 75; // Mais em baixo (era -35, agora -75)
-    
-    page.drawText(filename, {
-      x: filenameX,
-      y: filenameY,
-      size: fileFontSize,
-      font: font,
-      color: rgb(0.3, 0.3, 0.3), // Cinzento mais escuro para o arquivo
-    });
+
+      filenameLines.forEach(line => {
+        const lw = font.widthOfTextAtSize(line, fileFontSize);
+        page.drawText(line, {
+          x: width - lw - marginRight,
+          y: currentY,
+          size: fileFontSize,
+          font,
+          color: rgb(0.3, 0.3, 0.3),
+        });
+        currentY -= lineHeight;
+      });
   }
   
   if (imageBytes) {

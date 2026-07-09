@@ -3,8 +3,7 @@ import ExportPdfButton from "../Buttons/exportPdf";
 import PreviewPdfButton from "../Buttons/previewPDF";
 import useRowContextMenu from "../ContextMenu/useRowContextMenu";
 import MultiSelectDonos from "../MultiSelectDonos";
-import { FaPencil, FaXmark, FaCheck } from "react-icons/fa6";
-import "./styleTemplates.css";
+import { FaPencil, FaXmark, FaCheck, FaGripVertical, FaArrowRotateLeft, FaArrowLeft, FaClipboardList } from "react-icons/fa6";
 
 export default function Template2({
   isEditable = false,
@@ -47,6 +46,8 @@ export default function Template2({
   onSaveSuccess,
   onRenameFile,
   history = [],
+  initialMergedSpans = {},
+  initialHiddenCells = {},
 }) {
   const textAreaRefs = useRef({});
   const titleInputRef = useRef(null);
@@ -54,8 +55,18 @@ export default function Template2({
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [isSavingTitle, setIsSavingTitle] = useState(false);
-  const [mergedSpans, setMergedSpans] = useState({});
-  const [hiddenCells, setHiddenCells] = useState({});
+  const [mergedSpans, setMergedSpans] = useState(initialMergedSpans);
+  const [hiddenCells, setHiddenCells] = useState(initialHiddenCells);
+
+  // Resincroniza a união de células vinda da API sempre que o documento muda
+  // (o estado local é o único dono da união durante a edição, por isso não
+  // reagimos a qualquer alteração de referência dos props, só à troca de ficheiro).
+  useEffect(() => {
+    console.log("🔗 [DEBUG merge] tabelaMatriz recebeu initialMergedSpans:", initialMergedSpans, "initialHiddenCells:", initialHiddenCells);
+    setMergedSpans(initialMergedSpans);
+    setHiddenCells(initialHiddenCells);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathFilename]);
 
   const contextMenuAtividades = useRowContextMenu({
     totalRows: atividades.length,
@@ -81,7 +92,7 @@ export default function Template2({
       return [
         {
           label: "Unir/Expandir para baixo",
-          icon: "↕",
+          icon: <FaGripVertical size={14} />,
           className: "merge-down",
           disabled: !canExpandDown,
           action: () => {
@@ -102,7 +113,7 @@ export default function Template2({
         },
         {
           label: "Reduzir união",
-          icon: "⟲",
+          icon: <FaArrowRotateLeft size={12} />,
           className: "unmerge",
           disabled: !canUnmergeStep,
           action: () => {
@@ -148,6 +159,10 @@ export default function Template2({
 
   const handleTextareaResize = (e) => {
     const textarea = e.target;
+    // Limpa padding inline de um resize anterior; o padding por omissão (py-2)
+    // já alinha o texto ao topo, tal como nas células normais.
+    textarea.style.paddingTop = "";
+    textarea.style.paddingBottom = "";
     textarea.style.height = "auto";
     textarea.style.height = `${Math.max(textarea.scrollHeight, 40)}px`;
     const isMerged = textarea.dataset && textarea.dataset.merged === "1";
@@ -157,26 +172,15 @@ export default function Template2({
         const tdH = td.clientHeight;
         textarea.style.height = "auto";
         const contentH = textarea.scrollHeight;
-        const cs = window.getComputedStyle(textarea);
-        const baseTop = parseFloat(cs.paddingTop) || 10;
-        const baseBottom = parseFloat(cs.paddingBottom) || 10;
-        if (contentH <= tdH) {
-          const extraEach = Math.max(Math.floor((tdH - contentH) / 2), 0);
-          textarea.style.height = "100%";
-          textarea.style.paddingTop = `${baseTop + extraEach}px`;
-          textarea.style.paddingBottom = `${baseBottom + extraEach}px`;
-        } else {
-          textarea.style.height = `${contentH}px`;
-          textarea.style.paddingTop = `${baseTop}px`;
-          textarea.style.paddingBottom = `${baseBottom}px`;
-        }
-        textarea.style.overflowY = "hidden";
+        // Altura explícita em pixels (não "100%"): dentro de uma <td> com
+        // altura automática (definida pelas outras colunas da linha), um
+        // filho com height:100% não estica de forma fiável em todos os
+        // browsers. Medir tdH e aplicá-lo diretamente garante que a área de
+        // texto preenche mesmo a união (texto ao topo, sobra fica em baixo).
+        textarea.style.height = `${Math.max(contentH, tdH)}px`;
       }
-    } else {
-      textarea.style.paddingTop = "";
-      textarea.style.paddingBottom = "";
-      textarea.style.overflowY = "hidden";
     }
+    textarea.style.overflowY = "hidden";
   };
 
   useEffect(() => {
@@ -260,23 +264,27 @@ export default function Template2({
   };
 
   return (
-    <div className="template1-container">
+    <div className="flex flex-col items-center justify-start p-10 w-[80vw] max-w-full mx-auto bg-white rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.08)] border border-gray-200 overflow-visible">
 
       {/* ── Cabeçalho ── */}
-      <div className="matriz-header">
-        <div className="matriz-title-block">
-          {Title.length > 1 && <span className="matriz-breadcrumb">{Title[0]}</span>}
+      <div className="w-full flex justify-between items-start mb-7 pb-5 border-b-2 border-[#f0f0f0]">
+        <div className="flex flex-col gap-1">
+          {Title.length > 1 && (
+            <span className="text-xs font-semibold text-[#C8932F] uppercase tracking-[1px]">
+              {Title[0]}
+            </span>
+          )}
 
           {isEditingTitle ? (
-            <div className="matriz-title-edit">
+            <div className="flex items-center gap-1.5">
               {getFilenameParts().prefix && (
-                <span className="matriz-title-prefix">
+                <span className="text-[1.6rem] font-bold text-gray-400 whitespace-nowrap select-none">
                   {getFilenameParts().prefix}
                 </span>
               )}
               <input
                 ref={titleInputRef}
-                className="matriz-title-input"
+                className="text-[1.6rem] font-bold text-gray-900 border-0 border-b-2 border-b-[#C8932F] bg-transparent outline-none px-1 py-0.5 w-[700px] max-w-[70vw] font-[inherit]"
                 value={draftTitle}
                 onChange={(e) => setDraftTitle(e.target.value)}
                 onKeyDown={(e) => {
@@ -287,7 +295,7 @@ export default function Template2({
                 autoFocus
               />
               <button
-                className="matriz-title-action confirm"
+                className={`w-7 h-7 rounded-full border-0 cursor-pointer flex items-center justify-center text-[13px] transition-colors duration-150 shrink-0 bg-green-500 text-white hover:enabled:bg-green-700${isSavingTitle || !draftTitle.trim() ? " opacity-50 cursor-not-allowed" : ""}`}
                 onClick={confirmRename}
                 disabled={isSavingTitle || !draftTitle.trim()}
                 title="Confirmar"
@@ -295,7 +303,7 @@ export default function Template2({
                 {isSavingTitle ? "..." : <FaCheck size={14} />}
               </button>
               <button
-                className="matriz-title-action cancel"
+                className={`w-7 h-7 rounded-full border-0 cursor-pointer flex items-center justify-center text-[13px] transition-colors duration-150 shrink-0 bg-red-600 text-white hover:enabled:bg-red-800${isSavingTitle ? " opacity-50 cursor-not-allowed" : ""}`}
                 onClick={cancelRename}
                 disabled={isSavingTitle}
                 title="Cancelar"
@@ -304,13 +312,13 @@ export default function Template2({
               </button>
             </div>
           ) : (
-            <div className="matriz-title-display">
-              <h2 className="matriz-title">
+            <div className="group flex items-center gap-2">
+              <h2 className="text-[1.6rem] font-bold text-gray-900 m-0">
                 {Title.length > 1 ? Title.slice(1).join(" ") : Title[0]}
               </h2>
               {onRenameFile && (
                 <button
-                  className={`matriz-title-edit-btn${isEditable ? " visible" : ""}`}
+                  className={`bg-transparent border-0 cursor-pointer text-[#C8932F] p-1 rounded transition-all duration-200 flex items-center${isEditable ? " opacity-100" : " opacity-0 group-hover:opacity-100"}`}
                   onClick={startRename}
                   title="Clique para renomear"
                 >
@@ -322,27 +330,29 @@ export default function Template2({
         </div>
         <button
           onClick={() => window.history.back()}
-          className="back-button"
+          className="text-orange-500 border-0 bg-transparent cursor-pointer mr-2.5 inline-flex items-center gap-[5px] text-base"
           title="Voltar à página anterior"
         >
-          <span className="back-arrow">←</span>
-          <span className="back-text">Retroceder</span>
+          <FaArrowLeft size={14} />
+          <span>Retroceder</span>
         </button>
       </div>
 
       {/* ── Secção: Informações do Processo ── */}
-      <section className="matriz-section">
-        <div className="matriz-section-header">
-          <span className="matriz-section-icon">📋</span>
-          <h3 className="matriz-section-title">Informações do Processo</h3>
+      <section className="w-full bg-white border border-gray-200 rounded-[10px] mb-6 overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.05)]">
+        <div className="flex items-center gap-2.5 px-5 py-[14px] bg-gradient-to-br from-[#C8932F] to-[#e0a93a] border-b border-b-[#b8832a]">
+          <FaClipboardList size={16} className="text-white" />
+          <h3 className="text-[13px] font-bold text-white uppercase tracking-[0.8px] m-0">
+            Informações do Processo
+          </h3>
         </div>
 
-        <div className="matriz-info-grid">
+        <div className="grid grid-cols-2 gap-0 max-md:grid-cols-1">
 
           {/* Dono do Processo */}
-          <div className="matriz-info-card">
-            <div className="matriz-info-label">
-              <span className="matriz-label-dot" />
+          <div className="px-5 py-4 border-r border-r-[#f0f0f0] border-b border-b-[#f0f0f0] even:border-r-0 last:border-b-0">
+            <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 uppercase tracking-[0.6px] mb-2">
+              <span className="w-[7px] h-[7px] rounded-full bg-[#C8932F] shrink-0" />
               Dono do Processo (nomeado)
             </div>
             <MultiSelectDonos
@@ -356,14 +366,14 @@ export default function Template2({
           </div>
 
           {/* Objetivo do Processo */}
-          <div className="matriz-info-card">
-            <div className="matriz-info-label">
-              <span className="matriz-label-dot" />
+          <div className="px-5 py-4 border-r border-r-[#f0f0f0] border-b border-b-[#f0f0f0] even:border-r-0 last:border-b-0">
+            <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 uppercase tracking-[0.6px] mb-2">
+              <span className="w-[7px] h-[7px] rounded-full bg-[#C8932F] shrink-0" />
               Objetivo do Processo
             </div>
             <textarea
               ref={(el) => (textAreaRefs.current["objetivo"] = el)}
-              className="tabela-processo-textarea"
+              className="w-full border border-transparent rounded-md px-2.5 py-2 font-[inherit] text-[14px] text-gray-700 bg-gray-50 transition-all duration-200 resize-none box-border overflow-y-hidden min-h-[40px] leading-[1.5] focus:outline-none focus:border-[#C8932F] focus:bg-white focus:shadow-[0_0_0_3px_rgba(200,147,47,0.12)] read-only:bg-transparent read-only:cursor-default"
               value={objetivoProcesso}
               onChange={(e) => setObjetivoProcesso(e.target.value)}
               onInput={handleTextareaResize}
@@ -373,14 +383,14 @@ export default function Template2({
           </div>
 
           {/* Serviços de Entrada */}
-          <div className="matriz-info-card">
-            <div className="matriz-info-label matriz-label-entrada">
-              <span className="matriz-label-dot entrada" />
+          <div className="px-5 py-4 border-r border-r-[#f0f0f0] border-b border-b-[#f0f0f0] even:border-r-0 last:border-b-0">
+            <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 uppercase tracking-[0.6px] mb-2">
+              <span className="w-[7px] h-[7px] rounded-full bg-blue-500 shrink-0" />
               Serviços de Entrada
             </div>
             <textarea
               ref={(el) => (textAreaRefs.current["servicosEntrada"] = el)}
-              className="tabela-processo-textarea large"
+              className="w-full border border-transparent rounded-md px-2.5 py-2 font-[inherit] text-[14px] text-gray-700 bg-gray-50 transition-all duration-200 resize-none box-border overflow-y-hidden min-h-[40px] leading-[1.5] focus:outline-none focus:border-[#C8932F] focus:bg-white focus:shadow-[0_0_0_3px_rgba(200,147,47,0.12)] read-only:bg-transparent read-only:cursor-default"
               value={servicosEntrada}
               onChange={(e) => setServicosEntrada(e.target.value)}
               onInput={handleTextareaResize}
@@ -390,14 +400,14 @@ export default function Template2({
           </div>
 
           {/* Serviço de Saída */}
-          <div className="matriz-info-card">
-            <div className="matriz-info-label matriz-label-saida">
-              <span className="matriz-label-dot saida" />
+          <div className="px-5 py-4 border-r border-r-[#f0f0f0] border-b border-b-[#f0f0f0] even:border-r-0 last:border-b-0">
+            <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 uppercase tracking-[0.6px] mb-2">
+              <span className="w-[7px] h-[7px] rounded-full bg-emerald-500 shrink-0" />
               Serviço de Saída
             </div>
             <textarea
               ref={(el) => (textAreaRefs.current["servicoSaida"] = el)}
-              className="tabela-processo-textarea large"
+              className="w-full border border-transparent rounded-md px-2.5 py-2 font-[inherit] text-[14px] text-gray-700 bg-gray-50 transition-all duration-200 resize-none box-border overflow-y-hidden min-h-[40px] leading-[1.5] focus:outline-none focus:border-[#C8932F] focus:bg-white focus:shadow-[0_0_0_3px_rgba(200,147,47,0.12)] read-only:bg-transparent read-only:cursor-default"
               value={servicoSaida}
               onChange={(e) => setServicoSaida(e.target.value)}
               onInput={handleTextareaResize}
@@ -410,161 +420,167 @@ export default function Template2({
       </section>
 
       {/* ── Tabela: Principais Atividades ── */}
-      <table className="tabela-atividades">
-        <colgroup>
-          <col className="col-1" />
-          <col className="col-2" />
-          <col className="col-3" />
-          <col className="col-4" />
-          <col className="col-5" />
-          <col className="col-6" />
-        </colgroup>
-        <thead>
-          <tr>
-            {COL_LABELS.map((label, i) => (
-              <th key={i} className={`col-${i + 1}`}>{label}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {atividades.map((row, rowIdx) => (
-            <tr
-              key={rowIdx}
-              onContextMenu={
-                isEditable
-                  ? (e) => contextMenuAtividades.handleContextMenuEvent(e, rowIdx)
-                  : undefined
-              }
-            >
-              {row.map((cell, colIdx) => {
-                const key = `${rowIdx}-${colIdx}`;
-                const mergedTop = !!(mergedSpans[key] && mergedSpans[key] >= 2);
-                if (hiddenCells[key]) return null;
-                return (
-                  <td
-                    key={colIdx}
-                    data-label={COL_LABELS[colIdx]}
-                    onContextMenu={
-                      isEditable
-                        ? (e) => {
-                            e.stopPropagation();
-                            setContextMenuCell({ row: rowIdx, col: colIdx });
-                            contextMenuAtividades.handleContextMenuEvent(e, rowIdx);
-                          }
-                        : undefined
-                    }
-                    rowSpan={mergedTop ? mergedSpans[key] : 1}
-                    className={`${mergedTop ? "merged-cell " : ""}col-${colIdx + 1}`}
-                  >
-                    <textarea
-                      ref={(el) =>
-                        (textAreaRefs.current[`atividade-${rowIdx}-${colIdx}`] = el)
-                      }
-                      className="tabela-atividades-input custom"
-                      value={cell}
-                      onChange={(e) =>
-                        handleAtividadesChange(rowIdx, colIdx, e.target.value)
-                      }
-                      onInput={handleTextareaResize}
-                      placeholder={
-                        colIdx === 0
-                          ? "Atividade..."
-                          : colIdx === 1
-                          ? "Procedimento..."
-                          : "Requisito..."
-                      }
-                      style={{ resize: "none" }}
-                      data-merged={mergedTop ? "1" : "0"}
-                      readOnly={!isEditable}
-                    />
-                  </td>
-                );
-              })}
+      <div className="w-full overflow-x-auto mb-5 rounded-md border border-gray-200 shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+        <table className="w-full border-collapse font-sans bg-white table-fixed min-w-full break-words">
+          <colgroup>
+            <col style={{ width: "30%" }} />
+            <col style={{ width: "30%", minWidth: "200px" }} />
+            <col style={{ width: "8%", minWidth: "60px" }} />
+            <col style={{ width: "8%", minWidth: "60px" }} />
+            <col style={{ width: "8%", minWidth: "60px" }} />
+            <col style={{ width: "8%", minWidth: "60px" }} />
+          </colgroup>
+          <thead>
+            <tr>
+              {COL_LABELS.map((label, i) => (
+                <th
+                  key={i}
+                  className="bg-[#C8932F] text-white px-5 py-4 font-bold uppercase text-[11px] border-0 tracking-[0.8px] text-center border-b-[3px] border-b-[#b8832a] shadow-[inset_0_-2px_4px_rgba(0,0,0,0.1)] relative"
+                >
+                  {label}
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {/* ── Tabela: Indicadores ── */}
-      <table className="tabela-indicadores">
-        <thead>
-          <tr>
-            <th className="header-center">Indicadores de monitorização do processo</th>
-          </tr>
-        </thead>
-        <tbody>
-          {Array.isArray(indicadores) ? (
-            indicadores.map((indicador, rowIdx) => (
+          </thead>
+          <tbody>
+            {atividades.map((row, rowIdx) => (
               <tr
                 key={rowIdx}
+                className="transition-colors duration-200 border-b border-gray-200 hover:bg-gray-50 even:bg-[#fafbfc] even:hover:bg-gray-100"
+                onContextMenu={
+                  isEditable
+                    ? (e) => contextMenuAtividades.handleContextMenuEvent(e, rowIdx)
+                    : undefined
+                }
+              >
+                {row.map((cell, colIdx) => {
+                  const key = `${rowIdx}-${colIdx}`;
+                  const mergedTop = !!(mergedSpans[key] && mergedSpans[key] >= 2);
+                  if (hiddenCells[key]) return null;
+                  return (
+                    <td
+                      key={colIdx}
+                      data-label={COL_LABELS[colIdx]}
+                      onContextMenu={
+                        isEditable
+                          ? (e) => {
+                              e.stopPropagation();
+                              setContextMenuCell({ row: rowIdx, col: colIdx });
+                              contextMenuAtividades.handleContextMenuEvent(e, rowIdx);
+                            }
+                          : undefined
+                      }
+                      rowSpan={mergedTop ? mergedSpans[key] : 1}
+                      className={`p-0 bg-[inherit] relative h-auto overflow-hidden break-words w-full max-w-full box-border border border-gray-200 align-top text-[14px]${mergedTop ? " align-top" : ""}`}
+                    >
+                      <textarea
+                        ref={(el) =>
+                          (textAreaRefs.current[`atividade-${rowIdx}-${colIdx}`] = el)
+                        }
+                        className="w-full h-full border-0 bg-transparent px-3 py-2 font-[inherit] text-[14px] text-gray-700 leading-[1.3] resize-none overflow-hidden break-words min-h-8 max-w-full box-border block whitespace-pre-wrap m-0 focus:outline-none focus:bg-white focus:shadow-[inset_0_0_0_2px_#C8932F] focus:rounded placeholder:text-gray-400 placeholder:italic"
+                        value={cell}
+                        onChange={(e) =>
+                          handleAtividadesChange(rowIdx, colIdx, e.target.value)
+                        }
+                        onInput={handleTextareaResize}
+                        placeholder={
+                          colIdx === 0
+                            ? "Atividade..."
+                            : colIdx === 1
+                            ? "Procedimento..."
+                            : "Requisito..."
+                        }
+                        style={{ resize: "none" }}
+                        data-merged={mergedTop ? "1" : "0"}
+                        readOnly={!isEditable}
+                      />
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ── Secção: Indicadores ── */}
+      <section className="w-full bg-white border border-gray-200 rounded-[10px] mb-6 overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.05)]">
+        <div className="flex items-center gap-2.5 px-5 py-[14px] bg-gradient-to-br from-[#C8932F] to-[#e0a93a] border-b border-b-[#b8832a]">
+          <h3 className="text-[13px] font-bold text-white uppercase tracking-[0.8px] m-0">
+            Indicadores de monitorização do processo
+          </h3>
+        </div>
+        <div className="flex flex-col gap-px bg-[#f0f0f0] p-px">
+          {Array.isArray(indicadores) ? (
+            indicadores.map((indicador, rowIdx) => (
+              <div
+                key={rowIdx}
+                className="bg-white p-4 flex gap-3 items-start transition-colors duration-150 hover:bg-[#fafaf8]"
                 onContextMenu={
                   isEditable
                     ? (e) => contextMenuIndicadores.handleContextMenuEvent(e, rowIdx)
                     : undefined
                 }
               >
-                <td>
-                  <label style={{ display: "block", marginBottom: "5px", fontSize: "12px", fontWeight: "bold" }}>
-                    Indicador R{rowIdx + 1}:
-                  </label>
-                  <textarea
-                    ref={(el) => (textAreaRefs.current[`indicador-${rowIdx}`] = el)}
-                    className="tabela-indicadores-textarea medium"
-                    value={indicador || ""}
-                    onChange={(e) => handleIndicadoresChange(rowIdx, e.target.value)}
-                    onInput={handleTextareaResize}
-                    placeholder={`Indicador ${rowIdx + 1} de monitorização...`}
-                    style={{ resize: "none" }}
-                    readOnly={!isEditable}
-                  />
-                </td>
-              </tr>
+                <span className="shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-[#C8932F] to-[#e0a93a] text-white text-[11px] font-bold flex items-center justify-center shadow-[0_2px_6px_rgba(200,147,47,0.3)] mt-0.5">
+                  {rowIdx + 1}
+                </span>
+                <textarea
+                  ref={(el) => (textAreaRefs.current[`indicador-${rowIdx}`] = el)}
+                  className="flex-1 w-full border border-transparent rounded-md px-2.5 py-2 font-[inherit] text-[14px] text-gray-700 bg-gray-50 transition-all duration-200 resize-none box-border overflow-y-hidden min-h-[60px] leading-[1.5] focus:outline-none focus:border-[#C8932F] focus:bg-white focus:shadow-[0_0_0_3px_rgba(200,147,47,0.12)] read-only:bg-transparent read-only:cursor-default"
+                  value={indicador || ""}
+                  onChange={(e) => handleIndicadoresChange(rowIdx, e.target.value)}
+                  onInput={handleTextareaResize}
+                  placeholder={`Indicador ${rowIdx + 1} de monitorização...`}
+                  style={{ resize: "none" }}
+                  readOnly={!isEditable}
+                />
+              </div>
             ))
           ) : (
             ["r1", "r2", "r3"].map((r, idx) => (
-              <tr
+              <div
                 key={r}
+                className="bg-white p-4 flex gap-3 items-start transition-colors duration-150 hover:bg-[#fafaf8]"
                 onContextMenu={
                   isEditable
                     ? (e) => contextMenuIndicadores.handleContextMenuEvent(e, idx)
                     : undefined
                 }
               >
-                <td>
-                  <label style={{ display: "block", marginBottom: "5px", fontSize: "12px", fontWeight: "bold" }}>
-                    Indicador R{idx + 1}:
-                  </label>
-                  <textarea
-                    ref={(el) => (textAreaRefs.current[`indicador-${r}`] = el)}
-                    className="tabela-indicadores-textarea medium"
-                    value={indicadores[`indicadores_${r}`] || ""}
-                    onChange={(e) =>
-                      handleIndicadoresChange(`indicadores_${r}`, e.target.value)
-                    }
-                    onInput={handleTextareaResize}
-                    placeholder={`${
-                      idx === 0 ? "Primeiro" : idx === 1 ? "Segundo" : "Terceiro"
-                    } indicador de monitorização...`}
-                    style={{ resize: "none" }}
-                    readOnly={!isEditable}
-                  />
-                </td>
-              </tr>
+                <span className="shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-[#C8932F] to-[#e0a93a] text-white text-[11px] font-bold flex items-center justify-center shadow-[0_2px_6px_rgba(200,147,47,0.3)] mt-0.5">
+                  {idx + 1}
+                </span>
+                <textarea
+                  ref={(el) => (textAreaRefs.current[`indicador-${r}`] = el)}
+                  className="flex-1 w-full border border-transparent rounded-md px-2.5 py-2 font-[inherit] text-[14px] text-gray-700 bg-gray-50 transition-all duration-200 resize-none box-border overflow-y-hidden min-h-[60px] leading-[1.5] focus:outline-none focus:border-[#C8932F] focus:bg-white focus:shadow-[0_0_0_3px_rgba(200,147,47,0.12)] read-only:bg-transparent read-only:cursor-default"
+                  value={indicadores[`indicadores_${r}`] || ""}
+                  onChange={(e) =>
+                    handleIndicadoresChange(`indicadores_${r}`, e.target.value)
+                  }
+                  onInput={handleTextareaResize}
+                  placeholder={`${
+                    idx === 0 ? "Primeiro" : idx === 1 ? "Segundo" : "Terceiro"
+                  } indicador de monitorização...`}
+                  style={{ resize: "none" }}
+                  readOnly={!isEditable}
+                />
+              </div>
             ))
           )}
-        </tbody>
-      </table>
+        </div>
+      </section>
 
       {/* Context menus */}
       {isEditable && contextMenuAtividades.contextMenu}
       {isEditable && contextMenuIndicadores.contextMenu}
 
       {/* ── Botões flutuantes ── */}
-      <div className="fab-container">
+      <div className="fixed bottom-[100px] right-5 z-[1002] flex flex-col gap-3 items-center max-md:bottom-4 max-md:right-4">
         {setIsEditable && canEdit && (
           !isEditable ? (
             <button
-              className="edit-button"
+              className="w-11 h-11 rounded-full bg-transparent border-0 flex items-center justify-center text-[22px] shadow-[0_2px_8px_rgba(0,0,0,0.10)] cursor-pointer"
               onClick={() => setIsEditable(true)}
               title="Ativar modo de edição"
               style={{ ...sharedFabStyle, backgroundColor: "#1976d2", color: "white" }}

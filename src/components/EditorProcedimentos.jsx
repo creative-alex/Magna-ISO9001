@@ -7,6 +7,8 @@ import Template1 from "./templates/tabelaProcedimento";
 import ExportPdfButton from "./Buttons/exportPdf";
 import PreviewPdfButton from "./Buttons/previewPDF";
 import LoadingPage from "../pages/loading";
+import Sidebar from "./Sidebar";
+import Topbar from "./Topbar";
 
 // Definição dos dois templates
 const tabelas = [
@@ -127,7 +129,7 @@ export default function TablePageUnified() {
   const [isLoading, setIsLoading] = useState(true);
   
   // Context do usuário para verificar permissões
-  const { username } = useContext(UserContext);
+  const { username, userRole } = useContext(UserContext);
 
   const originalFilename =
     location?.state?.originalFilename
@@ -193,6 +195,8 @@ const [obsTableOriginal, setObsTableOriginal] = useState([]);
 const [mainTableOriginal, setMainTableOriginal] = useState([]);
 const [atividadesOriginal, setAtividadesOriginal] = useState([]);
 const [indicadoresOriginal, setIndicadoresOriginal] = useState([]);
+const [atividadesMergedSpans, setAtividadesMergedSpans] = useState({});
+const [atividadesHiddenCells, setAtividadesHiddenCells] = useState({});
 const [funcionarios, setFuncionarios] = useState([]);
 
 // Estado para controlar se as tabelas são editáveis (inicialmente false)
@@ -283,7 +287,7 @@ const isUserOwner = (donoProcessoString, username) => {
 };
 
 // Fallback: verificar permissões localmente se não vier do state
-const isAdmin = username === "superadmin" || username === "SuperAdmin";
+const isAdmin = userRole === "SuperAdmin";
 const canEditFallback = isAdmin || isUserOwner(donoProcesso, username);
 
 // Usar o valor do state se disponível, senão usar fallback
@@ -757,7 +761,30 @@ useEffect(() => {
           
           setAtividades(novasAtividades);
           setAtividadesOriginal(JSON.parse(JSON.stringify(novasAtividades))); // Definir valor original
-          
+
+          // Reconstrói a união de células a partir dos campos "_span" gravados no PDF,
+          // para a união sobreviver a um reload em vez de se perder.
+          const spanFields = Object.keys(formData).filter(f => /^atividades_r\d+_c\d+_span$/.test(f));
+          console.log("🔗 [DEBUG merge] Todas as chaves recebidas de pdf-form-data:", Object.keys(formData));
+          console.log("🔗 [DEBUG merge] Campos de união encontrados:", spanFields, spanFields.map(f => formData[f]));
+          const novosMergedSpans = {};
+          const novosHiddenCells = {};
+          spanFields.forEach(f => {
+            const match = f.match(/^atividades_r(\d+)_c(\d+)_span$/);
+            const row = parseInt(match[1], 10) - 1;
+            const col = parseInt(match[2], 10) - 1;
+            const span = parseInt(formData[f], 10);
+            if (span >= 2) {
+              novosMergedSpans[`${row}-${col}`] = span;
+              for (let coveredRow = row + 1; coveredRow < row + span; coveredRow++) {
+                novosHiddenCells[`${coveredRow}-${col}`] = true;
+              }
+            }
+          });
+          setAtividadesMergedSpans(novosMergedSpans);
+          setAtividadesHiddenCells(novosHiddenCells);
+          console.log("🔗 [DEBUG merge] mergedSpans reconstruído:", novosMergedSpans, "hiddenCells:", novosHiddenCells);
+
           // Busca por indicadores dinamicamente
           const indicadorFields = Object.keys(formData).filter(f => /^indicadores_r\d+$/.test(f));
           const indicadorNumbers = indicadorFields.map(f => parseInt(f.match(/^indicadores_r(\d+)$/)[1], 10));
@@ -1266,8 +1293,19 @@ useEffect(() => {
     return <LoadingPage />;
   }
   
+  const docName = originalFilename
+    ? originalFilename.split('/').pop().replace(/\.pdf$/i, '')
+    : 'Documento';
+
   return (
-    <div>
+    <div className="flex min-h-screen">
+      <Sidebar onSelectFile={(path) => navigate(`/file/${path.replace(/\s/g, '-').replace(/\//g, '__')}`)} />
+      <div className="ml-[230px] flex-1 flex flex-col min-h-screen">
+        <Topbar
+          icon={isTemplate2 ? "⚙️" : "📄"}
+          title={docName}
+        />
+        <div className="p-6 flex-1" style={{ padding: 0 }}>
       {isTemplate2 ? (
         <>
           <TabelaPdf
@@ -1307,6 +1345,8 @@ useEffect(() => {
             onRenameFile={isSuperAdmin ? handleRenameFile : undefined}
             history={history}
             clearHistory={clearHistory}
+            initialMergedSpans={atividadesMergedSpans}
+            initialHiddenCells={atividadesHiddenCells}
             handleChange={
               (rowIdx, colIdx, value) => {
                 const valorAnterior = tableData.main[rowIdx] ? tableData.main[rowIdx][colIdx] : '';
@@ -1410,7 +1450,7 @@ useEffect(() => {
       )}
       
       {/* AI Assistant para continuar tutorial */}
-      <AIAssistant 
+      <AIAssistant
         fileTree={[]}
         searchTerm=""
         username={username}
@@ -1419,6 +1459,8 @@ useEffect(() => {
         processOwners={{}}
         onSuggestion={() => {}}
       />
+        </div>
+      </div>
     </div>
   );
 }

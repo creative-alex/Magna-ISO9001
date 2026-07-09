@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import userAddIcon from "../../icons/user_add.ico";
+import { FaUserPlus } from "react-icons/fa6";
 
 const AddUserButton = () => {
   const navigate = useNavigate();
@@ -10,14 +10,8 @@ const AddUserButton = () => {
   };
 
   return (
-    <button className="createUser-button" onClick={handleAddUser}>
-      <img 
-        src={userAddIcon} 
-        alt="Adicionar Utilizador" 
-        style={{ width: '16px', height: '16px', marginRight: '5px' }} 
-        title="Adicionar Utilizador"
-        
-      />
+    <button className="bg-transparent text-[#7A5010] border border-[#E8D0A0] px-[14px] py-[7px] text-[13px] font-semibold cursor-pointer rounded-md transition-all duration-200 whitespace-nowrap hover:bg-[#F0E2C4] hover:-translate-y-px" onClick={handleAddUser}>
+      <FaUserPlus size={16} style={{ marginRight: '5px' }} title="Adicionar Utilizador" />
     </button>
   );
 };

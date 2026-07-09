@@ -217,26 +217,10 @@ export default function ExportPdfButton({
     }
   }, [exportRef, handleSendToBackend]);
 
-  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 600;
   return (
     <button
-      className="save-button"
+      className="w-11 h-11 rounded-full bg-[#1976d2] text-white border-0 flex items-center justify-center text-[22px] shadow-[0_2px_8px_rgba(0,0,0,0.10)] cursor-pointer p-0 transition-colors duration-200 hover:bg-[#1565c0]"
       onClick={handleSendToBackend}
-      style={{
-        width: 44,
-        height: 44,
-        borderRadius: '50%',
-        backgroundColor: '#1976d2',
-        color: 'white',
-        border: 'none',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: '22px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
-        cursor: 'pointer',
-        padding: 0
-      }}
       title="Guardar Mudanças"
     >
       <FaFloppyDisk size={20} />

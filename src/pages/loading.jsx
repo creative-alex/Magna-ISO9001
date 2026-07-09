@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { FaSpinner } from 'react-icons/fa6';
 
 const LoadingPage = () => {
   const [progress, setProgress] = useState(0);
@@ -42,12 +43,8 @@ const LoadingPage = () => {
       </div>
 
       {/* Spinner */}
-      <div style={{ position: 'relative', width: 48, height: 48, marginBottom: 32 }}>
-        <svg viewBox="0 0 48 48" style={{ width: 48, height: 48, animation: 'spin 1s linear infinite' }}>
-          <circle cx="24" cy="24" r="20" fill="none" stroke="#e5e7eb" strokeWidth="4" />
-          <circle cx="24" cy="24" r="20" fill="none" stroke="#C8932F" strokeWidth="4"
-            strokeDasharray="30 96" strokeLinecap="round" />
-        </svg>
+      <div style={{ marginBottom: 32, color: '#C8932F' }}>
+        <FaSpinner className="animate-spin" size={32} />
       </div>
 
       {/* Barra de progresso */}
@@ -60,7 +57,6 @@ const LoadingPage = () => {
 
       <div style={{ marginTop: 14, fontSize: 12, color: '#9ca3af' }}>A carregar...</div>
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };

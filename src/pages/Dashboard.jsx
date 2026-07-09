@@ -1,43 +1,38 @@
 import React, { useEffect, useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { UserContext } from "../context/userContext";
+import { FavoritesContext } from "../context/favoritesContext";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
-import { fixEncoding } from "../utils/fixEncoding";
+import FolderStructure from "../components/FolderStructure";
+import { filterTree } from "../utils/filterTree";
+import { FaFile, FaCheck, FaStar } from "react-icons/fa6";
+import AIAssistant from "../components/AIAssistant/AIAssistant";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { username } = useContext(UserContext);
-  const isAdmin = username === "superadmin" || username === "SuperAdmin";
+  const { username, userRole } = useContext(UserContext);
+  const { favorites, toggleFavorite, isFavorite } = useContext(FavoritesContext);
+  const isAdmin = userRole === "SuperAdmin";
   const gold = "#C8932F";
 
   const [processOwners, setProcessOwners] = useState({});
   const [fileTree, setFileTree] = useState([]);
   const [totalUsers, setTotalUsers] = useState(null);
-  const [favorites, setFavorites] = useState([]);
-  const [expandedProcess, setExpandedProcess] = useState(null);
   const [activeTab, setActiveTab] = useState("todos");
+  const [searchTerm, setSearchTerm] = useState("");
 
-  useEffect(() => {
+  const reloadFileTree = () =>
     fetch(`${process.env.REACT_APP_API_URL}/files/list-files-tree`)
       .then(r => r.json()).then(setFileTree).catch(() => {});
+
+  useEffect(() => {
+    reloadFileTree();
     fetch(`${process.env.REACT_APP_API_URL}/files/process-owners`)
       .then(r => r.json()).then(setProcessOwners).catch(() => {});
     fetch(`${process.env.REACT_APP_API_URL}/users/getAllUsers`)
       .then(r => r.json()).then(data => setTotalUsers(Array.isArray(data) ? data.length : data.users?.length ?? null)).catch(() => {});
   }, []);
-
-  useEffect(() => {
-    if (!username) return;
-    fetch(`${process.env.REACT_APP_API_URL}/users/favorites/${username}`)
-      .then(r => r.json()).then(data => {
-        const arr = Array.isArray(data) ? data : (data.favorites || []);
-        setFavorites(arr.map(fav => typeof fav === 'string'
-          ? { path: fav, name: fixEncoding(fav.split('/').pop().replace('.pdf', '')) }
-          : { path: fav.path || fav.filePath, name: fixEncoding(fav.name || fav.fileName || (fav.path || fav.filePath || '').split('/').pop().replace('.pdf', '')) }
-        ));
-      }).catch(() => {});
-  }, [username]);
 
   const handleSelectFile = (filePath) => {
     const formattedPath = filePath.replace(/\s/g, '-').replace(/\//g, '__');
@@ -51,26 +46,13 @@ export default function Dashboard() {
   const totalProcedimentos = fileTree.reduce((acc, node) =>
     acc + (node.type === "folder" && node.children ? node.children.filter(c => c.type === "file").length : 0), 0);
 
-  const todosProcessos = Object.entries(processOwners).map(([nome, dono]) => ({
-    nome, dono: dono || "Sem dono",
-    num: nome.match(/\d+/)?.[0] ?? "?",
-    estado: dono ? "ok" : "warn",
-  })).sort((a, b) => parseInt(a.num) - parseInt(b.num));
-
-  const processos = activeTab === "meus"
-    ? todosProcessos.filter(p => p.dono.split(',').map(n => n.trim()).includes(username))
-    : todosProcessos;
-
-  const dotColor = { ok: "#22c55e", warn: gold, alert: "#ef4444" };
-
-  const getFilesForProcess = (processName) => {
-    const folder = fileTree.find(n => n.name === processName);
-    if (!folder?.children) return [];
-    return folder.children.filter(c => c.type === "file").map(f => ({
-      name: fixEncoding(f.name.endsWith('.pdf') ? f.name.slice(0, -4) : f.name),
-      path: `${processName}/${f.name}`,
-    }));
-  };
+  const visibleTree = activeTab === "meus"
+    ? fileTree.filter(node => {
+        const owner = processOwners[node.name];
+        return owner && owner.split(',').map(n => n.trim()).includes(username);
+      })
+    : fileTree;
+  const filteredTree = filterTree(visibleTree, searchTerm);
 
   const kpis = [
     { label: "Processos", value: totalProcessos, sub: "no sistema", bar: 100 },
@@ -80,11 +62,11 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="app-shell">
+    <div className="flex min-h-screen">
       <Sidebar onSelectFile={handleSelectFile} />
 
-      <div className="main-area">
-        <Topbar icon="📊" title="Dashboard" />
+      <div className="ml-[230px] flex-1 flex flex-col min-h-screen">
+        <Topbar icon="📊" title="Dashboard" searchTerm={searchTerm} onSearchChange={setSearchTerm} />
 
         <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
 
@@ -111,58 +93,35 @@ export default function Dashboard() {
             <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
               <div style={{ padding: "14px 18px 10px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>Mapa de processos</span>
-                <span style={{ fontSize: 12, color: gold, cursor: "pointer" }} onClick={() => navigate("/indice")}>ver índice →</span>
               </div>
               <div style={{ display: "flex", borderBottom: "1px solid #f3f4f6", padding: "0 18px" }}>
                 {[{ label: "Todos", key: "todos" }, { label: "Os meus", key: "meus" }].map((tab) => {
                   const isActive = activeTab === tab.key;
                   return (
-                    <div key={tab.key} onClick={() => { setActiveTab(tab.key); setExpandedProcess(null); }}
+                    <div key={tab.key} onClick={() => setActiveTab(tab.key)}
                       style={{ fontSize: 12, padding: "9px 12px", color: isActive ? gold : "#6b7280", borderBottom: isActive ? `2px solid ${gold}` : "2px solid transparent", cursor: "pointer", marginBottom: -1, fontWeight: isActive ? 600 : 400 }}>
                       {tab.label}
                     </div>
                   );
                 })}
               </div>
-              <div style={{ padding: "4px 18px" }}>
-                {processos.length === 0 ? (
+              <div style={{ padding: "10px 18px" }}>
+                {filteredTree.length === 0 ? (
                   <div style={{ padding: "24px 0", color: "#9ca3af", fontSize: 13, textAlign: "center" }}>
                     {activeTab === "meus" ? "Não é responsável por nenhum processo" : "A carregar processos..."}
                   </div>
-                ) : processos.map((p, i) => {
-                  const isExpanded = expandedProcess === p.nome;
-                  const files = isExpanded ? getFilesForProcess(p.nome) : [];
-                  return (
-                    <div key={i} style={{ borderBottom: i < processos.length - 1 ? "1px solid #f9fafb" : "none" }}>
-                      <div onClick={() => setExpandedProcess(isExpanded ? null : p.nome)}
-                        style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", cursor: "pointer" }}>
-                        <span style={{ fontSize: 10, color: "#9ca3af", width: 22, flexShrink: 0, fontWeight: 600 }}>P{p.num}</span>
-                        <span style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor[p.estado], flexShrink: 0 }} />
-                        <span style={{ fontSize: 13, color: "#111827", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {p.nome.replace(/^PROCESSO \d+:\s*/i, "")}
-                        </span>
-                        <span style={{ fontSize: 11, color: "#9ca3af", flexShrink: 0 }}>{p.dono}</span>
-                        <span style={{ color: "#d1d5db", fontSize: 12, transition: "transform 0.2s", transform: isExpanded ? "rotate(90deg)" : "none" }}>›</span>
-                      </div>
-                      {isExpanded && (
-                        <div style={{ paddingLeft: 32, paddingBottom: 6 }}>
-                          {files.length === 0 ? (
-                            <div style={{ fontSize: 12, color: "#9ca3af", padding: "6px 0" }}>Sem procedimentos</div>
-                          ) : files.map((f, j) => (
-                            <div key={j} onClick={() => handleSelectFile(f.path)}
-                              style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", cursor: "pointer", borderBottom: j < files.length - 1 ? "1px solid #f9fafb" : "none", color: "#374151" }}
-                              onMouseEnter={e => e.currentTarget.style.color = gold}
-                              onMouseLeave={e => e.currentTarget.style.color = "#374151"}>
-                              <span style={{ fontSize: 12, color: "inherit" }}>📄</span>
-                              <span style={{ fontSize: 12, color: "inherit", flex: 1 }}>{f.name}</span>
-                              <span style={{ fontSize: 11, color: "#d1d5db" }}>›</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                ) : (
+                  <FolderStructure
+                    nodes={filteredTree}
+                    onSelectFile={handleSelectFile}
+                    processOwners={processOwners}
+                    currentUser={username}
+                    isAdmin={isAdmin}
+                    onDelete={reloadFileTree}
+                    onToggleFavorite={toggleFavorite}
+                    isFavorite={isFavorite}
+                  />
+                )}
               </div>
             </div>
 
@@ -179,7 +138,9 @@ export default function Dashboard() {
                   </span>
                 </div>
                 <div style={{ padding: "20px 18px", color: "#9ca3af", fontSize: 13, textAlign: "center" }}>
-                  <div style={{ fontSize: 30, marginBottom: 8 }}>✓</div>
+                  <div style={{ fontSize: 30, marginBottom: 8, display: "flex", justifyContent: "center" }}>
+                    <FaCheck style={{ color: "#22c55e" }} />
+                  </div>
                   Sem não conformidades abertas
                 </div>
               </div>
@@ -193,7 +154,9 @@ export default function Dashboard() {
                 <div style={{ padding: favorites.length === 0 ? "20px 18px" : "4px 18px" }}>
                   {favorites.length === 0 ? (
                     <div style={{ color: "#9ca3af", fontSize: 13, textAlign: "center" }}>
-                      <div style={{ fontSize: 24, marginBottom: 6 }}>☆</div>
+                      <div style={{ fontSize: 24, marginBottom: 6, display: "flex", justifyContent: "center" }}>
+                        <FaStar style={{ color: "#d1d5db" }} />
+                      </div>
                       Sem favoritos guardados
                     </div>
                   ) : favorites.map((fav, i) => (
@@ -201,7 +164,7 @@ export default function Dashboard() {
                       style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: i < favorites.length - 1 ? "1px solid #f9fafb" : "none", cursor: "pointer", color: "#374151" }}
                       onMouseEnter={e => e.currentTarget.style.color = gold}
                       onMouseLeave={e => e.currentTarget.style.color = "#374151"}>
-                      <span style={{ fontSize: 12 }}>📄</span>
+                      <FaFile style={{ fontSize: 12, flexShrink: 0 }} />
                       <span style={{ fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fav.name}</span>
                       <span style={{ fontSize: 11, color: "#d1d5db" }}>›</span>
                     </div>
@@ -212,6 +175,7 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      <AIAssistant fileTree={filteredTree} searchTerm={searchTerm} username={username} isAdmin={isAdmin} isSuperAdmin={isAdmin} processOwners={processOwners} onSuggestion={() => {}} />
     </div>
   );
 }

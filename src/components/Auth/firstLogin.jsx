@@ -1,328 +1,289 @@
 import React, { useState, useContext, useEffect } from "react";
 import { UserContext } from "../../context/userContext";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { confirmPasswordReset, verifyPasswordResetCode } from "firebase/auth";
-import LogoutButton from "./logout";
 import Logo from "../../logo.svg";
 import { APP_CONSTANTS } from "../../utils/constants";
-
+import { FaEye, FaEyeSlash, FaCheck, FaXmark, FaUser } from "react-icons/fa6";
 
 const FirstLoginComponent = ({ onComplete, mode = "firstLogin" }) => {
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [resetCode, setResetCode] = useState(null);
-  const [isValidResetCode, setIsValidResetCode] = useState(false);
-  const { userEmail, auth } = useContext(UserContext);
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+    const [newPassword, setNewPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [showNew, setShowNew] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [resetCode, setResetCode] = useState(null);
+    const [isValidResetCode, setIsValidResetCode] = useState(false);
+    const { userEmail, auth } = useContext(UserContext);
+    const navigate = useNavigate();
+    const location = useLocation();
+    const [searchParams] = useSearchParams();
 
-  // Determinar se é modo reset ou first login
-  const isResetMode = mode === "reset" || searchParams.get("mode") === "reset" || searchParams.get("oobCode");
-  const isFirstLogin = mode === "firstLogin" || !isResetMode;
+    const emailToUse = location.state?.email || userEmail;
 
-  // Verificar código de reset quando a página carrega (modo reset)
-  useEffect(() => {
-    const checkResetCode = async () => {
-      if (isResetMode) {
+    const isResetMode = mode === "reset" || searchParams.get("mode") === "reset" || !!searchParams.get("oobCode");
+    const isFirstLogin = !isResetMode;
+
+    useEffect(() => {
+        if (!isResetMode) return;
         const oobCode = searchParams.get("oobCode");
-        if (oobCode) {
-          setLoading(true);
-          try {
-            // Verificar se o código de reset é válido
-            await verifyPasswordResetCode(auth, oobCode);
-            setResetCode(oobCode);
-            setIsValidResetCode(true);
-          } catch (error) {
-            console.error("Código de reset inválido:", error);
-            
-            let errorMessage = "Código de recuperação inválido ou expirado.";
-            switch (error.code) {
-              case 'auth/invalid-action-code':
-                errorMessage = "O link de recuperação é inválido ou já foi usado.";
-                break;
-              case 'auth/expired-action-code':
-                errorMessage = "O link de recuperação expirou. Solicite um novo.";
-                break;
-              default:
-                errorMessage = "Erro ao verificar o código de recuperação.";
-            }
-            
-            toast.error(errorMessage);
-            
-            // Redirecionar para login após erro
-            setTimeout(() => {
-              navigate("/", { replace: true });
-            }, 3000);
-          } finally {
-            setLoading(false);
-          }
-        } else {
-          toast.error("Código de recuperação não encontrado.");
-          navigate("/", { replace: true });
+        if (!oobCode) {
+            toast.error("Código de recuperação não encontrado.");
+            setTimeout(() => navigate("/", { replace: true }), 3000);
+            return;
         }
-      }
+        setLoading(true);
+        verifyPasswordResetCode(auth, oobCode)
+            .then(() => { setResetCode(oobCode); setIsValidResetCode(true); })
+            .catch((err) => {
+                const msg = err.code === 'auth/expired-action-code'
+                    ? "O link expirou. Solicite um novo."
+                    : "O link de recuperação é inválido ou já foi usado.";
+                toast.error(msg);
+                setTimeout(() => navigate("/", { replace: true }), 3000);
+            })
+            .finally(() => setLoading(false));
+    }, [isResetMode, searchParams, auth, navigate]);
+
+    const minLen = APP_CONSTANTS.MIN_PASSWORD_LENGTH || 6;
+    const isPasswordValid = newPassword.length >= minLen;
+    const passwordsMatch = newPassword === confirmPassword && confirmPassword.length > 0;
+
+    const handleFirebasePasswordReset = async () => {
+        if (loading || !resetCode) return;
+        setLoading(true);
+        try {
+            if (!newPassword.trim()) throw new Error("Insira uma nova senha.");
+            if (!isPasswordValid) throw new Error(`A senha deve ter pelo menos ${minLen} caracteres.`);
+            if (!passwordsMatch) throw new Error("As senhas não coincidem.");
+            await confirmPasswordReset(auth, resetCode, newPassword);
+            toast.success("Senha alterada com sucesso!");
+            setTimeout(() => navigate("/", { replace: true }), 2000);
+        } catch (err) {
+            const msg = err.code === 'auth/weak-password' ? "Senha demasiado fraca." : err.message;
+            toast.error(msg);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    checkResetCode();
-  }, [isResetMode, searchParams, auth, navigate]);
+    const handlePasswordChange = async () => {
+        if (loading) return;
+        setLoading(true);
+        try {
+            if (!emailToUse) throw new Error("Erro: utilizador não encontrado.");
+            if (!newPassword.trim()) throw new Error("Insira uma nova senha.");
+            if (!isPasswordValid) throw new Error(`A senha deve ter pelo menos ${minLen} caracteres.`);
+            if (!passwordsMatch) throw new Error("As senhas não coincidem.");
 
-  // Função para confirmar reset de password
-  const handleFirebasePasswordReset = async () => {
-    if (loading) return;
-    
-    setLoading(true);
-    
-    try {
-      if (!newPassword.trim()) {
-        throw new Error("Por favor, insira uma nova senha.");
-      }
+            const response = await fetch("https://api-iso-9001.onrender.com/users/update-first-login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userEmail: emailToUse, newPassword, isFirstLogin: false }),
+            });
 
-      if (newPassword.length < APP_CONSTANTS.MIN_PASSWORD_LENGTH) {
-        throw new Error(`A senha deve ter pelo menos ${APP_CONSTANTS.MIN_PASSWORD_LENGTH} caracteres.`);
-      }
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || "Erro ao atualizar senha");
 
-      if (!confirmPassword.trim()) {
-        throw new Error("Por favor, confirme a nova senha.");
-      }
-
-      if (newPassword !== confirmPassword) {
-        throw new Error("As senhas não coincidem.");
-      }
-
-      if (!resetCode) {
-        throw new Error("Código de recuperação não encontrado.");
-      }
-
-      // Confirmar reset de password no Firebase
-      await confirmPasswordReset(auth, resetCode, newPassword);
-      
-      toast.success("Senha alterada com sucesso! Pode agora fazer login.");
-      
-      // Redirecionar para login após 2 segundos
-      setTimeout(() => {
-        navigate("/", { replace: true });
-      }, 2000);
-      
-    } catch (error) {
-      console.error("Erro ao alterar senha:", error);
-      
-      let errorMessage = "Erro ao alterar senha.";
-      
-      switch (error.code) {
-        case 'auth/invalid-action-code':
-          errorMessage = "O código de recuperação é inválido ou já foi usado.";
-          break;
-        case 'auth/expired-action-code':
-          errorMessage = "O código de recuperação expirou.";
-          break;
-        case 'auth/weak-password':
-          errorMessage = "A senha é muito fraca. Use uma senha mais forte.";
-          break;
-        default:
-          errorMessage = error.message || errorMessage;
-      }
-      
-      toast.error(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Validações em tempo real
-  const isPasswordValid = newPassword.length >= APP_CONSTANTS.MIN_PASSWORD_LENGTH;
-  const passwordsMatch = newPassword === confirmPassword && confirmPassword.length > 0;
-
-  const handlePasswordChange = async () => {
-    // Verificar se já está a processar
-    if (loading) return;
-    
-    setLoading(true);
-    
-    // Limpar erros anteriores
-    try {
-      // Validações
-      if (!isFirstLogin) {
-        throw new Error("Esta funcionalidade só está disponível para primeiro login.");
-      }
-      
-      if (!userEmail) {
-        throw new Error("Erro: colaborador não encontrado.");
-      }
-  
-      if (!newPassword.trim()) {
-        throw new Error("Por favor, insira uma nova senha.");
-      }
-
-      if (newPassword.length < APP_CONSTANTS.MIN_PASSWORD_LENGTH) {
-        throw new Error(`A senha deve ter pelo menos ${APP_CONSTANTS.MIN_PASSWORD_LENGTH} caracteres.`);
-      }
-
-      if (!confirmPassword.trim()) {
-        throw new Error("Por favor, confirme a nova senha.");
-      }
-
-      if (newPassword !== confirmPassword) {
-        throw new Error("As senhas não coincidem.");
-      }
-
-      const response = await fetch(`https://api-iso-9001.onrender.com/users/update-first-login`, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ 
-          userEmail, 
-          newPassword,
-          isFirstLogin: false // ✅ Definir como false após alterar senha
-        }),
-      });
-  
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || "Erro ao atualizar senha");
-  
-      // Exibe uma mensagem de sucesso
-      toast.success("Senha alterada com sucesso!");
-  
-      // Limpar dados do localStorage e redirecionar
-      setTimeout(() => {
-        localStorage.removeItem("user");
-        localStorage.removeItem("token");
-        localStorage.removeItem("userEmail");
-        
-        if (onComplete) {
-          onComplete();
-        } else {
-          // Redirecionar para página de login e terminar sessão
-          navigate("/");
-          
+            toast.success("Senha definida com sucesso!");
+            setTimeout(() => {
+                if (onComplete) onComplete();
+                else navigate("/", { replace: true });
+            }, 2000);
+        } catch (err) {
+            toast.error(err.message);
+        } finally {
+            setLoading(false);
         }
-      }, 2000); // 2 segundos de atraso
-    } catch (error) {
-      toast.error(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  return (
-    <div className="file-container">
-      <div className="header">
-        <img src={Logo} alt="Logo" className="logo" />
-        <h2 className="title">Magna ISO9001</h2>
-      </div>
-      <div className="file-panel">
-        <div className="panel-title">
-          {isResetMode ? "Definir Nova Senha" : "Alterar Senha"}
-        </div>
-        
-        {isResetMode && !isValidResetCode ? (
-          // Verificando código de reset
-          <div className="auth-form" style={{ textAlign: 'center' }}>
-            <div style={{ padding: '20px' }}>
-              {loading ? (
-                <div>
-                  <div>Verificando código de recuperação...</div>
-                  <div style={{ marginTop: '10px', fontSize: '14px', color: '#666' }}>
-                    Aguarde um momento
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <div>Código de recuperação inválido</div>
-                  <div style={{ marginTop: '16px' }}>
-                    <button 
-                      type="button" 
-                      onClick={() => navigate("/")}
-                      className="auth-button"
-                    >
-                      Voltar ao Login
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          // Formulário de alteração de senha (first login ou reset confirmado)
-          <form className="auth-form">
-            <div className="auth-field">
-              <label className="auth-label">Nova Senha:</label>
-              <input
-                type="password"
-                placeholder="Nova Senha"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="auth-input"
-              />
-              
-              {/* Indicadores de validação da senha */}
-              {newPassword && (
-                <div style={{ marginTop: '8px', fontSize: '12px' }}>
-                  <div style={{ color: isPasswordValid ? 'green' : 'red' }}>
-                    {isPasswordValid ? '✅' : '❌'} Pelo menos {APP_CONSTANTS.MIN_PASSWORD_LENGTH} caracteres
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <div className="auth-field">
-              <label className="auth-label">Confirme a Nova Senha:</label>
-              <input
-                type="password"
-                placeholder="Confirme a Nova Senha"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="auth-input"
-              />
-              
-              {/* Indicador de confirmação */}
-              {confirmPassword && (
-                <div style={{ marginTop: '8px', fontSize: '12px' }}>
-                  <div style={{ color: passwordsMatch ? 'green' : 'red' }}>
-                    {passwordsMatch ? '✅ Senhas coincidem' : '❌ Senhas não coincidem'}
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <button 
-              type="button" 
-              className="auth-button" 
-              onClick={isResetMode ? handleFirebasePasswordReset : handlePasswordChange}
-              disabled={loading || !isPasswordValid || !passwordsMatch}
-              style={{ 
-                opacity: (loading || !isPasswordValid || !passwordsMatch) ? 0.6 : 1,
-                cursor: (loading || !isPasswordValid || !passwordsMatch) ? 'not-allowed' : 'pointer'
-              }}
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        if (isResetMode) handleFirebasePasswordReset();
+        else handlePasswordChange();
+    };
+
+    const isFormReady = isFirstLogin
+        ? isPasswordValid && passwordsMatch
+        : isPasswordValid && passwordsMatch && isValidResetCode;
+
+    const pageTitle    = "Definir Nova Senha";
+    const pageSubtitle = "Crie uma nova senha pessoal para aceder ao sistema";
+
+    return (
+        <div className="flex min-h-screen font-sans">
+            {/* Painel de marca — igual ao login */}
+            <div
+                className="w-[42%] min-w-[300px] flex flex-col items-center justify-center relative overflow-hidden px-10 py-12 md:w-full md:min-w-0 md:min-h-[210px] md:py-9 md:px-6 before:content-[''] before:absolute before:-top-[100px] before:-right-[100px] before:w-[420px] before:h-[420px] before:rounded-full before:bg-white/[.06] before:pointer-events-none after:content-[''] after:absolute after:-bottom-[130px] after:-left-[80px] after:w-[400px] after:h-[400px] after:rounded-full after:bg-white/[.05] after:pointer-events-none"
+                style={{ background: 'linear-gradient(145deg,#4A1C00 0%,#7A4010 38%,#C8932F 100%)' }}
             >
-              {loading ? 'Processando...' : 'Confirmar Nova Senha'}
-            </button>
-            
-            <div style={{ marginTop: '16px', textAlign: 'center' }}>
-              <button 
-                type="button" 
-                onClick={() => navigate("/")}
-                style={{ 
-                  background: 'none', 
-                  border: 'none', 
-                  color: '#007bff', 
-                  textDecoration: 'underline',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                Voltar ao Login
-              </button>
+                <div className="text-center relative z-[1]">
+                    <div className="w-[90px] h-[90px] bg-white/[.18] border border-white/[.28] rounded-[22px] flex items-center justify-center mx-auto mb-7 shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
+                        <img src={Logo} alt="Logo Magna" className="w-[54px] h-[54px] brightness-0 invert" />
+                    </div>
+                    <h1 className="text-[2.7rem] font-extrabold text-white m-0 tracking-[5px] uppercase">Magna</h1>
+                    <p className="text-[0.88rem] text-white/70 mt-[7px] mb-[22px] tracking-[7px] uppercase font-light">ISO&nbsp;9001</p>
+                    <div className="w-[38px] h-[1.5px] bg-white/30 rounded-[2px] mx-auto mb-5" />
+                    <p className="text-[0.85rem] text-white/60 m-0 font-light leading-[1.8] tracking-[0.3px]">
+                        Sistema de Gestão<br />de Qualidade
+                    </p>
+                </div>
+                <span className="absolute bottom-[22px] text-[10.5px] text-white/40 tracking-[0.3px]">© 2026 Magna · Qualidade &amp; Excelência</span>
             </div>
-          </form>
-        )}
-      </div>
-    </div>
-  );
+
+            {/* Painel do formulário */}
+            <div className="flex-1 flex items-center justify-center px-8 py-12 bg-[#FDFCF9] max-sm:px-5 max-sm:py-7">
+                <div className="w-full max-w-[400px]">
+                    <div className="mb-[38px]">
+                        <h2 className="text-[1.85rem] font-bold text-gray-900 m-0 mb-2 tracking-[-0.3px]">{pageTitle}</h2>
+                        <p className="text-[14px] text-gray-500 m-0">{pageSubtitle}</p>
+                    </div>
+
+                    {/* Estado de verificação do código (modo reset) */}
+                    {isResetMode && !isValidResetCode ? (
+                        <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                            {loading ? (
+                                <>
+                                    <span className="inline-block border-[2.5px] border-white/30 border-t-white rounded-full animate-loginSpin" style={{ borderColor: 'rgba(200,147,47,0.3)', borderTopColor: '#C8932F', width: 32, height: 32, borderWidth: 3 }} />
+                                    <p style={{ marginTop: 16, color: '#6b7280', fontSize: 14 }}>A verificar o link de recuperação...</p>
+                                </>
+                            ) : (
+                                <>
+                                    <p style={{ color: '#dc2626', fontSize: 14, marginBottom: 20 }}>Link inválido ou expirado.</p>
+                                    <button
+                                        className="h-[52px] bg-gradient-to-br from-[#C8932F] to-[#DFA847] text-white border-0 rounded-[10px] text-[14px] font-bold cursor-pointer tracking-[1.8px] uppercase flex items-center justify-center shadow-[0_4px_18px_rgba(200,147,47,0.38)] transition-all duration-200 hover:opacity-[.92] hover:-translate-y-px"
+                                        onClick={() => navigate("/")}
+                                        style={{ width: 'auto', padding: '0 32px' }}
+                                    >
+                                        Voltar ao Login
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    ) : (
+                        <form className="flex flex-col gap-[22px]" onSubmit={handleSubmit}>
+                            {/* Email info (primeiro acesso) */}
+                            {isFirstLogin && emailToUse && (
+                                <div className="bg-gold-light border border-gold-mid rounded-[10px] px-[14px] py-[10px] text-[13px] text-logo-text flex items-center gap-2 mb-1">
+                                    <FaUser size={14} style={{ flexShrink: 0 }} />
+                                    <span><strong>{emailToUse}</strong></span>
+                                </div>
+                            )}
+
+                            {/* Nova senha */}
+                            <div className="flex flex-col gap-[7px]">
+                                <label htmlFor="fl-new" className="text-[11px] font-bold text-gray-700 uppercase tracking-[0.8px]">Nova Senha</label>
+                                <div className="relative">
+                                    <input
+                                        id="fl-new"
+                                        type={showNew ? "text" : "password"}
+                                        value={newPassword}
+                                        onChange={(e) => setNewPassword(e.target.value)}
+                                        placeholder="Mínimo 6 caracteres"
+                                        autoComplete="new-password"
+                                        required
+                                        className="h-[50px] px-4 pr-[50px] border-[1.5px] border-gray-200 rounded-[10px] text-[15px] text-gray-900 bg-white w-full box-border transition-all duration-200 focus:outline-none focus:border-[#C8932F] focus:shadow-[0_0_0_3px_rgba(200,147,47,0.12)] placeholder:text-[#c9d0d8]"
+                                    />
+                                    <button
+                                        type="button"
+                                        className="absolute right-[13px] top-1/2 -translate-y-1/2 bg-transparent border-0 cursor-pointer p-1 rounded-md text-gray-400 flex items-center justify-center transition-colors duration-150 hover:text-[#C8932F] hover:bg-[#C8932F]/[.08]"
+                                        onClick={() => setShowNew(p => !p)}
+                                        aria-label="Mostrar senha"
+                                    >
+                                        {showNew ? <FaEyeSlash size={16} /> : <FaEye size={16} />}
+                                    </button>
+                                </div>
+
+                                {/* Barra de força */}
+                                {newPassword.length > 0 && (
+                                    <div style={{ marginTop: 6 }}>
+                                        <div style={{ height: 3, background: '#f3f4f6', borderRadius: 4, overflow: 'hidden' }}>
+                                            <div style={{
+                                                height: '100%',
+                                                borderRadius: 4,
+                                                transition: 'width 0.3s, background 0.3s',
+                                                width: newPassword.length < 6 ? '33%' : newPassword.length < 10 ? '66%' : '100%',
+                                                background: newPassword.length < 6 ? '#dc2626' : newPassword.length < 10 ? '#d97706' : '#16a34a',
+                                            }} />
+                                        </div>
+                                        <span style={{
+                                            fontSize: 11, fontWeight: 600, marginTop: 3, display: 'block',
+                                            color: newPassword.length < 6 ? '#dc2626' : newPassword.length < 10 ? '#d97706' : '#16a34a',
+                                        }}>
+                                            {newPassword.length < 6 ? 'Senha fraca' : newPassword.length < 10 ? 'Senha média' : 'Senha forte'}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Confirmar senha */}
+                            <div className="flex flex-col gap-[7px]">
+                                <label htmlFor="fl-confirm" className="text-[11px] font-bold text-gray-700 uppercase tracking-[0.8px]">Confirmar Senha</label>
+                                <div className="relative">
+                                    <input
+                                        id="fl-confirm"
+                                        type={showConfirm ? "text" : "password"}
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                        placeholder="Repita a nova senha"
+                                        autoComplete="new-password"
+                                        required
+                                        className="h-[50px] px-4 pr-[50px] border-[1.5px] border-gray-200 rounded-[10px] text-[15px] text-gray-900 bg-white w-full box-border transition-all duration-200 focus:outline-none focus:border-[#C8932F] focus:shadow-[0_0_0_3px_rgba(200,147,47,0.12)] placeholder:text-[#c9d0d8]"
+                                    />
+                                    <button
+                                        type="button"
+                                        className="absolute right-[13px] top-1/2 -translate-y-1/2 bg-transparent border-0 cursor-pointer p-1 rounded-md text-gray-400 flex items-center justify-center transition-colors duration-150 hover:text-[#C8932F] hover:bg-[#C8932F]/[.08]"
+                                        onClick={() => setShowConfirm(p => !p)}
+                                        aria-label="Mostrar confirmação"
+                                    >
+                                        {showConfirm ? <FaEyeSlash size={16} /> : <FaEye size={16} />}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Indicadores de validação */}
+                            {(newPassword || confirmPassword) && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 4 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: isPasswordValid ? '#16a34a' : '#9ca3af' }}>
+                                        <span style={{ color: isPasswordValid ? '#16a34a' : '#dc2626' }}>
+                                            {isPasswordValid ? <FaCheck size={12} /> : <FaXmark size={12} />}
+                                        </span>
+                                        Mínimo {minLen} caracteres
+                                    </div>
+                                    {confirmPassword && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: passwordsMatch ? '#16a34a' : '#9ca3af' }}>
+                                            <span style={{ color: passwordsMatch ? '#16a34a' : '#dc2626' }}>
+                                                {passwordsMatch ? <FaCheck size={12} /> : <FaXmark size={12} />}
+                                            </span>
+                                            As senhas coincidem
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <button
+                                type="submit"
+                                className="h-[52px] w-full bg-gradient-to-br from-[#C8932F] to-[#DFA847] text-white border-0 rounded-[10px] text-[14px] font-bold cursor-pointer tracking-[1.8px] uppercase mt-1 flex items-center justify-center shadow-[0_4px_18px_rgba(200,147,47,0.38)] transition-all duration-200 hover:enabled:opacity-[.92] hover:enabled:-translate-y-px active:enabled:translate-y-0 disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
+                                disabled={loading || !isFormReady}
+                            >
+                                {loading ? <span className="inline-block w-5 h-5 border-[2.5px] border-white/30 border-t-white rounded-full animate-loginSpin" /> : 'Confirmar Nova Senha'}
+                            </button>
+
+                            <button
+                                type="button"
+                                className="bg-transparent border-0 p-0 text-[13px] text-[#C8932F] cursor-pointer font-medium underline underline-offset-2 transition-colors duration-150 hover:text-[#b8832a] block mx-auto mt-4"
+                                onClick={() => navigate("/")}
+                            >
+                                Voltar ao Login
+                            </button>
+                        </form>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
 };
 
 export default FirstLoginComponent;

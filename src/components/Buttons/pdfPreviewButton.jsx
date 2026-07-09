@@ -1,5 +1,5 @@
 import React from "react";
-import downloadIcon from "../../icons/download.ico";
+import { FaDownload } from "react-icons/fa6";
 
 const PdfPreviewButton = ({ file, currentPath }) => {
   // Função para carregar automaticamente a imagem PNG da empresa
@@ -267,13 +267,11 @@ const PdfPreviewButton = ({ file, currentPath }) => {
   };
 
   return (
-    <button onClick={handlePreviewClick}>
-      <img 
-        src={downloadIcon} 
-        alt={currentPath.length > 1 ? "Download direto" : "Preview PDF"} 
-        style={{ width: '16px', height: '16px' }} 
-        title=" Download"
-      />
+    <button
+      className="bg-transparent border-0 p-1 cursor-pointer flex items-center justify-center"
+      onClick={handlePreviewClick}
+    >
+      <FaDownload size={16} title="Download" />
     </button>
   );
 };

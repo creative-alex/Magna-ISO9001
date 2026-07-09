@@ -1,7 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import newFileIcon from "../../icons/plus.ico"; // Import your icon here
-import "../../index.css"; 
+import { FaPlus } from "react-icons/fa6";
 
 export default function CreateTableButton({ folderName, currentPath = [] }) {
   const navigate = useNavigate();
@@ -23,14 +22,10 @@ export default function CreateTableButton({ folderName, currentPath = [] }) {
   return (
     <button
       onClick={handleCreateTable}
-      className="create-table-btn"
+      className="bg-transparent text-[#7A5010] border border-[#E8D0A0] px-2 py-1.5 text-xs cursor-pointer rounded inline-flex items-center gap-[5px] transition-colors duration-200 whitespace-nowrap font-medium mr-2 hover:bg-[#F0E2C4]"
       title="Criar novo procedimento"
     >
-        <img 
-            src={newFileIcon} 
-            alt="Guardar documento" 
-            style={{ width: '16px', height: '16px' }} 
-        />
+        <FaPlus size={16} />
     </button>
   );
 }
