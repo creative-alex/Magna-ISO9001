@@ -8,3 +8,6 @@ client/node_modules/
 # Ignorar arquivos .env
 *.env
 
+# Credencial Firebase Admin - nunca deve ser trackeada
+api/db/serviceAccountKey.json
+
