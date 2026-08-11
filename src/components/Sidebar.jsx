@@ -66,13 +66,12 @@ export default function Sidebar({ onSelectFile }) {
         {/* Principal */}
         <div className="px-[14px] pt-4 pb-[5px] text-[10px] text-[#B8892A] tracking-[0.08em] uppercase font-semibold">Principal</div>
         <div className={navItemClass("/file")} onClick={() => navigate("/file")}>
-          <FaChartBar style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> Dashboard
-        </div>
+          <FaChartBar style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> ISO 9001 </div>
         {/* Recursos Humanos accordion */}
         {resourcesFiles.length > 0 && (
           <>
             <div className={navItemBaseClass} onClick={() => setShowResourcesDropdown(!showResourcesDropdown)}>
-              <FaPeopleGroup style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> Recursos Humanos
+              <FaPeopleGroup style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> Gestão de Pessoas
               <span className={`text-[10px] transition-transform duration-[250ms] ml-auto${showResourcesDropdown ? ' rotate-180' : ''}`}>▼</span>
             </div>
             {showResourcesDropdown && (

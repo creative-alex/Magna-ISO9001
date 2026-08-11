@@ -1,7 +1,7 @@
 import React from "react";
 import { FaDownload } from "react-icons/fa6";
 
-const PdfPreviewButton = ({ file, currentPath }) => {
+const PdfPreviewButton = ({ file, currentPath, size = 16, className }) => {
   // Função para carregar automaticamente a imagem PNG da empresa
   const loadCompanyImage = async () => {
     try {
@@ -268,10 +268,10 @@ const PdfPreviewButton = ({ file, currentPath }) => {
 
   return (
     <button
-      className="bg-transparent border-0 p-1 cursor-pointer flex items-center justify-center"
+      className={className ?? "bg-transparent border-0 p-1 cursor-pointer flex items-center justify-center"}
       onClick={handlePreviewClick}
     >
-      <FaDownload size={16} title="Download" />
+      <FaDownload size={size} title="Download" />
     </button>
   );
 };

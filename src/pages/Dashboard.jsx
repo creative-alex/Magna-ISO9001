@@ -4,9 +4,12 @@ import { UserContext } from "../context/userContext";
 import { FavoritesContext } from "../context/favoritesContext";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
-import FolderStructure from "../components/FolderStructure";
+import { fixEncoding } from "../utils/fixEncoding";
 import { filterTree } from "../utils/filterTree";
-import { FaFile, FaCheck, FaStar } from "react-icons/fa6";
+import DeleteButton from "../components/Buttons/delete";
+import CreateTableButton from "../components/Buttons/createTableButton";
+import PdfPreviewButton from "../components/Buttons/pdfPreviewButton";
+import { FaFile, FaCheck, FaStar, FaRegStar } from "react-icons/fa6";
 import AIAssistant from "../components/AIAssistant/AIAssistant";
 
 export default function Dashboard() {
@@ -19,6 +22,7 @@ export default function Dashboard() {
   const [processOwners, setProcessOwners] = useState({});
   const [fileTree, setFileTree] = useState([]);
   const [totalUsers, setTotalUsers] = useState(null);
+  const [expandedProcess, setExpandedProcess] = useState(null);
   const [activeTab, setActiveTab] = useState("todos");
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -46,13 +50,35 @@ export default function Dashboard() {
   const totalProcedimentos = fileTree.reduce((acc, node) =>
     acc + (node.type === "folder" && node.children ? node.children.filter(c => c.type === "file").length : 0), 0);
 
-  const visibleTree = activeTab === "meus"
-    ? fileTree.filter(node => {
-        const owner = processOwners[node.name];
-        return owner && owner.split(',').map(n => n.trim()).includes(username);
-      })
-    : fileTree;
-  const filteredTree = filterTree(visibleTree, searchTerm);
+  const filteredTree = filterTree(fileTree, searchTerm);
+  const filteredNames = new Set(filteredTree.map(n => n.name));
+
+  const todosProcessos = Object.entries(processOwners).map(([nome, dono]) => ({
+    nome, dono: dono || "Sem dono",
+    num: nome.match(/\d+/)?.[0] ?? "?",
+    estado: dono ? "ok" : "warn",
+  })).sort((a, b) => parseInt(a.num) - parseInt(b.num));
+
+  const processos = todosProcessos.filter(p => {
+    if (activeTab === "meus" && !p.dono.split(',').map(n => n.trim()).includes(username)) return false;
+    if (searchTerm && !filteredNames.has(p.nome)) return false;
+    return true;
+  });
+
+  const dotColor = { ok: "#22c55e", warn: gold, alert: "#ef4444" };
+
+  const ICON_SIZE = 13;
+  const iconBtnBase = "bg-transparent border-0 p-1 cursor-pointer flex items-center justify-center rounded flex-shrink-0";
+  const favoriteBtnClass = `${iconBtnBase} text-[#C8932F] hover:bg-[#FFF7E6]`;
+  const previewBtnClass = `${iconBtnBase} text-[#C8932F] hover:bg-[#FFF7E6]`;
+  const createBtnClass = `${iconBtnBase} text-[#7A5010] hover:bg-[#F0E2C4]`;
+  const deleteBtnClass = `${iconBtnBase} text-red-500 hover:bg-red-50`;
+
+  const getFilesForProcess = (processName) => {
+    const folder = filteredTree.find(n => n.name === processName);
+    if (!folder?.children) return [];
+    return folder.children.filter(c => c.type === "file");
+  };
 
   const kpis = [
     { label: "Processos", value: totalProcessos, sub: "no sistema", bar: 100 },
@@ -98,30 +124,69 @@ export default function Dashboard() {
                 {[{ label: "Todos", key: "todos" }, { label: "Os meus", key: "meus" }].map((tab) => {
                   const isActive = activeTab === tab.key;
                   return (
-                    <div key={tab.key} onClick={() => setActiveTab(tab.key)}
+                    <div key={tab.key} onClick={() => { setActiveTab(tab.key); setExpandedProcess(null); }}
                       style={{ fontSize: 12, padding: "9px 12px", color: isActive ? gold : "#6b7280", borderBottom: isActive ? `2px solid ${gold}` : "2px solid transparent", cursor: "pointer", marginBottom: -1, fontWeight: isActive ? 600 : 400 }}>
                       {tab.label}
                     </div>
                   );
                 })}
               </div>
-              <div style={{ padding: "10px 18px" }}>
-                {filteredTree.length === 0 ? (
+              <div style={{ padding: "4px 18px" }}>
+                {processos.length === 0 ? (
                   <div style={{ padding: "24px 0", color: "#9ca3af", fontSize: 13, textAlign: "center" }}>
                     {activeTab === "meus" ? "Não é responsável por nenhum processo" : "A carregar processos..."}
                   </div>
-                ) : (
-                  <FolderStructure
-                    nodes={filteredTree}
-                    onSelectFile={handleSelectFile}
-                    processOwners={processOwners}
-                    currentUser={username}
-                    isAdmin={isAdmin}
-                    onDelete={reloadFileTree}
-                    onToggleFavorite={toggleFavorite}
-                    isFavorite={isFavorite}
-                  />
-                )}
+                ) : processos.map((p, i) => {
+                  const isExpanded = expandedProcess === p.nome;
+                  const files = isExpanded ? getFilesForProcess(p.nome) : [];
+                  const canManage = isAdmin || p.dono.split(',').map(n => n.trim()).includes(username);
+                  return (
+                    <div key={i} style={{ borderBottom: i < processos.length - 1 ? "1px solid #f9fafb" : "none" }}>
+                      <div onClick={() => setExpandedProcess(isExpanded ? null : p.nome)}
+                        style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", cursor: "pointer" }}>
+                        <span style={{ fontSize: 10, color: "#9ca3af", width: 22, flexShrink: 0, fontWeight: 600 }}>P{p.num}</span>
+                        <span style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor[p.estado], flexShrink: 0 }} />
+                        <span style={{ fontSize: 13, color: "#111827", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {p.nome.replace(/^PROCESSO \d+:\s*/i, "")}
+                        </span>
+                        <span style={{ fontSize: 11, color: "#9ca3af", flexShrink: 0 }}>{p.dono}</span>
+                        {canManage && <CreateTableButton folderName={p.nome} currentPath={[]} size={ICON_SIZE} className={createBtnClass} />}
+                        {isAdmin && <DeleteButton file={{ name: p.nome }} currentPath={[]} onDelete={reloadFileTree} isFolder size={ICON_SIZE} className={deleteBtnClass} />}
+                        <span style={{ color: "#d1d5db", fontSize: 12, transition: "transform 0.2s", transform: isExpanded ? "rotate(90deg)" : "none" }}>›</span>
+                      </div>
+                      {isExpanded && (
+                        <div style={{ paddingLeft: 32, paddingBottom: 6 }}>
+                          {files.length === 0 ? (
+                            <div style={{ fontSize: 12, color: "#9ca3af", padding: "6px 0" }}>Sem procedimentos</div>
+                          ) : files.map((f, j) => {
+                            const displayName = fixEncoding(f.name.endsWith('.pdf') ? f.name.slice(0, -4) : f.name);
+                            const filePath = `${p.nome}/${f.name}`;
+                            const isFav = isFavorite(filePath);
+                            return (
+                              <div key={j} onClick={() => handleSelectFile(filePath)}
+                                style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", cursor: "pointer", borderBottom: j < files.length - 1 ? "1px solid #f9fafb" : "none", color: "#374151" }}
+                                onMouseEnter={e => e.currentTarget.style.color = gold}
+                                onMouseLeave={e => e.currentTarget.style.color = "#374151"}>
+                                <FaFile style={{ fontSize: 12, color: "inherit", flexShrink: 0 }} />
+                                <span style={{ fontSize: 12, color: "inherit", flex: 1 }}>{displayName}</span>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); toggleFavorite(filePath, displayName); }}
+                                  className={favoriteBtnClass}
+                                  title={isFav ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+                                >
+                                  {isFav ? <FaStar size={ICON_SIZE} /> : <FaRegStar size={ICON_SIZE} />}
+                                </button>
+                                <PdfPreviewButton file={f} currentPath={[p.nome]} size={ICON_SIZE} className={previewBtnClass} />
+                                {canManage && <DeleteButton file={f} currentPath={[p.nome]} onDelete={reloadFileTree} size={ICON_SIZE} className={deleteBtnClass} />}
+                                <span style={{ fontSize: 11, color: "#d1d5db", flexShrink: 0 }}>›</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

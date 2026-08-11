@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { FaTrash } from "react-icons/fa6";
 
-const DeleteButton = ({ file, currentPath, onDelete, isFolder = false }) => {
+const DeleteButton = ({ file, currentPath, onDelete, isFolder = false, size = 16, className }) => {
     const [notification, setNotification] = useState(null);
     const [confirmDialog, setConfirmDialog] = useState({ show: false, message: "", onConfirm: null });
 
@@ -48,11 +48,11 @@ const DeleteButton = ({ file, currentPath, onDelete, isFolder = false }) => {
     return (
         <>
             <button
-                className="bg-red-50 text-red-500 border border-red-200 rounded px-2 py-1 cursor-pointer text-xs hover:bg-red-100 hover:text-red-600 transition-colors duration-150"
+                className={className ?? "bg-red-50 text-red-500 border border-red-200 rounded px-2 py-1 cursor-pointer text-xs hover:bg-red-100 hover:text-red-600 transition-colors duration-150"}
                 onClick={handleDelete}
                 title={isFolder ? "Eliminar processo" : "Eliminar ficheiro"}
             >
-                <FaTrash size={16} />
+                <FaTrash size={size} />
             </button>
 
             {notification && (
