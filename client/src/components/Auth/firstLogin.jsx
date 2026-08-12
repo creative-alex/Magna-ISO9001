@@ -7,6 +7,7 @@ import { confirmPasswordReset, verifyPasswordResetCode } from "firebase/auth";
 import Logo from "../../logo.svg";
 import { APP_CONSTANTS } from "../../utils/constants";
 import { FaEye, FaEyeSlash, FaCheck, FaXmark, FaUser } from "react-icons/fa6";
+import { apiFetch } from "../../utils/apiFetch";
 
 const FirstLoginComponent = ({ onComplete, mode = "firstLogin" }) => {
     const [newPassword, setNewPassword] = useState("");
@@ -78,9 +79,8 @@ const FirstLoginComponent = ({ onComplete, mode = "firstLogin" }) => {
             if (!isPasswordValid) throw new Error(`A senha deve ter pelo menos ${minLen} caracteres.`);
             if (!passwordsMatch) throw new Error("As senhas não coincidem.");
 
-            const response = await fetch("https://api-iso-9001.onrender.com/users/update-first-login", {
+            const response = await apiFetch("/users/update-first-login", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ userEmail: emailToUse, newPassword, isFirstLogin: false }),
             });
 

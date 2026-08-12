@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import Sidebar from '../Sidebar';
 import Topbar from '../Topbar';
 import { FaEye, FaEyeSlash, FaCircleExclamation } from "react-icons/fa6";
+import { apiFetch } from '../../utils/apiFetch';
 
 const Register = () => {
     const [nome, setNome] = useState('');
@@ -34,9 +35,8 @@ const Register = () => {
         }
 
         try {
-            const response = await fetch('https://api-iso-9001.onrender.com/users/createUser', {
+            const response = await apiFetch('/users/createUser', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     nome,
                     email,

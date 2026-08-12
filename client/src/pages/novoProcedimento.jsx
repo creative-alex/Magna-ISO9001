@@ -4,6 +4,7 @@ import { UserContext } from '../context/userContext';
 import { generateEditablePdfTemplate1 } from '../utils/pdfGenerate';
 import Sidebar from '../components/Sidebar';
 import Topbar from '../components/Topbar';
+import { apiFetch } from '../utils/apiFetch';
 
 export default function NewTable() {
   const navigate = useNavigate();
@@ -26,7 +27,7 @@ export default function NewTable() {
   useEffect(() => {
     const fetchNextTableNumber = async () => {
       try {
-        const response = await fetch('https://api-iso-9001.onrender.com/files/list-files-tree');
+        const response = await apiFetch('/files/list-files-tree');
         if (response.ok) {
           const pdfTree = await response.json();
           if (!processFolder) { setNextTableNumber(null); return; }
@@ -150,7 +151,7 @@ export default function NewTable() {
       formData.append('mainTableData', JSON.stringify(tabelaPrincipal));
       formData.append('obsTableData', JSON.stringify(observacoes));
 
-      const response = await fetch('https://api-iso-9001.onrender.com/files/upload-pdf', {
+      const response = await apiFetch('/files/upload-pdf', {
         method: 'POST', body: formData,
       });
       if (!response.ok) throw new Error('Erro ao criar procedimento');

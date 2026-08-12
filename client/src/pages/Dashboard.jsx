@@ -11,6 +11,7 @@ import CreateTableButton from "../components/Buttons/createTableButton";
 import PdfPreviewButton from "../components/Buttons/pdfPreviewButton";
 import { FaFile, FaCheck, FaStar, FaRegStar } from "react-icons/fa6";
 import AIAssistant from "../components/AIAssistant/AIAssistant";
+import { apiFetch } from "../utils/apiFetch";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -27,14 +28,14 @@ export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState("");
 
   const reloadFileTree = () =>
-    fetch(`${process.env.REACT_APP_API_URL}/files/list-files-tree`)
+    apiFetch(`/files/list-files-tree`)
       .then(r => r.json()).then(setFileTree).catch(() => {});
 
   useEffect(() => {
     reloadFileTree();
-    fetch(`${process.env.REACT_APP_API_URL}/files/process-owners`)
+    apiFetch(`/files/process-owners`)
       .then(r => r.json()).then(setProcessOwners).catch(() => {});
-    fetch(`${process.env.REACT_APP_API_URL}/users/getAllUsers`)
+    apiFetch(`/users/getAllUsers`)
       .then(r => r.json()).then(data => setTotalUsers(Array.isArray(data) ? data.length : data.users?.length ?? null)).catch(() => {});
   }, []);
 

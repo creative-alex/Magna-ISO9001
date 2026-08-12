@@ -4,6 +4,7 @@ import { UserContext } from '../context/userContext';
 import { generateEditablePdfTemplate2 } from '../utils/pdfGenerate';
 import Sidebar from '../components/Sidebar';
 import Topbar from '../components/Topbar';
+import { apiFetch } from '../utils/apiFetch';
 
 export default function CreateProcess() {
   const navigate = useNavigate();
@@ -32,7 +33,7 @@ export default function CreateProcess() {
   useEffect(() => {
     const fetchNextProcessNumber = async () => {
       try {
-        const response = await fetch('https://api-iso-9001.onrender.com/files/process-owners');
+        const response = await apiFetch('/files/process-owners');
         if (response.ok) {
           const processOwners = await response.json();
           const processNumbers = Object.keys(processOwners)
@@ -61,7 +62,7 @@ export default function CreateProcess() {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await fetch('https://api-iso-9001.onrender.com/users/getAllUsers');
+        const response = await apiFetch('/users/getAllUsers');
         if (response.ok) setUsers(await response.json());
       } catch {}
     };
@@ -151,14 +152,13 @@ export default function CreateProcess() {
       formData.append('servico_saida', servicoSaida);
       indicadores.forEach((v, i) => formData.append(`indicadores_r${i + 1}`, v));
 
-      const pdfResponse = await fetch('https://api-iso-9001.onrender.com/files/save-pdf', {
+      const pdfResponse = await apiFetch('/files/save-pdf', {
         method: 'POST', body: formData,
       });
       if (!pdfResponse.ok) throw new Error('Erro ao guardar PDF');
 
-      const recordResponse = await fetch('https://api-iso-9001.onrender.com/files/create-record', {
+      const recordResponse = await apiFetch('/files/create-record', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           processName: fullProcessName, donoProcesso, objetivoProcesso,
           servicos_entrada: servicosEntrada, servico_saida: servicoSaida,

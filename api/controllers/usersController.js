@@ -310,6 +310,9 @@ const updateFirstLogin = async (req, res) => {
 const getFavorites = async (req, res) => {
   try {
     const { username } = req.params;
+    if (username !== req.user.nome) {
+      return res.status(403).json({ error: 'Não podes ver os favoritos de outro utilizador' });
+    }
     const snapshot = await db.collection('users').where('nome', '==', username).get();
     if (snapshot.empty) return res.json([]);
     const userData = snapshot.docs[0].data();
@@ -325,6 +328,9 @@ const updateFavorite = async (req, res) => {
     const { username, filePath, fileName, action } = req.body;
     if (!username || !filePath || !action) {
       return res.status(400).json({ error: 'username, filePath e action são obrigatórios' });
+    }
+    if (username !== req.user.nome) {
+      return res.status(403).json({ error: 'Não podes alterar os favoritos de outro utilizador' });
     }
 
     const snapshot = await db.collection('users').where('nome', '==', username).get();

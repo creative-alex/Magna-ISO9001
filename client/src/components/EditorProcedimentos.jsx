@@ -9,6 +9,7 @@ import PreviewPdfButton from "./Buttons/previewPDF";
 import LoadingPage from "../pages/loading";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
+import { apiFetch } from "../utils/apiFetch";
 
 // Definição dos dois templates
 const tabelas = [
@@ -218,9 +219,8 @@ const handleRenameFile = async (nameParam) => {
   setIsSavingFilename(true);
 
   try {
-    const response = await fetch("https://api-iso-9001.onrender.com/files/rename-file", {
+    const response = await apiFetch("/files/rename-file", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         oldFilename: originalFilename,
         newFilename: targetName
@@ -298,7 +298,7 @@ const isSuperAdmin = isSuperAdminFromState !== undefined ? isSuperAdminFromState
 useEffect(() => {
   const carregarFuncionarios = async () => {
     try {
-      const response = await fetch("https://api-iso-9001.onrender.com/users/getAllUsers");
+      const response = await apiFetch("/users/getAllUsers");
       if (!response.ok) {
         throw new Error("Erro ao carregar funcionários");
       }
@@ -548,12 +548,11 @@ useEffect(() => {
   // Função para atualizar donoProcesso no backend
   const updateDonoProcessoBackend = async (newDonoProcesso) => {
     try {
-      const response = await fetch("https://api-iso-9001.onrender.com/files/update-dono-processo", {
+      const response = await apiFetch("/files/update-dono-processo", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           processId: nomeProcesso,
-          donoProcesso: newDonoProcesso 
+          donoProcesso: newDonoProcesso
         }),
       });
 
@@ -660,9 +659,8 @@ useEffect(() => {
     setIsLoading(true);
     let currentTemplate = template;
 
-    fetch("https://api-iso-9001.onrender.com/files/pdf-form-data", {
+    apiFetch("/files/pdf-form-data", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ filename: encodeURIComponent(originalFilename) }),
     })
       .then(res => {
@@ -1022,12 +1020,11 @@ useEffect(() => {
   // Nova função para salvar histórico no backend
   const saveHistoryToBackend = async (historyData) => {
     try {
-      const response = await fetch("https://api-iso-9001.onrender.com/files/save-process-history", {
+      const response = await apiFetch("/files/save-process-history", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          processId: nomeProcesso, 
-          history: historyData 
+        body: JSON.stringify({
+          processId: nomeProcesso,
+          history: historyData
         }),
       });
 
@@ -1049,9 +1046,8 @@ useEffect(() => {
       if (!nomeProcesso) return;
       
       
-      const response = await fetch("https://api-iso-9001.onrender.com/files/get-process-data", {
+      const response = await apiFetch("/files/get-process-data", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ processId: nomeProcesso }),
       });
 

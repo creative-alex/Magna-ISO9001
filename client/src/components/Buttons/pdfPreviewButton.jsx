@@ -1,5 +1,6 @@
 import React from "react";
 import { FaDownload } from "react-icons/fa6";
+import { apiFetch } from "../../utils/apiFetch";
 
 const PdfPreviewButton = ({ file, currentPath, size = 16, className }) => {
   // Função para carregar automaticamente a imagem PNG da empresa
@@ -39,11 +40,8 @@ const PdfPreviewButton = ({ file, currentPath, size = 16, className }) => {
         button.title = 'A descarregar...';
         button.style.opacity = '0.7';
         
-        const response = await fetch('https://api-iso-9001.onrender.com/files/download', {
+        const response = await apiFetch('/files/download', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
           body: JSON.stringify({ path: encodeURIComponent(filePath) }),
         });
 
@@ -72,11 +70,8 @@ const PdfPreviewButton = ({ file, currentPath, size = 16, className }) => {
       }
       
       // 1. Primeiro, carrega os dados do PDF
-      const formDataResponse = await fetch("https://api-iso-9001.onrender.com/files/pdf-form-data", {
+      const formDataResponse = await apiFetch("/files/pdf-form-data", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({ filename: encodeURIComponent(filePath) }),
       });
       

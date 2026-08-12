@@ -8,6 +8,7 @@ import {
   FaFileContract, FaIdCard, FaFileLines, FaGraduationCap, FaFile,
   FaPencil, FaCheck, FaCloudArrowUp, FaArrowUpRightFromSquare, FaCircleMinus,
 } from "react-icons/fa6";
+import { apiFetch } from "../utils/apiFetch";
 
 const DOCUMENT_FIELDS = [
   { key: "contrato",     label: "Contrato de trabalho",       Icon: FaFileContract,  accept: ".pdf,.doc,.docx" },
@@ -48,7 +49,7 @@ export default function Perfil() {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("folderPath", `Colaboradores/${username}/`);
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/files/upload-document`, {
+      const res = await apiFetch(`/files/upload-document`, {
         method: "POST",
         body: formData,
       });
@@ -69,9 +70,8 @@ export default function Perfil() {
     if (!ref) return;
     setViewing(prev => ({ ...prev, [docKey]: true }));
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/files/download`, {
+      const res = await apiFetch(`/files/download`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path: encodeURIComponent(ref.path) }),
       });
       if (res.ok) {

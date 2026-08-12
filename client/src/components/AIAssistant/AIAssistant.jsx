@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTutorial, TUTORIAL_TYPES } from '../../context/tutorialContext';
 import { FaRobot, FaXmark } from 'react-icons/fa6';
+import { apiFetch } from '../../utils/apiFetch';
 
 const AIAssistant = ({ 
   fileTree, 
@@ -686,9 +687,8 @@ const AIAssistant = ({
     }
 
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/assistant`, {
+      const res = await apiFetch(`/api/assistant`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: inputText, username, currentPage, pageContext: buildPageContext() }),
       });
       const data = await res.json();

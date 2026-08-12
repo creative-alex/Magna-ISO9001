@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { UserContext } from '../context/userContext';
+import { apiFetch } from '../utils/apiFetch';
 
 const DocumentosAssociados = ({ 
   currentValue, 
@@ -224,7 +225,7 @@ const DocumentosAssociados = ({
     setLoading(true);
     try {
       // Busca todos os ficheiros na pasta principal e suas subpastas
-      const response = await fetch('https://api-iso-9001.onrender.com/files/list-files-tree');
+      const response = await apiFetch('/files/list-files-tree');
       
       if (!response.ok) {
         throw new Error('Erro ao buscar árvore de ficheiros');
@@ -348,7 +349,7 @@ const DocumentosAssociados = ({
       formData.append('file', file);
       formData.append('folderPath', folderPath + '/');
 
-      const response = await fetch('https://api-iso-9001.onrender.com/files/upload-document', {
+      const response = await apiFetch('/files/upload-document', {
         method: 'POST',
         body: formData,
       });
@@ -407,11 +408,8 @@ const DocumentosAssociados = ({
         async () => {
           try {
             
-            const response = await fetch(`https://api-iso-9001.onrender.com/files/delete`, {
+            const response = await apiFetch(`/files/delete`, {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
               body: JSON.stringify({ filename: fullPath }),
             });
             
@@ -483,11 +481,8 @@ const DocumentosAssociados = ({
     const fullPath = typeof docObject === 'object' ? docObject.fullPath : documento;
     
     try {
-      const response = await fetch('https://api-iso-9001.onrender.com/files/get-pdf', {
+      const response = await apiFetch('/files/get-pdf', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ path: fullPath }),
       });
 
@@ -552,11 +547,8 @@ const DocumentosAssociados = ({
     const fullPath = typeof docObject === 'object' ? docObject.fullPath : documento;
     
     try {
-      const response = await fetch('https://api-iso-9001.onrender.com/files/download', {
+      const response = await apiFetch('/files/download', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ path: fullPath }),
       });
 

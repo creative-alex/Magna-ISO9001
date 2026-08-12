@@ -14,6 +14,7 @@ import {
   FaXmark,
   FaFile,
 } from "react-icons/fa6";
+import { apiFetch } from "../utils/apiFetch";
 
 export default function Sidebar({ onSelectFile }) {
   const navigate = useNavigate();
@@ -29,7 +30,7 @@ export default function Sidebar({ onSelectFile }) {
   const isActive = (path) => location.pathname === path;
 
   useEffect(() => {
-    fetch(`${process.env.REACT_APP_API_URL}/files/list-files-tree`)
+    apiFetch(`/files/list-files-tree`)
       .then(r => r.json())
       .then(data => {
         const rf = data.find(n => n.name.includes("PROCESSO 6") || n.name.toLowerCase().includes("gestão de recursos humanos"));

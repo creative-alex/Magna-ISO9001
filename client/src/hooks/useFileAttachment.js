@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { apiFetch } from '../utils/apiFetch';
 
 /**
  * Hook personalizado para gerenciar anexos de arquivos
@@ -35,7 +36,7 @@ const useFileAttachment = () => {
 
     setLoading(true);
     try {
-      const response = await fetch('https://api-iso-9001.onrender.com/files/list-files-tree');
+      const response = await apiFetch('/files/list-files-tree');
       
       if (!response.ok) {
         throw new Error('Erro ao buscar árvore de ficheiros');
@@ -143,7 +144,7 @@ const useFileAttachment = () => {
       formData.append('file', file);
       formData.append('folderPath', folderPath + '/');
 
-      const response = await fetch('https://api-iso-9001.onrender.com/files/upload-document', {
+      const response = await apiFetch('/files/upload-document', {
         method: 'POST',
         body: formData,
       });
@@ -227,11 +228,8 @@ const useFileAttachment = () => {
     console.log('👁️ Preview:', fullPath);
     
     try {
-      const response = await fetch('https://api-iso-9001.onrender.com/files/get-pdf', {
+      const response = await apiFetch('/files/get-pdf', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ path: encodeURIComponent(fullPath) }),
       });
 
@@ -274,11 +272,8 @@ const useFileAttachment = () => {
     console.log('⬇️ Download:', fullPath);
     
     try {
-      const response = await fetch('https://api-iso-9001.onrender.com/files/download', {
+      const response = await apiFetch('/files/download', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ path: encodeURIComponent(fullPath) }),
       });
 

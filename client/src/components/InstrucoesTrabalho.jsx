@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiFetch } from '../utils/apiFetch';
 
 const InstrucoesTrabalho = ({ 
   currentValue, 
@@ -167,11 +168,8 @@ const InstrucoesTrabalho = ({
     }
     
     try {
-      const response = await fetch('https://api-iso-9001.onrender.com/files/download', {
+      const response = await apiFetch('/files/download', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ path: encodeURIComponent(fullPath) }),
       });
 
@@ -241,7 +239,7 @@ const InstrucoesTrabalho = ({
     setLoading(true);
     try {
       // Busca todos os ficheiros na pasta principal e suas subpastas
-      const response = await fetch('https://api-iso-9001.onrender.com/files/list-files-tree');
+      const response = await apiFetch('/files/list-files-tree');
       
       if (!response.ok) {
         throw new Error('Erro ao buscar árvore de ficheiros');
@@ -384,7 +382,7 @@ const InstrucoesTrabalho = ({
       formData.append('file', file);
       formData.append('folderPath', folderPath + '/');
 
-      const response = await fetch('https://api-iso-9001.onrender.com/files/upload-document', {
+      const response = await apiFetch('/files/upload-document', {
         method: 'POST',
         body: formData,
       });
@@ -442,25 +440,37 @@ const InstrucoesTrabalho = ({
   };
 
   // Função para download de instrução
-  const handleDownload = (instrucaoName) => {
+  const handleDownload = async (instrucaoName) => {
     // Busca a instrução na lista disponível para obter o caminho completo
     const instrucao = instrucoesDisponiveis.find(
       inst => (typeof inst === 'object' ? inst.displayName : inst) === instrucaoName
     );
-    
+
     if (instrucao && typeof instrucao === 'object') {
       const fullPath = instrucao.fullPath;
-      
-      // URL para download
-      const downloadUrl = `https://api-iso-9001.onrender.com/files/download/${encodeURIComponent(fullPath)}`;
-      
-      // Cria um link temporário para download
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = instrucaoName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+
+      try {
+        // Pedido autenticado (o endpoint exige sessão válida, por isso já não
+        // pode ser um <a href> simples — precisa de ir via apiFetch)
+        const response = await apiFetch(`/files/download/${encodeURIComponent(fullPath)}`);
+        if (!response.ok) {
+          showNotification('Erro ao descarregar a instrução.', 'error');
+          return;
+        }
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = instrucaoName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error('🚨 Erro no download:', error);
+        showNotification('Erro ao descarregar a instrução.', 'error');
+      }
     }
   };
 
@@ -480,7 +490,7 @@ const InstrucoesTrabalho = ({
         async () => {
           try {
             
-            const response = await fetch(`https://api-iso-9001.onrender.com/files/delete/${encodeURIComponent(fullPath)}`, {
+            const response = await apiFetch(`/files/delete/${encodeURIComponent(fullPath)}`, {
               method: 'DELETE'
             });
             

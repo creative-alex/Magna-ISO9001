@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { FaTrash } from "react-icons/fa6";
+import { apiFetch } from "../../utils/apiFetch";
 
 const DeleteButton = ({ file, currentPath, onDelete, isFolder = false, size = 16, className }) => {
     const [notification, setNotification] = useState(null);
@@ -27,9 +28,8 @@ const DeleteButton = ({ file, currentPath, onDelete, isFolder = false, size = 16
     const performDelete = async () => {
         try {
             const filePath = [...currentPath, file.name].join("/");
-            const response = await fetch(`${process.env.REACT_APP_API_URL}/files/delete`, {
+            const response = await apiFetch(`/files/delete`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ filename: encodeURIComponent(filePath) }),
             });
 

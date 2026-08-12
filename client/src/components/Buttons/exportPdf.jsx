@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { generateEditablePdf } from "../../utils/pdfGenerate";
 import { FaFloppyDisk } from "react-icons/fa6";
+import { apiFetch } from "../../utils/apiFetch";
 
 export default function ExportPdfButton({
   templateType = 1,
@@ -134,7 +135,7 @@ export default function ExportPdfButton({
       }
           }
 
-    await fetch("https://api-iso-9001.onrender.com/files/upload-pdf", {
+    await apiFetch("/files/upload-pdf", {
       method: "POST",
       body: formData,
     });
@@ -145,11 +146,8 @@ export default function ExportPdfButton({
         console.log("Atualizando dono do processo:", donoProcesso);
         const processId = pathFilename; // Usando o filename como processId
         
-        await fetch("https://api-iso-9001.onrender.com/files/update-dono-processo", {
+        await apiFetch("/files/update-dono-processo", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({
             processId: processId,
             donoProcesso: donoProcesso

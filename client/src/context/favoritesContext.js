@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { UserContext } from "./userContext";
 import { fixEncoding } from "../utils/fixEncoding";
+import { apiFetch } from "../utils/apiFetch";
 
 export const FavoritesContext = createContext();
 
@@ -22,7 +23,7 @@ export const FavoritesProvider = ({ children }) => {
 
   useEffect(() => {
     if (!username) { setFavorites([]); return; }
-    fetch(`${process.env.REACT_APP_API_URL}/users/favorites/${username}`)
+    apiFetch(`/users/favorites/${username}`)
       .then(r => r.json())
       .then(data => setFavorites(normalizeFavorites(data)))
       .catch(() => setFavorites([]));
@@ -31,9 +32,8 @@ export const FavoritesProvider = ({ children }) => {
   const toggleFavorite = async (filePath, fileName) => {
     const exists = favorites.find(f => f.path === filePath);
     try {
-      const r = await fetch(`${process.env.REACT_APP_API_URL}/users/favorites`, {
+      const r = await apiFetch(`/users/favorites`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, filePath, fileName, action: exists ? 'remove' : 'add' })
       });
       if (r.ok) {
