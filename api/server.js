@@ -1,9 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const db = require("./db/firebase"); 
-const path = require("path");
-const serviceAccount = require(path.join(__dirname, "./db/serviceAccountKey.json"));
+const db = require("./db/firebase");
 const userRoute = require("./Routes/userRoutes");
 const pdfRoute = require("./Routes/pdfRoutes");
 const assistantRoute = require("./Routes/assistantRoutes");
