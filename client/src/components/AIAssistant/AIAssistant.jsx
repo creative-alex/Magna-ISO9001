@@ -43,7 +43,6 @@ const AIAssistant = ({
       } else {
         setCurrentPage('unknown');
       }      
-      console.log('📍 Página atual detectada:', currentPage, '(path:', path, ')');
     };
 
     detectCurrentPage();

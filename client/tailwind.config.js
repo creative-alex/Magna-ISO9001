@@ -23,6 +23,18 @@ module.exports = {
         section: {
           label: '#B8892A',
         },
+        danger: {
+          DEFAULT: '#E86F51',
+          light:   '#fce5df',
+        },
+        success: {
+          DEFAULT: '#A3D977',
+          light:   '#ecfbe4',
+        },
+        warning: {
+          DEFAULT: '#F1B74E',
+          light:   '#fff4e0',
+        },
       },
       fontFamily: {
         sans: ['Segoe UI', 'Tahoma', 'Geneva', 'Verdana', 'sans-serif'],

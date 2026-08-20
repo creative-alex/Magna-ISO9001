@@ -9,8 +9,8 @@ const DocumentosAssociados = ({
   isEditable = true, // Nova prop para controlar editabilidade
   canEdit = true // Nova prop para controlar se pode editar (permissões)
 }) => {
-  const { username, userRole } = useContext(UserContext);
-  const isSuperAdmin = (userRole && userRole.toLowerCase() === 'superadmin') || (username && username.toLowerCase() === 'superadmin');
+  const { nivelAcesso } = useContext(UserContext);
+  const isSuperAdmin = nivelAcesso === 'SuperAdmin';
   const [documentosDisponiveis, setDocumentosDisponiveis] = useState([]);
   const [documentosSelecionados, setDocumentosSelecionados] = useState([]);
   const [showModal, setShowModal] = useState(false);

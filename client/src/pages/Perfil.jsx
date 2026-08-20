@@ -20,9 +20,9 @@ const DOCUMENT_FIELDS = [
 
 export default function Perfil() {
   const navigate = useNavigate();
-  const { username, userEmail, userRole } = useContext(UserContext);
+  const { username, userEmail, userRole, nivelAcesso } = useContext(UserContext);
   const gold = "#C8932F";
-  const isAdmin = userRole === "SuperAdmin";
+  const isAdmin = nivelAcesso === "SuperAdmin";
   const initials = username ? username.slice(0, 2).toUpperCase() : "??";
 
   const docsKey = `magna_perfil_docs_${username}`;

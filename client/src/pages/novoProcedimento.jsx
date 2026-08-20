@@ -156,7 +156,7 @@ export default function NewTable() {
       });
       if (!response.ok) throw new Error('Erro ao criar procedimento');
 
-      navigate('/file');
+      navigate('/dashboard');
     } catch (err) {
       setError('Erro ao criar procedimento: ' + err.message);
     } finally {

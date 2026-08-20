@@ -28,7 +28,10 @@ async function requireAuth(req, res, next) {
       uid: decodedToken.uid,
       email: decodedToken.email,
       nome: userData.nome || decodedToken.name || null,
+      // "role" é só o cargo/título mostrado (texto livre, ex: "Gestora RH / Coordenadora
+      // Pedagógica") — NUNCA usar para decidir permissões, usar sempre nivelAcesso.
       role: userData.role || "user",
+      nivelAcesso: userData.nivelAcesso || "Colaborador",
     };
 
     next();
@@ -38,12 +41,27 @@ async function requireAuth(req, res, next) {
   }
 }
 
+function isSuperAdmin(nivelAcesso) {
+  return (nivelAcesso || "").toLowerCase() === "superadmin";
+}
+
+function isAdminOrHR(nivelAcesso) {
+  const nivel = (nivelAcesso || "").toLowerCase();
+  return nivel === "superadmin" || nivel === "gestorrh";
+}
+
 function requireAdmin(req, res, next) {
-  const role = (req.user?.role || "").toLowerCase();
-  if (role !== "superadmin") {
+  if (!isSuperAdmin(req.user?.nivelAcesso)) {
     return res.status(403).json({ error: "Acesso restrito a administradores" });
   }
   next();
 }
 
-module.exports = { requireAuth, requireAdmin };
+function requireAdminOrHR(req, res, next) {
+  if (!isAdminOrHR(req.user?.nivelAcesso)) {
+    return res.status(403).json({ error: "Acesso restrito a administradores e gestores de recursos humanos" });
+  }
+  next();
+}
+
+module.exports = { requireAuth, requireAdmin, requireAdminOrHR, isSuperAdmin, isAdminOrHR };

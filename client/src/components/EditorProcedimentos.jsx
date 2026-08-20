@@ -130,7 +130,7 @@ export default function TablePageUnified() {
   const [isLoading, setIsLoading] = useState(true);
   
   // Context do usuário para verificar permissões
-  const { username, userRole } = useContext(UserContext);
+  const { username, nivelAcesso } = useContext(UserContext);
 
   const originalFilename =
     location?.state?.originalFilename
@@ -287,7 +287,7 @@ const isUserOwner = (donoProcessoString, username) => {
 };
 
 // Fallback: verificar permissões localmente se não vier do state
-const isAdmin = userRole === "SuperAdmin";
+const isAdmin = nivelAcesso === "SuperAdmin";
 const canEditFallback = isAdmin || isUserOwner(donoProcesso, username);
 
 // Usar o valor do state se disponível, senão usar fallback

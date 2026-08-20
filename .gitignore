@@ -11,3 +11,6 @@ client/node_modules/
 # Credencial Firebase Admin - nunca deve ser trackeada
 api/db/serviceAccountKey.json
 
+# Output da migração do Livro de Ponto (contém emails e passwords temporárias)
+api/scripts/migration-output/
+

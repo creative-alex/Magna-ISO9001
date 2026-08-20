@@ -4,6 +4,9 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { UserContext } from "../../context/userContext";
 import Logo from "../../logo.svg";
+import LoginBackground from "../../assets/login/capa.jpg";
+import LoginFooter from "../../assets/login/footer.png";
+import LoginLogo from "../../assets/login/logo.png";
 import { FaEye, FaEyeSlash, FaCircleExclamation } from "react-icons/fa6";
 
 const Login = ({ onLoginSuccess }) => {
@@ -12,6 +15,7 @@ const Login = ({ onLoginSuccess }) => {
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [destination, setDestination] = useState("/dashboard");
     const navigate = useNavigate();
     const location = useLocation();
     const { auth, isAuthenticated, setUserEmail } = useContext(UserContext);
@@ -76,7 +80,7 @@ const Login = ({ onLoginSuccess }) => {
 
             if (response.ok) {
                 if (data.isFirstLogin) {
-                    navigate("/first-login", { replace: true, state: { email: data.email } });
+                    navigate("/reset-password", { replace: true, state: { email: data.email } });
                     return;
                 }
 
@@ -85,13 +89,14 @@ const Login = ({ onLoginSuccess }) => {
                     toast.success("Login bem-sucedido!");
                 }
 
+                const target = location.state?.from?.pathname || destination;
+
                 if (onLoginSuccess && typeof onLoginSuccess === 'function') {
-                    onLoginSuccess(data);
+                    onLoginSuccess(data, target);
                     return;
                 }
 
-                const redirectPath = location.state?.from?.pathname || "/";
-                navigate(redirectPath, { replace: true });
+                navigate(target, { replace: true });
             } else {
                 setError(data.message || "Erro ao verificar token");
                 toast.error("Erro ao verificar token");
@@ -109,28 +114,44 @@ const Login = ({ onLoginSuccess }) => {
 
     return (
         <div className="flex min-h-screen font-sans">
+            <div className="fixed top-4 right-4 z-20">
+                <select
+                    value={destination}
+                    onChange={(e) => setDestination(e.target.value)}
+                    aria-label="Entrar em"
+                    className="bg-white text-[#5C3D0E] text-[11px] font-semibold rounded-md pl-2.5 pr-1.5 py-1.5 border border-gray-200 shadow-sm cursor-pointer transition-colors duration-150 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#C8932F]/50"
+                >
+                    <option value="/dashboard">Painel Principal</option>
+                    <option value="/ponto">Livro de Ponto</option>
+                </select>
+            </div>
             {/* Brand panel */}
-            <div className="w-[42%] min-w-[300px] flex flex-col items-center justify-center relative overflow-hidden px-10 py-12 before:content-[''] before:absolute before:-top-[100px] before:-right-[100px] before:w-[420px] before:h-[420px] before:rounded-full before:bg-white/[.06] before:pointer-events-none after:content-[''] after:absolute after:-bottom-[130px] after:-left-[80px] after:w-[400px] after:h-[400px] after:rounded-full after:bg-white/[.05] after:pointer-events-none"
-                style={{ background: 'linear-gradient(145deg,#4A1C00 0%,#7A4010 38%,#C8932F 100%)' }}>
+            <div className="w-[35%] min-w-[300px] flex flex-col items-center justify-center relative overflow-hidden px-10 py-12 before:content-[''] before:absolute before:-top-[100px] before:-right-[100px] before:w-[420px] before:h-[420px] before:rounded-full before:bg-white/[.06] before:pointer-events-none after:content-[''] after:absolute after:-bottom-[130px] after:-left-[80px] after:w-[400px] after:h-[400px] after:rounded-full after:bg-white/[.05] after:pointer-events-none"
+                style={{
+                    backgroundImage: `linear-gradient(145deg, rgba(74,28,0,0.45) 0%, rgba(122,64,16,0.4) 38%, rgba(200,147,47,0.35) 100%), url(${LoginBackground})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                }}>
                 <div className="text-center relative z-[1]">
                     <div className="w-[90px] h-[90px] bg-white/[.18] border border-white/[.28] rounded-[22px] flex items-center justify-center mx-auto mb-7 shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
                         <img src={Logo} alt="Logo Magna" className="w-[54px] h-[54px] brightness-0 invert" />
                     </div>
-                    <h1 className="text-[2.7rem] font-extrabold text-white m-0 tracking-[5px] uppercase">Magna</h1>
-                    <p className="text-[0.88rem] text-white/70 mt-[7px] mb-[22px] tracking-[7px] uppercase font-light">ISO&nbsp;9001</p>
+                    <h1 className="text-[2.7rem] font-extrabold text-white m-0 tracking-[5px] uppercase drop-shadow-[0_1px_4px_rgba(0,0,0,0.5)]">Magna</h1>
+                    <p className="text-[0.88rem] text-white/90 mt-[7px] mb-[22px] tracking-[7px] uppercase font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.5)]">ISO&nbsp;9001</p>
                     <div className="w-[38px] h-[1.5px] bg-white/30 rounded-[2px] mx-auto mb-5" />
-                    <p className="text-[0.85rem] text-white/60 m-0 font-light leading-[1.8] tracking-[0.3px]">
+                    <p className="text-[0.85rem] text-white/90 m-0 font-medium leading-[1.8] tracking-[0.3px] drop-shadow-[0_1px_3px_rgba(0,0,0,0.5)]">
                         Sistema de Gestão<br />de Qualidade
                     </p>
                 </div>
-                <span className="absolute bottom-[22px] text-[10.5px] text-white/40 tracking-[0.3px]">© 2026 Magna · Qualidade &amp; Excelência</span>
+                <span className="absolute bottom-[22px] text-[10.5px] text-white/75 tracking-[0.3px] drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">© 2026 Magna · Qualidade &amp; Excelência</span>
             </div>
 
             {/* Form panel */}
-            <div className="flex-1 flex items-center justify-center px-8 py-12 bg-[#FDFCF9] max-sm:px-5 max-sm:py-7">
-                <div className="w-full max-w-[400px]">
-                    <div className="mb-[38px]">
-                        <h2 className="text-[1.85rem] font-bold text-gray-900 m-0 mb-2 tracking-[-0.3px]">Bem-vindo de volta</h2>
+            <div className="flex-1 flex flex-col overflow-y-auto relative px-8 py-6 bg-[#FDFCF9] max-sm:px-5 max-sm:py-5">
+                <div className="flex-1 flex flex-col justify-center w-full max-w-[900px] mx-auto">
+                    <div className="mb-6 max-sm:mb-6">
+                        <img src={LoginLogo} alt="Logo Magna" className="block h-24 w-auto object-contain mb-5 -ml-8 max-sm:h-20 max-sm:mb-5 max-sm:-ml-4" />
+                        <h2 className="text-[1.85rem] font-bold text-gray-900 m-0 mb-2 tracking-[-0.3px]">Bem-vindo/a</h2>
                         <p className="text-[14px] text-gray-500 m-0">Inicie sessão para aceder ao sistema</p>
                     </div>
 
@@ -200,6 +221,12 @@ const Login = ({ onLoginSuccess }) => {
                         </button>
                     </form>
                 </div>
+
+                <img
+                    src={LoginFooter}
+                    alt=""
+                    className="w-auto h-auto max-w-[700px] max-h-[240px] object-contain mx-auto mt-6 shrink-0 max-sm:max-w-[220px] max-sm:max-h-[55px] max-sm:mt-6"
+                />
             </div>
         </div>
     );

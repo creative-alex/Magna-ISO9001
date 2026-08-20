@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useContext } from "react";
+import React, { useState, useContext } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { toast } from "react-toastify";
 import { UserContext } from "../context/userContext";
 import { FavoritesContext } from "../context/favoritesContext";
-import { fixEncoding } from "../utils/fixEncoding";
 import {
   FaChartBar,
   FaPeopleGroup,
@@ -13,33 +13,52 @@ import {
   FaClipboardList,
   FaXmark,
   FaFile,
+  FaIdCard,
+  FaGraduationCap,
+  FaUmbrellaBeach,
+  FaClock,
+  FaSackDollar,
+  FaBriefcaseMedical,
+  FaTrophy,
 } from "react-icons/fa6";
-import { apiFetch } from "../utils/apiFetch";
+
+const PEOPLE_MANAGEMENT_ITEMS = [
+  { name: "Cadastro", icon: FaIdCard },
+  { name: "Plano de Formação", icon: FaGraduationCap },
+  { name: "Mapa de Férias", icon: FaUmbrellaBeach },
+  { name: "Livro de Ponto", icon: FaClock },
+  { name: "Processamento Salários", icon: FaSackDollar },
+  { name: "Medicina de Trabalho", icon: FaBriefcaseMedical },
+  { name: "Prémios", icon: FaTrophy },
+];
 
 export default function Sidebar({ onSelectFile }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { username, userRole } = useContext(UserContext);
+  const { username, nivelAcesso } = useContext(UserContext);
   const { favorites, toggleFavorite } = useContext(FavoritesContext);
-  const isAdmin = userRole === "SuperAdmin";
+  const isAdmin = nivelAcesso === "SuperAdmin";
+  const isHR = nivelAcesso === "GestorRH";
   const initials = username ? username.slice(0, 2).toUpperCase() : "??";
 
-  const [resourcesFiles, setResourcesFiles] = useState([]);
   const [showFavoritesDropdown, setShowFavoritesDropdown] = useState(false);
   const [showResourcesDropdown, setShowResourcesDropdown] = useState(false);
   const isActive = (path) => location.pathname === path;
 
-  useEffect(() => {
-    apiFetch(`/files/list-files-tree`)
-      .then(r => r.json())
-      .then(data => {
-        const rf = data.find(n => n.name.includes("PROCESSO 6") || n.name.toLowerCase().includes("gestão de recursos humanos"));
-        if (rf?.children) setResourcesFiles(rf.children.filter(c => c.type === "file").map(f => ({
-          name: fixEncoding(f.name.endsWith('.pdf') ? f.name.slice(0, -4) : f.name),
-          path: `${rf.name}/${f.name}`,
-        })));
-      }).catch(() => {});
-  }, []);
+  const handlePeopleManagementItemClick = (item) => {
+    if (item.name === "Livro de Ponto") {
+      navigate("/ponto");
+    } else if (item.name === "Cadastro") {
+      navigate(isAdmin || isHR ? "/colaboradores" : "/cadastro");
+    } else if (item.name === "Processamento Salários" && (isAdmin || isHR)) {
+      navigate("/salarios");
+    } else if (item.name === "Mapa de Férias") {
+      navigate("/ferias");
+    } else {
+      toast.info("Funcionalidade em breve", { position: "top-right", autoClose: 2500 });
+    }
+    setShowResourcesDropdown(false);
+  };
 
   const navItemClass = (path) =>
     `flex items-center gap-2.5 py-[9px] px-3 text-[13px] cursor-pointer rounded-md mx-2 my-px transition-colors duration-150 relative no-underline ${
@@ -66,32 +85,28 @@ export default function Sidebar({ onSelectFile }) {
         <div className="flex-1 overflow-y-auto">
         {/* Principal */}
         <div className="px-[14px] pt-4 pb-[5px] text-[10px] text-[#B8892A] tracking-[0.08em] uppercase font-semibold">Principal</div>
-        <div className={navItemClass("/file")} onClick={() => navigate("/file")}>
+        <div className={navItemClass("/dashboard")} onClick={() => navigate("/dashboard")}>
           <FaChartBar style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> ISO 9001 </div>
-        {/* Recursos Humanos accordion */}
-        {resourcesFiles.length > 0 && (
-          <>
-            <div className={navItemBaseClass} onClick={() => setShowResourcesDropdown(!showResourcesDropdown)}>
-              <FaPeopleGroup style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> Gestão de Pessoas
-              <span className={`text-[10px] transition-transform duration-[250ms] ml-auto${showResourcesDropdown ? ' rotate-180' : ''}`}>▼</span>
-            </div>
-            {showResourcesDropdown && (
-              <div className="mx-2 mb-1 rounded-md overflow-hidden border border-[#E8D0A0] bg-[#FDF8EE]">
-                {resourcesFiles.map(file => (
-                  <div
-                    key={file.path}
-                    className="flex items-start gap-2 px-3 py-[8px] border-b border-[#EDE0C4] last:border-b-0 cursor-pointer transition-colors duration-150 hover:bg-[#F0E2C4]"
-                    onClick={() => { onSelectFile(file.path); setShowResourcesDropdown(false); }}
-                  >
-                    <FaFile style={{ fontSize: 12, color: "var(--gold)", flexShrink: 0, marginTop: 2 }} />
-                    <span className="text-[12px] text-[#5C3D0E] font-medium leading-snug break-words min-w-0">
-                      {file.name}
-                    </span>
-                  </div>
-                ))}
+        {/* Gestão de Pessoas accordion */}
+        <div className={navItemBaseClass} onClick={() => setShowResourcesDropdown(!showResourcesDropdown)}>
+          <FaPeopleGroup style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> Gestão de Pessoas
+          <span className={`text-[10px] transition-transform duration-[250ms] ml-auto${showResourcesDropdown ? ' rotate-180' : ''}`}>▼</span>
+        </div>
+        {showResourcesDropdown && (
+          <div className="mx-2 mb-1 rounded-md overflow-hidden border border-[#E8D0A0] bg-[#FDF8EE]">
+            {PEOPLE_MANAGEMENT_ITEMS.map(item => (
+              <div
+                key={item.name}
+                className="flex items-start gap-2 px-3 py-[8px] border-b border-[#EDE0C4] last:border-b-0 cursor-pointer transition-colors duration-150 hover:bg-[#F0E2C4]"
+                onClick={() => handlePeopleManagementItemClick(item)}
+              >
+                <item.icon style={{ fontSize: 12, color: "var(--gold)", flexShrink: 0, marginTop: 2 }} />
+                <span className="text-[12px] text-[#5C3D0E] font-medium leading-snug break-words min-w-0">
+                  {item.name}
+                </span>
               </div>
-            )}
-          </>
+            ))}
+          </div>
         )}
 
         {/* Favoritos accordion */}
@@ -147,6 +162,9 @@ export default function Sidebar({ onSelectFile }) {
             </div>
             <div className={navItemBaseClass} onClick={() => navigate('/novo-processo')}>
               <FaClipboardList style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> Novo Processo
+            </div>
+            <div className={navItemBaseClass} onClick={() => navigate('/ponto/entidades')}>
+              <FaClock style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> Gerir Livro de Ponto
             </div>
           </>
         )}

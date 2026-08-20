@@ -15,9 +15,9 @@ import { apiFetch } from "../utils/apiFetch";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { username, userRole } = useContext(UserContext);
+  const { username, nivelAcesso } = useContext(UserContext);
   const { favorites, toggleFavorite, isFavorite } = useContext(FavoritesContext);
-  const isAdmin = userRole === "SuperAdmin";
+  const isAdmin = nivelAcesso === "SuperAdmin";
   const gold = "#C8932F";
 
   const [processOwners, setProcessOwners] = useState({});

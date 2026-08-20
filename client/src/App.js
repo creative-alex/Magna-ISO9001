@@ -11,21 +11,33 @@ import { UserContext } from "./context/userContext";
 import { TutorialProvider } from "./context/tutorialContext";
 import NewTable from "./pages/novoProcedimento"
 import Perfil from "./pages/Perfil"
+import Cadastro from "./pages/Cadastro"
+import Colaboradores from "./pages/Colaboradores"
+import MapaFerias from "./pages/MapaFerias"
+import ProcessamentoSalarios from "./pages/ProcessamentoSalarios"
+import SalarioColaborador from "./pages/SalarioColaborador"
 import RegistoNaoConformidade from "./pages/RegistoNaoConformidade";
 import FirstLogin from "./components/Auth/firstLogin";
 import { ToastContainer } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
+import TimeTrackingUserDashboard from "./pages/TimeTracking/UserDashboard";
+import TimeTrackingRegistos from "./pages/TimeTracking/RegistosPage";
+import TimeTrackingEntities from "./pages/TimeTracking/EntitiesPage";
+import TimeTrackingEntityUsers from "./pages/TimeTracking/EntityUsers";
+import TimeTrackingUserDetails from "./pages/TimeTracking/UserDetails";
+import NewEntity from "./components/TimeTracking/Admin/entities/newEntity";
+import NewTimeTrackingUser from "./components/TimeTracking/Admin/clients/newUser";
 
 function App() {
   const navigate = useNavigate();
   const { setUsername, setUserEmail, setUserRole, setIsAuthenticated, isAuthenticated } = useContext(UserContext);
 
-  const handleLoginSuccess = (userData) => {
+  const handleLoginSuccess = (userData, destination = "/dashboard") => {
     setUsername(userData.nome);
     setUserEmail(userData.email);
     setUserRole(userData.role);
     setIsAuthenticated(true);
-    navigate("/file");
+    navigate(destination);
   };
 
   return (
@@ -36,14 +48,14 @@ function App() {
           path="/"
           element={
             isAuthenticated ?
-              <Navigate to="/file" replace /> :
+              <Navigate to="/dashboard" replace /> :
               <Login onLoginSuccess={handleLoginSuccess} />
           }
         />
         
         {/* Rotas protegidas */}
         <Route
-          path="/file"
+          path="/dashboard"
           element={
             <ProtectedRoute>
               <DashboardPage />
@@ -107,6 +119,54 @@ function App() {
           }
         />
         <Route
+          path="/cadastro"
+          element={
+            <ProtectedRoute>
+              <Cadastro />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/cadastro/:id"
+          element={
+            <ProtectedRoute>
+              <Cadastro />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/colaboradores"
+          element={
+            <ProtectedRoute>
+              <Colaboradores />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ferias"
+          element={
+            <ProtectedRoute>
+              <MapaFerias />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/salarios"
+          element={
+            <ProtectedRoute>
+              <ProcessamentoSalarios />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/salarios/:id"
+          element={
+            <ProtectedRoute>
+              <SalarioColaborador />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/nao-conformidade"
           element={
             <ProtectedRoute>
@@ -115,16 +175,70 @@ function App() {
           }
         />
         <Route
-          path="/first-login"
+          path="/reset-password"
           element={<FirstLogin mode="firstLogin" />}
         />
         <Route
-          path="/reset-password"
-          element={<FirstLogin mode="reset" />}
-        />
-        <Route 
           path="/forgot-password"
           element={<FirstLogin mode="forgot" />}
+        />
+
+        {/* Livro de Ponto */}
+        <Route
+          path="/ponto"
+          element={
+            <ProtectedRoute>
+              <TimeTrackingUserDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ponto/registos"
+          element={
+            <ProtectedRoute>
+              <TimeTrackingRegistos />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ponto/entidades"
+          element={
+            <ProtectedRoute>
+              <TimeTrackingEntities />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ponto/entidades/:id_entidade"
+          element={
+            <ProtectedRoute>
+              <TimeTrackingEntityUsers />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ponto/nova-entidade"
+          element={
+            <ProtectedRoute>
+              <NewEntity />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ponto/novo-user"
+          element={
+            <ProtectedRoute>
+              <NewTimeTrackingUser />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ponto/user-details/:uid"
+          element={
+            <ProtectedRoute>
+              <TimeTrackingUserDetails />
+            </ProtectedRoute>
+          }
         />
       </Routes>
       <ToastContainer 

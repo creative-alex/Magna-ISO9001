@@ -8,10 +8,12 @@ export const UserContext = createContext();
 
 export const UserProvider = ({ children }) => {
   const [username, setUsername] = useState(null);
+  const [uid, setUid] = useState(null);
   const [userEmail, setUserEmail] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [userRole, setUserRole] = useState(null);
+  const [nivelAcesso, setNivelAcesso] = useState(null);
 
   // Função para verificar e validar o token do utilizador
   const validateUserToken = async (user) => {
@@ -34,13 +36,15 @@ export const UserProvider = ({ children }) => {
         const userData = await response.json();
 
         if (userData.isFirstLogin) {
-          // Não autenticar — login.jsx redireciona para /first-login
+          // Não autenticar — login.jsx redireciona para /reset-password
           return false;
         }
 
         setUsername(userData.nome);
+        setUid(userData.uid);
         setUserEmail(userData.email);
         setUserRole(userData.role);
+        setNivelAcesso(userData.nivelAcesso);
         setIsAuthenticated(true);
         return true;
       } else {
@@ -58,8 +62,10 @@ export const UserProvider = ({ children }) => {
   // Função para limpar dados do utilizador
   const clearUserData = () => {
     setUsername(null);
+    setUid(null);
     setUserEmail("");
     setUserRole(null);
+    setNivelAcesso(null);
     setIsAuthenticated(false);
   };
 
@@ -99,10 +105,14 @@ export const UserProvider = ({ children }) => {
   const value = {
     username,
     setUsername,
+    uid,
+    setUid,
     userEmail,
     setUserEmail,
     userRole,
     setUserRole,
+    nivelAcesso,
+    setNivelAcesso,
     isAuthenticated,
     setIsAuthenticated,
     isLoading,

@@ -316,7 +316,7 @@ export default function RegistoNaoConformidade() {
       if (!res.ok) throw new Error(`Erro ${res.status}`);
 
       toast.success("Não conformidade registada com sucesso!");
-      navigate("/file");
+      navigate("/dashboard");
     } catch (e) {
       setError("Ocorreu um erro ao enviar. Por favor tente novamente.");
       toast.error("Erro ao registar a não conformidade.");

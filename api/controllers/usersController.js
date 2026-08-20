@@ -1,5 +1,14 @@
 const admin = require("firebase-admin");
 const db = require("../db/firebase").db;
+const { isSuperAdmin: hasSuperAdminAccess } = require("../middleware/auth");
+
+// Únicos valores válidos para o nível de acesso (controla permissões). Distinto
+// de "role", que é só o cargo/título mostrado (texto livre, ex: "Gestora RH /
+// Coordenadora Pedagógica") e nunca deve ser usado para decidir permissões.
+const NIVEIS_ACESSO = ["SuperAdmin", "GestorRH", "Colaborador"];
+function normalizeNivelAcesso(nivelAcesso) {
+  return NIVEIS_ACESSO.includes(nivelAcesso) ? nivelAcesso : "Colaborador";
+}
 
 const verifyTokenAndGetUserInfo = async (req, res) => {
   try {
@@ -43,7 +52,7 @@ const verifyTokenAndGetUserInfo = async (req, res) => {
       }
     }
 
-    const isSuperAdmin = userData.role === "SuperAdmin" || userData.role === "superadmin";
+    const isSuperAdmin = hasSuperAdminAccess(userData.nivelAcesso);
     console.log('📍 Role do usuário:', userData.role || 'user');
 
     const responseData = {
@@ -52,6 +61,7 @@ const verifyTokenAndGetUserInfo = async (req, res) => {
       email: decodedToken.email,
       displayName: userRecord.displayName || userData.nome || 'N/A',
       role: userData.role || 'user',
+      nivelAcesso: normalizeNivelAcesso(userData.nivelAcesso),
       nome: userData.nome || userRecord.displayName || 'N/A',
       isFirstLogin: isSuperAdmin ? false : (userData.isFirstLogin ?? true),
     };
@@ -67,7 +77,7 @@ const verifyTokenAndGetUserInfo = async (req, res) => {
 
 const createUser = async (req, res) => {
   try {
-    const { nome, email, role, uid, isFirstLogin } = req.body;
+    const { nome, email, role, nivelAcesso, uid, isFirstLogin } = req.body;
 
     // Validação básica
     if (!nome || !email) {
@@ -82,6 +92,7 @@ const createUser = async (req, res) => {
           nome,
           email,
           role: role || 'User',
+          nivelAcesso: normalizeNivelAcesso(nivelAcesso),
           isFirstLogin: isFirstLogin !== undefined ? isFirstLogin : true,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
@@ -159,6 +170,7 @@ const createUser = async (req, res) => {
         entidade: entityRef,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         role: role?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-') || 'user',
+        nivelAcesso: normalizeNivelAcesso(nivelAcesso),
         isFirstLogin: true
       });
 
@@ -199,7 +211,7 @@ const getAllUsers = async (req, res) => {
     snapshot.forEach(doc => {
       const data = doc.data();
       // Filtrar SuperAdmins da lista
-      if (data.role !== "SuperAdmin" && data.role !== "superadmin") {
+      if (!hasSuperAdminAccess(data.nivelAcesso)) {
         users.push({
           id: doc.id,
           nome: data.nome || data.name || data.displayName || 'Nome não disponível',
@@ -212,6 +224,45 @@ const getAllUsers = async (req, res) => {
     
   } catch (error) {
     console.error("Erro ao buscar usuários:", error);
+    res.status(500).json({ error: "Erro interno do servidor", details: error.message });
+  }
+};
+
+const getColaboradores = async (req, res) => {
+  try {
+    const db = admin.firestore();
+    const [snapshot, entidadesSnapshot] = await Promise.all([
+      db.collection('users').get(),
+      db.collection('entidades').get(),
+    ]);
+
+    if (snapshot.empty) {
+      return res.json([]);
+    }
+
+    const entidadeNomes = {};
+    entidadesSnapshot.forEach(doc => {
+      entidadeNomes[doc.id] = doc.data().nome || doc.id;
+    });
+
+    const colaboradores = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (!hasSuperAdminAccess(data.nivelAcesso)) {
+        const entidadeId = data.entidade ? data.entidade.replace('entidades/', '') : null;
+        colaboradores.push({
+          id: doc.id,
+          nome: data.nome || 'Nome não disponível',
+          email: data.email || 'Email não disponível',
+          role: data.role || 'user',
+          entidade: entidadeId ? (entidadeNomes[entidadeId] || entidadeId) : null,
+        });
+      }
+    });
+
+    res.json(colaboradores);
+  } catch (error) {
+    console.error("Erro ao buscar colaboradores:", error);
     res.status(500).json({ error: "Erro interno do servidor", details: error.message });
   }
 };
@@ -360,5 +411,5 @@ const updateFavorite = async (req, res) => {
 };
 
 module.exports = {
-  verifyTokenAndGetUserInfo, createUser, getAllUsers, getFavorites, updateFavorite, updateFirstLogin
+  verifyTokenAndGetUserInfo, createUser, getAllUsers, getColaboradores, getFavorites, updateFavorite, updateFirstLogin
 };
