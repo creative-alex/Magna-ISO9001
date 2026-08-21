@@ -4,6 +4,7 @@ import { calcularHoras, formatarMinutos } from "../../../../utils/timeTracking/c
 import RegisterVacation from "../../Shared/vacationButton";
 import DeleteRegister from "./deleteRegisterButton";
 import MedicalLeave from "../../Shared/medicalLeave";
+import BirthdayButton from "../../Shared/birthdayButton";
 import { HOLIDAYS_PORTO, getMoveableHolidays } from "../../../../utils/timeTracking/constants";
 
 
@@ -18,6 +19,7 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
     diasFalta: 0,
     diasFerias: 0,
     diasBaixaMedica: 0,
+    diasAniversario: 0,
   });
   const [editando, setEditando] = useState(null);
   const [novoValor, setNovoValor] = useState("");
@@ -63,6 +65,7 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
         extra: "-",
         isFerias: false,
         isBaixaMedica: false,
+        isAniversario: false,
       }));
 
       const data = response.ok ? await response.json() : { registos: [] };
@@ -100,6 +103,22 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
             })
         : [];
 
+      // Processar dias de aniversário aprovados
+      const aniversarios = Array.isArray(data.aniversario)
+        ? data.aniversario
+            .filter(a => a.approved === true)
+            .map(a => {
+              const dateStr = a.date;
+              if (dateStr.length === 10 && dateStr[2] === "-") {
+                return dateStr.slice(0, 5);
+              }
+              if (dateStr.length === 10 && dateStr[4] === "-") {
+                return dateStr.slice(8, 10) + "-" + dateStr.slice(5, 7);
+              }
+              return dateStr;
+            })
+        : [];
+
       const hoje = new Date();
       const allHolidays = [...HOLIDAYS_PORTO, ...getMoveableHolidays(year)];
       novosDados = novosDados.map((item, index) => {
@@ -112,9 +131,21 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
         const diaSemana = dataAtual.getDay();
         const feriado = allHolidays.includes(item.dia);
 
-        // Verificar se o dia está marcado como férias ou baixa médica
+        // Verificar se o dia está marcado como férias, baixa médica ou aniversário
         const estaDeFerias = ferias.includes(item.dia);
         const estaDeBaixaMedica = baixas.includes(item.dia);
+        const estaDeAniversario = aniversarios.includes(item.dia);
+
+        if (estaDeAniversario) {
+          return {
+            ...item,
+            horaEntrada: "🎂 Aniversário",
+            horaSaida: "🎂 Aniversário",
+            total: "Aniversário",
+            extra: "Aniversário",
+            isAniversario: true,
+          };
+        }
 
         if (estaDeFerias) {
           return {
@@ -191,9 +222,10 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
         return item;
       });
 
-      const diasFalta = novosDados.filter((d) => d.total === "0h 0m" && !d.isFerias && !d.isBaixaMedica).length;
+      const diasFalta = novosDados.filter((d) => d.total === "0h 0m" && !d.isFerias && !d.isBaixaMedica && !d.isAniversario).length;
       const diasFerias = novosDados.filter((d) => d.isFerias).length;
       const diasBaixaMedica = novosDados.filter((d) => d.isBaixaMedica).length;
+      const diasAniversario = novosDados.filter((d) => d.isAniversario).length;
 
       const novosTotais = {
         totalHoras: formatarMinutos(totalMinutos + totalMinutosExtras),
@@ -202,6 +234,7 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
         diasFalta,
         diasFerias,
         diasBaixaMedica,
+        diasAniversario,
       };
 
       setTotais(novosTotais);
@@ -222,6 +255,7 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
         diasFalta: 0,
         diasFerias: 0,
         diasBaixaMedica: 0,
+        diasAniversario: 0,
       });
     }
   };
@@ -283,9 +317,10 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
       y,
       index,
       dia: dados[index].dia,
-      isFerias: dados[index].isFerias
+      isFerias: dados[index].isFerias,
+      isAniversario: dados[index].isAniversario
     });
-  };  
+  };
     
   return (
     <>
@@ -300,6 +335,12 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
         <div className="flex flex-col gap-1 [&_button]:w-full [&_button]:bg-transparent [&_button]:border-none [&_button]:text-gold [&_button]:px-3 [&_button]:py-2 [&_button]:text-sm [&_button]:cursor-pointer [&_button]:rounded [&_button]:text-left [&_button]:transition-colors [&_button]:duration-200 [&_button:hover]:bg-gold-light [&_button:hover]:text-white">
           <RegisterVacation username={username} date={contextMenu.dia} onSuccess={fetchData} />
           <MedicalLeave username={username} date={contextMenu.dia} onSuccess={fetchData} />
+          <BirthdayButton
+            username={username}
+            date={`${contextMenu.dia}-${year}`}
+            isMarked={contextMenu.isAniversario}
+            onSuccess={fetchData}
+          />
           <DeleteRegister username={username} date={contextMenu.dia} onSuccess={fetchData} />
         </div>
       </div>

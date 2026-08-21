@@ -85,7 +85,7 @@ export default function Dashboard() {
     { label: "Processos", value: totalProcessos, sub: "no sistema", bar: 100 },
     { label: "Procedimentos", value: totalProcedimentos, sub: "documentados", bar: Math.min(100, totalProcedimentos * 3) },
     { label: "Não conformidades", value: 0, sub: "abertas", bar: 0, barColor: "#ef4444" },
-    { label: "Colaboradores", value: totalUsers ?? "—", sub: "com acesso", noBar: true },
+    { label: "Colaboradores", value: totalUsers ?? " - ", sub: "com acesso", noBar: true },
   ];
 
   return (

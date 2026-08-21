@@ -1,13 +1,21 @@
 const admin = require("firebase-admin");
 const db = require("../db/firebase").db;
 const { calculateMonthlyAttendanceSummary } = require("./timeTracking/reportsController");
-const { isAdminOrHR } = require("../middleware/auth");
+const { isAdminOrHR, isAdministrador } = require("../middleware/auth");
 const { sendMail, renderEmail } = require("../services/mailer");
 
 const bucket = admin.storage().bucket();
 
 function canAccess(req) {
   return isAdminOrHR(req.user?.nivelAcesso);
+}
+
+// Leitura: admin/RH vê qualquer colaborador; Administrador vê os colaboradores da
+// sua própria entidade; um colaborador comum só pode consultar os seus próprios
+// dados (nunca editar nem enviar recibos - isso continua restrito a canAccess).
+function canRead(req, id, targetEntidade) {
+  return canAccess(req) || req.user?.uid === id
+    || (isAdministrador(req.user?.nivelAcesso) && !!targetEntidade && targetEntidade === req.user?.entidade);
 }
 
 const MES_REGEX = /^\d{4}-\d{2}$/;
@@ -21,9 +29,9 @@ function getMesLabel(mes) {
   return `${MES_LABELS[Number(m) - 1]} de ${ano}`;
 }
 
-// Campos mensais — cada mês é o seu próprio documento em users/{id}/salarios/{mes}.
+// Campos mensais  -  cada mês é o seu próprio documento em users/{id}/salarios/{mes}.
 // Nota: o valor do subsídio de alimentação e o valor/km de deslocações são iguais
-// para todos e vêm de parametrosSalario — aqui só se guarda se a pessoa tem
+// para todos e vêm de parametrosSalario  -  aqui só se guarda se a pessoa tem
 // deslocações este mês e quantos km, não o valor em euros.
 // Baixas, licenças, faltas, férias e dias trabalhados NÃO entram aqui: vêm sempre
 // calculados a partir do livro de ponto em getSalario (ver calculateMonthlyAttendanceSummary),
@@ -36,11 +44,8 @@ const SALARIO_MES_FIELD_KEYS = [
 
 const getSalario = async (req, res) => {
   try {
-    if (!canAccess(req)) {
-      return res.status(403).json({ error: "Acesso restrito a administradores e gestores de recursos humanos" });
-    }
-
     const { id, mes } = req.params;
+
     if (!MES_REGEX.test(mes)) {
       return res.status(400).json({ error: "Mês inválido (formato esperado AAAA-MM)" });
     }
@@ -52,6 +57,10 @@ const getSalario = async (req, res) => {
     }
 
     const userData = userDoc.data();
+    if (!canRead(req, id, userData.entidade)) {
+      return res.status(403).json({ error: "Sem permissão para consultar estes dados salariais" });
+    }
+
     const escalaoVencimento = userData.escalao_vencimento || "";
     const temIsencaoHorario = !!userData.tem_isencao_horario;
 
@@ -121,6 +130,7 @@ const getSalario = async (req, res) => {
       dias_trabalhados: attendance.diasTrabalhados,
       dias_ferias: attendance.diasFerias,
       dias_baixa_medica: attendance.diasBaixaMedica,
+      dias_aniversario: attendance.diasAniversario,
       dias_falta: attendance.diasFalta,
       recibo_path: mesData.recibo_path || null,
       form,
@@ -223,14 +233,14 @@ const uploadRecibo = async (req, res) => {
       try {
         await sendMail({
           to: userData.email,
-          subject: `Recibo de vencimento disponível — ${mesLabel}`,
+          subject: `Recibo de vencimento disponível  -  ${mesLabel}`,
           html: renderEmail("recibo-vencimento", { nome, mesLabel, eyebrow: "Recibo de vencimento" }),
         });
       } catch (mailError) {
         console.error("Erro ao enviar email de notificação de recibo:", mailError);
       }
     } else {
-      console.error(`Colaborador ${id} sem email — notificação de recibo não enviada`);
+      console.error(`Colaborador ${id} sem email  -  notificação de recibo não enviada`);
     }
 
     res.json({ message: "Recibo guardado com sucesso", recibo_path: filePath });

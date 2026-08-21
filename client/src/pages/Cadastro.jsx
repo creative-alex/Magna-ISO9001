@@ -134,7 +134,12 @@ export default function Cadastro() {
   const { username, uid, nivelAcesso, setUsername } = useContext(UserContext);
   const isAdmin = nivelAcesso === "SuperAdmin";
   const isHR = nivelAcesso === "GestorRH";
+  const isAdministrador = nivelAcesso === "Administrador";
   const canEditRestricted = isAdmin || isHR;
+  // Administrador só pode consultar o cadastro de outro colaborador (o backend confirma
+  // que é da sua entidade); nunca ganha canEditRestricted, por isso continua sem poder
+  // editar os campos de "Contrato de trabalho"/"Estágio".
+  const canViewOther = isAdmin || isHR || isAdministrador;
   const isViewingOther = !!id;
   const targetKey = id || uid;
   const targetLabel = isViewingOther ? (location.state?.nome || id) : username;
@@ -152,11 +157,11 @@ export default function Cadastro() {
   const fileInputRefs = useRef({});
 
   useEffect(() => {
-    if (isViewingOther && !isAdmin && !isHR) {
+    if (isViewingOther && !canViewOther) {
       navigate("/cadastro", { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isViewingOther, isAdmin, isHR]);
+  }, [isViewingOther, canViewOther]);
 
   const fetchCadastro = async () => {
     const res = await apiFetch(`/cadastro/${targetKey}`);
@@ -221,7 +226,7 @@ export default function Cadastro() {
     }
     if (snapshot) return snapshot;
     if (keys.length === 0) {
-      // Ainda não há histórico guardado (cadastro anterior a esta funcionalidade) — melhor esforço com os dados atuais.
+      // Ainda não há histórico guardado (cadastro anterior a esta funcionalidade)  -  melhor esforço com os dados atuais.
       return CONTRATO_HISTORY_KEYS.reduce((acc, key) => { acc[key] = form[key]; return acc; }, {});
     }
     return null;
@@ -284,9 +289,9 @@ export default function Cadastro() {
       return `${d}/${m}/${y}`;
     }
     if (field.type === "select" || field.type === "text" || field.type === "email" || field.type === "tel" || field.type === "number") {
-      return value || "—";
+      return value || " - ";
     }
-    return "—";
+    return " - ";
   };
 
   const renderField = (field, editable, dataSource = form) => {
@@ -443,7 +448,7 @@ export default function Cadastro() {
             )}
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 17, fontWeight: 700, color: "#111827" }}>
-                Ficha de cadastro — {nomeCurto}
+                Ficha de cadastro  -  {nomeCurto}
               </div>
               <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 3 }}>
                 Dados pessoais, contratuais e documentação associados ao processo individual do colaborador.

@@ -355,7 +355,7 @@ export async function generateNonEditablePdfTemplate2(atividades, donoProcesso, 
   const dashToEmpty = (val) => {
     const s = (val ?? '').toString();
     // Se contém apenas espaços e traços (inclui diferentes tipos de traço), considera vazio
-    return /^[\s\-–—]*$/.test(s) ? '' : s;
+    return /^[\s\-– - ]*$/.test(s) ? '' : s;
   };
 
   // Aplica sanitização a todos os campos relevantes do Template 2

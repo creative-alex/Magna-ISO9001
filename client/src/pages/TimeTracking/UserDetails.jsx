@@ -41,7 +41,11 @@ const UserDetails = ({ selectedUser }) => {
   const location = useLocation();
   const { uid: uidParam } = useParams();
   const [dados, setDados] = useState([]);
-  const { username } = useContext(UserContext);
+  const { username, nivelAcesso: actorNivelAcesso } = useContext(UserContext);
+  // Um Administrador só gere colaboradores da sua própria entidade e nunca pode
+  // atribuir/manter um nível de acesso igual ou superior ao seu  -  o backend também
+  // impõe isto (updateUserDetails), mas o formulário fica coerente com o que é aceite.
+  const isAdministrador = actorNivelAcesso === "Administrador";
 
   const handleSelectFile = (filePath) => {
     const formattedPath = filePath.replace(/\s/g, '-').replace(/\//g, '__');
@@ -428,7 +432,13 @@ const normalizedEntityUrl = userDetails?.entidade
                         </div>
                         <div>
                           <span style={labelStyle}>Entidade</span>
-                          <input type="text" style={inputStyle} value={editedData?.entidade || ""} onChange={(e) => setEditedData({ ...editedData, entidade: e.target.value })} />
+                          <input
+                            type="text"
+                            style={{ ...inputStyle, ...(isAdministrador ? { cursor: "not-allowed", opacity: 0.7 } : {}) }}
+                            value={editedData?.entidade || ""}
+                            onChange={(e) => setEditedData({ ...editedData, entidade: e.target.value })}
+                            disabled={isAdministrador}
+                          />
                         </div>
                         <div>
                           <span style={labelStyle}>Função</span>
@@ -438,8 +448,9 @@ const normalizedEntityUrl = userDetails?.entidade
                           <span style={labelStyle}>Nível de acesso</span>
                           <select name="nivelAcesso" style={selectStyle} value={editedData?.nivelAcesso || "Colaborador"} onChange={handleInputChange}>
                             <option value="Colaborador">Colaborador</option>
-                            <option value="GestorRH">Gestor(a) de Recursos Humanos</option>
-                            <option value="SuperAdmin">SuperAdmin</option>
+                            {!isAdministrador && <option value="Administrador">Administrador</option>}
+                            {!isAdministrador && <option value="GestorRH">Gestor(a) de Recursos Humanos</option>}
+                            {!isAdministrador && <option value="SuperAdmin">SuperAdmin</option>}
                           </select>
                         </div>
                         <div>

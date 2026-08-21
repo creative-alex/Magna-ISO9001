@@ -1,11 +1,11 @@
 const admin = require("firebase-admin");
 const db = require("../db/firebase").db;
-const { isSuperAdmin: hasSuperAdminAccess } = require("../middleware/auth");
+const { isSuperAdmin: hasSuperAdminAccess, isAdministrador } = require("../middleware/auth");
 
 // Únicos valores válidos para o nível de acesso (controla permissões). Distinto
 // de "role", que é só o cargo/título mostrado (texto livre, ex: "Gestora RH /
 // Coordenadora Pedagógica") e nunca deve ser usado para decidir permissões.
-const NIVEIS_ACESSO = ["SuperAdmin", "GestorRH", "Colaborador"];
+const NIVEIS_ACESSO = ["SuperAdmin", "GestorRH", "Administrador", "Colaborador"];
 function normalizeNivelAcesso(nivelAcesso) {
   return NIVEIS_ACESSO.includes(nivelAcesso) ? nivelAcesso : "Colaborador";
 }
@@ -55,6 +55,20 @@ const verifyTokenAndGetUserInfo = async (req, res) => {
     const isSuperAdmin = hasSuperAdminAccess(userData.nivelAcesso);
     console.log('📍 Role do usuário:', userData.role || 'user');
 
+    // Nome legível da entidade  -  só é preciso resolver quando o utilizador é
+    // Administrador (usado no frontend para bloquear o campo "Entidade" ao criar/editar
+    // colaboradores, para não deixar sair da sua própria entidade).
+    let entidadeNome = null;
+    if (isAdministrador(userData.nivelAcesso) && typeof userData.entidade === 'string') {
+      const entidadeId = userData.entidade.replace('entidades/', '');
+      try {
+        const entidadeDoc = await db.collection('entidades').doc(entidadeId).get();
+        entidadeNome = entidadeDoc.exists ? (entidadeDoc.data().nome || null) : null;
+      } catch (err) {
+        console.error('⚠️ Erro ao buscar nome da entidade:', err);
+      }
+    }
+
     const responseData = {
       message: 'Token válido',
       uid: decodedToken.uid,
@@ -64,6 +78,8 @@ const verifyTokenAndGetUserInfo = async (req, res) => {
       nivelAcesso: normalizeNivelAcesso(userData.nivelAcesso),
       nome: userData.nome || userRecord.displayName || 'N/A',
       isFirstLogin: isSuperAdmin ? false : (userData.isFirstLogin ?? true),
+      entidade: userData.entidade || null,
+      entidadeNome,
     };
 
     console.log('✅ Retornando dados do usuário:', JSON.stringify(responseData, null, 2));
@@ -245,19 +261,26 @@ const getColaboradores = async (req, res) => {
       entidadeNomes[doc.id] = doc.data().nome || doc.id;
     });
 
+    // Administrador só vê os colaboradores da sua própria entidade; SuperAdmin/GestorRH
+    // (os únicos outros níveis que chegam aqui, ver requireCanViewColaboradores) veem todos.
+    const actorNivelAcesso = req.user?.nivelAcesso;
+    const scopeToOwnEntidade = isAdministrador(actorNivelAcesso);
+    const actorEntidade = req.user?.entidade || null;
+
     const colaboradores = [];
     snapshot.forEach(doc => {
       const data = doc.data();
-      if (!hasSuperAdminAccess(data.nivelAcesso)) {
-        const entidadeId = data.entidade ? data.entidade.replace('entidades/', '') : null;
-        colaboradores.push({
-          id: doc.id,
-          nome: data.nome || 'Nome não disponível',
-          email: data.email || 'Email não disponível',
-          role: data.role || 'user',
-          entidade: entidadeId ? (entidadeNomes[entidadeId] || entidadeId) : null,
-        });
-      }
+      if (hasSuperAdminAccess(data.nivelAcesso)) return;
+      if (scopeToOwnEntidade && data.entidade !== actorEntidade) return;
+
+      const entidadeId = data.entidade ? data.entidade.replace('entidades/', '') : null;
+      colaboradores.push({
+        id: doc.id,
+        nome: data.nome || 'Nome não disponível',
+        email: data.email || 'Email não disponível',
+        role: data.role || 'user',
+        entidade: entidadeId ? (entidadeNomes[entidadeId] || entidadeId) : null,
+      });
     });
 
     res.json(colaboradores);

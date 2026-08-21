@@ -1,18 +1,36 @@
 const admin = require("firebase-admin");
 const { normalizeEntityId, normalizeUserId } = require("./helpers");
+const { isSuperAdmin, isAdminOrHR, isAdministrador } = require("../../middleware/auth");
 const db = admin.firestore();
 
 // Únicos valores válidos para o nível de acesso (controla permissões). Distinto
 // de "role", que é só o cargo/título mostrado (texto livre) e nunca deve ser
 // usado para decidir permissões.
-const NIVEIS_ACESSO = ["SuperAdmin", "GestorRH", "Colaborador"];
+const NIVEIS_ACESSO = ["SuperAdmin", "GestorRH", "Administrador", "Colaborador"];
 function normalizeNivelAcesso(nivelAcesso) {
   return NIVEIS_ACESSO.includes(nivelAcesso) ? nivelAcesso : "Colaborador";
 }
 
+// Um Administrador só gere colaboradores da sua própria entidade e nunca pode
+// promover ninguém (incluindo a si próprio) a um nível igual ou superior ao seu
+// (GestorRH/SuperAdmin)  -  isso continua exclusivo do SuperAdmin. Um SuperAdmin
+// continua sem restrições.
+function normalizeNivelAcessoForActor(actorNivelAcesso, requestedNivelAcesso) {
+  const requested = normalizeNivelAcesso(requestedNivelAcesso);
+  if (isSuperAdmin(actorNivelAcesso)) return requested;
+  if (requested === "GestorRH" || requested === "SuperAdmin") return "Colaborador";
+  return requested;
+}
+
 const createUser = async (req, res) => {
   try {
-    const { nome, email, entidade, role, nivelAcesso, temporaryPassword } = req.body;
+    const { nome, email, role, nivelAcesso, temporaryPassword } = req.body;
+    const actorIsAdministrador = isAdministrador(req.user?.nivelAcesso);
+    // Administrador só pode criar colaboradores dentro da sua própria entidade  -  ignora
+    // qualquer "entidade" enviada no corpo e usa sempre a do próprio Administrador.
+    const entidade = actorIsAdministrador
+      ? (req.user?.entidade || "").replace("entidades/", "")
+      : req.body.entidade;
 
     // Validação básica
     if (!nome || !email || !entidade || !temporaryPassword) {
@@ -61,7 +79,7 @@ const createUser = async (req, res) => {
         entidade: entityRef,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         role: role ? normalizeUserId(role) : 'user',
-        nivelAcesso: normalizeNivelAcesso(nivelAcesso),
+        nivelAcesso: normalizeNivelAcessoForActor(req.user?.nivelAcesso, nivelAcesso),
         isFirstLogin: true
       });
 
@@ -97,6 +115,10 @@ const userDetails = async (req, res) => {
     }
 
     const userData = userDoc.data();
+
+    if (isAdministrador(req.user?.nivelAcesso) && userData.entidade !== req.user?.entidade) {
+      return res.status(403).json({ error: "Acesso restrito a colaboradores da sua entidade" });
+    }
 
     let entidadeNome = "Desconhecida";
 
@@ -143,6 +165,10 @@ const getUsersByEntity = async (req, res) => {
 
     const entidadeId = normalizeEntityId(entidadeNome);
 
+    if (isAdministrador(req.user?.nivelAcesso) && `entidades/${entidadeId}` !== req.user?.entidade) {
+      return res.status(403).json({ error: "Acesso restrito à sua entidade" });
+    }
+
     const usersRef = db.collection("users");
     const snapshot = await usersRef.where("entidade", "==", `entidades/${entidadeId}`).get();
 
@@ -166,14 +192,8 @@ const getUsersByEntity = async (req, res) => {
 
 const updateUserDetails = async (req, res) => {
   try {
-    const { uid, nome, entidade, role, nivelAcesso, newPassword } = req.body;
-
-    if (!uid || !nome || !entidade || !role) {
-      return res.status(400).json({ error: "Todos os campos são obrigatórios." });
-    }
-
-    const entidadeId = normalizeEntityId(entidade);
-    const entidadeRef = `entidades/${entidadeId}`;
+    const { uid, nome, role, nivelAcesso, newPassword } = req.body;
+    const actorIsAdministrador = isAdministrador(req.user?.nivelAcesso);
 
     const userDocRef = db.collection("users").doc(uid);
     const userDoc = await userDocRef.get();
@@ -182,12 +202,34 @@ const updateUserDetails = async (req, res) => {
       return res.status(404).json({ error: "user não encontrado." });
     }
 
+    if (actorIsAdministrador && userDoc.data().entidade !== req.user?.entidade) {
+      return res.status(403).json({ error: "Acesso restrito a colaboradores da sua entidade" });
+    }
+    // Um Administrador nunca pode editar um GestorRH/SuperAdmin que por acaso partilhe
+    // a mesma entidade  -  evita conseguir despromovê-lo ou alterar os seus dados.
+    if (actorIsAdministrador && isAdminOrHR(userDoc.data().nivelAcesso)) {
+      return res.status(403).json({ error: "Acesso restrito a colaboradores da sua entidade" });
+    }
+
+    // Administrador nunca pode mudar a entidade de um colaborador  -  mantém sempre a
+    // própria, para não conseguir "tirar" ninguém da entidade que gere.
+    const entidade = actorIsAdministrador
+      ? (req.user?.entidade || "").replace("entidades/", "")
+      : req.body.entidade;
+
+    if (!uid || !nome || !entidade || !role) {
+      return res.status(400).json({ error: "Todos os campos são obrigatórios." });
+    }
+
+    const entidadeId = normalizeEntityId(entidade);
+    const entidadeRef = `entidades/${entidadeId}`;
+
     // O ID do documento (== UID do Firebase Auth) nunca muda, mesmo quando o
-    // nome muda — os dados em "registo-ponto/{uid}" continuam válidos sem
+    // nome muda  -  os dados em "registo-ponto/{uid}" continuam válidos sem
     // precisar de nenhuma migração.
     const updatedData = { entidade: entidadeRef, nome, role, updatedAt: new Date() };
     if (nivelAcesso !== undefined) {
-      updatedData.nivelAcesso = normalizeNivelAcesso(nivelAcesso);
+      updatedData.nivelAcesso = normalizeNivelAcessoForActor(req.user?.nivelAcesso, nivelAcesso);
     }
 
     if (newPassword) {
@@ -229,6 +271,15 @@ const deleteUser = async (req, res) => {
 
     if (!userDoc.exists) {
       return res.status(404).json({ error: "user não encontrado." });
+    }
+
+    if (isAdministrador(req.user?.nivelAcesso)) {
+      if (userDoc.data().entidade !== req.user?.entidade) {
+        return res.status(403).json({ error: "Acesso restrito a colaboradores da sua entidade" });
+      }
+      if (isAdminOrHR(userDoc.data().nivelAcesso)) {
+        return res.status(403).json({ error: "Acesso restrito a colaboradores da sua entidade" });
+      }
     }
 
     const registoPontoRef = db.collection("registo-ponto").doc(uid);

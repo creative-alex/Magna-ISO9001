@@ -451,7 +451,7 @@ const InstrucoesTrabalho = ({
 
       try {
         // Pedido autenticado (o endpoint exige sessão válida, por isso já não
-        // pode ser um <a href> simples — precisa de ir via apiFetch)
+        // pode ser um <a href> simples  -  precisa de ir via apiFetch)
         const response = await apiFetch(`/files/download/${encodeURIComponent(fullPath)}`);
         if (!response.ok) {
           showNotification('Erro ao descarregar a instrução.', 'error');

@@ -16,6 +16,8 @@ import Colaboradores from "./pages/Colaboradores"
 import MapaFerias from "./pages/MapaFerias"
 import ProcessamentoSalarios from "./pages/ProcessamentoSalarios"
 import SalarioColaborador from "./pages/SalarioColaborador"
+import PlanoFormacao from "./pages/PlanoFormacao"
+import FormacaoColaborador from "./pages/FormacaoColaborador"
 import RegistoNaoConformidade from "./pages/RegistoNaoConformidade";
 import FirstLogin from "./components/Auth/firstLogin";
 import { ToastContainer } from "react-toastify";
@@ -163,6 +165,22 @@ function App() {
           element={
             <ProtectedRoute>
               <SalarioColaborador />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/plano-formacao"
+          element={
+            <ProtectedRoute>
+              <PlanoFormacao />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/plano-formacao/:id"
+          element={
+            <ProtectedRoute>
+              <FormacaoColaborador />
             </ProtectedRoute>
           }
         />

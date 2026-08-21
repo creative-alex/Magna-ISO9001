@@ -1,7 +1,7 @@
 // Constantes da aplicação
 
 
-// Feriados portugueses fixos (Porto) — formato DD-MM
+// Feriados portugueses fixos (Porto)  -  formato DD-MM
 export const HOLIDAYS_PORTO = [
   "01-01",   // Ano Novo
   "25-04",   // Dia da Liberdade

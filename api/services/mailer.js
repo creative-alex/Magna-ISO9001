@@ -48,11 +48,11 @@ const LOGO_ATTACHMENT = {
 
 async function sendMail({ to, subject, html }) {
   if (!to) {
-    console.error("Sem destinatário — email não enviado:", subject);
+    console.error("Sem destinatário  -  email não enviado:", subject);
     return;
   }
   if (ACCOUNTS.length === 0) {
-    console.error("Nenhuma conta de no-reply configurada (NODEEMAIL/NODEPASSWORD) — email não enviado:", subject);
+    console.error("Nenhuma conta de no-reply configurada (NODEEMAIL/NODEPASSWORD)  -  email não enviado:", subject);
     return;
   }
 

@@ -158,7 +158,7 @@ function StepProgress({ steps, current, maxStep, onJump }) {
       <div className="mt-2 text-center text-xs text-gray-500">
         <span className="font-semibold" style={{ color: GOLD }}>{steps[current]?.label}</span>
         {current < steps.length - 1 && (
-          <span className="text-gray-400"> — passo {current + 1} de {steps.length - 1}</span>
+          <span className="text-gray-400">  -  passo {current + 1} de {steps.length - 1}</span>
         )}
       </div>
 

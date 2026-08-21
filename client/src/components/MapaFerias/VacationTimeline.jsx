@@ -38,14 +38,24 @@ function buildVacationMap(employees) {
   return map;
 }
 
+function buildBirthdayMap(employees) {
+  const map = new Map();
+  employees.forEach((emp) => {
+    map.set(emp.uid, new Set(emp.birthdayDaysCurrentYear || []));
+  });
+  return map;
+}
+
 export default function VacationTimeline({ year, onYearChange }) {
   const { uid, nivelAcesso } = useContext(UserContext);
   const isAdminOrHR = nivelAcesso === "SuperAdmin" || nivelAcesso === "GestorRH";
 
   const [employees, setEmployees] = useState([]);
   const [vacationMap, setVacationMap] = useState(new Map());
+  const [birthdayMap, setBirthdayMap] = useState(new Map());
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState("timeline"); // "timeline" | "resumo"
+  const [dayMode, setDayMode] = useState("ferias"); // "ferias" | "aniversario"  -  o que o clique num dia marca, na timeline
   const [activeMonth, setActiveMonth] = useState(new Date().getMonth());
 
   const loadMap = useCallback(async () => {
@@ -60,6 +70,7 @@ export default function VacationTimeline({ year, onYearChange }) {
       const sorted = [...(data.employees || [])].sort((a, b) => a.nome.localeCompare(b.nome, "pt"));
       setEmployees(sorted);
       setVacationMap(buildVacationMap(sorted));
+      setBirthdayMap(buildBirthdayMap(sorted));
     } catch (err) {
       console.error("Erro ao carregar mapa de férias:", err);
       toast.error("Erro ao carregar o mapa de férias");
@@ -130,6 +141,41 @@ export default function VacationTimeline({ year, onYearChange }) {
     }
   };
 
+  const toggleBirthdayDay = async (rowUid, dateStr) => {
+    if (!canEdit(rowUid)) return;
+
+    const currentSet = birthdayMap.get(rowUid) || new Set();
+    const isChecked = currentSet.has(dateStr);
+
+    if (!isChecked && currentSet.size >= 1) {
+      const emp = employeesByUid[rowUid];
+      toast.error(`${emp?.nome || "Colaborador"} já utilizou o dia de aniversário deste ano`);
+      return;
+    }
+
+    const flip = (prev) => {
+      const next = new Map(prev);
+      const set = new Set(next.get(rowUid) || []);
+      if (set.has(dateStr)) set.delete(dateStr); else set.add(dateStr);
+      next.set(rowUid, set);
+      return next;
+    };
+
+    setBirthdayMap(flip);
+
+    try {
+      const response = await apiFetch("/timetracking/toggle-birthday-day", {
+        method: "POST",
+        body: JSON.stringify({ uid: rowUid, date: dateStr }),
+      });
+      if (!response.ok) throw new Error("Falha ao atualizar dia de aniversário");
+    } catch (err) {
+      console.error(err);
+      setBirthdayMap(flip); // reverter (a mesma operação é a sua própria inversa)
+      toast.error("Erro ao atualizar dia de aniversário");
+    }
+  };
+
   const updateQuotaOverride = async (targetUid, newQuota) => {
     try {
       const response = await apiFetch("/timetracking/vacation-quota-override", {
@@ -182,6 +228,28 @@ export default function VacationTimeline({ year, onYearChange }) {
         </div>
 
         <div className="flex items-center gap-3">
+          {viewMode === "timeline" && (
+            <div className="flex items-center gap-1 bg-gray-50 rounded-full border border-gray-100 p-1">
+              <button
+                onClick={() => setDayMode("ferias")}
+                title="Clicar num dia marca/desmarca férias"
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  dayMode === "ferias" ? "bg-gold text-white shadow-sm" : "text-gray-500 hover:bg-gray-100"
+                }`}
+              >
+                Férias
+              </button>
+              <button
+                onClick={() => setDayMode("aniversario")}
+                title="Clicar num dia marca/desmarca o dia de aniversário (1/ano)"
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  dayMode === "aniversario" ? "bg-rose-400 text-white shadow-sm" : "text-gray-500 hover:bg-gray-100"
+                }`}
+              >
+                🎂 Aniversário
+              </button>
+            </div>
+          )}
           {viewMode === "timeline" ? (
             <div className="flex items-center gap-1">
               <button
@@ -243,6 +311,7 @@ export default function VacationTimeline({ year, onYearChange }) {
           <ResumoTab
             employees={employees}
             vacationMap={vacationMap}
+            birthdayMap={birthdayMap}
             year={year}
             isAdminOrHR={isAdminOrHR}
             onQuotaChange={updateQuotaOverride}
@@ -271,6 +340,7 @@ export default function VacationTimeline({ year, onYearChange }) {
             <div className="flex flex-col gap-1">
               {employees.map((emp) => {
                 const rowSet = vacationMap.get(emp.uid) || new Set();
+                const rowBirthdaySet = birthdayMap.get(emp.uid) || new Set();
                 const editable = canEdit(emp.uid);
                 const isCurrentUser = emp.uid === uid;
                 return (
@@ -295,6 +365,7 @@ export default function VacationTimeline({ year, onYearChange }) {
                         const isDispensa = activeMonth === 11 && DISPENSA_DAYS.includes(day);
                         const dateStr = `${pad2(day)}-${pad2(activeMonth + 1)}-${year}`;
                         const isChecked = rowSet.has(dateStr);
+                        const isBirthday = rowBirthdaySet.has(dateStr);
 
                         const prevDateStr = day > 1 ? `${pad2(day - 1)}-${pad2(activeMonth + 1)}-${year}` : null;
                         const nextDateStr = day < daysInMonth ? `${pad2(day + 1)}-${pad2(activeMonth + 1)}-${year}` : null;
@@ -311,7 +382,7 @@ export default function VacationTimeline({ year, onYearChange }) {
                           return (
                             <div
                               key={day}
-                              title={`${pad2(day)}/${pad2(activeMonth + 1)} — Dia de dispensa da empresa`}
+                              title={`${pad2(day)}/${pad2(activeMonth + 1)}  -  Dia de dispensa da empresa`}
                               className="flex-1 bg-gray-200"
                             />
                           );
@@ -320,23 +391,37 @@ export default function VacationTimeline({ year, onYearChange }) {
                         // Fins de semana e feriados nunca podem ser marcados de novo, mas um
                         // dia já marcado (ex.: dado antigo) continua a poder ser desmarcado.
                         const blockedReason = isHoliday ? "holiday" : isWeekend ? "weekend" : null;
-                        const canToggle = editable && (isChecked || !blockedReason);
-                        const blockedLabel = blockedReason === "holiday" ? " — Feriado nacional" : blockedReason === "weekend" ? " — Fim de semana" : "";
+                        const blockedLabel = blockedReason === "holiday" ? "  -  Feriado nacional" : blockedReason === "weekend" ? "  -  Fim de semana" : "";
+
+                        // O clique marca férias ou dia de aniversário, segundo o modo ativo;
+                        // o dia de aniversário tem quota fixa de 1/ano (sem transição).
+                        const isMarkedInMode = dayMode === "ferias" ? isChecked : isBirthday;
+                        const quotaExhausted = dayMode === "aniversario" && !isBirthday && rowBirthdaySet.size >= 1;
+                        const canToggle = editable && (isMarkedInMode || (!blockedReason && !quotaExhausted));
+                        const toggleHandler = dayMode === "ferias" ? toggleVacationDay : toggleBirthdayDay;
+
+                        const statusLabel = isChecked
+                          ? "  -  Férias"
+                          : isBirthday
+                          ? "  -  🎂 Dia de aniversário"
+                          : quotaExhausted
+                          ? "  -  Dia de aniversário já utilizado este ano"
+                          : blockedLabel;
 
                         return (
                           <button
                             key={day}
                             type="button"
-                            title={`${pad2(day)}/${pad2(activeMonth + 1)}/${year}${isChecked ? " — Férias" : blockedLabel}`}
+                            title={`${pad2(day)}/${pad2(activeMonth + 1)}/${year}${statusLabel}`}
                             disabled={!canToggle}
-                            onClick={() => toggleVacationDay(emp.uid, dateStr)}
+                            onClick={() => toggleHandler(emp.uid, dateStr)}
                             className={[
                               "flex-1 h-full transition-colors relative",
-                              isChecked ? "bg-gold" : isHoliday ? "bg-warning/20" : isWeekend ? "bg-gray-100" : "bg-transparent",
+                              isChecked ? "bg-gold" : isBirthday ? "bg-rose-400" : isHoliday ? "bg-warning/20" : isWeekend ? "bg-gray-100" : "bg-transparent",
                               isChecked && !prevChecked ? "rounded-l-full" : "",
                               isChecked && !nextChecked ? "rounded-r-full" : "",
-                              canToggle && !isChecked ? "hover:bg-gold-mid/50 cursor-pointer" : "",
-                              canToggle && isChecked ? "cursor-pointer hover:brightness-110" : "",
+                              canToggle && !isMarkedInMode ? "hover:bg-gold-mid/50 cursor-pointer" : "",
+                              canToggle && isMarkedInMode ? "cursor-pointer hover:brightness-110" : "",
                               !canToggle ? "cursor-not-allowed" : "",
                               isToday ? "ring-1 ring-inset ring-gold/60" : "",
                             ].join(" ")}
@@ -355,7 +440,7 @@ export default function VacationTimeline({ year, onYearChange }) {
   );
 }
 
-function ResumoTab({ employees, vacationMap, year, isAdminOrHR, onQuotaChange, onCarryoverChange, currentUid }) {
+function ResumoTab({ employees, vacationMap, birthdayMap, year, isAdminOrHR, onQuotaChange, onCarryoverChange, currentUid }) {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="overflow-auto">
@@ -368,12 +453,15 @@ function ResumoTab({ employees, vacationMap, year, isAdminOrHR, onQuotaChange, o
               <th className="sticky top-0 bg-gray-50 px-4 py-3 font-medium text-gray-500 border-b border-gray-100">Quota {year}</th>
               <th className="sticky top-0 bg-gray-50 px-4 py-3 font-medium text-gray-500 border-b border-gray-100">Usado {year}</th>
               <th className="sticky top-0 bg-gray-50 px-4 py-3 font-medium text-gray-500 border-b border-gray-100">Por usar</th>
+              <th className="sticky top-0 bg-gray-50 px-4 py-3 font-medium text-gray-500 border-b border-gray-100">🎂 Aniversário</th>
             </tr>
           </thead>
           <tbody>
             {employees.map((emp, rowIndex) => {
               const usadoAtualLive = vacationMap.get(emp.uid)?.size ?? emp.usadoAtual;
               const saldoLive = emp.quotaAtual + emp.carryoverAtual - usadoAtualLive;
+              const birthdaySetLive = birthdayMap.get(emp.uid);
+              const birthdayDateLive = birthdaySetLive ? [...birthdaySetLive][0] : emp.birthdayDaysCurrentYear?.[0];
               const isCurrentUser = emp.uid === currentUid;
               return (
                 <tr key={emp.uid} className={isCurrentUser ? "bg-gold-light/70" : rowIndex % 2 === 1 ? "bg-gray-50/60" : ""}>
@@ -385,7 +473,7 @@ function ResumoTab({ employees, vacationMap, year, isAdminOrHR, onQuotaChange, o
                       <span className={isCurrentUser ? "text-gray-900 font-semibold" : "text-gray-700"}>{emp.nome}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-2 text-gray-400 border-b border-gray-50">{emp.entidade || "—"}</td>
+                  <td className="px-4 py-2 text-gray-400 border-b border-gray-50">{emp.entidade || " - "}</td>
                   <td className="px-4 py-2 text-center border-b border-gray-50">
                     {isAdminOrHR ? (
                       <InlineNumberEditor
@@ -413,6 +501,13 @@ function ResumoTab({ employees, vacationMap, year, isAdminOrHR, onQuotaChange, o
                   <td className="px-4 py-2 text-center text-gray-700 border-b border-gray-50">{usadoAtualLive}</td>
                   <td className={`px-4 py-2 text-center font-semibold border-b border-gray-50 ${saldoLive < 0 ? "text-danger" : "text-gray-800"}`}>
                     {saldoLive}
+                  </td>
+                  <td className="px-4 py-2 text-center border-b border-gray-50">
+                    {birthdayDateLive ? (
+                      <span className="text-rose-500 font-medium">{birthdayDateLive}</span>
+                    ) : (
+                      <span className="text-gray-400">Disponível</span>
+                    )}
                   </td>
                 </tr>
               );

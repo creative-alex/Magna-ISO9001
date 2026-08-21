@@ -1,16 +1,23 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { apiFetch } from '../../../../utils/apiFetch';
+import { UserContext } from '../../../../context/userContext';
 import capa from '../../../../assets/timeTracking/capa.jpg';
 import LogoutButton from '../../../Auth/logout';
 import AdminNavigationButtons from '../../../../pages/TimeTracking/AdminDashboard';
 
 const NewUser = () => {
+  const { nivelAcesso: actorNivelAcesso, entidadeNome: actorEntidadeNome } = useContext(UserContext);
+  // Um Administrador só pode criar colaboradores dentro da sua própria entidade e
+  // nunca pode atribuir um nível de acesso igual ou superior ao seu  -  o backend
+  // também impõe isto, mas mantemos o formulário coerente com o que vai ser aceite.
+  const isAdministrador = actorNivelAcesso === 'Administrador';
+
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [entidade, setEntidade] = useState('');
+  const [entidade, setEntidade] = useState(isAdministrador ? (actorEntidadeNome || '') : '');
   const [message, setMessage] = useState('');
   const [role, setRole] = useState('');
   const [nivelAcesso, setNivelAcesso] = useState('Colaborador');
@@ -63,7 +70,7 @@ const NewUser = () => {
       setNome('');
       setEmail('');
       setPassword('');
-      setEntidade('');
+      setEntidade(isAdministrador ? (actorEntidadeNome || '') : '');
       setRole('');
       setNivelAcesso('Colaborador');
     } catch (error) {
@@ -157,8 +164,9 @@ const NewUser = () => {
             required
           >
             <option value="Colaborador">Colaborador</option>
-            <option value="GestorRH">Gestor(a) de Recursos Humanos</option>
-            <option value="SuperAdmin">SuperAdmin</option>
+            {!isAdministrador && <option value="Administrador">Administrador</option>}
+            {!isAdministrador && <option value="GestorRH">Gestor(a) de Recursos Humanos</option>}
+            {!isAdministrador && <option value="SuperAdmin">SuperAdmin</option>}
           </select>
         </div>
 
@@ -167,11 +175,15 @@ const NewUser = () => {
           <input
             type="text"
             id="entidade"
-            className="w-full h-[60px] px-[0.875rem] py-[0.625rem] border border-gold rounded-full text-[0.9375rem] bg-transparent text-[#1e293b] transition-all duration-300 focus:border-gold focus:shadow-[0_0_0_3px_rgba(200,147,47,0.2)] focus:outline-none placeholder:text-gray-400 max-[600px]:h-12 max-[600px]:text-base max-[600px]:px-3 max-[600px]:py-2 max-[600px]:bg-[#fffaf0] appearance-none cursor-pointer bg-no-repeat bg-[right_0.75rem_center] bg-[length:1rem] pr-10 bg-[url('data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 20 20%27 fill=%22%2364748b%22><path fill-rule=%22evenodd%22 d=%22M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z%22 clip-rule=%22evenodd%22 /></svg>')]"
+            className="w-full h-[60px] px-[0.875rem] py-[0.625rem] border border-gold rounded-full text-[0.9375rem] bg-transparent text-[#1e293b] transition-all duration-300 focus:border-gold focus:shadow-[0_0_0_3px_rgba(200,147,47,0.2)] focus:outline-none placeholder:text-gray-400 max-[600px]:h-12 max-[600px]:text-base max-[600px]:px-3 max-[600px]:py-2 max-[600px]:bg-[#fffaf0] appearance-none cursor-pointer bg-no-repeat bg-[right_0.75rem_center] bg-[length:1rem] pr-10 bg-[url('data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 20 20%27 fill=%22%2364748b%22><path fill-rule=%22evenodd%22 d=%22M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z%22 clip-rule=%22evenodd%22 /></svg>')] disabled:cursor-not-allowed disabled:opacity-70"
             value={entidade}
             onChange={(e) => setEntidade(e.target.value)}
+            disabled={isAdministrador}
             required
           />
+          {isAdministrador && (
+            <span className="text-[12px] text-gray-400">Como Administrador, só podes criar colaboradores na tua própria entidade.</span>
+          )}
           {/* <EntidadeSelect
             id="entidade"
             className="form-select"

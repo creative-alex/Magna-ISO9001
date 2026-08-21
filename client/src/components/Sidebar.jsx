@@ -32,13 +32,29 @@ const PEOPLE_MANAGEMENT_ITEMS = [
   { name: "Prémios", icon: FaTrophy },
 ];
 
+// Mesma normalização usada em toda a app para gerar o slug de uma entidade a
+// partir do seu nome (ex: allEntities.jsx, Entity.jsx)  -  aqui só é preciso para
+// levar um Administrador direto à página da sua própria entidade.
+const normalizeEntitySlug = (nome) => (nome || "").toLowerCase()
+  .normalize('NFD')
+  .replace(/\p{Diacritic}/gu, '')
+  .replace(/&/g, 'e')
+  .replace(/-/g, ' ')
+  .replace(/[^a-z0-9\s]/g, '')
+  .trim()
+  .replace(/\s+/g, '-')
+  .replace(/-+/g, '-')
+  .replace(/^-+|-+$/g, '');
+
 export default function Sidebar({ onSelectFile }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { username, nivelAcesso } = useContext(UserContext);
+  const { username, nivelAcesso, uid, entidadeNome } = useContext(UserContext);
   const { favorites, toggleFavorite } = useContext(FavoritesContext);
   const isAdmin = nivelAcesso === "SuperAdmin";
   const isHR = nivelAcesso === "GestorRH";
+  const isAdministrador = nivelAcesso === "Administrador";
+  const canManageColaboradores = isAdmin || isHR || isAdministrador;
   const initials = username ? username.slice(0, 2).toUpperCase() : "??";
 
   const [showFavoritesDropdown, setShowFavoritesDropdown] = useState(false);
@@ -49,9 +65,11 @@ export default function Sidebar({ onSelectFile }) {
     if (item.name === "Livro de Ponto") {
       navigate("/ponto");
     } else if (item.name === "Cadastro") {
-      navigate(isAdmin || isHR ? "/colaboradores" : "/cadastro");
-    } else if (item.name === "Processamento Salários" && (isAdmin || isHR)) {
-      navigate("/salarios");
+      navigate(canManageColaboradores ? "/colaboradores" : "/cadastro");
+    } else if (item.name === "Processamento Salários") {
+      navigate(canManageColaboradores ? "/salarios" : `/salarios/${uid}`);
+    } else if (item.name === "Plano de Formação") {
+      navigate(canManageColaboradores ? "/plano-formacao" : `/plano-formacao/${uid}`);
     } else if (item.name === "Mapa de Férias") {
       navigate("/ferias");
     } else {
@@ -153,17 +171,27 @@ export default function Sidebar({ onSelectFile }) {
           <FaArrowsRotate style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> Tratar Não Conformidade
         </div>
 
-        {/* Administração */}
-        {isAdmin && (
+        {/* Administração  -  SuperAdmin vê tudo; Administrador só as ações que se
+            aplicam à sua própria entidade (nunca "Novo Processo", que é sobre
+            documentação ISO e não tem nada a ver com colaboradores). */}
+        {(isAdmin || isAdministrador) && (
           <>
             <div className="px-[14px] pt-4 pb-[5px] text-[10px] text-[#B8892A] tracking-[0.08em] uppercase font-semibold">Administração</div>
-            <div className={navItemBaseClass} onClick={() => navigate('/create-user')}>
+            <div
+              className={navItemBaseClass}
+              onClick={() => navigate(isAdmin ? '/create-user' : '/ponto/novo-user')}
+            >
               <FaUser style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> Novo Utilizador
             </div>
-            <div className={navItemBaseClass} onClick={() => navigate('/novo-processo')}>
-              <FaClipboardList style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> Novo Processo
-            </div>
-            <div className={navItemBaseClass} onClick={() => navigate('/ponto/entidades')}>
+            {isAdmin && (
+              <div className={navItemBaseClass} onClick={() => navigate('/novo-processo')}>
+                <FaClipboardList style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> Novo Processo
+              </div>
+            )}
+            <div
+              className={navItemBaseClass}
+              onClick={() => navigate(isAdmin ? '/ponto/entidades' : `/ponto/entidades/${normalizeEntitySlug(entidadeNome)}`)}
+            >
               <FaClock style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> Gerir Livro de Ponto
             </div>
           </>
@@ -182,7 +210,7 @@ export default function Sidebar({ onSelectFile }) {
             </div>
             <div>
               <div className="text-xs text-[#4A2E08] font-semibold">{username}</div>
-              <div className="text-[10px] text-[#B8892A]">{isAdmin ? 'SuperAdmin' : 'Utilizador'}</div>
+              <div className="text-[10px] text-[#B8892A]">{isAdmin ? 'SuperAdmin' : isAdministrador ? 'Administrador' : 'Utilizador'}</div>
             </div>
             <FaUser style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--section-label)' }} />
           </div>

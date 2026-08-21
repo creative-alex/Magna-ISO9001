@@ -14,7 +14,7 @@ const createVacation = async (req, res) => {
     if (authError) return res.status(403).json({ error: authError });
 
     // Um admin a registar férias por um colaborador fica automaticamente
-    // aprovado; um pedido próprio fica sempre pendente de aprovação — nunca
+    // aprovado; um pedido próprio fica sempre pendente de aprovação  -  nunca
     // se confia num "Approved" vindo do cliente.
     const Approved = userId !== req.user.uid;
 

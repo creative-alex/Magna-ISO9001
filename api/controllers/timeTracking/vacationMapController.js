@@ -16,7 +16,7 @@ function parseDataAdmissao(dataAdmissao) {
 // que resta no ano. O mês de admissão só conta como completo se a entrada
 // foi até ao dia 15 (senão só o mês seguinte entra na conta).
 // Um SuperAdmin/GestorRH pode substituir este cálculo por um valor manual
-// por ano (users/{uid}/quotaOverrides/{year}) — nesse caso o valor manual
+// por ano (users/{uid}/quotaOverrides/{year})  -  nesse caso o valor manual
 // prevalece sempre sobre o automático.
 function computeQuotaForYear(dataAdmissao, targetYear, overrideQuota) {
   if (typeof overrideQuota === "number") {
@@ -45,7 +45,7 @@ function isApprovedDoc(data) {
   return data.Approved === true || data.Approved === "true" || data.Approved === 1;
 }
 
-// Feriados fixos portugueses (Porto), formato DD-MM — mantido em sincronia
+// Feriados fixos portugueses (Porto), formato DD-MM  -  mantido em sincronia
 // com HOLIDAYS_PORTO em client/src/utils/timeTracking/constants.js. 24 e 31
 // de dezembro ficam de fora daqui porque são tratados à parte como "dias de
 // dispensa" (categoria distinta pedida pela empresa, não são feriados legais).
@@ -55,7 +55,7 @@ const FIXED_HOLIDAYS_DDMM = [
 ];
 const DISPENSA_DDMM = ["24-12", "31-12"];
 
-// Páscoa pelo algoritmo de Meeus/Jones/Butcher — mesmo cálculo usado em
+// Páscoa pelo algoritmo de Meeus/Jones/Butcher  -  mesmo cálculo usado em
 // client/src/utils/timeTracking/constants.js (getMoveableHolidays).
 function calculateEaster(year) {
   const a = year % 19;
@@ -86,7 +86,7 @@ function getMoveableHolidaysDDMM(year) {
 }
 
 // Não é permitido marcar férias em fins de semana, feriados nacionais ou nos
-// dias de dispensa da empresa (24/31 dez) — devolve o motivo do bloqueio, ou
+// dias de dispensa da empresa (24/31 dez)  -  devolve o motivo do bloqueio, ou
 // null se o dia for marcável.
 function getBlockedReason(day, month, year) {
   const ddmm = `${String(day).padStart(2, "0")}-${String(month).padStart(2, "0")}`;
@@ -104,6 +104,23 @@ async function getUsedDaysForYear(uid, targetYear) {
   const feriasSnapshot = await db.collection("registo-ponto").doc(uid).collection("Ferias").get();
   let count = 0;
   feriasSnapshot.forEach((doc) => {
+    const data = doc.data();
+    if (!data.date || !isApprovedDoc(data)) return;
+    const parts = data.date.split("-");
+    if (parts.length !== 3) return;
+    if (parseInt(parts[2], 10) === targetYear) count++;
+  });
+  return count;
+}
+
+// Dia de aniversário: benefício fixo de 1 dia/ano por colaborador, independente
+// da quota de férias (não faz proration nem transita de ano para ano).
+const BIRTHDAY_ANNUAL_QUOTA = 1;
+
+async function getUsedBirthdayDaysForYear(uid, targetYear) {
+  const snapshot = await db.collection("registo-ponto").doc(uid).collection("DiasAniversario").get();
+  let count = 0;
+  snapshot.forEach((doc) => {
     const data = doc.data();
     if (!data.date || !isApprovedDoc(data)) return;
     const parts = data.date.split("-");
@@ -136,8 +153,9 @@ const getVacationMap = async (req, res) => {
       const uid = userDoc.id;
       const entidadeId = data.entidade ? data.entidade.replace("entidades/", "") : null;
 
-      const [feriasSnapshot, quotaOverrideDoc, diasTransitadosDoc] = await Promise.all([
+      const [feriasSnapshot, aniversarioSnapshot, quotaOverrideDoc, diasTransitadosDoc] = await Promise.all([
         db.collection("registo-ponto").doc(uid).collection("Ferias").get(),
+        db.collection("registo-ponto").doc(uid).collection("DiasAniversario").get(),
         userDoc.ref.collection("quotaOverrides").doc(String(currentYear)).get(),
         userDoc.ref.collection("diasTransitados").doc(String(currentYear)).get(),
       ]);
@@ -155,12 +173,27 @@ const getVacationMap = async (req, res) => {
         if (docYear === currentYear) approvedDaysCurrentYear.push(feriasData.date);
       });
 
+      const birthdayDaysCurrentYear = [];
+
+      aniversarioSnapshot.forEach((doc) => {
+        const aniversarioData = doc.data();
+        if (!aniversarioData.date || !isApprovedDoc(aniversarioData)) return;
+
+        const parts = aniversarioData.date.split("-");
+        if (parts.length !== 3) return;
+        const docYear = parseInt(parts[2], 10);
+
+        if (docYear === currentYear) birthdayDaysCurrentYear.push(aniversarioData.date);
+      });
+
       const quotaOverrideAtual = quotaOverrideDoc.exists ? quotaOverrideDoc.data().quota : null;
       const carryoverOverrideAtual = diasTransitadosDoc.exists ? diasTransitadosDoc.data().dias : null;
       const quotaAtual = computeQuotaForYear(data.data_admissao, currentYear, quotaOverrideAtual ?? undefined);
       const carryoverAtual = carryoverOverrideAtual ?? 0;
       const usadoAtual = computeUsedForYear(approvedDaysCurrentYear, currentYear);
       const saldoDisponivel = quotaAtual + carryoverAtual - usadoAtual;
+      const birthdayUsadoAtual = birthdayDaysCurrentYear.length;
+      const birthdaySaldoDisponivel = BIRTHDAY_ANNUAL_QUOTA - birthdayUsadoAtual;
 
       employees.push({
         uid,
@@ -173,6 +206,9 @@ const getVacationMap = async (req, res) => {
         carryoverOverrideAtual,
         usadoAtual,
         saldoDisponivel,
+        birthdayDaysCurrentYear,
+        birthdayUsadoAtual,
+        birthdaySaldoDisponivel,
       });
     }
 
@@ -246,6 +282,60 @@ const toggleVacationDay = async (req, res) => {
   }
 };
 
+// Dia de aniversário: benefício próprio, separado da quota de férias  -  1
+// dia/ano, sem proration nem transição, auto-aprovado tal como o toggle de
+// férias (o próprio marca diretamente, sem fluxo de aprovação do responsável).
+const toggleBirthdayDay = async (req, res) => {
+  try {
+    const { uid, date } = req.body;
+    if (!uid || !date) {
+      return res.status(400).json({ error: "Faltam campos obrigatórios: uid e/ou date" });
+    }
+
+    const isSelf = req.user.uid === uid;
+    if (!isSelf && !isAdminOrHR(req.user.nivelAcesso)) {
+      return res.status(403).json({ error: "Sem permissão para alterar o dia de aniversário deste colaborador" });
+    }
+
+    const [day, month, year] = date.split("-");
+    const targetYear = parseInt(year, 10);
+    const registoId = `registo_${day}${month}${year}`;
+    const docRef = db.collection("registo-ponto").doc(uid).collection("DiasAniversario").doc(registoId);
+    const existing = await docRef.get();
+
+    if (existing.exists) {
+      await docRef.delete();
+      return res.status(200).json({ message: "Dia de aniversário removido", action: "removed", date });
+    }
+
+    const blockedReason = getBlockedReason(parseInt(day, 10), parseInt(month, 10), targetYear);
+    if (blockedReason) {
+      const messages = {
+        weekend: "Não é possível marcar o dia de aniversário num fim de semana",
+        holiday: "Não é possível marcar o dia de aniversário num feriado nacional",
+        dispensa: "Não é possível marcar o dia de aniversário num dia de dispensa da empresa",
+      };
+      return res.status(400).json({ error: messages[blockedReason] });
+    }
+
+    const usedThisYear = await getUsedBirthdayDaysForYear(uid, targetYear);
+    if (usedThisYear + 1 > BIRTHDAY_ANNUAL_QUOTA) {
+      return res.status(400).json({ error: "O dia de aniversário deste ano já foi utilizado" });
+    }
+
+    await docRef.set({
+      date: `${day}-${month}-${year}`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      Approved: true,
+      createdBy: req.user.uid,
+    });
+    return res.status(201).json({ message: "Dia de aniversário marcado", action: "added", date });
+  } catch (error) {
+    console.error("Erro ao alternar dia de aniversário:", error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
 // Só SuperAdmin/GestorRH (gate feito na rota via requireAdminOrHR) pode
 // definir manualmente a quota de férias de um colaborador para um dado ano,
 // substituindo o cálculo automático (22 dias/ano, prorateado no ano de
@@ -279,7 +369,7 @@ const setVacationQuotaOverride = async (req, res) => {
 
 // Só SuperAdmin/GestorRH (gate feito na rota via requireAdminOrHR) pode
 // definir os dias de férias transitados do ano anterior para um colaborador,
-// num dado ano — valor sempre manual, guardado em users/{uid}/diasTransitados/{year}.
+// num dado ano  -  valor sempre manual, guardado em users/{uid}/diasTransitados/{year}.
 // Enviar days=null remove a entrada (volta a 0).
 const setVacationCarryover = async (req, res) => {
   try {
@@ -311,6 +401,7 @@ const setVacationCarryover = async (req, res) => {
 module.exports = {
   getVacationMap,
   toggleVacationDay,
+  toggleBirthdayDay,
   setVacationQuotaOverride,
   setVacationCarryover,
 };

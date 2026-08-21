@@ -101,7 +101,7 @@ export default function Perfil() {
 
         <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
 
-          {/* Avatar + nome + botão editar — full width */}
+          {/* Avatar + nome + botão editar  -  full width */}
           <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 24 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
               <div style={{
@@ -112,8 +112,8 @@ export default function Perfil() {
                 {initials}
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 20, fontWeight: 700, color: "#111827" }}>{username || "—"}</div>
-                <div style={{ fontSize: 13, color: "#6b7280", marginTop: 3 }}>{userEmail || "—"}</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: "#111827" }}>{username || " - "}</div>
+                <div style={{ fontSize: 13, color: "#6b7280", marginTop: 3 }}>{userEmail || " - "}</div>
                 <div style={{
                   display: "inline-block", marginTop: 8,
                   fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20,
@@ -178,7 +178,7 @@ export default function Perfil() {
                         onBlur={e => e.target.style.borderColor = "#e5e7eb"}
                       />
                     ) : (
-                      <span style={{ fontSize: 13, color: "#111827", fontWeight: 500, wordBreak: "break-all" }}>{value || "—"}</span>
+                      <span style={{ fontSize: 13, color: "#111827", fontWeight: 500, wordBreak: "break-all" }}>{value || " - "}</span>
                     )}
                   </div>
                 ))}

@@ -3,8 +3,8 @@ const { resolveTargetUid } = require("./helpers");
 const db = admin.firestore();
 
 // NOTA: o ID do documento em "registo-ponto" é, por omissão, o UID do
-// Firebase Auth do utilizador autenticado (req.user.uid) — nunca um valor
-// vindo do corpo do pedido — isto evita que um utilizador aceda/altere os
+// Firebase Auth do utilizador autenticado (req.user.uid)  -  nunca um valor
+// vindo do corpo do pedido  -  isto evita que um utilizador aceda/altere os
 // registos de outro só por enviar um "username"/"uid" diferente. As poucas
 // funções que um admin também usa para ver/editar os dados de OUTRO
 // colaborador (updateUserTime) usam resolveTargetUid, que só deixa usar um
@@ -269,13 +269,15 @@ const deleteRegister = async (req, res) => {
     const registosRef = userDocRef.collection("Registos");
     const feriasRef = userDocRef.collection("Ferias");
     const baixasRef = userDocRef.collection("BaixasMedicas");
+    const aniversarioRef = userDocRef.collection("DiasAniversario");
 
     console.log("📌 Buscando registo com ID:", registoId);
     const registoDoc = await registosRef.doc(registoId).get();
     const feriasDoc = await feriasRef.doc(registoId).get();
     const baixasDoc = await baixasRef.doc(registoId).get();
+    const aniversarioDoc = await aniversarioRef.doc(registoId).get();
 
-    if (!registoDoc.exists && !feriasDoc.exists && !baixasDoc.exists) {
+    if (!registoDoc.exists && !feriasDoc.exists && !baixasDoc.exists && !aniversarioDoc.exists) {
       console.log("⚠️ Nenhum registo encontrado para a data informada");
       return res.status(404).json({ error: "Nenhum registo encontrado para a data informada" });
     }
@@ -293,6 +295,10 @@ const deleteRegister = async (req, res) => {
     if (baixasDoc.exists) {
       console.log("🗑️ Apagando registo de baixa médica:", baixasDoc.id);
       batch.delete(baixasDoc.ref);
+    }
+    if (aniversarioDoc.exists) {
+      console.log("🗑️ Apagando dia de aniversário:", aniversarioDoc.id);
+      batch.delete(aniversarioDoc.ref);
     }
 
     console.log("🔄 Executando batch delete...");

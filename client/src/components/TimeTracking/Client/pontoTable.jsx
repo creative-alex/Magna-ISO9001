@@ -45,6 +45,7 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
       const manualOvertimeData = data.manualOvertime || [];
       const ferias = data.ferias || [];
       const baixas = data.baixas || [];
+      const aniversario = data.aniversario || [];
 
       const dadosProcessados = Array.from({ length: diasNoMes }, (_, i) => {
         const dia = `${String(i + 1).padStart(2, "0")}-${String(month).padStart(2, "0")}`;
@@ -53,6 +54,7 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
 
         const feriaDodia = ferias.find(f => f.date === diaCompleto);
         const baixaDodia = baixas.find(b => b.date === diaCompleto);
+        const aniversarioDodia = aniversario.find(a => a.date === diaCompleto);
 
         const manualOvertimeForDay = manualOvertimeData.filter(mo => mo.date === diaCompleto);
         const hasManualOvertime = manualOvertimeForDay.length > 0;
@@ -60,13 +62,14 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
 
         const isFerias = feriaDodia != null;
         const isBaixa = baixaDodia != null;
+        const isAniversario = aniversarioDodia != null;
 
-        const horaEntrada = isFerias ? "Férias" : isBaixa ? "Baixa" : (registo?.horaEntrada || "-");
-        const horaSaida  = isFerias ? "Férias" : isBaixa ? "Baixa" : (registo?.horaSaida  || "-");
+        const horaEntrada = isFerias ? "Férias" : isBaixa ? "Baixa" : isAniversario ? "🎂 Aniversário" : (registo?.horaEntrada || "-");
+        const horaSaida  = isFerias ? "Férias" : isBaixa ? "Baixa" : isAniversario ? "🎂 Aniversário" : (registo?.horaSaida  || "-");
         const dataObj = registo ? new Date(registo.timestamp) : null;
         const horaEntradaExtraida = extractTime(registo?.horaEntrada);
         const horaSaidaExtraida   = extractTime(registo?.horaSaida);
-        const horasCalculadas = (horaEntradaExtraida && horaSaidaExtraida && !isFerias && !isBaixa)
+        const horasCalculadas = (horaEntradaExtraida && horaSaidaExtraida && !isFerias && !isBaixa && !isAniversario)
           ? calcularHoras(horaEntradaExtraida, horaSaidaExtraida, dataObj)
           : { total: "-", extra: "-", minutosExtras: 0, minutosFalta: 0 };
 

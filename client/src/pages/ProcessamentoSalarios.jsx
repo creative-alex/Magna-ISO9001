@@ -104,7 +104,7 @@ function ParametrosSalario() {
                   style={inputStyle}
                 />
               ) : (
-                <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{parametros.valor_subsidio_alimentacao || "—"}</div>
+                <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{parametros.valor_subsidio_alimentacao || " - "}</div>
               )}
             </div>
             <div>
@@ -118,7 +118,7 @@ function ParametrosSalario() {
                   style={inputStyle}
                 />
               ) : (
-                <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{parametros.valor_km_deslocacao || "—"}</div>
+                <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{parametros.valor_km_deslocacao || " - "}</div>
               )}
             </div>
           </div>
@@ -137,7 +137,7 @@ function ParametrosSalario() {
                     style={{ ...inputStyle, marginBottom: 8 }}
                   />
                 ) : (
-                  <div style={{ fontSize: 13, color: "#111827", fontWeight: 500, marginBottom: 8 }}>{e.valor_bruto || "—"}</div>
+                  <div style={{ fontSize: 13, color: "#111827", fontWeight: 500, marginBottom: 8 }}>{e.valor_bruto || " - "}</div>
                 )}
                 <span style={{ fontSize: 11, color: "#6b7280", marginBottom: 4, display: "block" }}>Valor isenção horário (€)</span>
                 {e.escalao === "I" ? (
@@ -165,13 +165,17 @@ function ParametrosSalario() {
 
 export default function ProcessamentoSalarios() {
   const navigate = useNavigate();
-  const { nivelAcesso } = useContext(UserContext);
+  const { uid, nivelAcesso } = useContext(UserContext);
   const isAdmin = nivelAcesso === "SuperAdmin";
   const isHR = nivelAcesso === "GestorRH";
+  const isAdministrador = nivelAcesso === "Administrador";
+  const canView = isAdmin || isHR || isAdministrador;
 
   useEffect(() => {
-    if (!isAdmin && !isHR) {
-      navigate("/dashboard", { replace: true });
+    // Esta página (parâmetros + lista de colaboradores) é só para admin/RH/
+    // Administrador; um colaborador comum vê antes o seu próprio processamento.
+    if (!canView) {
+      navigate(`/salarios/${uid}`, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -181,7 +185,7 @@ export default function ProcessamentoSalarios() {
     navigate(`/file/${formattedPath}`, { state: { originalFilename: filePath } });
   };
 
-  if (!isAdmin && !isHR) return null;
+  if (!canView) return null;
 
   return (
     <div className="flex min-h-screen">
@@ -190,9 +194,13 @@ export default function ProcessamentoSalarios() {
       <div className="ml-[230px] flex-1 flex flex-col min-h-screen">
         <Topbar icon="💰" title="Processamento Salários" />
 
-        <div style={{ padding: "24px 24px 0", display: "flex", flexDirection: "column", gap: 20 }}>
-          <ParametrosSalario />
-        </div>
+        {/* Parâmetros de salário são globais (não são "dados dos colaboradores da
+            entidade"), por isso continuam só para admin/RH  -  Administrador não os edita. */}
+        {(isAdmin || isHR) && (
+          <div style={{ padding: "24px 24px 0", display: "flex", flexDirection: "column", gap: 20 }}>
+            <ParametrosSalario />
+          </div>
+        )}
 
         <ColaboradoresGroupedList
           title="Colaboradores"

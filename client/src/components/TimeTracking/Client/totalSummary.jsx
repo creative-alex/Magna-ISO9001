@@ -12,6 +12,7 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1 }) => {
     totalExtras: "0h 0m",
     diasFalta: 0,
     diasFerias: 0,
+    diasAniversario: 0,
   });
   const [accumulatedExtras, setAccumulatedExtras] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -55,6 +56,7 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1 }) => {
         const registos = data.registos || [];
         const ferias = data.ferias || [];
         const baixas = data.baixas || [];
+        const aniversario = data.aniversario || [];
         const manualOvertime = data.manualOvertime || [];
         const deductionMinutes = data.deductionMinutes || 0;
 
@@ -62,11 +64,12 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1 }) => {
         const isSpecialStatus = (h) => {
           if (!h || h === '-') return false;
           const low = h.toLowerCase();
-          return low.startsWith('feria') || low.startsWith('féria') || low.startsWith('baixa');
+          return low.startsWith('feria') || low.startsWith('féria') || low.startsWith('baixa') || low.startsWith('aniversario');
         };
         const parseDDMM = (d) => (d && d.length >= 5 && d[2] === '-') ? d.slice(0, 5) : d;
         const feriasSet = new Set(ferias.filter(f => f.approved).map(f => parseDDMM(f.date || '')));
         const baixasSet = new Set(baixas.filter(b => b.approved).map(b => parseDDMM(b.date || '')));
+        const aniversarioSet = new Set(aniversario.filter(a => a.approved).map(a => parseDDMM(a.date || '')));
 
         // Calcular totais
         let totalMinutos = 0;
@@ -85,6 +88,7 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1 }) => {
           const isHoliday = allHolidays.includes(dayStr);
           const isFerias = feriasSet.has(dayStr);
           const isBaixa = baixasSet.has(dayStr);
+          const isAniversario = aniversarioSet.has(dayStr);
           const isPast = dataAtual < hoje && dataAtual.toDateString() !== hoje.toDateString();
           const isWorkday = diaSemana >= 1 && diaSemana <= 5;
 
@@ -98,7 +102,7 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1 }) => {
               totalMinutosExtras += resCalc.minutosExtras;
               totalMinutosFalta += resCalc.minutosFalta;
             }
-          } else if (isPast && isWorkday && !isHoliday && !isFerias && !isBaixa && !registo) {
+          } else if (isPast && isWorkday && !isHoliday && !isFerias && !isBaixa && !isAniversario && !registo) {
             totalMinutosFalta += 480;
             diasFalta++;
           }
@@ -118,6 +122,7 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1 }) => {
           totalExtras: formatarMinutos(totalMinutosExtrasLiquidas),
           diasFalta,
           diasFerias: ferias.filter(f => f.approved).length,
+          diasAniversario: aniversario.filter(a => a.approved).length,
         });
       } catch (error) {
         console.error("Erro ao buscar totais:", error);
@@ -140,7 +145,7 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1 }) => {
     const isSpecialStatus = (h) => {
       if (!h || h === '-') return false;
       const low = h.toLowerCase();
-      return low.startsWith('feria') || low.startsWith('féria') || low.startsWith('baixa');
+      return low.startsWith('feria') || low.startsWith('féria') || low.startsWith('baixa') || low.startsWith('aniversario');
     };
     const parseDDMM = (d) => (d && d.length >= 5 && d[2] === '-') ? d.slice(0, 5) : d;
 
@@ -157,12 +162,14 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1 }) => {
         const registos = data.registos || [];
         const ferias = data.ferias || [];
         const baixas = data.baixas || [];
+        const aniversario = data.aniversario || [];
         const manualOvertime = data.manualOvertime || [];
         const deductionMinutes = data.deductionMinutes || 0;
         const diasNoMes = new Date(currentYear, monthNum, 0).getDate();
 
         const feriasSet = new Set(ferias.filter(f => f.approved).map(f => parseDDMM(f.date || '')));
         const baixasSet = new Set(baixas.filter(b => b.approved).map(b => parseDDMM(b.date || '')));
+        const aniversarioSet = new Set(aniversario.filter(a => a.approved).map(a => parseDDMM(a.date || '')));
 
         let extras = 0;
         let falta = 0;
@@ -175,6 +182,7 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1 }) => {
           const isHoliday = allHolidays.includes(dayStr);
           const isFerias = feriasSet.has(dayStr);
           const isBaixa = baixasSet.has(dayStr);
+          const isAniversario = aniversarioSet.has(dayStr);
           const isPast = dataObj < now && dataObj.toDateString() !== now.toDateString();
           const isWorkday = diaSemana >= 1 && diaSemana <= 5;
 
@@ -186,7 +194,7 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1 }) => {
               extras += calc.minutosExtras || 0;
               falta += calc.minutosFalta || 0;
             }
-          } else if (isPast && isWorkday && !isHoliday && !isFerias && !isBaixa && !registo) {
+          } else if (isPast && isWorkday && !isHoliday && !isFerias && !isBaixa && !isAniversario && !registo) {
             falta += 480;
           }
         }
@@ -338,6 +346,7 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1 }) => {
         <p className="mb-2"><strong>Horas Extras (total):</strong> {accumulatedExtras === null ? '...' : <span className={accumulatedExtras < 0 ? 'text-danger' : ''}>{formatarMinutos(accumulatedExtras)}</span>}</p>
         <p className="mb-2"><strong>Faltas:</strong> {totais.diasFalta}</p>
         <p className="mb-2"><strong>Férias:</strong> {totais.diasFerias}</p>
+        <p className="mb-2"><strong>🎂 Aniversário:</strong> {totais.diasAniversario}</p>
         <button
           onClick={handleOpenYearlyModal}
           className="mt-4 underline cursor-pointer bg-transparent border-none text-sm font-medium text-gold"

@@ -45,11 +45,17 @@ export default function SalarioColaborador() {
   const navigate = useNavigate();
   const { id } = useParams();
   const location = useLocation();
-  const { nivelAcesso } = useContext(UserContext);
+  const { uid, nivelAcesso } = useContext(UserContext);
   const isAdmin = nivelAcesso === "SuperAdmin";
   const isHR = nivelAcesso === "GestorRH";
+  const isAdministrador = nivelAcesso === "Administrador";
+  const canManage = isAdmin || isHR;
+  const isSelf = uid === id;
+  // Administrador só tem acesso de leitura (o backend confirma que o colaborador é da
+  // sua entidade); nunca ganha canManage, por isso os botões de edição continuam ocultos.
+  const canView = canManage || isSelf || isAdministrador;
   const targetLabel = location.state?.nome || id;
-  const nomeCurto = getNomeCurto(targetLabel) || targetLabel;
+  const nomeCurto = getNomeCurto(targetLabel);
 
   const [mes, setMes] = useState(getCurrentMonth());
   const [editMode, setEditMode] = useState(false);
@@ -75,9 +81,10 @@ export default function SalarioColaborador() {
   const isencaoDependePessoa = escalaoVencimento === "II";
 
   useEffect(() => {
-    if (!isAdmin && !isHR) {
+    if (!canView) {
       navigate("/dashboard", { replace: true });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchSalario = useCallback(async ({ silent = false } = {}) => {
@@ -113,8 +120,9 @@ export default function SalarioColaborador() {
   }, [id, mes]);
 
   useEffect(() => {
-    if (!isAdmin && !isHR) return;
+    if (!canView) return;
     fetchSalario();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, mes]);
 
   const handleChange = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
@@ -253,7 +261,7 @@ export default function SalarioColaborador() {
             style={inputStyle}
           />
         ) : (
-          <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{value || "—"}</div>
+          <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{value || " - "}</div>
         )}
       </div>
     );
@@ -264,7 +272,7 @@ export default function SalarioColaborador() {
     navigate(`/file/${formattedPath}`, { state: { originalFilename: filePath } });
   };
 
-  if (!isAdmin && !isHR) return null;
+  if (!canView) return null;
 
   return (
     <div className="flex min-h-screen">
@@ -277,8 +285,8 @@ export default function SalarioColaborador() {
 
           <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "18px 24px", display: "flex", alignItems: "center", gap: 16 }}>
             <button
-              onClick={() => navigate("/salarios")}
-              title="Voltar à lista de colaboradores"
+              onClick={() => navigate(canManage ? "/salarios" : "/dashboard")}
+              title={canManage ? "Voltar à lista de colaboradores" : "Voltar ao dashboard"}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center",
                 width: 32, height: 32, border: "1px solid #e5e7eb", borderRadius: 7,
@@ -289,7 +297,7 @@ export default function SalarioColaborador() {
             </button>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 17, fontWeight: 700, color: "#111827" }}>
-                Processamento de salário — {nomeCurto}
+                Processamento de salário  -  {nomeCurto}
               </div>
               <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 3 }}>
                 {getMesLabel(mes)}
@@ -306,22 +314,24 @@ export default function SalarioColaborador() {
                 background: editMode ? "#f3f4f6" : "#fafafa", color: "#111827", flexShrink: 0,
               }}
             />
-            <button
-              disabled={saving}
-              onClick={() => { if (editMode) handleSave(); else setEditMode(true); }}
-              style={{
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "8px 16px", fontSize: 13, fontWeight: 500, cursor: saving ? "wait" : "pointer",
-                border: `1px solid ${editMode ? "#22c55e" : GOLD}`,
-                borderRadius: 7, background: "#fff",
-                color: editMode ? "#22c55e" : GOLD,
-                transition: "all 0.15s", flexShrink: 0, opacity: saving ? 0.6 : 1,
-              }}
-            >
-              {saving
-                ? "A guardar..."
-                : editMode ? <><FaCheck style={{ fontSize: 12 }} /> Guardar</> : <><FaPencil style={{ fontSize: 12 }} /> Editar</>}
-            </button>
+            {canManage && (
+              <button
+                disabled={saving}
+                onClick={() => { if (editMode) handleSave(); else setEditMode(true); }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "8px 16px", fontSize: 13, fontWeight: 500, cursor: saving ? "wait" : "pointer",
+                  border: `1px solid ${editMode ? "#22c55e" : GOLD}`,
+                  borderRadius: 7, background: "#fff",
+                  color: editMode ? "#22c55e" : GOLD,
+                  transition: "all 0.15s", flexShrink: 0, opacity: saving ? 0.6 : 1,
+                }}
+              >
+                {saving
+                  ? "A guardar..."
+                  : editMode ? <><FaCheck style={{ fontSize: 12 }} /> Guardar</> : <><FaPencil style={{ fontSize: 12 }} /> Editar</>}
+              </button>
+            )}
           </div>
 
           {loading ? (
@@ -330,7 +340,7 @@ export default function SalarioColaborador() {
             </div>
           ) : (
             <>
-              {/* Vencimento — escalão editável; valores vêm sempre da tabela de vencimentos */}
+              {/* Vencimento  -  escalão editável; valores vêm sempre da tabela de vencimentos */}
               <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
                 <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 8 }}>
                   <FaSackDollar style={{ color: GOLD, fontSize: 13 }} />
@@ -348,12 +358,12 @@ export default function SalarioColaborador() {
                         {ESCALAO_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
                       </select>
                     ) : (
-                      <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{escalaoVencimento || "—"}</div>
+                      <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{escalaoVencimento || " - "}</div>
                     )}
                   </div>
                   <div>
                     <span style={labelStyle}>Valor de vencimento bruto (€)</span>
-                    <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{valorBruto ?? "—"}</div>
+                    <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{valorBruto ?? " - "}</div>
                   </div>
                   <div>
                     <span style={labelStyle}>Tem isenção de horário</span>
@@ -391,12 +401,12 @@ export default function SalarioColaborador() {
                   </div>
                   <div>
                     <span style={labelStyle}>Valor de isenção de horário de trabalho (€)</span>
-                    <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{valorIsencao ?? "—"}</div>
+                    <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{valorIsencao ?? " - "}</div>
                   </div>
                 </div>
               </div>
 
-              {/* Subsídio de alimentação — valor/dia fixo (parâmetros gerais); só varia o cartão e os dias trabalhados */}
+              {/* Subsídio de alimentação  -  valor/dia fixo (parâmetros gerais); só varia o cartão e os dias trabalhados */}
               <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
                 <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 8 }}>
                   <FaCreditCard style={{ color: GOLD, fontSize: 13 }} />
@@ -409,11 +419,11 @@ export default function SalarioColaborador() {
                   {SUBSIDIO_FIELDS.map(renderField)}
                   <div>
                     <span style={labelStyle}>Dias trabalhados</span>
-                    <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{diasTrabalhados ?? "—"}</div>
+                    <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{diasTrabalhados ?? " - "}</div>
                   </div>
                   <div>
-                    <span style={labelStyle}>Valor a pagar (€)</span>
-                    <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{valorSubsidioAlimentacaoPagar ?? "—"}</div>
+                    <span style={labelStyle}>Valor a receber (€)</span>
+                    <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{valorSubsidioAlimentacaoPagar ?? " - "}</div>
                   </div>
                 </div>
               </div>
@@ -429,13 +439,13 @@ export default function SalarioColaborador() {
                 <div style={{ padding: 18, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px 20px" }}>
                   {DESLOCACOES_FIELDS.filter(f => !f.conditionalOn || form[f.conditionalOn] === true).map(renderField)}
                   <div>
-                    <span style={labelStyle}>Valor a pagar (€)</span>
-                    <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{valorDeslocacoes ?? "—"}</div>
+                    <span style={labelStyle}>Valor a receber (€)</span>
+                    <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{valorDeslocacoes ?? " - "}</div>
                   </div>
                 </div>
               </div>
 
-              {/* Ajustes do mês — vem sempre do livro de ponto, não é editável aqui */}
+              {/* Ajustes do mês  -  vem sempre do livro de ponto, não é editável aqui */}
               <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
                 <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 8 }}>
                   <FaCalendarDays style={{ color: GOLD, fontSize: 13 }} />
@@ -465,19 +475,19 @@ export default function SalarioColaborador() {
                 <div style={{ padding: 18, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px 20px" }}>
                   <div>
                     <span style={labelStyle}>Baixas</span>
-                    <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{diasBaixaMedica ?? "—"}</div>
+                    <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{diasBaixaMedica ?? " - "}</div>
                   </div>
                   <div>
                     <span style={labelStyle}>Licenças</span>
-                    <div style={{ fontSize: 13, color: "#9ca3af", fontWeight: 500 }}>—</div>
+                    <div style={{ fontSize: 13, color: "#9ca3af", fontWeight: 500 }}> - </div>
                   </div>
                   <div>
                     <span style={labelStyle}>Faltas</span>
-                    <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{diasFalta ?? "—"}</div>
+                    <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{diasFalta ?? " - "}</div>
                   </div>
                   <div>
                     <span style={labelStyle}>Férias</span>
-                    <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{diasFerias ?? "—"}</div>
+                    <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{diasFerias ?? " - "}</div>
                   </div>
                 </div>
               </div>

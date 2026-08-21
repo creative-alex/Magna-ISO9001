@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { requireAuth, requireAdmin, requireAdminOrHR } = require('../middleware/auth');
+const { requireAuth, requireAdmin, requireAdminOrHR, requireAdminOrEntidadeAdmin } = require('../middleware/auth');
 const {
   createUser,
   userDetails,
@@ -42,13 +42,14 @@ const { ping } = require('../controllers/timeTracking/utilsController');
 const {
   getVacationMap,
   toggleVacationDay,
+  toggleBirthdayDay,
   setVacationQuotaOverride,
   setVacationCarryover,
 } = require('../controllers/timeTracking/vacationMapController');
 
 // Auto-serviço (qualquer utilizador autenticado, sobre os seus próprios dados)
 //
-// NOTA: não há rotas próprias de verificação de token / primeiro login aqui —
+// NOTA: não há rotas próprias de verificação de token / primeiro login aqui  - 
 // a app fundida usa só as do Magna (/users/verifyTokenAndGetUserInfo e
 // /users/update-first-login), que já cobrem exatamente a mesma necessidade.
 router.post("/registerEntry", requireAuth, registerEntry);
@@ -67,26 +68,36 @@ router.post("/get-manual-overtime", requireAuth, getManualOvertimeForMonth);
 router.put("/update-manual-overtime", requireAuth, updateManualOvertime);
 router.delete("/delete-manual-overtime", requireAuth, deleteManualOvertime);
 router.get("/ping", requireAuth, ping);
-// Calendário de férias de toda a equipa — informação visível a qualquer
+// Calendário de férias de toda a equipa  -  informação visível a qualquer
 // colaborador autenticado (não é dado sensível de admin), usado tanto pela
 // vista de admin como pelo calendário que aparece ao próprio colaborador.
 router.post("/all-vacations", requireAuth, getAllUsersVacations);
 
 // Mapa de férias (grelha company-wide): leitura aberta a qualquer autenticado;
 // escrita permite auto-edição da própria linha OU edição de outra linha por
-// admin/GestorRH — regra mista que não cabe em requireAdmin (só SuperAdmin)
+// admin/GestorRH  -  regra mista que não cabe em requireAdmin (só SuperAdmin)
 // nem em requireAdminOrHR sozinho (bloquearia a auto-edição do próprio user),
 // por isso a validação de permissão vive dentro do próprio controller.
 router.post("/vacation-map", requireAuth, getVacationMap);
 router.post("/toggle-vacation-day", requireAuth, toggleVacationDay);
+// Dia de aniversário: mesma regra mista de permissão que o dia de férias
+// (auto-edição ou admin/GestorRH), validada dentro do controller.
+router.post("/toggle-birthday-day", requireAuth, toggleBirthdayDay);
 router.post("/vacation-quota-override", requireAuth, requireAdminOrHR, setVacationQuotaOverride);
 router.post("/vacation-carryover", requireAuth, requireAdminOrHR, setVacationCarryover);
 
 // Administração (gestão de outros utilizadores / dados cross-user)
-router.post("/userDetails", requireAuth, requireAdmin, userDetails);
-router.post('/createUser', requireAuth, requireAdmin, createUser);
-router.post("/byEntity", requireAuth, requireAdmin, getUsersByEntity);
-router.post("/updateUserDetails", requireAuth, requireAdmin, updateUserDetails);
+//
+// userDetails/createUser/byEntity/updateUserDetails/deleteUser também aceitam
+// "Administrador"  -  o nível intermédio só gere colaboradores da sua própria
+// entidade, restrição validada dentro de cada controller (não cabe num middleware
+// que não conhece a entidade do colaborador-alvo). As restantes ações desta secção
+// (aprovação de férias, processamento de horas extras, etc.) continuam exclusivas
+// de SuperAdmin, tal como já não estavam disponíveis para GestorRH.
+router.post("/userDetails", requireAuth, requireAdminOrEntidadeAdmin, userDetails);
+router.post('/createUser', requireAuth, requireAdminOrEntidadeAdmin, createUser);
+router.post("/byEntity", requireAuth, requireAdminOrEntidadeAdmin, getUsersByEntity);
+router.post("/updateUserDetails", requireAuth, requireAdminOrEntidadeAdmin, updateUserDetails);
 router.post("/approve-vacation", requireAuth, requireAdmin, approveVacation);
 router.post("/reject-vacation", requireAuth, requireAdmin, rejectVacation);
 router.post("/pending-vacations", requireAuth, requireAdmin, getPendingVacations);
@@ -95,6 +106,6 @@ router.post("/clear-overtime-deductions", requireAuth, requireAdmin, clearOverti
 router.post("/debug-corrupt-overtime", requireAuth, requireAdmin, debugCorruptOvertime);
 router.post("/delete-corrupt-overtime", requireAuth, requireAdmin, deleteCorruptOvertime);
 router.delete("/deleteRegister", requireAuth, requireAdmin, deleteRegister);
-router.post("/deleteUser", requireAuth, requireAdmin, deleteUser);
+router.post("/deleteUser", requireAuth, requireAdminOrEntidadeAdmin, deleteUser);
 
 module.exports = router;

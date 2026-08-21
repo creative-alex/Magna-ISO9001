@@ -5,17 +5,19 @@ import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import ColaboradoresGroupedList from "../components/ColaboradoresGroupedList";
 
-export default function Colaboradores() {
+export default function PlanoFormacao() {
   const navigate = useNavigate();
-  const { nivelAcesso } = useContext(UserContext);
+  const { uid, nivelAcesso } = useContext(UserContext);
   const isAdmin = nivelAcesso === "SuperAdmin";
   const isHR = nivelAcesso === "GestorRH";
   const isAdministrador = nivelAcesso === "Administrador";
   const canView = isAdmin || isHR || isAdministrador;
 
   useEffect(() => {
+    // Esta página (lista de colaboradores) é só para admin/RH/Administrador; um
+    // colaborador comum vê antes o seu próprio plano de formação.
     if (!canView) {
-      navigate("/cadastro", { replace: true });
+      navigate(`/plano-formacao/${uid}`, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -32,11 +34,11 @@ export default function Colaboradores() {
       <Sidebar onSelectFile={handleSelectFile} />
 
       <div className="ml-[230px] flex-1 flex flex-col min-h-screen">
-        <Topbar icon="🪪" title="Cadastro" />
+        <Topbar icon="🎓" title="Plano de Formação" />
         <ColaboradoresGroupedList
           title="Colaboradores"
-          subtitle="Agrupados por entidade. Seleciona um colaborador para consultar ou preencher a respetiva ficha de cadastro."
-          onSelect={(c) => navigate(`/cadastro/${c.id}`, { state: { nome: c.nome, email: c.email } })}
+          subtitle="Agrupados por entidade. Seleciona um colaborador para consultar ou preencher o respetivo plano de formação."
+          onSelect={(c) => navigate(`/plano-formacao/${c.id}`, { state: { nome: c.nome, email: c.email } })}
         />
       </div>
     </div>

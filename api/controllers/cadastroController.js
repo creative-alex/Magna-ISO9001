@@ -1,9 +1,16 @@
 const admin = require("firebase-admin");
 const db = require("../db/firebase").db;
-const { isAdminOrHR } = require("../middleware/auth");
+const { isAdminOrHR, isAdministrador } = require("../middleware/auth");
 
 function canAccess(req, id) {
   return req.user?.uid === id || isAdminOrHR(req.user?.nivelAcesso);
+}
+
+// Leitura: admin/RH vê qualquer colaborador; Administrador vê os colaboradores da
+// sua própria entidade (nunca de outra); um colaborador comum só vê o seu próprio
+// cadastro. Nunca dá direito de escrita  -  isso continua só em canAccess/canEditRestricted.
+function canRead(req, id, targetEntidade) {
+  return canAccess(req, id) || (isAdministrador(req.user?.nivelAcesso) && !!targetEntidade && targetEntidade === req.user?.entidade);
 }
 
 function canEditRestricted(req) {
@@ -25,7 +32,7 @@ const RESTRICTED_DOC_KEYS = [
   "digitalizacao_contrato_estagio", "outra_documentacao_estagio",
 ];
 
-// "nome" (conta) guarda o nome curto — primeiro e último nome do "nome_completo" do cadastro.
+// "nome" (conta) guarda o nome curto  -  primeiro e último nome do "nome_completo" do cadastro.
 function getNomeCurto(nomeCompleto) {
   const partes = (nomeCompleto || "").trim().split(/\s+/).filter(Boolean);
   if (partes.length === 0) return "";
@@ -35,7 +42,7 @@ function getNomeCurto(nomeCompleto) {
 
 // Únicos campos que os endpoints de cadastro podem ler/escrever no documento do colaborador
 // (outras funcionalidades, como o processamento de salários, guardam os seus próprios campos
-// no mesmo documento — sem esta lista explícita, ficariam a "vazar" para dentro do cadastro).
+// no mesmo documento  -  sem esta lista explícita, ficariam a "vazar" para dentro do cadastro).
 const CADASTRO_FIELD_KEYS = [
   "nome_completo", "data_nascimento",
   "morada", "codigo_postal", "localidade", "telefone", "email_profissional",
@@ -52,9 +59,6 @@ const CADASTRO_FIELD_KEYS = [
 const getCadastro = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!canAccess(req, id)) {
-      return res.status(403).json({ error: "Sem permissão para consultar este cadastro" });
-    }
 
     const userDoc = await db.collection("users").doc(id).get();
     if (!userDoc.exists) {
@@ -62,17 +66,21 @@ const getCadastro = async (req, res) => {
     }
 
     const data = userDoc.data();
+    if (!canRead(req, id, data.entidade)) {
+      return res.status(403).json({ error: "Sem permissão para consultar este cadastro" });
+    }
+
     const form = {};
     CADASTRO_FIELD_KEYS.forEach(key => {
       if (data[key] !== undefined) form[key] = data[key];
     });
 
-    // Histórico mensal de "Contrato de trabalho" — um documento por mês em users/{id}/contratoHistorico/{mes}.
+    // Histórico mensal de "Contrato de trabalho"  -  um documento por mês em users/{id}/contratoHistorico/{mes}.
     const historicoSnap = await userDoc.ref.collection("contratoHistorico").get();
     const contratoHistorico = {};
     historicoSnap.forEach(doc => { contratoHistorico[doc.id] = doc.data(); });
 
-    // Documentos digitalizados — um documento por chave (ex: "digitalizacao_cc") em users/{id}/docs/{docKey}.
+    // Documentos digitalizados  -  um documento por chave (ex: "digitalizacao_cc") em users/{id}/docs/{docKey}.
     const docsSnap = await userDoc.ref.collection("docs").get();
     const docs = {};
     docsSnap.forEach(doc => { docs[doc.id] = doc.data(); });

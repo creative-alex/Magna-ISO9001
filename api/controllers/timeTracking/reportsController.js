@@ -155,6 +155,11 @@ const getUserRecords = async (req, res) => {
       .doc(userId)
       .collection("BaixasMedicas");
 
+    const aniversarioRef = db
+      .collection("registo-ponto")
+      .doc(userId)
+      .collection("DiasAniversario");
+
     let feriasInfos = [];
     for (let i = 0; i < listaDeDatas.length; i += 30) {
       const batch = listaDeDatas.slice(i, i + 30);
@@ -173,6 +178,18 @@ const getUserRecords = async (req, res) => {
       const baixasSnapshot = await baixasRef.where("date", "in", batch).get();
       baixasInfos.push(
         ...baixasSnapshot.docs.map((doc) => ({
+          date: doc.data().date,
+          approved: doc.data().Approved ?? false
+        }))
+      );
+    }
+
+    let aniversarioInfos = [];
+    for (let i = 0; i < listaDeDatas.length; i += 30) {
+      const batch = listaDeDatas.slice(i, i + 30);
+      const aniversarioSnapshot = await aniversarioRef.where("date", "in", batch).get();
+      aniversarioInfos.push(
+        ...aniversarioSnapshot.docs.map((doc) => ({
           date: doc.data().date,
           approved: doc.data().Approved ?? false
         }))
@@ -216,6 +233,9 @@ const getUserRecords = async (req, res) => {
     const deductionDoc = await deductionsRef.doc(monthKey).get();
     const deductionMinutes = deductionDoc.exists ? (deductionDoc.data().deductionMinutes || 0) : 0;
 
+    // Data de criação do colaborador, para o frontend não contar faltas antes da conta existir
+    const userCreatedAt = await getUserCreatedAt(userId);
+
     const registos = snapshot.docs.map((doc) => {
       const data = doc.data();
       const dataFormatada = data.timestamp.toDate().toISOString().split("T")[0];
@@ -239,6 +259,10 @@ const getUserRecords = async (req, res) => {
         status = "Baixa Médica";
         horaEntrada = "Baixa";
         horaSaida = "Baixa";
+      } else if (aniversarioInfos.some(a => a.date === diaMesAnoFormatado)) {
+        status = "Aniversário";
+        horaEntrada = "aniversario";
+        horaSaida = "aniversario";
       }
 
       return {
@@ -257,8 +281,10 @@ const getUserRecords = async (req, res) => {
       registos,
       ferias: feriasInfos,
       baixas: baixasInfos,
+      aniversario: aniversarioInfos,
       manualOvertime: manualOvertimeInfos,
-      deductionMinutes: deductionMinutes
+      deductionMinutes: deductionMinutes,
+      createdAt: userCreatedAt ? userCreatedAt.toISOString() : null
     });
   } catch (error) {
     return res.status(500).json({ error: error.message });
@@ -342,7 +368,7 @@ const getOvertimeSummary = async (req, res) => {
       .doc(userId)
       .collection("HorasExtraManual");
 
-    // Sem campo "timestamp" nesta subcoleção — filtra-se pelo ano embutido em
+    // Sem campo "timestamp" nesta subcoleção  -  filtra-se pelo ano embutido em
     // "date" (formato DD-MM-YYYY), tal como o resto dos endpoints já fazem.
     const manualOvertimeSnapshot = await manualOvertimeRef.get();
 
@@ -581,7 +607,7 @@ const getYearlySummary = async (req, res) => {
   }
 };
 
-// Resumo de assiduidade de UM mês para um colaborador — usado pelo processamento
+// Resumo de assiduidade de UM mês para um colaborador  -  usado pelo processamento
 // de salários (dias trabalhados/faltas/férias/baixas deixam de ser inseridos à mão
 // e passam a vir do livro de ponto). Função pura, sem req/res e sem efeitos
 // secundários (não grava nada), ao contrário de processOvertimeDeduction.
@@ -607,7 +633,7 @@ async function calculateMonthlyAttendanceSummary({ uid, year, month }) {
   });
 
   // Datas em Ferias/BaixasMedicas aparecem tanto em "DD-MM" como em "DD-MM-YYYY"
-  // (ver getYearlySummary acima) — normalizar para {dia, mes, ano}.
+  // (ver getYearlySummary acima)  -  normalizar para {dia, mes, ano}.
   function parseDocDate(dateStr) {
     if (!dateStr || !dateStr.includes("-")) return null;
     const parts = dateStr.split("-");
@@ -618,7 +644,12 @@ async function calculateMonthlyAttendanceSummary({ uid, year, month }) {
 
   const feriasRef = db.collection("registo-ponto").doc(uid).collection("Ferias");
   const baixasRef = db.collection("registo-ponto").doc(uid).collection("BaixasMedicas");
-  const [feriasSnapshot, baixasSnapshot] = await Promise.all([feriasRef.get(), baixasRef.get()]);
+  const aniversarioRef = db.collection("registo-ponto").doc(uid).collection("DiasAniversario");
+  const [feriasSnapshot, baixasSnapshot, aniversarioSnapshot] = await Promise.all([
+    feriasRef.get(),
+    baixasRef.get(),
+    aniversarioRef.get(),
+  ]);
 
   let diasFerias = 0;
   const feriasDias = new Set();
@@ -642,7 +673,20 @@ async function calculateMonthlyAttendanceSummary({ uid, year, month }) {
     baixasDias.add(parsed.dia);
   });
 
-  // Feriados portugueses (Porto) — fixos + móveis calculados para o ano (mesma
+  // Dia de aniversário: excluído de faltas tal como férias/baixa, mas não conta
+  // como "dia trabalhado" nem entra na quota de férias.
+  let diasAniversario = 0;
+  const aniversarioDias = new Set();
+  aniversarioSnapshot.forEach(doc => {
+    const data = doc.data();
+    if (data.Approved !== true) return;
+    const parsed = parseDocDate(data.date);
+    if (!parsed || parsed.mes !== month || (parsed.ano !== null && parsed.ano !== year)) return;
+    diasAniversario++;
+    aniversarioDias.add(parsed.dia);
+  });
+
+  // Feriados portugueses (Porto)  -  fixos + móveis calculados para o ano (mesma
   // lista usada em processOvertimeDeduction, abaixo).
   const holidays = [
     "01-01", "25-04", "01-05", "10-06", "15-08", "05-10",
@@ -659,7 +703,7 @@ async function calculateMonthlyAttendanceSummary({ uid, year, month }) {
     if (diaSemana < 1 || diaSemana > 5) continue; // só dias úteis
 
     const diaString = `${String(dia).padStart(2, "0")}-${String(month).padStart(2, "0")}`;
-    if (holidays.includes(diaString) || feriasDias.has(dia) || baixasDias.has(dia)) continue;
+    if (holidays.includes(diaString) || feriasDias.has(dia) || baixasDias.has(dia) || aniversarioDias.has(dia)) continue;
 
     const isAfterCreation = !userCreatedAt || dataAtual >= userCreatedAt;
     if (!isAfterCreation) continue;
@@ -669,13 +713,13 @@ async function calculateMonthlyAttendanceSummary({ uid, year, month }) {
     if (!isPast) continue;
 
     // Falta = não há registo nenhum nesse dia. Um registo incompleto (ex.: entrada
-    // sem saída, esqueceu-se de bater o ponto) não conta como falta — segue a mesma
+    // sem saída, esqueceu-se de bater o ponto) não conta como falta  -  segue a mesma
     // regra da tabela do livro de ponto (pontoTable.jsx), onde calcularHoras devolve
     // total "-" nesse caso e por isso não entra no filtro de diasFalta.
     if (!registoPorDia[dia]) diasFalta++;
   }
 
-  return { diasTrabalhados, diasFerias, diasBaixaMedica, diasFalta };
+  return { diasTrabalhados, diasFerias, diasBaixaMedica, diasAniversario, diasFalta };
 }
 
 // Processar deduções de horas extras baseadas em faltas
@@ -718,12 +762,19 @@ const processOvertimeDeduction = async (req, res) => {
       .doc(uid)
       .collection("BaixasMedicas");
 
+    const aniversarioRef = db
+      .collection("registo-ponto")
+      .doc(uid)
+      .collection("DiasAniversario");
+
     const feriasSnapshot = await feriasRef.get();
     const baixasSnapshot = await baixasRef.get();
+    const aniversarioSnapshot = await aniversarioRef.get();
 
-    // Mapear férias e baixas por data
+    // Mapear férias, baixas e dia de aniversário por data
     const feriasMap = {};
     const baixasMap = {};
+    const aniversarioMap = {};
 
     feriasSnapshot.forEach(doc => {
       const data = doc.data();
@@ -761,7 +812,25 @@ const processOvertimeDeduction = async (req, res) => {
       }
     });
 
-    // Feriados portugueses (Porto) — fixos + móveis calculados para o ano
+    aniversarioSnapshot.forEach(doc => {
+      const data = doc.data();
+      const dateStr = data.date;
+      let key;
+
+      if (dateStr.length === 10 && dateStr[2] === "-") {
+        key = dateStr.slice(0, 5); // "DD-MM"
+      } else if (dateStr.length === 10 && dateStr[4] === "-") {
+        key = dateStr.slice(8, 10) + "-" + dateStr.slice(5, 7); // "DD-MM"
+      } else {
+        key = dateStr;
+      }
+
+      if (data.Approved === true) {
+        aniversarioMap[key] = true;
+      }
+    });
+
+    // Feriados portugueses (Porto)  -  fixos + móveis calculados para o ano
     const holidays = [
       "01-01", "25-04", "01-05", "10-06", "15-08", "05-10",
       "01-11", "01-12", "08-12", "25-12", "24-06",
@@ -784,8 +853,9 @@ const processOvertimeDeduction = async (req, res) => {
         const isFeriado = holidays.includes(diaString);
         const isFerias = feriasMap[diaString];
         const isBaixaMedica = baixasMap[diaString];
+        const isAniversario = aniversarioMap[diaString];
 
-        if (!isFeriado && !isFerias && !isBaixaMedica) {
+        if (!isFeriado && !isFerias && !isBaixaMedica && !isAniversario) {
           // Verificar se a data é após a criação do colaborador
           const isAfterCreation = !userCreatedAt || dataAtual >= userCreatedAt;
 

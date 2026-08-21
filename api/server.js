@@ -10,6 +10,7 @@ const entityRoute = require("./Routes/entityRoutes");
 const cadastroRoute = require("./Routes/cadastroRoutes");
 const salarioRoute = require("./Routes/salarioRoutes");
 const parametrosSalarioRoute = require("./Routes/parametrosSalarioRoutes");
+const formacaoRoute = require("./Routes/formacaoRoutes");
 
 const app = express();
 app.use(express.json());
@@ -28,6 +29,7 @@ app.use("/entities", entityRoute);
 app.use("/cadastro", cadastroRoute);
 app.use("/salario", salarioRoute);
 app.use("/parametros-salario", parametrosSalarioRoute);
+app.use("/formacao", formacaoRoute);
 
 
 const PORT = process.env.PORT || 1080;

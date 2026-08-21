@@ -14,6 +14,8 @@ export const UserProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [userRole, setUserRole] = useState(null);
   const [nivelAcesso, setNivelAcesso] = useState(null);
+  const [entidade, setEntidade] = useState(null);
+  const [entidadeNome, setEntidadeNome] = useState(null);
 
   // Função para verificar e validar o token do utilizador
   const validateUserToken = async (user) => {
@@ -36,7 +38,7 @@ export const UserProvider = ({ children }) => {
         const userData = await response.json();
 
         if (userData.isFirstLogin) {
-          // Não autenticar — login.jsx redireciona para /reset-password
+          // Não autenticar  -  login.jsx redireciona para /reset-password
           return false;
         }
 
@@ -45,6 +47,8 @@ export const UserProvider = ({ children }) => {
         setUserEmail(userData.email);
         setUserRole(userData.role);
         setNivelAcesso(userData.nivelAcesso);
+        setEntidade(userData.entidade);
+        setEntidadeNome(userData.entidadeNome);
         setIsAuthenticated(true);
         return true;
       } else {
@@ -66,6 +70,8 @@ export const UserProvider = ({ children }) => {
     setUserEmail("");
     setUserRole(null);
     setNivelAcesso(null);
+    setEntidade(null);
+    setEntidadeNome(null);
     setIsAuthenticated(false);
   };
 
@@ -113,6 +119,10 @@ export const UserProvider = ({ children }) => {
     setUserRole,
     nivelAcesso,
     setNivelAcesso,
+    entidade,
+    setEntidade,
+    entidadeNome,
+    setEntidadeNome,
     isAuthenticated,
     setIsAuthenticated,
     isLoading,

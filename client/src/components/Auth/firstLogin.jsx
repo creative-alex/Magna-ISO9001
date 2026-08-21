@@ -117,7 +117,7 @@ const FirstLoginComponent = ({ onComplete, mode = "firstLogin" }) => {
 
     return (
         <div className="flex min-h-screen font-sans">
-            {/* Painel de marca — igual ao login */}
+            {/* Painel de marca  -  igual ao login */}
             <div
                 className="w-[35%] min-w-[300px] flex flex-col items-center justify-center relative overflow-hidden px-10 py-12 before:content-[''] before:absolute before:-top-[100px] before:-right-[100px] before:w-[420px] before:h-[420px] before:rounded-full before:bg-white/[.06] before:pointer-events-none after:content-[''] after:absolute after:-bottom-[130px] after:-left-[80px] after:w-[400px] after:h-[400px] after:rounded-full after:bg-white/[.05] after:pointer-events-none"
                 style={{

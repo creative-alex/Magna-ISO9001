@@ -665,7 +665,7 @@ const AIAssistant = ({
     setUserInput('');
     setIsTyping(true);
 
-    // Tutorial trigger — único caso com efeito de UI local
+    // Tutorial trigger  -  único caso com efeito de UI local
     const isTutorialRequest =
       question.includes('tutorial') ||
       (question.includes('como') && question.includes('anexo')) ||
