@@ -24,17 +24,19 @@ const registerEntry = async (req, res) => {
     const userDocRef = db.collection("registo-ponto").doc(userId);
 
     // Extrai data do parâmetro time enviado pelo cliente (formato: YYYY-MM-DD HH:mm)
-    let dd, mm, yyyy;
+    let dd, mm, yyyy, horaEntrada;
     if (time.includes(' ')) {
       // Formato completo: YYYY-MM-DD HH:mm
-      const [datePart] = time.split(' ');
+      const [datePart, horaPart] = time.split(' ');
       [yyyy, mm, dd] = datePart.split('-');
+      horaEntrada = horaPart;
     } else {
       // Formato antigo (apenas hora) - fallback para data do servidor
       const today = new Date();
       dd = String(today.getDate()).padStart(2, "0");
       mm = String(today.getMonth() + 1).padStart(2, "0");
       yyyy = today.getFullYear();
+      horaEntrada = time;
     }
 
     const registoId = `registo_${dd}${mm}${yyyy}`;
@@ -42,7 +44,7 @@ const registerEntry = async (req, res) => {
     console.log("Gerado registoId:", registoId);
 
     await userDocRef.collection("Registos").doc(registoId).set({
-      horaEntrada: time,
+      horaEntrada,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
 
@@ -108,17 +110,19 @@ const registerLeave = async (req, res) => {
     const userId = req.user.uid;
 
     // Extrai data do parâmetro time enviado pelo cliente (formato: YYYY-MM-DD HH:mm)
-    let dd, mm, yyyy;
+    let dd, mm, yyyy, horaSaida;
     if (time.includes(' ')) {
       // Formato completo: YYYY-MM-DD HH:mm
-      const [datePart] = time.split(' ');
+      const [datePart, horaPart] = time.split(' ');
       [yyyy, mm, dd] = datePart.split('-');
+      horaSaida = horaPart;
     } else {
       // Formato antigo (apenas hora) - fallback para data do servidor
       const today = new Date();
       dd = String(today.getDate()).padStart(2, "0");
       mm = String(today.getMonth() + 1).padStart(2, "0");
       yyyy = today.getFullYear();
+      horaSaida = time;
     }
 
     console.log("Buscando documento de entrada no Firestore...");
@@ -143,7 +147,7 @@ const registerLeave = async (req, res) => {
     console.log(`Atualizando registo ${registoId} com hora de saída...`);
 
     await registosRef.doc(registoId).update({
-      horaSaida: time,
+      horaSaida,
     });
 
     console.log("Saída registada com sucesso no Firestore.");
