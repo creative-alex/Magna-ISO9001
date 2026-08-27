@@ -2,8 +2,8 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const upload = multer();
-const { getSalario, saveSalario, uploadRecibo } = require('../controllers/salarioController');
-const { requireAuth } = require('../middleware/auth');
+const { getSalario, saveSalario, uploadRecibo } = require('./salarioController');
+const { requireAuth } = require('../../shared/middleware/auth');
 
 router.get('/:id/:mes', requireAuth, getSalario);
 router.put('/:id/:mes', requireAuth, saveSalario);

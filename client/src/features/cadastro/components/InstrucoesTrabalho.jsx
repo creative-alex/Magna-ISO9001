@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { apiFetch } from '../utils/apiFetch';
+import { apiFetch } from '../../../shared/utils/apiFetch';
 
 const InstrucoesTrabalho = ({ 
   currentValue, 

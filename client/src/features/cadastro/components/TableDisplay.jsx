@@ -1,7 +1,7 @@
 import React from "react";
-import Template1 from "../components/templates/tabelaProcedimento";
-import Template2 from "../components/templates/tabelaMatriz";
-import AIAssistant from "../components/AIAssistant/AIAssistant";
+import Template1 from "./tabelaProcedimento";
+import Template2 from "./tabelaMatriz";
+import AIAssistant from "../../aiAssistant/components/AIAssistant";
 
 export default function TabelaPdf({
   templateType = 1,

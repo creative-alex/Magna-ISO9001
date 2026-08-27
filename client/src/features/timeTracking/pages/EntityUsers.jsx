@@ -1,11 +1,11 @@
 import React, { useContext } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { UserContext } from '../../context/userContext';
-import Entity from '../../components/TimeTracking/Admin/entities/Entity';
-import EntityUserList from '../../components/TimeTracking/Admin/entities/entityUserList';
-import LoadingSpinner from '../../components/TimeTracking/Shared/loadingSpinner';
-import Sidebar from '../../components/Sidebar';
-import Topbar from '../../components/Topbar';
+import { UserContext } from '../../../shared/context/userContext';
+import Entity from '../components/Admin/entities/Entity';
+import EntityUserList from '../components/Admin/entities/entityUserList';
+import LoadingSpinner from '../components/Shared/loadingSpinner';
+import Sidebar from '../../../shared/components/Sidebar';
+import Topbar from '../../../shared/components/Topbar';
 
 const EntityUsersPage = () => {
   const { id_entidade } = useParams();

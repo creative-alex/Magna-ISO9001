@@ -3,7 +3,7 @@ const admin = require("firebase-admin");
 const { PDFDocument } = require('pdf-lib');
 
 // Importar configuração do Firebase
-require("../db/firebase");
+require("../../shared/db/firebase");
 
 // Configuração do Firebase Storage
 const bucket = admin.storage().bucket();

@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Sidebar from "../components/Sidebar";
-import Topbar from "../components/Topbar";
-import VacationTimeline from "../components/MapaFerias/VacationTimeline";
+import Sidebar from "../../../shared/components/Sidebar";
+import Topbar from "../../../shared/components/Topbar";
+import VacationTimeline from "../components/VacationTimeline";
 
 export default function MapaFerias() {
   const navigate = useNavigate();

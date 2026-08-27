@@ -1,8 +1,8 @@
 import React, { useContext, useEffect, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { FaBuilding } from "react-icons/fa6";
-import { apiFetch } from "../../../../utils/apiFetch";
-import { UserContext } from "../../../../context/userContext";
+import { apiFetch } from "../../../../../shared/utils/apiFetch";
+import { UserContext } from "../../../../../shared/context/userContext";
 
 const GOLD = "#C8932F";
 

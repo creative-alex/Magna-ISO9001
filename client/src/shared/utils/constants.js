@@ -1,11 +1,14 @@
 // API Configuration
 export const API_CONFIG = {
   BASE_URL: process.env.REACT_APP_API_URL,
+  // wss:// em produção (https), ws:// em dev (http) - mesmo host/porta do BASE_URL.
+  WS_URL: (process.env.REACT_APP_API_URL || '').replace(/^http/, 'ws'),
   ENDPOINTS: {
     AUTH: '/auth',
     USERS: '/users',
     FILES: '/files',
-    UPDATE_FIRST_LOGIN: '/users/update-first-login'
+    UPDATE_FIRST_LOGIN: '/users/update-first-login',
+    CHAT: '/chat',
   }
 };
 

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { FaBuilding, FaChevronRight, FaGear, FaMagnifyingGlass } from "react-icons/fa6";
 import Entity from "./Entity";
-import { apiFetch } from "../../../../utils/apiFetch";
+import { apiFetch } from "../../../../../shared/utils/apiFetch";
 
 const GOLD = "#C8932F";
 
@@ -120,7 +120,7 @@ const AllEntities = () => {
           <Link to="/ponto/nova-entidade">
             <button style={btnGoldOutline}>+ Nova Entidade</button>
           </Link>
-          <Link to="/ponto/novo-user">
+          <Link to="/create-user">
             <button style={btnGoldOutline}>+ Novo Utilizador</button>
           </Link>
         </div>

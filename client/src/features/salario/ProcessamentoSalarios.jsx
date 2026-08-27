@@ -1,12 +1,12 @@
 import React, { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { UserContext } from "../context/userContext";
-import Sidebar from "../components/Sidebar";
-import Topbar from "../components/Topbar";
-import ColaboradoresGroupedList from "../components/ColaboradoresGroupedList";
+import { UserContext } from "../../shared/context/userContext";
+import Sidebar from "../../shared/components/Sidebar";
+import Topbar from "../../shared/components/Topbar";
+import ColaboradoresGroupedList from "../../shared/components/ColaboradoresGroupedList";
 import { FaPencil, FaCheck, FaSliders } from "react-icons/fa6";
-import { apiFetch } from "../utils/apiFetch";
+import { apiFetch } from "../../shared/utils/apiFetch";
 
 const GOLD = "#C8932F";
 

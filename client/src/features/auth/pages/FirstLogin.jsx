@@ -1,16 +1,16 @@
 import React, { useState, useContext, useEffect } from "react";
-import { UserContext } from "../../context/userContext";
+import { UserContext } from "../../../shared/context/userContext";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { confirmPasswordReset, verifyPasswordResetCode } from "firebase/auth";
-import Logo from "../../logo.svg";
-import LoginBackground from "../../assets/login/capa.jpg";
-import LoginFooter from "../../assets/login/footer.png";
-import LoginLogo from "../../assets/login/logo.png";
-import { APP_CONSTANTS } from "../../utils/constants";
+import Logo from "../../../shared/assets/logo.svg";
+import LoginBackground from "../../../shared/assets/capa.jpg";
+import LoginFooter from "../../../shared/assets/footer.png";
+import LoginLogo from "../assets/logo.png";
+import { APP_CONSTANTS } from "../../../shared/utils/constants";
 import { FaEye, FaEyeSlash, FaCheck, FaXmark, FaUser } from "react-icons/fa6";
-import { apiFetch } from "../../utils/apiFetch";
+import { apiFetch } from "../../../shared/utils/apiFetch";
 
 const FirstLoginComponent = ({ onComplete, mode = "firstLogin" }) => {
     const [newPassword, setNewPassword] = useState("");

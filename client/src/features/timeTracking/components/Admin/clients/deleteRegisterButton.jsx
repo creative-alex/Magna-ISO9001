@@ -1,5 +1,5 @@
 import React from 'react';
-import { apiFetch } from '../../../../utils/apiFetch';
+import { apiFetch } from '../../../../../shared/utils/apiFetch';
 
 const DeleteRegister = ({ username, date, year, onDelete, onSuccess }) => {
   const apagarregisto = async () => {

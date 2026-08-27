@@ -1,6 +1,6 @@
 const admin = require("firebase-admin");
-const db = require("../db/firebase").db;
-const { isAdminOrHR, isAdministrador } = require("../middleware/auth");
+const db = require("../../shared/db/firebase").db;
+const { isAdminOrHR, isAdministrador } = require("../../shared/middleware/auth");
 
 function canAccess(req, id) {
   return req.user?.uid === id || isAdminOrHR(req.user?.nivelAcesso);
@@ -20,7 +20,7 @@ function canEditRestricted(req) {
 // Campos de "Contrato de trabalho" e "Estágio": só GestorRH/SuperAdmin pode alterá-los,
 // mesmo que o próprio colaborador tenha acesso de escrita ao resto do seu cadastro.
 const RESTRICTED_FORM_KEYS = [
-  "tipo_contrato", "funcao", "situacao_contratual", "data_admissao", "data_fim_contrato",
+  "sede", "tipo_contrato", "funcao", "situacao_contratual", "data_admissao", "data_fim_contrato",
   "cedencia_temporaria", "entidade_cedencia_temporaria", "data_inicio_cedencia", "data_fim_cedencia",
   "baixa_medica", "data_inicio_baixa_medica", "data_fim_baixa_medica",
   "funcao_estagio", "n_processo_estagio", "duracao_estagio",
@@ -45,13 +45,14 @@ function getNomeCurto(nomeCompleto) {
 // no mesmo documento  -  sem esta lista explícita, ficariam a "vazar" para dentro do cadastro).
 const CADASTRO_FIELD_KEYS = [
   "nome_completo", "data_nascimento",
-  "morada", "codigo_postal", "localidade", "telefone", "email_profissional",
+  "morada", "codigo_postal", "localidade", "telefone", "telefone_emergencia", "email_profissional",
   "n_cartao_cidadao", "nif", "n_seguranca_social",
-  "situacao_familiar", "n_dependentes", "n_dependentes_deficientes", "declarante_deficiente", "conjuge_deficiente",
-  "tipo_contrato", "funcao", "situacao_contratual", "data_admissao", "data_fim_contrato",
+  "situacao_conjugal", "irs_jovem", "percentagem_isencao", "n_titulares",
+  "n_dependentes", "n_dependentes_deficientes", "declarante_deficiente", "conjuge_deficiente",
+  "area_formacao", "habilitacoes", "ccp", "cv_atualizado", "ficha_dgert_atualizada",
+  "sede", "tipo_contrato", "funcao", "situacao_contratual", "data_admissao", "data_fim_contrato",
   "cedencia_temporaria", "entidade_cedencia_temporaria", "data_inicio_cedencia", "data_fim_cedencia",
   "baixa_medica", "data_inicio_baixa_medica", "data_fim_baixa_medica",
-  "habilitacoes", "ccp", "cv_atualizado", "ficha_dgert_atualizada",
   "funcao_estagio", "n_processo_estagio", "duracao_estagio",
   "data_inicio_estagio", "data_fim_estagio", "entidade_financiadora", "valor_apoio_entidade",
 ];
@@ -145,11 +146,11 @@ const saveCadastro = async (req, res) => {
         novoSnapshot[key] = key in update ? update[key] : (existingData[key] !== undefined ? existingData[key] : "");
       });
 
-      const ultimoSnap = await userDocRef.collection("contratoHistorico")
-        .orderBy(admin.firestore.FieldPath.documentId(), "desc")
-        .limit(1)
-        .get();
-      const lastSnapshot = ultimoSnap.empty ? null : ultimoSnap.docs[0].data();
+      const historicoSnap = await userDocRef.collection("contratoHistorico").get();
+      const ultimoMes = historicoSnap.docs.map(doc => doc.id).sort().pop();
+      const lastSnapshot = ultimoMes
+        ? historicoSnap.docs.find(doc => doc.id === ultimoMes).data()
+        : null;
       const changed = !lastSnapshot || RESTRICTED_FORM_KEYS.some(key => (lastSnapshot[key] ?? "") !== (novoSnapshot[key] ?? ""));
 
       if (changed) {

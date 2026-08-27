@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { verifyTokenAndGetUserInfo, getAllUsers, getColaboradores, createUser, getFavorites, updateFavorite, updateFirstLogin } = require('../controllers/usersController');
-const { requireAuth, requireAdmin, requireCanViewColaboradores } = require('../middleware/auth');
+const { verifyTokenAndGetUserInfo, getAllUsers, getColaboradores, createUser, getFavorites, updateFavorite, updateFirstLogin } = require('./usersController');
+const { requireAuth, requireAdmin, requireCanViewColaboradores } = require('../../shared/middleware/auth');
 
 
 router.post("/verifyTokenAndGetUserInfo", verifyTokenAndGetUserInfo);

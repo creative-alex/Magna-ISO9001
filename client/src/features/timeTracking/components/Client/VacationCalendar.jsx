@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { apiFetch } from '../../../utils/apiFetch';
+import { apiFetch } from '../../../../shared/utils/apiFetch';
 
 const VacationCalendar = ({ currentUser }) => {
   const [year, setYear] = useState(new Date().getFullYear());

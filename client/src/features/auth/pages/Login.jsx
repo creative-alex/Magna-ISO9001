@@ -2,11 +2,11 @@ import React, { useState, useContext, useRef, useEffect } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
-import { UserContext } from "../../context/userContext";
-import Logo from "../../logo.svg";
-import LoginBackground from "../../assets/login/capa.jpg";
-import LoginFooter from "../../assets/login/footer.png";
-import LoginLogo from "../../assets/login/logo.png";
+import { UserContext } from "../../../shared/context/userContext";
+import Logo from "../../../shared/assets/logo.svg";
+import LoginBackground from "../../../shared/assets/capa.jpg";
+import LoginFooter from "../../../shared/assets/footer.png";
+import LoginLogo from "../assets/logo.png";
 import { FaEye, FaEyeSlash, FaCircleExclamation } from "react-icons/fa6";
 
 const Login = ({ onLoginSuccess }) => {

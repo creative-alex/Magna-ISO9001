@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { FaTrash } from "react-icons/fa6";
-import { apiFetch } from "../../utils/apiFetch";
+import { apiFetch } from "../../../shared/utils/apiFetch";
 
 const DeleteButton = ({ file, currentPath, onDelete, isFolder = false, size = 16, className }) => {
     const [notification, setNotification] = useState(null);

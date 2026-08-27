@@ -1,6 +1,7 @@
 const admin = require("firebase-admin");
-const { normalizeEntityId, normalizeUserId } = require("./helpers");
-const { isSuperAdmin, isAdminOrHR, isAdministrador } = require("../../middleware/auth");
+const { normalizeUserId } = require("./helpers");
+const { normalizeEntityId } = require("../../shared/lib/normalizeEntityId");
+const { isSuperAdmin, isAdminOrHR, isAdministrador } = require("../../shared/middleware/auth");
 const db = admin.firestore();
 
 // Únicos valores válidos para o nível de acesso (controla permissões). Distinto

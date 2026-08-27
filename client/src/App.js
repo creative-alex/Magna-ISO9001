@@ -1,34 +1,38 @@
 import React, { useContext } from "react";
-import Login from './components/Auth/login';
-import ProtectedRoute from './components/Auth/ProtectedRoute';
+import Login from './features/auth/pages/Login';
+import ProtectedRoute from './features/auth/components/ProtectedRoute';
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
-import DashboardPage from "./pages/Dashboard";
-import TablePage from "./components/EditorProcedimentos"; 
-import CreateProcess from "./pages/novoProcesso";
-import CreateProcedimento from "./pages/novoProcedimento";
-import Register from "./components/Auth/register";
-import { UserContext } from "./context/userContext";
-import { TutorialProvider } from "./context/tutorialContext";
-import NewTable from "./pages/novoProcedimento"
-import Perfil from "./pages/Perfil"
-import Cadastro from "./pages/Cadastro"
-import Colaboradores from "./pages/Colaboradores"
-import MapaFerias from "./pages/MapaFerias"
-import ProcessamentoSalarios from "./pages/ProcessamentoSalarios"
-import SalarioColaborador from "./pages/SalarioColaborador"
-import PlanoFormacao from "./pages/PlanoFormacao"
-import FormacaoColaborador from "./pages/FormacaoColaborador"
-import RegistoNaoConformidade from "./pages/RegistoNaoConformidade";
-import FirstLogin from "./components/Auth/firstLogin";
+import DashboardPage from "./features/dashboard/pages/Dashboard";
+import TablePage from "./features/cadastro/pages/EditorProcedimentos";
+import CreateProcess from "./features/cadastro/pages/NovoProcesso";
+import CreateProcedimento from "./features/cadastro/pages/NovoProcedimento";
+import Register from "./features/auth/pages/Register";
+import { UserContext } from "./shared/context/userContext";
+import { TutorialProvider } from "./shared/context/tutorialContext";
+import NewTable from "./features/cadastro/pages/NovoProcedimento"
+import Cadastro from "./features/cadastro/pages/Cadastro"
+import Colaboradores from "./features/cadastro/pages/Colaboradores"
+import MapaFerias from "./features/mapaFerias/pages/MapaFerias"
+import ProcessamentoSalarios from "./features/salario/ProcessamentoSalarios"
+import SalarioColaborador from "./features/salario/SalarioColaborador"
+import PlanoFormacao from "./features/formacao/PlanoFormacao"
+import FormacaoColaborador from "./features/formacao/FormacaoColaborador"
+import MedicinaTrabalho from "./features/medicinaTrabalho/MedicinaTrabalho"
+import MedicinaTrabalhoColaborador from "./features/medicinaTrabalho/MedicinaTrabalhoColaborador"
+import Premios from "./features/premios/Premios"
+import PremiosColaborador from "./features/premios/PremiosColaborador"
+import Chat from "./features/chat/pages/Chat";
+import RegistoNaoConformidade from "./features/naoConformidade/RegistoNaoConformidade";
+import TratamentoNaoConformidade from "./features/naoConformidade/TratamentoNaoConformidade";
+import FirstLogin from "./features/auth/pages/FirstLogin";
 import { ToastContainer } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
-import TimeTrackingUserDashboard from "./pages/TimeTracking/UserDashboard";
-import TimeTrackingRegistos from "./pages/TimeTracking/RegistosPage";
-import TimeTrackingEntities from "./pages/TimeTracking/EntitiesPage";
-import TimeTrackingEntityUsers from "./pages/TimeTracking/EntityUsers";
-import TimeTrackingUserDetails from "./pages/TimeTracking/UserDetails";
-import NewEntity from "./components/TimeTracking/Admin/entities/newEntity";
-import NewTimeTrackingUser from "./components/TimeTracking/Admin/clients/newUser";
+import TimeTrackingUserDashboard from "./features/timeTracking/pages/UserDashboard";
+import TimeTrackingRegistos from "./features/timeTracking/pages/RegistosPage";
+import TimeTrackingEntities from "./features/timeTracking/pages/EntitiesPage";
+import TimeTrackingEntityUsers from "./features/timeTracking/pages/EntityUsers";
+import TimeTrackingUserDetails from "./features/timeTracking/pages/UserDetails";
+import NewEntity from "./features/timeTracking/pages/NewEntity";
 
 function App() {
   const navigate = useNavigate();
@@ -113,14 +117,6 @@ function App() {
           } 
         />
         <Route
-          path="/perfil"
-          element={
-            <ProtectedRoute>
-              <Perfil />
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="/cadastro"
           element={
             <ProtectedRoute>
@@ -185,10 +181,66 @@ function App() {
           }
         />
         <Route
-          path="/nao-conformidade"
+          path="/medicina-trabalho"
+          element={
+            <ProtectedRoute>
+              <MedicinaTrabalho />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/medicina-trabalho/:id"
+          element={
+            <ProtectedRoute>
+              <MedicinaTrabalhoColaborador />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/premios"
+          element={
+            <ProtectedRoute>
+              <Premios />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/premios/:id"
+          element={
+            <ProtectedRoute>
+              <PremiosColaborador />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/chat"
+          element={
+            <ProtectedRoute>
+              <Chat />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/chat/:colaboradorId"
+          element={
+            <ProtectedRoute>
+              <Chat />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/registar-nao-conformidade"
           element={
             <ProtectedRoute>
               <RegistoNaoConformidade />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tratar-nao-conformidade"
+          element={
+            <ProtectedRoute>
+              <TratamentoNaoConformidade />
             </ProtectedRoute>
           }
         />
@@ -239,14 +291,6 @@ function App() {
           element={
             <ProtectedRoute>
               <NewEntity />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/ponto/novo-user"
-          element={
-            <ProtectedRoute>
-              <NewTimeTrackingUser />
             </ProtectedRoute>
           }
         />

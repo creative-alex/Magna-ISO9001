@@ -1,20 +1,52 @@
-import React, { useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useNavigate } from "react-router-dom";
-import Sidebar from '../Sidebar';
-import Topbar from '../Topbar';
+import Sidebar from '../../../shared/components/Sidebar';
+import Topbar from '../../../shared/components/Topbar';
 import { FaEye, FaEyeSlash, FaCircleExclamation } from "react-icons/fa6";
-import { apiFetch } from '../../utils/apiFetch';
+import { apiFetch } from '../../../shared/utils/apiFetch';
+import { UserContext } from '../../../shared/context/userContext';
 
 const Register = () => {
+    const { nivelAcesso: actorNivelAcesso, entidadeNome: actorEntidadeNome } = useContext(UserContext);
+    // Um Administrador só pode criar colaboradores dentro da sua própria entidade e
+    // nunca pode atribuir um nível de acesso igual ou superior ao seu  -  o backend
+    // também impõe isto, mas mantemos o formulário coerente com o que vai ser aceite.
+    const isAdministrador = actorNivelAcesso === 'Administrador';
+    // Só o SuperAdmin pode escolher o nível de acesso do novo user  -  os restantes
+    // criam sempre um Colaborador, tal como o backend já impõe.
+    const isSuperAdmin = actorNivelAcesso === 'SuperAdmin';
+
     const [nome, setNome] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [role, setRole] = useState('');
+    const [nivelAcesso, setNivelAcesso] = useState('Colaborador');
+    const [entidade, setEntidade] = useState(isAdministrador ? (actorEntidadeNome || '') : '');
+    const [entidades, setEntidades] = useState([]);
+    const [entidadesLoading, setEntidadesLoading] = useState(true);
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+
+    useEffect(() => {
+        (async () => {
+            setEntidadesLoading(true);
+            try {
+                const response = await apiFetch('/entities/showEntities', { method: 'POST' });
+                if (!response.ok) throw new Error('Erro ao buscar entidades');
+                const data = await response.json();
+                const entityNames = Array.isArray(data) ? data : Object.values(data.entityNames || {});
+                setEntidades(entityNames);
+            } catch (error) {
+                toast.error('Não foi possível carregar as entidades.');
+            } finally {
+                setEntidadesLoading(false);
+            }
+        })();
+    }, []);
 
     const handleSubmit = async (event) => {
         event.preventDefault();
@@ -35,14 +67,15 @@ const Register = () => {
         }
 
         try {
-            const response = await apiFetch('/users/createUser', {
+            const response = await apiFetch('/timetracking/createUser', {
                 method: 'POST',
                 body: JSON.stringify({
                     nome,
                     email,
+                    entidade,
+                    role,
+                    nivelAcesso,
                     temporaryPassword: password,
-                    role: 'User',
-                    isFirstLogin: true,
                 }),
             });
 
@@ -55,8 +88,11 @@ const Register = () => {
             setNome('');
             setEmail('');
             setPassword('');
+            setRole('');
+            setNivelAcesso('Colaborador');
+            setEntidade(isAdministrador ? (actorEntidadeNome || '') : '');
 
-            setTimeout(() => navigate('/file'), 2000);
+            setTimeout(() => navigate('/dashboard'), 2000);
         } catch (error) {
             let errorMessage = 'Erro ao criar conta';
             if (error.message.includes('email-already-exists') || error.message.includes('Email já está em uso')) {
@@ -172,11 +208,65 @@ const Register = () => {
                                     <span className="text-[12px] text-gray-400">O utilizador será obrigado a alterar a password no primeiro acesso.</span>
                                 </div>
 
+                                <div className="flex flex-col gap-1.5 mb-4 last:mb-0">
+                                    <label htmlFor="reg-role" className="text-[11px] font-bold text-gray-700 uppercase tracking-[0.7px]">Função</label>
+                                    <input
+                                        id="reg-role"
+                                        type="text"
+                                        className="w-full px-[14px] py-2.5 border-[1.5px] border-gray-200 rounded-lg text-[14px] text-gray-900 bg-white box-border transition-all duration-200 focus:outline-none focus:border-[#C8932F] focus:shadow-[0_0_0_3px_rgba(200,147,47,0.1)] placeholder:text-[#c9d0d8]"
+                                        value={role}
+                                        onChange={(e) => setRole(e.target.value)}
+                                        placeholder="Ex: Colaborador Administrativo"
+                                        required
+                                    />
+                                </div>
+
+                                {isSuperAdmin && (
+                                    <div className="flex flex-col gap-1.5 mb-4 last:mb-0">
+                                        <label htmlFor="reg-nivelAcesso" className="text-[11px] font-bold text-gray-700 uppercase tracking-[0.7px]">Nível de Acesso</label>
+                                        <select
+                                            id="reg-nivelAcesso"
+                                            className="w-full px-[14px] py-2.5 border-[1.5px] border-gray-200 rounded-lg text-[14px] text-gray-900 bg-white box-border transition-all duration-200 focus:outline-none focus:border-[#C8932F] focus:shadow-[0_0_0_3px_rgba(200,147,47,0.1)]"
+                                            value={nivelAcesso}
+                                            onChange={(e) => setNivelAcesso(e.target.value)}
+                                            required
+                                        >
+                                            <option value="Colaborador">Colaborador</option>
+                                            <option value="Administrador">Administrador</option>
+                                            <option value="GestorRH">Gestor(a) de Recursos Humanos</option>
+                                            <option value="SuperAdmin">SuperAdmin</option>
+                                        </select>
+                                    </div>
+                                )}
+
+                                <div className="flex flex-col gap-1.5 mb-4 last:mb-0">
+                                    <label htmlFor="reg-entidade" className="text-[11px] font-bold text-gray-700 uppercase tracking-[0.7px]">Entidade</label>
+                                    <select
+                                        id="reg-entidade"
+                                        className="w-full px-[14px] py-2.5 border-[1.5px] border-gray-200 rounded-lg text-[14px] text-gray-900 bg-white box-border transition-all duration-200 focus:outline-none focus:border-[#C8932F] focus:shadow-[0_0_0_3px_rgba(200,147,47,0.1)] disabled:cursor-not-allowed disabled:opacity-70"
+                                        value={entidade}
+                                        onChange={(e) => setEntidade(e.target.value)}
+                                        disabled={isAdministrador || entidadesLoading}
+                                        required
+                                    >
+                                        <option value="" disabled>{entidadesLoading ? 'A carregar entidades...' : 'Seleciona uma entidade'}</option>
+                                        {isAdministrador && actorEntidadeNome && !entidades.includes(actorEntidadeNome) && (
+                                            <option value={actorEntidadeNome}>{actorEntidadeNome}</option>
+                                        )}
+                                        {entidades.map((nome) => (
+                                            <option key={nome} value={nome}>{nome}</option>
+                                        ))}
+                                    </select>
+                                    {isAdministrador && (
+                                        <span className="text-[12px] text-gray-400">Como Administrador, só podes criar colaboradores na tua própria entidade.</span>
+                                    )}
+                                </div>
+
                                 <div className="flex gap-3 justify-end py-1 pb-2 max-sm:flex-col-reverse" style={{ marginTop: 8 }}>
                                     <button
                                         type="button"
                                         className="px-6 py-[11px] bg-white text-gray-500 border-[1.5px] border-gray-200 rounded-lg text-[14px] font-semibold cursor-pointer transition-all duration-150 hover:bg-gray-50 hover:border-gray-300 max-sm:w-full max-sm:justify-center"
-                                        onClick={() => navigate('/file')}
+                                        onClick={() => navigate('/dashboard')}
                                     >
                                         Cancelar
                                     </button>

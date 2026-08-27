@@ -1,10 +1,10 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UserContext } from '../context/userContext';
+import { UserContext } from '../../../shared/context/userContext';
 import { generateEditablePdfTemplate2 } from '../utils/pdfGenerate';
-import Sidebar from '../components/Sidebar';
-import Topbar from '../components/Topbar';
-import { apiFetch } from '../utils/apiFetch';
+import Sidebar from '../../../shared/components/Sidebar';
+import Topbar from '../../../shared/components/Topbar';
+import { apiFetch } from '../../../shared/utils/apiFetch';
 
 export default function CreateProcess() {
   const navigate = useNavigate();
@@ -168,7 +168,7 @@ export default function CreateProcess() {
       });
       if (!recordResponse.ok) throw new Error('Erro ao criar registro na BD');
 
-      navigate('/file');
+      navigate('/dashboard');
     } catch (err) {
       setError('Erro ao criar processo: ' + err.message);
     } finally {

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import TableRow from './tableRow';
-import { calcularHoras, formatarMinutos } from '../../../utils/timeTracking/calcHours';
+import { calcularHoras, formatarMinutos } from '../../utils/calcHours';
 import ContextMenu from './contextMenu';
 import ManualOvertimeModal from './ManualOvertimeModal';
-import { apiFetch } from '../../../utils/apiFetch';
+import { apiFetch } from '../../../../shared/utils/apiFetch';
 
 const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year = new Date().getFullYear(), className = '' }) => {
   const [dados, setDados] = useState([]);

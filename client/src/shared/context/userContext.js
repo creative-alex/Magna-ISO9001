@@ -1,6 +1,6 @@
 import { createContext, useState, useEffect } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import LoadingPage from "../pages/loading";
+import LoadingPage from "../components/Loading";
 import { API_CONFIG } from "../utils/constants";
 import { auth } from "../utils/firebase";
 

@@ -1,6 +1,6 @@
-const { db } = require('../../db/firebase');
-const { validateEntity } = require('../../validations/entity')
-const { normalizeEntityId } = require('./helpers');
+const { db } = require('../../shared/db/firebase');
+const { validateEntity } = require('./entityValidation')
+const { normalizeEntityId } = require('../../shared/lib/normalizeEntityId');
 const admin = require("firebase-admin");
 const path = require("path");
 

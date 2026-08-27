@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { apiFetch } from "../../../../utils/apiFetch";
-import { calcularHoras, formatarMinutos } from "../../../../utils/timeTracking/calcHours";
+import { apiFetch } from "../../../../../shared/utils/apiFetch";
+import { calcularHoras, formatarMinutos } from "../../../utils/calcHours";
 import RegisterVacation from "../../Shared/vacationButton";
 import DeleteRegister from "./deleteRegisterButton";
 import MedicalLeave from "../../Shared/medicalLeave";
 import BirthdayButton from "../../Shared/birthdayButton";
-import { HOLIDAYS_PORTO, getMoveableHolidays } from "../../../../utils/timeTracking/constants";
+import { HOLIDAYS_PORTO, getMoveableHolidays } from "../../../../../shared/utils/holidays";
 
 
 

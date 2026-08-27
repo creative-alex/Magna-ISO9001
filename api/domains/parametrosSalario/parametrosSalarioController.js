@@ -1,6 +1,6 @@
 const admin = require("firebase-admin");
-const db = require("../db/firebase").db;
-const { isAdminOrHR } = require("../middleware/auth");
+const db = require("../../shared/db/firebase").db;
+const { isAdminOrHR } = require("../../shared/middleware/auth");
 
 const ESCALOES = ["I", "II", "III", "IV"];
 

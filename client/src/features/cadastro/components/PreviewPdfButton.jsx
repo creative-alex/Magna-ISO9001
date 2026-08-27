@@ -1,5 +1,5 @@
 import React from "react";
-import { generateNonEditablePdfFromHtml, generateNonEditablePdfTemplate2 } from "../../utils/pdfGenerate";
+import { generateNonEditablePdfFromHtml, generateNonEditablePdfTemplate2 } from "../utils/pdfGenerate";
 import { FaEye } from "react-icons/fa";
 
 export default function PreviewPdfButton({ 

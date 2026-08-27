@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useTutorial, TUTORIAL_TYPES } from '../../context/tutorialContext';
+import { useTutorial, TUTORIAL_TYPES } from '../../../shared/context/tutorialContext';
 import { FaRobot, FaXmark } from 'react-icons/fa6';
-import { apiFetch } from '../../utils/apiFetch';
+import { apiFetch } from '../../../shared/utils/apiFetch';
 
 const AIAssistant = ({ 
   fileTree, 

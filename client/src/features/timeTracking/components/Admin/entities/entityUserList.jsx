@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiFetch } from '../../../../utils/apiFetch';
+import { apiFetch } from '../../../../../shared/utils/apiFetch';
 
 const GOLD = "#C8932F";
 

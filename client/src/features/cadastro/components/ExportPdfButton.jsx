@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
-import { generateEditablePdf } from "../../utils/pdfGenerate";
+import { generateEditablePdf } from "../utils/pdfGenerate";
 import { FaFloppyDisk } from "react-icons/fa6";
-import { apiFetch } from "../../utils/apiFetch";
+import { apiFetch } from "../../../shared/utils/apiFetch";
 
 export default function ExportPdfButton({
   templateType = 1,

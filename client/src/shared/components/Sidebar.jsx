@@ -5,6 +5,7 @@ import { UserContext } from "../context/userContext";
 import { FavoritesContext } from "../context/favoritesContext";
 import {
   FaChartBar,
+  FaBuilding,
   FaPeopleGroup,
   FaStar,
   FaTriangleExclamation,
@@ -20,6 +21,7 @@ import {
   FaSackDollar,
   FaBriefcaseMedical,
   FaTrophy,
+  FaComments,
 } from "react-icons/fa6";
 
 const PEOPLE_MANAGEMENT_ITEMS = [
@@ -31,6 +33,22 @@ const PEOPLE_MANAGEMENT_ITEMS = [
   { name: "Medicina de Trabalho", icon: FaBriefcaseMedical },
   { name: "Prémios", icon: FaTrophy },
 ];
+
+const PEOPLE_MANAGEMENT_PATH_PREFIXES = [
+  "/ponto",
+  "/colaboradores",
+  "/cadastro",
+  "/salarios",
+  "/plano-formacao",
+  "/ferias",
+  "/medicina-trabalho",
+  "/premios",
+];
+
+const isPeopleManagementPath = (pathname) =>
+  PEOPLE_MANAGEMENT_PATH_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
 
 // Mesma normalização usada em toda a app para gerar o slug de uma entidade a
 // partir do seu nome (ex: allEntities.jsx, Entity.jsx)  -  aqui só é preciso para
@@ -58,7 +76,9 @@ export default function Sidebar({ onSelectFile }) {
   const initials = username ? username.slice(0, 2).toUpperCase() : "??";
 
   const [showFavoritesDropdown, setShowFavoritesDropdown] = useState(false);
-  const [showResourcesDropdown, setShowResourcesDropdown] = useState(false);
+  const [showResourcesDropdown, setShowResourcesDropdown] = useState(() =>
+    isPeopleManagementPath(location.pathname)
+  );
   const isActive = (path) => location.pathname === path;
 
   const handlePeopleManagementItemClick = (item) => {
@@ -70,12 +90,15 @@ export default function Sidebar({ onSelectFile }) {
       navigate(canManageColaboradores ? "/salarios" : `/salarios/${uid}`);
     } else if (item.name === "Plano de Formação") {
       navigate(canManageColaboradores ? "/plano-formacao" : `/plano-formacao/${uid}`);
+    } else if (item.name === "Medicina de Trabalho") {
+      navigate(canManageColaboradores ? "/medicina-trabalho" : `/medicina-trabalho/${uid}`);
+    } else if (item.name === "Prémios") {
+      navigate(canManageColaboradores ? "/premios" : `/premios/${uid}`);
     } else if (item.name === "Mapa de Férias") {
       navigate("/ferias");
     } else {
       toast.info("Funcionalidade em breve", { position: "top-right", autoClose: 2500 });
     }
-    setShowResourcesDropdown(false);
   };
 
   const navItemClass = (path) =>
@@ -105,6 +128,8 @@ export default function Sidebar({ onSelectFile }) {
         <div className="px-[14px] pt-4 pb-[5px] text-[10px] text-[#B8892A] tracking-[0.08em] uppercase font-semibold">Principal</div>
         <div className={navItemClass("/dashboard")} onClick={() => navigate("/dashboard")}>
           <FaChartBar style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> ISO 9001 </div>
+        <div className={navItemClass("/chat")} onClick={() => navigate("/chat")}>
+          <FaComments style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> Chat com RH </div>
         {/* Gestão de Pessoas accordion */}
         <div className={navItemBaseClass} onClick={() => setShowResourcesDropdown(!showResourcesDropdown)}>
           <FaPeopleGroup style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> Gestão de Pessoas
@@ -164,10 +189,10 @@ export default function Sidebar({ onSelectFile }) {
 
         {/* Ações rápidas */}
         <div className="px-[14px] pt-4 pb-[5px] text-[10px] text-[#B8892A] tracking-[0.08em] uppercase font-semibold">Ações rápidas</div>
-        <div className={navItemBaseClass} onClick={() => window.open('https://docs.google.com/forms/d/e/1FAIpQLSePnbZJUGv7J_YW0MKXn-E61t_naMr25TO2nk_GRDdR8Z13MQ/viewform', '_blank')}>
+        <div className={navItemBaseClass} onClick={() => navigate('/registar-nao-conformidade')}>
           <FaTriangleExclamation style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> Registar Não Conformidade
         </div>
-        <div className={navItemBaseClass} onClick={() => window.open('https://docs.google.com/forms/d/e/1FAIpQLScrMQcU-waZqVtapeChdN3cQOl8SRQtZkWZEUJNvAYvvYLIJw/viewform', '_blank')}>
+        <div className={navItemBaseClass} onClick={() => navigate('/tratar-nao-conformidade')}>
           <FaArrowsRotate style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> Tratar Não Conformidade
         </div>
 
@@ -179,10 +204,18 @@ export default function Sidebar({ onSelectFile }) {
             <div className="px-[14px] pt-4 pb-[5px] text-[10px] text-[#B8892A] tracking-[0.08em] uppercase font-semibold">Administração</div>
             <div
               className={navItemBaseClass}
-              onClick={() => navigate(isAdmin ? '/create-user' : '/ponto/novo-user')}
+              onClick={() => navigate('/create-user')}
             >
               <FaUser style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> Novo Utilizador
             </div>
+            {isAdmin && (
+              <div
+                className={navItemBaseClass}
+                onClick={() => navigate('/ponto/nova-entidade')}
+              >
+                <FaBuilding style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> Nova Entidade
+              </div>
+            )}
             {isAdmin && (
               <div className={navItemBaseClass} onClick={() => navigate('/novo-processo')}>
                 <FaClipboardList style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> Novo Processo
@@ -201,10 +234,7 @@ export default function Sidebar({ onSelectFile }) {
 
         {/* User pill / bottom */}
         <div className="px-2 py-3 border-t border-[#E8D0A0] shrink-0">
-          <div
-            className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer transition-colors duration-150 hover:bg-[#F0E2C4]"
-            onClick={() => navigate('/perfil')}
-          >
+          <div className="flex items-center gap-2 px-2.5 py-2 rounded-md">
             <div className="w-[30px] h-[30px] rounded-full bg-[#C8932F] flex items-center justify-center text-[11px] font-semibold text-white shrink-0">
               {initials}
             </div>
@@ -212,7 +242,6 @@ export default function Sidebar({ onSelectFile }) {
               <div className="text-xs text-[#4A2E08] font-semibold">{username}</div>
               <div className="text-[10px] text-[#B8892A]">{isAdmin ? 'SuperAdmin' : isAdministrador ? 'Administrador' : 'Utilizador'}</div>
             </div>
-            <FaUser style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--section-label)' }} />
           </div>
         </div>
       </aside>

@@ -1,8 +1,8 @@
 import React, { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
-import { UserContext } from "../context/userContext";
-import Sidebar from "../components/Sidebar";
-import Topbar from "../components/Topbar";
+import { UserContext } from "../../shared/context/userContext";
+import Sidebar from "../../shared/components/Sidebar";
+import Topbar from "../../shared/components/Topbar";
 import { toast } from "react-toastify";
 
 const GOLD = "#C8932F";

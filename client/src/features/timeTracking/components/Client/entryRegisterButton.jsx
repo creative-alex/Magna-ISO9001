@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { apiFetch } from '../../../utils/apiFetch';
+import { apiFetch } from '../../../../shared/utils/apiFetch';
 
 
 const EntryButton = ({ username, fontSize = '1.5vw', buttonHeight = '5vh' }) => {

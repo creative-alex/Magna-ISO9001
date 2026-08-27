@@ -4,9 +4,9 @@ import './index.css';
 import App from './App';
 import { BrowserRouter as Router } from 'react-router-dom';
 import reportWebVitals from './reportWebVitals';
-import { UserProvider } from "./context/userContext";
-import { TutorialProvider } from "./context/tutorialContext";
-import { FavoritesProvider } from "./context/favoritesContext";
+import { UserProvider } from "./shared/context/userContext";
+import { TutorialProvider } from "./shared/context/tutorialContext";
+import { FavoritesProvider } from "./shared/context/favoritesContext";
 
 
 const root = ReactDOM.createRoot(document.getElementById('root'));

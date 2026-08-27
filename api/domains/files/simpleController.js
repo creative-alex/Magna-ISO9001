@@ -1,7 +1,7 @@
 const admin = require("firebase-admin");
 
 // Garantir que Firebase está inicializado
-require("../db/firebase");
+require("../../shared/db/firebase");
 
 // CONTROLLER SIMPLES - SÓ PARA CRIAR REGISTROS NA BD
 const createProcessRecord = async (req, res) => {

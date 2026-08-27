@@ -1,26 +1,28 @@
 import React, { useContext, useState, useRef, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
-import { UserContext } from "../context/userContext";
-import Sidebar from "../components/Sidebar";
-import Topbar from "../components/Topbar";
+import { UserContext } from "../../../shared/context/userContext";
+import Sidebar from "../../../shared/components/Sidebar";
+import Topbar from "../../../shared/components/Topbar";
 import {
   FaUser, FaLocationDot, FaIdCard, FaUsers, FaFileContract,
   FaGraduationCap, FaCloudArrowUp, FaArrowUpRightFromSquare,
   FaCircleMinus, FaPencil, FaCheck, FaArrowLeft,
 } from "react-icons/fa6";
-import { apiFetch } from "../utils/apiFetch";
-import { getNomeCurto } from "../utils/nomeCurto";
+import { apiFetch } from "../../../shared/utils/apiFetch";
+import { getNomeCurto } from "../../../shared/utils/nomeCurto";
 
 const GOLD = "#C8932F";
 
-const SITUACAO_FAMILIAR_OPTIONS = ["Solteiro(a)", "Casado(a)", "União de facto", "Divorciado(a)", "Viúvo(a)"];
+const SITUACAO_CONJUGAL_OPTIONS = ["Não Casado(a)", "Casado(a)", "Casado(a) 1 titular", "Casado(a) 2 titulares", "Viúvo(a)", "Divorciado(a)",];
 const TIPO_CONTRATO_OPTIONS = [
   "Contrato sem termo", "Contrato a termo certo", "Contrato a termo incerto",
   "Prestação de serviços", "Contrato de estágio", "Outro",
 ];
 const SITUACAO_CONTRATUAL_OPTIONS = ["Ativo", "Suspenso", "Cessado", "Reformado"];
+const LOCAL_OPTIONS = ["Porto", "Coimbra", "Paredes", "Canedo", "Abrantes", "Vila Nova de Gaia"];
 const TIPO_CONTRATO_ESTAGIO = "Contrato de estágio";
+const TIPO_CONTRATO_SEM_TERMO = "Contrato sem termo";
 
 const SECTIONS = [
   {
@@ -29,6 +31,10 @@ const SECTIONS = [
     fields: [
       { key: "nome_completo", label: "Nome completo", type: "text" },
       { key: "data_nascimento", label: "Data de nascimento", type: "date" },
+      { key: "n_cartao_cidadao", label: "Nº cartão de cidadão", type: "text" },
+      { key: "nif", label: "NIF", type: "text" },
+      { key: "n_seguranca_social", label: "Nº segurança social", type: "text" },
+      { key: "digitalizacao_cc", label: "Digitalização CC (frente e verso)", type: "file" },
     ],
   },
   {
@@ -38,28 +44,22 @@ const SECTIONS = [
       { key: "morada", label: "Morada", type: "text" },
       { key: "codigo_postal", label: "Código postal", type: "text", placeholder: "0000-000" },
       { key: "localidade", label: "Localidade", type: "text" },
-      { key: "telefone", label: "Telefone", type: "tel" },
+      { key: "telefone", label: "Contacto", type: "tel" },
+      { key: "telefone_emergencia", label: "Contacto de emergência", type: "tel" },
       { key: "email_profissional", label: "Email profissional", type: "email" },
     ],
   },
   {
-    title: "Identificação civil e fiscal",
-    Icon: FaIdCard,
-    fields: [
-      { key: "n_cartao_cidadao", label: "Nº cartão de cidadão", type: "text" },
-      { key: "nif", label: "NIF", type: "text" },
-      { key: "n_seguranca_social", label: "Nº segurança social", type: "text" },
-      { key: "digitalizacao_cc", label: "Digitalização CC (frente e verso)", type: "file" },
-    ],
-  },
-  {
-    title: "Situação familiar",
+    title: "Dados fiscais/IRS",
     Icon: FaUsers,
     fields: [
-      { key: "situacao_familiar", label: "Situação familiar", type: "select", options: SITUACAO_FAMILIAR_OPTIONS },
+      { key: "situacao_conjugal", label: "Situação conjugal", type: "select", options: SITUACAO_CONJUGAL_OPTIONS },
+      { key: "irs_jovem", label: "IRS jovem", type: "toggle" },
+      { key: "percentagem_isencao", label: "Percentagem de isenção", type: "number", showIf: f => f.irs_jovem === true },
+      { key: "n_titulares", label: "Nº titulares do agregado familiar", type: "number" },
       { key: "n_dependentes", label: "Nº dependentes", type: "number" },
       { key: "n_dependentes_deficientes", label: "Nº dependentes com deficiência", type: "number" },
-      { key: "declarante_deficiente", label: "Declarante com deficiência", type: "toggle" },
+      { key: "declarante_deficiente", label: "Tem incapacidade superior a 60%", type: "toggle" },
       { key: "conjuge_deficiente", label: "Cônjuge com deficiência", type: "toggle" },
     ],
   },
@@ -67,29 +67,32 @@ const SECTIONS = [
     title: "Formação e habilitações",
     Icon: FaGraduationCap,
     fields: [
+      { key: "area_formacao", label: "Área de formação", type: "text" },
       { key: "habilitacoes", label: "Habilitações literárias", type: "text" },
-      { key: "ccp", label: "CCP (Certificado de Competências Pedagógicas)", type: "text" },
-      { key: "cv_atualizado", label: "CV atualizado", type: "toggle" },
-      { key: "ficha_dgert_atualizada", label: "Ficha curricular DGERT atualizada", type: "toggle" },
-      { key: "digitalizacao_cv_original", label: "Digitalização do CV original", type: "file" },
+      { key: "certificado_habilitacoes", label: "Certificado de habilitações", type: "file" },
+      { key: "ccp", label: "CCP (Certificado de Competências Pedagógicas)", type: "toggle" },
+      { key: "digitalizacao_ccp", label: "Comprovativo do CCP", type: "file", showIf: f => f.ccp === true },
+      { key: "ficha_dgert_atualizada", label: "Ficha curricular DGERT atualizada", type: "file" },
+      { key: "cv_atualizado", label: "CV atualizado", type: "file" },
     ],
   },
   {
-    title: "Contrato de trabalho",
+    title: "Dados contratuais ",
     Icon: FaFileContract,
     restricted: true,
     monthHistory: true,
     fields: [
+      { key: "sede", label: "Sede", type: "select", options: LOCAL_OPTIONS },
       { key: "tipo_contrato", label: "Tipo de contrato celebrado", type: "select", options: TIPO_CONTRATO_OPTIONS },
       { key: "situacao_contratual", label: "Situação contratual", type: "select", options: SITUACAO_CONTRATUAL_OPTIONS },
 
       // Campos abaixo só se aplicam a contratos que não sejam de estágio profissional
       { key: "funcao", label: "Função", type: "text", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO },
       { key: "data_admissao", label: "Data de admissão", type: "date", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO },
-      { key: "data_fim_contrato", label: "Data de fim de contrato", type: "date", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO },
-      { key: "digitalizacao_contrato", label: "Digitalização do contrato (todas as páginas)", type: "file", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO },
+      { key: "data_fim_contrato", label: "Data de fim de contrato", type: "date", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO &&  f.tipo_contrato !== TIPO_CONTRATO_SEM_TERMO },
+      { key: "digitalizacao_contrato", label: "Contrato (todas as páginas)", type: "file", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO },
       { key: "cedencia_temporaria", label: "Cedência temporária", type: "toggle", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO },
-      { key: "entidade_cedencia_temporaria", label: "Entidade de cedência temporária", type: "text", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO && f.cedencia_temporaria === true },
+      { key: "entidade_cedencia_temporaria", label: "Entidade de céssionaria", type: "text", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO && f.cedencia_temporaria === true },
       { key: "data_inicio_cedencia", label: "Data de início da cedência", type: "date", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO && f.cedencia_temporaria === true },
       { key: "data_fim_cedencia", label: "Data de fim da cedência", type: "date", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO && f.cedencia_temporaria === true },
       { key: "digitalizacao_contrato_cedencia", label: "Digitalização do contrato de cedência temporária", type: "file", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO && f.cedencia_temporaria === true },

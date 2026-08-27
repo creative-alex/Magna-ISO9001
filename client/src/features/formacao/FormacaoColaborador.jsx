@@ -1,28 +1,40 @@
 import React, { useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
-import { UserContext } from "../context/userContext";
-import Sidebar from "../components/Sidebar";
-import Topbar from "../components/Topbar";
+import { UserContext } from "../../shared/context/userContext";
+import Sidebar from "../../shared/components/Sidebar";
+import Topbar from "../../shared/components/Topbar";
 import {
   FaGraduationCap, FaFileLines, FaPencil, FaCheck, FaArrowLeft, FaTrash, FaPlus,
 } from "react-icons/fa6";
-import { apiFetch } from "../utils/apiFetch";
-import { getNomeCurto } from "../utils/nomeCurto";
+import { apiFetch } from "../../shared/utils/apiFetch";
+import { getNomeCurto } from "../../shared/utils/nomeCurto";
 
 const GOLD = "#C8932F";
 
 const ACAO_FIELDS = [
   { key: "nome_acao", label: "Nome da ação", type: "text", span: 2 },
-  { key: "duracao", label: "Duração", type: "text", span: 1 },
-  { key: "local", label: "Local", type: "text", span: 1 },
-  { key: "horario", label: "Horário", type: "text", span: 1 },
-  { key: "objetivo", label: "Objetivo", type: "textarea", span: 1 },
   { key: "entidade_formadora", label: "Entidade formadora", type: "text", span: 1 },
+  { key: "local", label: "Local", type: "text", span: 1 },
+  { key: "horario", label: "Modalidade", type: "select", span: 1, options: ["Laboral", "Pós-Laboral", "Misto"] },
+  { key: "duracao", label: "Duração (horas)", type: "number", span: 1 },
+  { key: "observacao", label: "Observação", type: "textarea", span: 3, rows: 4 },
 ];
 
 function getCurrentYear() {
   return String(new Date().getFullYear());
+}
+
+function toggleInSet(set, value) {
+  const next = new Set(set);
+  if (next.has(value)) next.delete(value); else next.add(value);
+  return next;
+}
+
+function removeFromSet(set, value) {
+  const next = new Set(set);
+  next.delete(value);
+  return next;
 }
 
 export default function FormacaoColaborador() {
@@ -42,11 +54,11 @@ export default function FormacaoColaborador() {
   const nomeCurto = getNomeCurto(targetLabel);
 
   const [ano, setAno] = useState(getCurrentYear());
-  const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [acoes, setAcoes] = useState([]);
   const [addingAcao, setAddingAcao] = useState(false);
+  const [editingIds, setEditingIds] = useState(new Set());
+  const [savingIds, setSavingIds] = useState(new Set());
   const [uploadingCertId, setUploadingCertId] = useState(null);
   const [viewingCertId, setViewingCertId] = useState(null);
   const [removingCertId, setRemovingCertId] = useState(null);
@@ -66,6 +78,7 @@ export default function FormacaoColaborador() {
       if (res.ok) {
         const data = await res.json();
         setAcoes(data.acoes || []);
+        setEditingIds(new Set());
       } else {
         toast.error("Não foi possível carregar o plano de formação", { position: "top-right" });
       }
@@ -94,6 +107,7 @@ export default function FormacaoColaborador() {
       if (res.ok) {
         const data = await res.json();
         setAcoes(prev => [...prev, data.acao]);
+        setEditingIds(prev => new Set(prev).add(data.acao.id));
       } else {
         toast.error("Falha ao adicionar ação de formação", { position: "top-right" });
       }
@@ -111,6 +125,7 @@ export default function FormacaoColaborador() {
       const res = await apiFetch(`/formacao/${id}/${ano}/acoes/${acaoId}`, { method: "DELETE" });
       if (res.ok) {
         setAcoes(prev => prev.filter(a => a.id !== acaoId));
+        setEditingIds(prev => removeFromSet(prev, acaoId));
         toast.success("Ação de formação eliminada", { position: "top-right", autoClose: 2000 });
       } else {
         toast.error("Falha ao eliminar a ação de formação", { position: "top-right" });
@@ -123,27 +138,30 @@ export default function FormacaoColaborador() {
     }
   };
 
-  const handleSave = async () => {
-    setSaving(true);
+  const handleToggleEdit = (acaoId) => {
+    setEditingIds(prev => toggleInSet(prev, acaoId));
+  };
+
+  const handleSaveAcao = async (acaoId) => {
+    const acao = acoes.find(a => a.id === acaoId);
+    if (!acao) return;
+    setSavingIds(prev => new Set(prev).add(acaoId));
     try {
-      const results = await Promise.all(acoes.map(a =>
-        apiFetch(`/formacao/${id}/${ano}/acoes/${a.id}`, {
-          method: "PUT",
-          body: JSON.stringify({ acao: a }),
-        })
-      ));
-      if (results.every(r => r.ok)) {
-        setEditMode(false);
-        await fetchFormacao();
-        toast.success("Plano de formação guardado", { position: "top-right", autoClose: 2500 });
+      const res = await apiFetch(`/formacao/${id}/${ano}/acoes/${acaoId}`, {
+        method: "PUT",
+        body: JSON.stringify({ acao }),
+      });
+      if (res.ok) {
+        setEditingIds(prev => removeFromSet(prev, acaoId));
+        toast.success("Ação de formação guardada", { position: "top-right", autoClose: 2000 });
       } else {
-        toast.error("Falha ao guardar o plano de formação", { position: "top-right" });
+        toast.error("Falha ao guardar a ação de formação", { position: "top-right" });
       }
     } catch (e) {
       console.error(e);
-      toast.error("Falha ao guardar o plano de formação", { position: "top-right" });
+      toast.error("Falha ao guardar a ação de formação", { position: "top-right" });
     } finally {
-      setSaving(false);
+      setSavingIds(prev => removeFromSet(prev, acaoId));
     }
   };
 
@@ -214,36 +232,54 @@ export default function FormacaoColaborador() {
     }
   };
 
-  const inputStyle = {
+  const inputStyle = (isEditing) => ({
     width: "100%", fontSize: 13, color: "#111827", fontWeight: 500,
     border: "1px solid #e5e7eb", borderRadius: 6, padding: "7px 9px",
-    outline: "none", background: editMode ? "#fafafa" : "#fff",
+    outline: "none", background: isEditing ? "#fafafa" : "#fff",
     boxSizing: "border-box", fontFamily: "inherit",
-  };
+  });
 
   const labelStyle = { fontSize: 11, color: "#6b7280", marginBottom: 4, display: "block" };
 
-  const renderAcaoField = (acao, field) => {
-    const { key, label, type, span } = field;
+  const renderAcaoField = (acao, field, isEditing) => {
+    const { key, label, type, span, rows, options } = field;
     const value = acao[key];
+
+    if (type === "select") {
+      return (
+        <div key={key} style={{ gridColumn: `span ${span}` }}>
+          <span style={labelStyle}>{label}</span>
+          {isEditing ? (
+            <select value={value} onChange={e => handleChange(acao.id, key, e.target.value)} style={inputStyle(isEditing)}>
+              <option value="">Selecionar...</option>
+              {options.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          ) : (
+            <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{value || " - "}</div>
+          )}
+        </div>
+      );
+    }
 
     return (
       <div key={key} style={{ gridColumn: `span ${span}` }}>
         <span style={labelStyle}>{label}</span>
-        {editMode ? (
+
+        {isEditing ? (
           type === "textarea" ? (
             <textarea
               value={value}
               onChange={e => handleChange(acao.id, key, e.target.value)}
-              rows={2}
-              style={{ ...inputStyle, resize: "vertical" }}
+              rows={rows || 2}
+              style={{ ...inputStyle(isEditing), resize: "vertical" }}
             />
           ) : (
             <input
-              type="text"
+              type={type === "number" ? "number" : "text"}
+              min={type === "number" ? 0 : undefined}
               value={value}
               onChange={e => handleChange(acao.id, key, e.target.value)}
-              style={inputStyle}
+              style={inputStyle(isEditing)}
             />
           )
         ) : (
@@ -263,6 +299,8 @@ export default function FormacaoColaborador() {
   if (!canView) return null;
 
   const anoOptions = Array.from({ length: 6 }, (_, i) => String(new Date().getFullYear() - i));
+  const anySaving = savingIds.size > 0;
+  const totalHorasAno = acoes.reduce((sum, a) => sum + (Number(a.duracao) || 0), 0);
 
   return (
     <div className="flex min-h-screen">
@@ -293,69 +331,46 @@ export default function FormacaoColaborador() {
                 Ano civil de {ano}
               </div>
             </div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+              <span style={{ fontSize: 11, color: "#9ca3af" }}>Total de horas no ano</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>{totalHorasAno}h</span>
+            </div>
             <select
               value={ano}
-              disabled={editMode || saving}
+              disabled={editingIds.size > 0 || anySaving}
               onChange={e => setAno(e.target.value)}
-              title={editMode ? "Termina a edição para mudar de ano" : "Mudar de ano"}
+              title={editingIds.size > 0 ? "Termina a edição para mudar de ano" : "Mudar de ano"}
               style={{
                 fontSize: 13, padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 7,
-                background: editMode ? "#f3f4f6" : "#fafafa", color: "#111827", flexShrink: 0,
+                background: editingIds.size > 0 ? "#f3f4f6" : "#fafafa", color: "#111827", flexShrink: 0,
               }}
             >
               {anoOptions.map(o => <option key={o} value={o}>{o}</option>)}
             </select>
-            {canManage && (
-              <button
-                disabled={saving}
-                onClick={() => { if (editMode) handleSave(); else setEditMode(true); }}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  padding: "8px 16px", fontSize: 13, fontWeight: 500, cursor: saving ? "wait" : "pointer",
-                  border: `1px solid ${editMode ? "#22c55e" : GOLD}`,
-                  borderRadius: 7, background: "#fff",
-                  color: editMode ? "#22c55e" : GOLD,
-                  transition: "all 0.15s", flexShrink: 0, opacity: saving ? 0.6 : 1,
-                }}
-              >
-                {saving
-                  ? "A guardar..."
-                  : editMode ? <><FaCheck style={{ fontSize: 12 }} /> Guardar</> : <><FaPencil style={{ fontSize: 12 }} /> Editar</>}
-              </button>
-            )}
           </div>
 
           {loading ? (
             <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 40, textAlign: "center", fontSize: 13, color: "#9ca3af" }}>
               A carregar plano de formação...
             </div>
+          ) : acoes.length === 0 ? (
+            <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 24, textAlign: "center", fontSize: 13, color: "#9ca3af" }}>
+              Sem ações de formação registadas para este ano.
+            </div>
           ) : (
-            <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-              <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 8 }}>
-                <FaGraduationCap style={{ color: GOLD, fontSize: 13 }} />
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>Plano de formação</span>
-                <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: "auto" }}>Ano civil {ano}</span>
-              </div>
-
-              {acoes.length === 0 ? (
-                <div style={{ padding: 24, textAlign: "center", fontSize: 13, color: "#9ca3af" }}>
-                  Sem ações de formação registadas para este ano.
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column" }}>
-                  {acoes.map((acao, index) => (
-                    <div
-                      key={acao.id}
-                      style={{
-                        padding: 18,
-                        borderBottom: index < acoes.length - 1 ? "1px solid #f3f4f6" : "none",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", marginBottom: 12 }}>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: "#9ca3af" }}>
-                          Ação {index + 1}
-                        </span>
-                        {editMode && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {acoes.map((acao, index) => {
+                const isEditing = editingIds.has(acao.id);
+                const isSaving = savingIds.has(acao.id);
+                return (
+                  <div key={acao.id} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+                    <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 8 }}>
+                      <FaGraduationCap style={{ color: GOLD, fontSize: 13 }} />
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>
+                        {acao.nome_acao || `Ação ${index + 1}`}
+                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
+                        {canManage && isEditing && (
                           <button
                             type="button"
                             onClick={() => handleDeleteAcao(acao.id)}
@@ -363,7 +378,7 @@ export default function FormacaoColaborador() {
                             title="Eliminar ação de formação"
                             style={{
                               display: "flex", alignItems: "center", justifyContent: "center",
-                              width: 26, height: 26, marginLeft: "auto",
+                              width: 26, height: 26,
                               cursor: deletingAcaoId === acao.id ? "wait" : "pointer",
                               border: "1px solid #fee2e2", borderRadius: 7, background: "#fff", color: "#dc2626",
                             }}
@@ -371,10 +386,30 @@ export default function FormacaoColaborador() {
                             <FaTrash style={{ fontSize: 10 }} />
                           </button>
                         )}
+                        {canManage && (
+                          <button
+                            disabled={isSaving}
+                            onClick={() => { if (isEditing) handleSaveAcao(acao.id); else handleToggleEdit(acao.id); }}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 6,
+                              padding: "6px 12px", fontSize: 12, fontWeight: 500, cursor: isSaving ? "wait" : "pointer",
+                              border: `1px solid ${isEditing ? "#22c55e" : GOLD}`,
+                              borderRadius: 7, background: "#fff",
+                              color: isEditing ? "#22c55e" : GOLD,
+                              transition: "all 0.15s", opacity: isSaving ? 0.6 : 1,
+                            }}
+                          >
+                            {isSaving
+                              ? "A guardar..."
+                              : isEditing ? <><FaCheck style={{ fontSize: 11 }} /> Guardar</> : <><FaPencil style={{ fontSize: 11 }} /> Editar</>}
+                          </button>
+                        )}
                       </div>
+                    </div>
 
+                    <div style={{ padding: 18 }}>
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "14px 20px", marginBottom: 14 }}>
-                        {ACAO_FIELDS.map(field => renderAcaoField(acao, field))}
+                        {ACAO_FIELDS.map(field => renderAcaoField(acao, field, isEditing))}
                       </div>
 
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -400,7 +435,7 @@ export default function FormacaoColaborador() {
                             >
                               {viewingCertId === acao.id ? "A abrir..." : "Ver"}
                             </button>
-                            {editMode && (
+                            {isEditing && (
                               <button
                                 type="button"
                                 onClick={() => handleRemoveCertificado(acao.id)}
@@ -416,7 +451,7 @@ export default function FormacaoColaborador() {
                               </button>
                             )}
                           </>
-                        ) : editMode ? (
+                        ) : isEditing ? (
                           <label
                             style={{
                               display: "flex", alignItems: "center", gap: 6,
@@ -444,28 +479,28 @@ export default function FormacaoColaborador() {
                         )}
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
-              {editMode && canManage && (
-                <div style={{ padding: 18, borderTop: acoes.length > 0 ? "1px solid #f3f4f6" : "none" }}>
-                  <button
-                    type="button"
-                    onClick={handleAddAcao}
-                    disabled={addingAcao}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 6,
-                      padding: "8px 14px", fontSize: 13, fontWeight: 500,
-                      cursor: addingAcao ? "wait" : "pointer",
-                      border: `1px dashed ${GOLD}`, borderRadius: 7, background: "#fff", color: GOLD,
-                    }}
-                  >
-                    <FaPlus style={{ fontSize: 11 }} />
-                    {addingAcao ? "A adicionar..." : "Adicionar ação de formação"}
-                  </button>
-                </div>
-              )}
+          {!loading && canManage && (
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <button
+                type="button"
+                onClick={handleAddAcao}
+                disabled={addingAcao}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "8px 16px", fontSize: 13, fontWeight: 500,
+                  cursor: addingAcao ? "wait" : "pointer",
+                  border: `1px dashed ${GOLD}`, borderRadius: 7, background: "#fff", color: GOLD,
+                }}
+              >
+                <FaPlus style={{ fontSize: 11 }} />
+                {addingAcao ? "A adicionar..." : "Adicionar ação de formação"}
+              </button>
             </div>
           )}
 

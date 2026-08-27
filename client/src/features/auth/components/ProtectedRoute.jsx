@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { UserContext } from '../../context/userContext';
-import LoadingPage from '../../pages/loading';
+import { UserContext } from '../../../shared/context/userContext';
+import LoadingPage from '../../../shared/components/Loading';
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, isLoading } = useContext(UserContext);

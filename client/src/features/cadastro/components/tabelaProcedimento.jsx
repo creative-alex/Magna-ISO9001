@@ -1,10 +1,10 @@
 import React, { useRef, useEffect, useState } from "react";
-import ExportPdfButton from "../Buttons/exportPdf";
-import PreviewPdfButton from "../Buttons/previewPDF";
-import DocumentosAssociados from "../DocumentosAssociados";
-import InstrucoesTrabalho from "../InstrucoesTrabalho";
-import useRowContextMenu from "../ContextMenu/useRowContextMenu";
-import { parseFormattedText } from "../../utils/textFormatting";
+import ExportPdfButton from "./ExportPdfButton";
+import PreviewPdfButton from "./PreviewPdfButton";
+import DocumentosAssociados from "./DocumentosAssociados";
+import InstrucoesTrabalho from "./InstrucoesTrabalho";
+import useRowContextMenu from "../hooks/useRowContextMenu";
+import { parseFormattedText } from "../utils/textFormatting";
 import { FaXmark, FaArrowLeft, FaPencil } from "react-icons/fa6";
 
 export default function Template1({

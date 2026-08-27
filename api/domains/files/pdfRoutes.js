@@ -3,9 +3,9 @@ const express = require("express");
 const router = express.Router();
 const multer = require('multer');
 const upload = multer();
-const filesController = require("../controllers/filesController");
-const simpleController = require("../controllers/simpleController");
-const { requireAuth, requireAdmin } = require("../middleware/auth");
+const filesController = require("./filesController");
+const simpleController = require("./simpleController");
+const { requireAuth, requireAdmin } = require("../../shared/middleware/auth");
 
 router.post("/get-pdf", requireAuth, filesController.getPdf);
 router.get('/list-files-tree', requireAuth, filesController.listFilesTree);

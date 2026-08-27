@@ -1,6 +1,6 @@
 const admin = require("firebase-admin");
-const db = require("../db/firebase").db;
-const { isSuperAdmin: hasSuperAdminAccess, isAdministrador } = require("../middleware/auth");
+const db = require("../../shared/db/firebase").db;
+const { isSuperAdmin: hasSuperAdminAccess, isAdministrador } = require("../../shared/middleware/auth");
 
 // Únicos valores válidos para o nível de acesso (controla permissões). Distinto
 // de "role", que é só o cargo/título mostrado (texto livre, ex: "Gestora RH /

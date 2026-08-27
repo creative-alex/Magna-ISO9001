@@ -1,10 +1,10 @@
 import React, { useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UserContext } from '../../context/userContext';
-import { AllEntities } from '../../components/TimeTracking/Admin/entities/allEntities';
-import LoadingSpinner from '../../components/TimeTracking/Shared/loadingSpinner';
-import Sidebar from '../../components/Sidebar';
-import Topbar from '../../components/Topbar';
+import { UserContext } from '../../../shared/context/userContext';
+import { AllEntities } from '../components/Admin/entities/allEntities';
+import LoadingSpinner from '../components/Shared/loadingSpinner';
+import Sidebar from '../../../shared/components/Sidebar';
+import Topbar from '../../../shared/components/Topbar';
 
 const EntitiesPage = () => {
   const { username } = useContext(UserContext);

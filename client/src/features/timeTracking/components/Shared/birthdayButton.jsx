@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { toast } from 'react-toastify';
-import { apiFetch } from '../../../utils/apiFetch';
+import { apiFetch } from '../../../../shared/utils/apiFetch';
 
 // Dia de aniversário: benefício de 1 dia/ano, separado da quota de férias.
 // Ao contrário de VacationButton/MedicalLeave (fluxo de pedido), este botão

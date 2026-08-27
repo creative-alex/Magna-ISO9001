@@ -1,8 +1,8 @@
 const admin = require("firebase-admin");
-const db = require("../db/firebase").db;
-const { calculateMonthlyAttendanceSummary } = require("./timeTracking/reportsController");
-const { isAdminOrHR, isAdministrador } = require("../middleware/auth");
-const { sendMail, renderEmail } = require("../services/mailer");
+const db = require("../../shared/db/firebase").db;
+const { calculateMonthlyAttendanceSummary } = require("../timeTracking/reportsController");
+const { isAdminOrHR, isAdministrador } = require("../../shared/middleware/auth");
+const { sendMail, renderEmail } = require("../../shared/services/mailer");
 
 const bucket = admin.storage().bucket();
 

@@ -1,4 +1,4 @@
-const { askAssistant } = require("../services/ai-assistant/assistantService");
+const { askAssistant } = require("./assistantService");
 
 async function handleAssistantQuery(req, res) {
   const { question, username, currentPage, pageContext } = req.body;

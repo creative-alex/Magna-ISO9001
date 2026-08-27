@@ -1,6 +1,6 @@
 import React from "react";
 import { FaDownload } from "react-icons/fa6";
-import { apiFetch } from "../../utils/apiFetch";
+import { apiFetch } from "../../../shared/utils/apiFetch";
 
 const PdfPreviewButton = ({ file, currentPath, size = 16, className }) => {
   // Função para carregar automaticamente a imagem PNG da empresa
@@ -86,7 +86,7 @@ const PdfPreviewButton = ({ file, currentPath, size = 16, className }) => {
       const isTemplate2 = /^\d/.test(fileName) && !/^\d{2}/.test(fileName); // Arquivos que começam com 1 dígito são Template 2
       
       // 2. Processa os dados para o formato das tabelas
-      const { generateNonEditablePdf, generateNonEditablePdfTemplate2 } = await import("../../utils/pdfGenerate");
+      const { generateNonEditablePdf, generateNonEditablePdfTemplate2 } = await import("../../cadastro/utils/pdfGenerate");
       
       if (isTemplate2) {
         // Template 2 - Processar dados específicos do template 2

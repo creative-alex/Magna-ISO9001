@@ -1,16 +1,22 @@
 require("dotenv").config();
+const http = require("http");
 const express = require("express");
 const cors = require("cors");
-const db = require("./db/firebase");
-const userRoute = require("./Routes/userRoutes");
-const pdfRoute = require("./Routes/pdfRoutes");
-const assistantRoute = require("./Routes/assistantRoutes");
-const timeTrackingRoute = require("./Routes/timeTrackingRoutes");
-const entityRoute = require("./Routes/entityRoutes");
-const cadastroRoute = require("./Routes/cadastroRoutes");
-const salarioRoute = require("./Routes/salarioRoutes");
-const parametrosSalarioRoute = require("./Routes/parametrosSalarioRoutes");
-const formacaoRoute = require("./Routes/formacaoRoutes");
+const db = require("./shared/db/firebase");
+const { attachChatWebSocket } = require("./domains/chat/chatServer");
+const userRoute = require("./domains/users/userRoutes");
+const pdfRoute = require("./domains/files/pdfRoutes");
+const assistantRoute = require("./domains/assistant/assistantRoutes");
+const timeTrackingRoute = require("./domains/timeTracking/timeTrackingRoutes");
+const entityRoute = require("./domains/entities/entityRoutes");
+const cadastroRoute = require("./domains/cadastro/cadastroRoutes");
+const salarioRoute = require("./domains/salario/salarioRoutes");
+const parametrosSalarioRoute = require("./domains/parametrosSalario/parametrosSalarioRoutes");
+const formacaoRoute = require("./domains/formacao/formacaoRoutes");
+const chatRoute = require("./domains/chat/chatRoutes");
+const medicinaTrabalhoRoute = require("./domains/medicinaTrabalho/medicinaTrabalhoRoutes");
+const premiosRoute = require("./domains/premios/premiosRoutes");
+const konamiWordleRoute = require("./domains/konamiWordle/konamiWordleRoutes");
 
 const app = express();
 app.use(express.json());
@@ -30,7 +36,14 @@ app.use("/cadastro", cadastroRoute);
 app.use("/salario", salarioRoute);
 app.use("/parametros-salario", parametrosSalarioRoute);
 app.use("/formacao", formacaoRoute);
+app.use("/chat", chatRoute);
+app.use("/medicina-trabalho", medicinaTrabalhoRoute);
+app.use("/premios", premiosRoute);
+app.use("/konami-wordle", konamiWordleRoute);
 
+
+const server = http.createServer(app);
+attachChatWebSocket(server);
 
 const PORT = process.env.PORT || 1080;
-app.listen(PORT, '0.0.0.0', () => console.log(`Servidor aberto na porta ${PORT}`));
+server.listen(PORT, '0.0.0.0', () => console.log(`Servidor aberto na porta ${PORT}`));

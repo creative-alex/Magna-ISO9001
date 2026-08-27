@@ -1,7 +1,7 @@
 import React, { useContext, useState } from 'react';
-import { UserContext } from '../../../context/userContext';
+import { UserContext } from '../../../../shared/context/userContext';
 import { toast } from 'react-toastify';
-import { apiFetch } from '../../../utils/apiFetch';
+import { apiFetch } from '../../../../shared/utils/apiFetch';
 
 const MedicalLeave = ({ username, date, onSuccess }) => {
   const { nivelAcesso } = useContext(UserContext);

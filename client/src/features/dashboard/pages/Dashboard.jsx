@@ -1,17 +1,18 @@
 import React, { useEffect, useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
-import { UserContext } from "../context/userContext";
-import { FavoritesContext } from "../context/favoritesContext";
-import Sidebar from "../components/Sidebar";
-import Topbar from "../components/Topbar";
-import { fixEncoding } from "../utils/fixEncoding";
+import { UserContext } from "../../../shared/context/userContext";
+import { FavoritesContext } from "../../../shared/context/favoritesContext";
+import Sidebar from "../../../shared/components/Sidebar";
+import Topbar from "../../../shared/components/Topbar";
+import { fixEncoding } from "../../../shared/utils/fixEncoding";
 import { filterTree } from "../utils/filterTree";
-import DeleteButton from "../components/Buttons/delete";
-import CreateTableButton from "../components/Buttons/createTableButton";
-import PdfPreviewButton from "../components/Buttons/pdfPreviewButton";
+import DeleteButton from "../components/DeleteButton";
+import CreateTableButton from "../components/CreateTableButton";
+import PdfPreviewButton from "../components/PdfPreviewButton";
 import { FaFile, FaCheck, FaStar, FaRegStar } from "react-icons/fa6";
-import AIAssistant from "../components/AIAssistant/AIAssistant";
-import { apiFetch } from "../utils/apiFetch";
+import AIAssistant from "../../aiAssistant/components/AIAssistant";
+import KonamiWordle from "../components/KonamiWordle";
+import { apiFetch } from "../../../shared/utils/apiFetch";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -242,6 +243,7 @@ export default function Dashboard() {
         </div>
       </div>
       <AIAssistant fileTree={filteredTree} searchTerm={searchTerm} username={username} isAdmin={isAdmin} isSuperAdmin={isAdmin} processOwners={processOwners} onSuggestion={() => {}} />
+      <KonamiWordle />
     </div>
   );
 }

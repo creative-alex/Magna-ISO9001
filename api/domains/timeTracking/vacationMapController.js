@@ -1,6 +1,6 @@
 const admin = require("firebase-admin");
 const db = admin.firestore();
-const { isAdminOrHR, isSuperAdmin } = require("../../middleware/auth");
+const { isAdminOrHR, isSuperAdmin } = require("../../shared/middleware/auth");
 
 const STANDARD_ANNUAL_QUOTA = 22;
 

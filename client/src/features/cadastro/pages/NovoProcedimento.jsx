@@ -1,10 +1,10 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { UserContext } from '../context/userContext';
+import { UserContext } from '../../../shared/context/userContext';
 import { generateEditablePdfTemplate1 } from '../utils/pdfGenerate';
-import Sidebar from '../components/Sidebar';
-import Topbar from '../components/Topbar';
-import { apiFetch } from '../utils/apiFetch';
+import Sidebar from '../../../shared/components/Sidebar';
+import Topbar from '../../../shared/components/Topbar';
+import { apiFetch } from '../../../shared/utils/apiFetch';
 
 export default function NewTable() {
   const navigate = useNavigate();

@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useLocation, useParams, Link } from "react-router-dom";
 import { FaUser, FaCalendarDays } from "react-icons/fa6";
-import { apiFetch } from '../../utils/apiFetch';
-import { UserContext } from '../../context/userContext';
-import LoadingSpinner from '../../components/TimeTracking/Shared/loadingSpinner';
-import Sidebar from '../../components/Sidebar';
-import Topbar from '../../components/Topbar';
-import TableHours from '../../components/TimeTracking/Admin/clients/pontoTable';
-import UserStats from '../../components/TimeTracking/Admin/clients/userStats';
+import { apiFetch } from '../../../shared/utils/apiFetch';
+import { UserContext } from '../../../shared/context/userContext';
+import LoadingSpinner from '../components/Shared/loadingSpinner';
+import Sidebar from '../../../shared/components/Sidebar';
+import Topbar from '../../../shared/components/Topbar';
+import TableHours from '../components/Admin/clients/pontoTable';
+import UserStats from '../components/Admin/clients/userStats';
 
 const GOLD = "#C8932F";
 

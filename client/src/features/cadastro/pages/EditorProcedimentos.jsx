@@ -1,15 +1,15 @@
 import React, { useEffect, useState, useRef, useContext } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
-import { UserContext } from "../context/userContext";
-import AIAssistant from "./AIAssistant/AIAssistant";
-import TabelaPdf from "../pages/tableDisplay";
-import Template1 from "./templates/tabelaProcedimento";
-import ExportPdfButton from "./Buttons/exportPdf";
-import PreviewPdfButton from "./Buttons/previewPDF";
-import LoadingPage from "../pages/loading";
-import Sidebar from "./Sidebar";
-import Topbar from "./Topbar";
-import { apiFetch } from "../utils/apiFetch";
+import { UserContext } from "../../../shared/context/userContext";
+import AIAssistant from "../../aiAssistant/components/AIAssistant";
+import TabelaPdf from "../components/TableDisplay";
+import Template1 from "../components/tabelaProcedimento";
+import ExportPdfButton from "../components/ExportPdfButton";
+import PreviewPdfButton from "../components/PreviewPdfButton";
+import LoadingPage from "../../../shared/components/Loading";
+import Sidebar from "../../../shared/components/Sidebar";
+import Topbar from "../../../shared/components/Topbar";
+import { apiFetch } from "../../../shared/utils/apiFetch";
 
 // Definição dos dois templates
 const tabelas = [

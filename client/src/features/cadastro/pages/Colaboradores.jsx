@@ -1,9 +1,9 @@
 import React, { useContext, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { UserContext } from "../context/userContext";
-import Sidebar from "../components/Sidebar";
-import Topbar from "../components/Topbar";
-import ColaboradoresGroupedList from "../components/ColaboradoresGroupedList";
+import { UserContext } from "../../../shared/context/userContext";
+import Sidebar from "../../../shared/components/Sidebar";
+import Topbar from "../../../shared/components/Topbar";
+import ColaboradoresGroupedList from "../../../shared/components/ColaboradoresGroupedList";
 
 export default function Colaboradores() {
   const navigate = useNavigate();

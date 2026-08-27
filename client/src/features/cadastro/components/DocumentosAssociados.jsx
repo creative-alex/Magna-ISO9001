@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { UserContext } from '../context/userContext';
-import { apiFetch } from '../utils/apiFetch';
+import { UserContext } from '../../../shared/context/userContext';
+import { apiFetch } from '../../../shared/utils/apiFetch';
 
 const DocumentosAssociados = ({ 
   currentValue, 

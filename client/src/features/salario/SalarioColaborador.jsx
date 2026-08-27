@@ -1,15 +1,15 @@
 import React, { useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
-import { UserContext } from "../context/userContext";
-import Sidebar from "../components/Sidebar";
-import Topbar from "../components/Topbar";
+import { UserContext } from "../../shared/context/userContext";
+import Sidebar from "../../shared/components/Sidebar";
+import Topbar from "../../shared/components/Topbar";
 import {
   FaSackDollar, FaCalendarDays, FaCreditCard, FaFileInvoiceDollar, FaCarSide,
   FaPencil, FaCheck, FaArrowLeft, FaArrowsRotate,
 } from "react-icons/fa6";
-import { apiFetch } from "../utils/apiFetch";
-import { getNomeCurto } from "../utils/nomeCurto";
+import { apiFetch } from "../../shared/utils/apiFetch";
+import { getNomeCurto } from "../../shared/utils/nomeCurto";
 
 const GOLD = "#C8932F";
 

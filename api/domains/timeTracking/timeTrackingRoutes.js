@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { requireAuth, requireAdmin, requireAdminOrHR, requireAdminOrEntidadeAdmin } = require('../middleware/auth');
+const { requireAuth, requireAdmin, requireAdminOrHR, requireAdminOrEntidadeAdmin } = require('../../shared/middleware/auth');
 const {
   createUser,
   userDetails,
   getUsersByEntity,
   updateUserDetails,
   deleteUser,
-} = require('../controllers/timeTracking/userManagementController');
+} = require('./userManagementController');
 const {
   registerEntry,
   checkEntry,
@@ -22,7 +22,7 @@ const {
   deleteManualOvertime,
   debugCorruptOvertime,
   deleteCorruptOvertime,
-} = require('../controllers/timeTracking/timeTrackingController');
+} = require('./timeTrackingController');
 const {
   createVacation,
   approveVacation,
@@ -30,22 +30,22 @@ const {
   createMedicalLeave,
   getPendingVacations,
   getAllUsersVacations,
-} = require('../controllers/timeTracking/vacationController');
+} = require('./vacationController');
 const {
   getUserRecords,
   getOvertimeSummary,
   getYearlySummary,
   processOvertimeDeduction,
   clearOvertimeDeductions,
-} = require('../controllers/timeTracking/reportsController');
-const { ping } = require('../controllers/timeTracking/utilsController');
+} = require('./reportsController');
+const { ping } = require('./utilsController');
 const {
   getVacationMap,
   toggleVacationDay,
   toggleBirthdayDay,
   setVacationQuotaOverride,
   setVacationCarryover,
-} = require('../controllers/timeTracking/vacationMapController');
+} = require('./vacationMapController');
 
 // Auto-serviço (qualquer utilizador autenticado, sobre os seus próprios dados)
 //

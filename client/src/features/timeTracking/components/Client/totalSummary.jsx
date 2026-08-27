@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { calcularHoras, formatarMinutos } from '../../../utils/timeTracking/calcHours';
-import { HOLIDAYS_PORTO, getMoveableHolidays } from '../../../utils/timeTracking/constants';
+import { calcularHoras, formatarMinutos } from '../../utils/calcHours';
+import { HOLIDAYS_PORTO, getMoveableHolidays } from '../../../../shared/utils/holidays';
 import VacationCalendar from './VacationCalendar';
 import ManualOvertimeButton from './manualOvertime';
 import TimeTrackingTable from './pontoTable';
-import { apiFetch } from '../../../utils/apiFetch';
+import { apiFetch } from '../../../../shared/utils/apiFetch';
 
 const TotaisSummary = ({ username, month = new Date().getMonth() + 1 }) => {
   const [totais, setTotais] = useState({

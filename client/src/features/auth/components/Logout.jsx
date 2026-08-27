@@ -1,5 +1,5 @@
 import React, { useContext, useState } from 'react';
-import { UserContext } from '../../context/userContext';
+import { UserContext } from '../../../shared/context/userContext';
 import { useNavigate } from 'react-router-dom';
 
 const LogoutButton = () => {

@@ -1,19 +1,4 @@
-const { isAdminOrHR } = require("../../middleware/auth");
-
-// Função helper para normalizar IDs de entidades
-const normalizeEntityId = (nome) => {
-  return nome
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/&/g, 'e')
-    .replace(/-/g, ' ')
-    .replace(/[^a-z0-9\s]/g, '')
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-+|-+$/g, '');
-};
+const { isAdminOrHR } = require("../../shared/middleware/auth");
 
 // Função helper para normalizar IDs de colaboradors
 const normalizeUserId = (nome) => {
@@ -42,7 +27,6 @@ const resolveTargetUid = (req) => {
 };
 
 module.exports = {
-  normalizeEntityId,
   normalizeUserId,
   resolveTargetUid
 };

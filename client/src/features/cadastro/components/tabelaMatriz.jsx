@@ -1,8 +1,8 @@
 import React, { useRef, useEffect, useState } from "react";
-import ExportPdfButton from "../Buttons/exportPdf";
-import PreviewPdfButton from "../Buttons/previewPDF";
-import useRowContextMenu from "../ContextMenu/useRowContextMenu";
-import MultiSelectDonos from "../MultiSelectDonos";
+import ExportPdfButton from "./ExportPdfButton";
+import PreviewPdfButton from "./PreviewPdfButton";
+import useRowContextMenu from "../hooks/useRowContextMenu";
+import MultiSelectDonos from "./MultiSelectDonos";
 import { FaPencil, FaXmark, FaCheck, FaGripVertical, FaArrowRotateLeft, FaArrowLeft, FaClipboardList } from "react-icons/fa6";
 
 export default function Template2({

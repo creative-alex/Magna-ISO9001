@@ -1,4 +1,4 @@
-const { db } = require('../db/firebase'); 
+const { db } = require('../../shared/db/firebase'); 
 
 // Função de validação
 const validateEntity = (entityData) => {

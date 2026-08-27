@@ -1,6 +1,6 @@
 const admin = require("firebase-admin");
-const db = require("../db/firebase").db;
-const { isAdminOrHR, isAdministrador } = require("../middleware/auth");
+const db = require("../../shared/db/firebase").db;
+const { isAdminOrHR, isAdministrador } = require("../../shared/middleware/auth");
 
 const bucket = admin.storage().bucket();
 
@@ -23,7 +23,7 @@ function canManage(req) {
 // certificado juntos no mesmo registo (em vez de duas listas separadas
 // que era preciso emparelhar manualmente).
 const ACAO_FIELD_KEYS = [
-  "nome_acao", "duracao", "local", "horario", "objetivo", "entidade_formadora",
+  "nome_acao", "duracao", "local", "horario", "entidade_formadora", "observacao",
 ];
 
 function serializeAcao(doc) {

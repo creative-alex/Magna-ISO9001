@@ -1,12 +1,12 @@
 import React, { useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UserContext } from '../../context/userContext';
-import * as Client from '../../components/TimeTracking/Client';
-import LoadingSpinner from '../../components/TimeTracking/Shared/loadingSpinner';
-import Sidebar from '../../components/Sidebar';
-import Topbar from '../../components/Topbar';
-import capa from '../../assets/timeTracking/capa.jpg';
-import footer from '../../assets/timeTracking/footer.png';
+import { UserContext } from '../../../shared/context/userContext';
+import * as Client from '../components/Client';
+import LoadingSpinner from '../components/Shared/loadingSpinner';
+import Sidebar from '../../../shared/components/Sidebar';
+import Topbar from '../../../shared/components/Topbar';
+import capa from '../../../shared/assets/capa.jpg';
+import footer from '../../../shared/assets/footer.png';
 
 const UserDashboard = () => {
   const { username } = useContext(UserContext);

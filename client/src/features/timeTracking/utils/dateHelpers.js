@@ -1,4 +1,5 @@
-import { DATE_FORMATS, HOLIDAYS_PORTO } from './constants';
+import { DATE_FORMATS } from './constants';
+import { HOLIDAYS_PORTO } from '../../../shared/utils/holidays';
 
 // Formatação de datas
 export const formatDate = (date, format = DATE_FORMATS.DEFAULT) => {

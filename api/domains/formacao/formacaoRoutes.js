@@ -9,8 +9,8 @@ const {
   deleteAcao,
   uploadCertificadoAcao,
   deleteCertificadoAcao,
-} = require('../controllers/formacaoController');
-const { requireAuth } = require('../middleware/auth');
+} = require('./formacaoController');
+const { requireAuth } = require('../../shared/middleware/auth');
 
 router.get('/:id/:ano', requireAuth, getFormacao);
 router.post('/:id/:ano/acoes', requireAuth, createAcao);

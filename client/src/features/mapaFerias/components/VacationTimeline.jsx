@@ -6,9 +6,9 @@ import {
   FaChevronRight,
   FaUmbrellaBeach,
 } from "react-icons/fa6";
-import { apiFetch } from "../../utils/apiFetch";
-import { UserContext } from "../../context/userContext";
-import { HOLIDAYS_PORTO, getMoveableHolidays } from "../../utils/timeTracking/constants";
+import { apiFetch } from "../../../shared/utils/apiFetch";
+import { UserContext } from "../../../shared/context/userContext";
+import { HOLIDAYS_PORTO, getMoveableHolidays } from "../../../shared/utils/holidays";
 
 const MONTH_NAMES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
