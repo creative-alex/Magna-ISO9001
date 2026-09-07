@@ -69,10 +69,16 @@ function isAdminOrHRorAdministrador(nivelAcesso) {
   return isAdminOrHR(nivelAcesso) || isAdministrador(nivelAcesso);
 }
 
-// SuperAdmin + Administrador (exclui GestorRH de propósito, para manter a mesma
-// exclusão que já existia para a gestão de utilizadores antes deste nível existir).
-function isSuperAdminOrAdministrador(nivelAcesso) {
-  return isSuperAdmin(nivelAcesso) || isAdministrador(nivelAcesso);
+// Nível dedicado à área financeira: a par do SuperAdmin, é o único com direito de
+// EDIÇÃO em Processamento de Salários e Prémios. GestorRH mantém leitura nestas
+// duas áreas (continua incluído em isAdminOrHR) mas deixou de as poder editar  -
+// separação de funções entre RH e Financeiro pedida explicitamente.
+function isGestorFinanceiro(nivelAcesso) {
+  return (nivelAcesso || "").toLowerCase() === "gestorfinanceiro";
+}
+
+function isSuperAdminOrGestorFinanceiro(nivelAcesso) {
+  return isSuperAdmin(nivelAcesso) || isGestorFinanceiro(nivelAcesso);
 }
 
 function requireAdmin(req, res, next) {
@@ -89,20 +95,21 @@ function requireAdminOrHR(req, res, next) {
   next();
 }
 
-// Gestão de contas de colaboradores (criar/editar/apagar): SuperAdmin sem restrições,
-// Administrador só dentro da sua própria entidade  -  essa segunda parte da validação
-// vive no controller (precisa de ler a entidade do colaborador-alvo).
+// Gestão de contas de colaboradores (criar/editar/apagar): SuperAdmin e GestorRH sem
+// restrições, Administrador só dentro da sua própria entidade  -  essa segunda parte da
+// validação vive no controller (precisa de ler a entidade do colaborador-alvo).
 function requireAdminOrEntidadeAdmin(req, res, next) {
-  if (!isSuperAdminOrAdministrador(req.user?.nivelAcesso)) {
+  if (!isAdminOrHRorAdministrador(req.user?.nivelAcesso)) {
     return res.status(403).json({ error: "Acesso restrito a administradores" });
   }
   next();
 }
 
-// Ver a lista de colaboradores (cadastro/salário/formação): admin/RH vê todos,
-// Administrador só os da sua entidade  -  filtragem feita no controller.
+// Ver a lista de colaboradores (cadastro/salário/formação/prémios): admin/RH/Gestor
+// Financeiro vê todos, Administrador só os da sua entidade  -  filtragem feita no
+// controller (getColaboradores).
 function requireCanViewColaboradores(req, res, next) {
-  if (!isAdminOrHRorAdministrador(req.user?.nivelAcesso)) {
+  if (!isAdminOrHRorAdministrador(req.user?.nivelAcesso) && !isGestorFinanceiro(req.user?.nivelAcesso)) {
     return res.status(403).json({ error: "Acesso restrito a administradores e gestores de recursos humanos" });
   }
   next();
@@ -118,5 +125,6 @@ module.exports = {
   isAdminOrHR,
   isAdministrador,
   isAdminOrHRorAdministrador,
-  isSuperAdminOrAdministrador,
+  isGestorFinanceiro,
+  isSuperAdminOrGestorFinanceiro,
 };

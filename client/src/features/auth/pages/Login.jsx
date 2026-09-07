@@ -16,6 +16,7 @@ const Login = ({ onLoginSuccess }) => {
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const [destination, setDestination] = useState("/dashboard");
+    const [destinationTouched, setDestinationTouched] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
     const { auth, isAuthenticated, setUserEmail } = useContext(UserContext);
@@ -89,7 +90,9 @@ const Login = ({ onLoginSuccess }) => {
                     toast.success("Login bem-sucedido!");
                 }
 
-                const target = location.state?.from?.pathname || destination;
+                const target = destinationTouched
+                    ? destination
+                    : (location.state?.from?.pathname || destination);
 
                 if (onLoginSuccess && typeof onLoginSuccess === 'function') {
                     onLoginSuccess(data, target);
@@ -113,11 +116,11 @@ const Login = ({ onLoginSuccess }) => {
     };
 
     return (
-        <div className="flex min-h-screen font-sans">
+        <div className="flex min-h-screen font-sans max-md:flex-col">
             <div className="fixed top-4 right-4 z-20">
                 <select
                     value={destination}
-                    onChange={(e) => setDestination(e.target.value)}
+                    onChange={(e) => { setDestination(e.target.value); setDestinationTouched(true); }}
                     aria-label="Entrar em"
                     className="bg-white text-[#5C3D0E] text-[11px] font-semibold rounded-md pl-2.5 pr-1.5 py-1.5 border border-gray-200 shadow-sm cursor-pointer transition-colors duration-150 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#C8932F]/50"
                 >
@@ -125,14 +128,15 @@ const Login = ({ onLoginSuccess }) => {
                     <option value="/ponto">Livro de Ponto</option>
                 </select>
             </div>
-            {/* Brand panel */}
-            <div className="w-[35%] min-w-[300px] flex flex-col items-center justify-center relative overflow-hidden px-10 py-12 before:content-[''] before:absolute before:-top-[100px] before:-right-[100px] before:w-[420px] before:h-[420px] before:rounded-full before:bg-white/[.06] before:pointer-events-none after:content-[''] after:absolute after:-bottom-[130px] after:-left-[80px] after:w-[400px] after:h-[400px] after:rounded-full after:bg-white/[.05] after:pointer-events-none"
+            {/* Brand panel: coluna à esquerda no desktop; em mobile passa a fundo fixo
+                de ecrã inteiro, com o form por cima (ver painel do form). */}
+            <div className="w-[35%] min-w-[300px] max-md:fixed max-md:inset-0 max-md:w-full max-md:min-w-0 flex flex-col items-center justify-center relative overflow-hidden px-10 py-12 before:content-[''] before:absolute before:-top-[100px] before:-right-[100px] before:w-[420px] before:h-[420px] before:rounded-full before:bg-white/[.06] before:pointer-events-none after:content-[''] after:absolute after:-bottom-[130px] after:-left-[80px] after:w-[400px] after:h-[400px] after:rounded-full after:bg-white/[.05] after:pointer-events-none"
                 style={{
                     backgroundImage: `linear-gradient(145deg, rgba(74,28,0,0.45) 0%, rgba(122,64,16,0.4) 38%, rgba(200,147,47,0.35) 100%), url(${LoginBackground})`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                 }}>
-                <div className="text-center relative z-[1]">
+                <div className="text-center relative z-[1] max-md:hidden">
                     <div className="w-[90px] h-[90px] bg-white/[.18] border border-white/[.28] rounded-[22px] flex items-center justify-center mx-auto mb-7 shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
                         <img src={Logo} alt="Logo Magna" className="w-[54px] h-[54px] brightness-0 invert" />
                     </div>
@@ -143,11 +147,13 @@ const Login = ({ onLoginSuccess }) => {
                         Sistema de Gestão<br />de Qualidade
                     </p>
                 </div>
-                <span className="absolute bottom-[22px] text-[10.5px] text-white/75 tracking-[0.3px] drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">© 2026 Magna · Qualidade &amp; Excelência</span>
+                <span className="absolute bottom-[22px] text-[10.5px] text-white/75 tracking-[0.3px] drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] max-md:hidden">© 2026 Magna · Qualidade &amp; Excelência</span>
             </div>
 
-            {/* Form panel */}
-            <div className="flex-1 flex flex-col overflow-y-auto relative px-8 py-6 bg-[#FDFCF9] max-sm:px-5 max-sm:py-5">
+            {/* Form panel: cartão translúcido sobreposto à imagem em mobile (topo
+                da imagem fica visível acima do cartão); painel sólido normal a
+                partir do md. */}
+            <div className="flex-1 flex flex-col overflow-y-auto relative z-10 px-8 py-6 bg-[#FDFCF9] max-sm:px-5 max-sm:py-5 max-md:mt-[26vh] max-md:min-h-[74vh] max-md:bg-white/95 max-md:backdrop-blur-sm max-md:rounded-t-[28px] max-md:shadow-[0_-10px_40px_rgba(0,0,0,0.18)]">
                 <div className="flex-1 flex flex-col justify-center w-full max-w-[900px] mx-auto">
                     <div className="mb-6 max-sm:mb-6">
                         <img src={LoginLogo} alt="Logo Magna" className="block h-24 w-auto object-contain mb-5 -ml-8 max-sm:h-20 max-sm:mb-5 max-sm:-ml-4" />
@@ -225,7 +231,7 @@ const Login = ({ onLoginSuccess }) => {
                 <img
                     src={LoginFooter}
                     alt=""
-                    className="w-auto h-auto max-w-[700px] max-h-[240px] object-contain mx-auto mt-6 shrink-0 max-sm:max-w-[220px] max-sm:max-h-[55px] max-sm:mt-6"
+                    className="w-auto h-auto max-w-[700px] max-h-[240px] object-contain mx-auto mt-6 shrink-0 max-sm:max-w-[85%] max-sm:max-h-[110px] max-sm:mt-6"
                 />
             </div>
         </div>

@@ -1,13 +1,15 @@
 import React from 'react';
+import CompensateOvertimeButton from '../Shared/compensateOvertimeButton';
 
-const TableRow = ({ 
-  item, 
-  index, 
-  month, 
+const TableRow = ({
+  item,
+  index,
+  month,
   onContextMenu,
-  showTooltip, 
-  hideTooltip, 
-  openOvertimeManager 
+  showTooltip,
+  hideTooltip,
+  openOvertimeManager,
+  onCompensated
 }) => {
   // Função para extrair apenas a hora no formato HH:MM
   const extractTime = (timeString) => {
@@ -25,9 +27,14 @@ const TableRow = ({
   const diaSemana = dataAtual.getDay();
   const isFimDeSemana = diaSemana === 0 || diaSemana === 6;
   
+  // O utilizador escolhe quanto quer compensar (pode ser menos do que o défice
+  // todo), por isso o dia pode continuar a mostrar menos de 8h mesmo já
+  // compensado  -  nesse caso mostra-se a azul em vez de vermelho, e sem botão
+  // (só é possível compensar um dia uma vez).
   const isLessThanEightHours = item.total !== "-" && parseInt(item.total.split("h")[0]) < 8 && !isFimDeSemana;
   const isFeriasPendente = item.feriasPendente;
   const isBaixaPendente = item.baixaPendente;
+  const isCompensado = item.compensated;
 
   // Debug log
   if (item.manualOvertime) {
@@ -40,7 +47,7 @@ const TableRow = ({
     rowClass = "bg-warning-light";
   } else if (isBaixaPendente) {
     rowClass = "bg-danger-light";
-  } else if (isLessThanEightHours) {
+  } else if (isLessThanEightHours && !isCompensado) {
     rowClass = "text-danger";
   }
 
@@ -67,10 +74,18 @@ const TableRow = ({
       </td>
       <td className="px-4 py-3 text-left border-b border-gray-200">{extractTime(item.horaEntrada)}</td>
       <td className="px-4 py-3 text-left border-b border-gray-200">{extractTime(item.horaSaida)}</td>
-      <td className="px-4 py-3 text-left border-b border-gray-200">{item.total}</td>
-      <td className={`px-4 py-3 text-left border-b border-gray-200 ${item.extra !== '-' && item.extra !== '0h 0m' ? 'text-success' : ''}`}>
-        {item.extra !== '-' && item.extra !== '0h 0m' ? item.extra : '-'}
+      <td className={`px-4 py-3 text-left border-b border-gray-200 ${isCompensado ? "text-blue-600 font-semibold" : ""}`}>
+        {item.total}
+        {isCompensado && (
+          <span className="font-normal"> ({Math.floor(item.compensatedMinutes / 60)}h {item.compensatedMinutes % 60}m compensadas)</span>
+        )}
+        {isLessThanEightHours && !isCompensado && (
+          <CompensateOvertimeButton date={item.diaCompleto} deficitMinutes={item.minutosFalta} onSuccess={onCompensated} />
+        )}
       </td>
+      {/* <td className={`px-4 py-3 text-left border-b border-gray-200 ${item.extra !== '-' && item.extra !== '0h 0m' ? 'text-success' : ''}`}>
+        {item.extra !== '-' && item.extra !== '0h 0m' ? item.extra : '-'}
+      </td> */}
     </tr>
   );
 };

@@ -1,25 +1,25 @@
 const admin = require("firebase-admin");
 const { normalizeUserId } = require("./helpers");
 const { normalizeEntityId } = require("../../shared/lib/normalizeEntityId");
-const { isSuperAdmin, isAdminOrHR, isAdministrador } = require("../../shared/middleware/auth");
+const { isSuperAdmin, isAdminOrHR, isAdministrador, isGestorFinanceiro } = require("../../shared/middleware/auth");
 const db = admin.firestore();
 
 // Únicos valores válidos para o nível de acesso (controla permissões). Distinto
 // de "role", que é só o cargo/título mostrado (texto livre) e nunca deve ser
 // usado para decidir permissões.
-const NIVEIS_ACESSO = ["SuperAdmin", "GestorRH", "Administrador", "Colaborador"];
+const NIVEIS_ACESSO = ["SuperAdmin", "GestorRH", "Administrador", "GestorFinanceiro", "Colaborador"];
 function normalizeNivelAcesso(nivelAcesso) {
   return NIVEIS_ACESSO.includes(nivelAcesso) ? nivelAcesso : "Colaborador";
 }
 
 // Um Administrador só gere colaboradores da sua própria entidade e nunca pode
 // promover ninguém (incluindo a si próprio) a um nível igual ou superior ao seu
-// (GestorRH/SuperAdmin)  -  isso continua exclusivo do SuperAdmin. Um SuperAdmin
-// continua sem restrições.
+// (GestorRH/GestorFinanceiro/SuperAdmin)  -  isso continua exclusivo do SuperAdmin.
+// Um SuperAdmin continua sem restrições.
 function normalizeNivelAcessoForActor(actorNivelAcesso, requestedNivelAcesso) {
   const requested = normalizeNivelAcesso(requestedNivelAcesso);
   if (isSuperAdmin(actorNivelAcesso)) return requested;
-  if (requested === "GestorRH" || requested === "SuperAdmin") return "Colaborador";
+  if (requested === "GestorRH" || requested === "GestorFinanceiro" || requested === "SuperAdmin") return "Colaborador";
   return requested;
 }
 
@@ -206,9 +206,9 @@ const updateUserDetails = async (req, res) => {
     if (actorIsAdministrador && userDoc.data().entidade !== req.user?.entidade) {
       return res.status(403).json({ error: "Acesso restrito a colaboradores da sua entidade" });
     }
-    // Um Administrador nunca pode editar um GestorRH/SuperAdmin que por acaso partilhe
-    // a mesma entidade  -  evita conseguir despromovê-lo ou alterar os seus dados.
-    if (actorIsAdministrador && isAdminOrHR(userDoc.data().nivelAcesso)) {
+    // Um Administrador nunca pode editar um GestorRH/GestorFinanceiro/SuperAdmin que por
+    // acaso partilhe a mesma entidade  -  evita conseguir despromovê-lo ou alterar os seus dados.
+    if (actorIsAdministrador && (isAdminOrHR(userDoc.data().nivelAcesso) || isGestorFinanceiro(userDoc.data().nivelAcesso))) {
       return res.status(403).json({ error: "Acesso restrito a colaboradores da sua entidade" });
     }
 
@@ -278,7 +278,7 @@ const deleteUser = async (req, res) => {
       if (userDoc.data().entidade !== req.user?.entidade) {
         return res.status(403).json({ error: "Acesso restrito a colaboradores da sua entidade" });
       }
-      if (isAdminOrHR(userDoc.data().nivelAcesso)) {
+      if (isAdminOrHR(userDoc.data().nivelAcesso) || isGestorFinanceiro(userDoc.data().nivelAcesso)) {
         return res.status(403).json({ error: "Acesso restrito a colaboradores da sua entidade" });
       }
     }

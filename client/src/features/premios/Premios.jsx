@@ -9,13 +9,14 @@ export default function Premios() {
   const navigate = useNavigate();
   const { uid, nivelAcesso } = useContext(UserContext);
   const isAdmin = nivelAcesso === "SuperAdmin";
-  const isHR = nivelAcesso === "GestorRH";
   const isAdministrador = nivelAcesso === "Administrador";
-  const canView = isAdmin || isHR || isAdministrador;
+  const isGestorFinanceiro = nivelAcesso === "GestorFinanceiro";
+  const canView = isAdmin || isAdministrador || isGestorFinanceiro;
 
   useEffect(() => {
-    // Esta página (lista de colaboradores) é só para admin/RH/Administrador; um
-    // colaborador comum vê antes os seus próprios prémios.
+    // Esta página (lista de colaboradores) é só para admin/Administrador/Gestor
+    // Financeiro; GestorRH (só consulta os seus próprios prémios, ver canRead no
+    // backend) e um colaborador comum veem antes os seus próprios prémios.
     if (!canView) {
       navigate(`/premios/${uid}`, { replace: true });
     }
@@ -33,7 +34,7 @@ export default function Premios() {
     <div className="flex min-h-screen">
       <Sidebar onSelectFile={handleSelectFile} />
 
-      <div className="ml-[230px] flex-1 flex flex-col min-h-screen">
+      <div className="ml-[var(--sidebar-w,230px)] transition-[margin-left] duration-200 flex-1 min-w-0 flex flex-col min-h-screen">
         <Topbar icon="🏆" title="Prémios" />
         <ColaboradoresGroupedList
           title="Colaboradores"

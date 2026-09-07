@@ -5,7 +5,7 @@ import ContextMenu from './contextMenu';
 import ManualOvertimeModal from './ManualOvertimeModal';
 import { apiFetch } from '../../../../shared/utils/apiFetch';
 
-const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year = new Date().getFullYear(), className = '' }) => {
+const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year = new Date().getFullYear(), className = '', onCompensated }) => {
   const [dados, setDados] = useState([]);
   const [loading, setLoading] = useState(true);
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, dayIndex: null });
@@ -60,6 +60,9 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
         const hasManualOvertime = manualOvertimeForDay.length > 0;
         const manualOvertimeTotalMinutes = manualOvertimeForDay.reduce((sum, mo) => sum + mo.totalMinutes, 0);
 
+        const minutosCompensados = registo?.horasCompensatorias || 0;
+        const isCompensado = minutosCompensados > 0;
+
         const isFerias = feriaDodia != null;
         const isBaixa = baixaDodia != null;
         const isAniversario = aniversarioDodia != null;
@@ -71,14 +74,17 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
         const horaSaidaExtraida   = extractTime(registo?.horaSaida);
         const horasCalculadas = (horaEntradaExtraida && horaSaidaExtraida && !isFerias && !isBaixa && !isAniversario)
           ? calcularHoras(horaEntradaExtraida, horaSaidaExtraida, dataObj)
-          : { total: "-", extra: "-", minutosExtras: 0, minutosFalta: 0 };
+          : { total: "-", extra: "-", minutos: 0, minutosExtras: 0, minutosFalta: 0 };
 
         return {
           dia,
           diaCompleto,
           horaEntrada,
           horaSaida,
-          total: horasCalculadas.total,
+          // Dia compensado: soma-se o que foi trabalhado com o que foi coberto
+          // pelo saldo anual de horas extra (o utilizador escolhe quanto quer
+          // compensar, pode não ser o défice todo  -  ver CompensateOvertimeButton).
+          total: isCompensado ? formatarMinutos(horasCalculadas.minutos + minutosCompensados) : horasCalculadas.total,
           extra: horasCalculadas.extra,
           minutosExtras: horasCalculadas.minutosExtras || 0,
           minutosFalta: horasCalculadas.minutosFalta || 0,
@@ -87,7 +93,9 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
           manualOvertimeEntries: manualOvertimeForDay,
           manualOvertimeDescription: manualOvertimeForDay.map(mo => mo.description).join(', '),
           feriasPendente: isFerias,
-          baixaPendente: isBaixa
+          baixaPendente: isBaixa,
+          compensated: isCompensado,
+          compensatedMinutes: minutosCompensados
         };
       });
 
@@ -153,16 +161,48 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
     fetchData();
   };
 
+  const handleCompensated = () => {
+    fetchData();
+    if (onCompensated) onCompensated();
+  };
+
+
+  const tableHead = (
+    <thead className="sticky top-0 bg-white">
+      <tr>
+        <th className="px-4 py-3 text-left font-semibold text-gold uppercase text-xs tracking-wide border-b-2 border-gray-200">Data</th>
+        <th className="px-4 py-3 text-left font-semibold text-gold uppercase text-xs tracking-wide border-b-2 border-gray-200">Hora Entrada</th>
+        <th className="px-4 py-3 text-left font-semibold text-gold uppercase text-xs tracking-wide border-b-2 border-gray-200">Hora Saída</th>
+        <th className="px-4 py-3 text-left font-semibold text-gold uppercase text-xs tracking-wide border-b-2 border-gray-200">Horas Trabalhadas</th>
+        {/* <th className="px-4 py-3 text-left font-semibold text-gold uppercase text-xs tracking-wide border-b-2 border-gray-200">Horas Extras</th> */}
+      </tr>
+    </thead>
+  );
 
   if (loading) {
-    return <div>A carregar...</div>;
+    return (
+      <div className={`${className}`.trim()}>
+        <table className="w-full border-collapse text-[0.9rem] bg-white">
+          {tableHead}
+          <tbody>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <tr key={i} className="border-b border-gray-100">
+                <td className="px-4 py-3"><div className="h-3 w-12 rounded-full bg-gray-100 animate-pulse" style={{ animationDelay: `${i * 60}ms` }} /></td>
+                <td className="px-4 py-3"><div className="h-3 w-14 rounded-full bg-gray-100 animate-pulse" style={{ animationDelay: `${i * 60}ms` }} /></td>
+                <td className="px-4 py-3"><div className="h-3 w-14 rounded-full bg-gray-100 animate-pulse" style={{ animationDelay: `${i * 60}ms` }} /></td>
+                <td className="px-4 py-3"><div className="h-3 w-20 rounded-full bg-gray-100 animate-pulse" style={{ animationDelay: `${i * 60}ms` }} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
   }
 
   // Calcular totais
   const calcularTotais = () => {
     let totalMinutosTrabalho = 0;
     let totalMinutosExtras = 0;
-    let totalMinutosFalta = 0;
     let totalManualOvertime = 0;
 
     dados.forEach(item => {
@@ -173,11 +213,12 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
         }
       }
       totalMinutosExtras += item.minutosExtras || 0;
-      totalMinutosFalta += item.minutosFalta || 0;
       totalManualOvertime += item.manualOvertimeMinutes || 0;
     });
 
-    const totalExtrasLiquido = totalMinutosExtras + totalManualOvertime - totalMinutosFalta;
+    // Bruto: o mensal já não é reduzido pelas faltas do dia  -  ver
+    // CompensateOvertimeButton, que desconta do saldo anual em vez do mensal.
+    const totalExtrasLiquido = totalMinutosExtras + totalManualOvertime;
 
     return {
       totalTrabalho: formatarMinutos(totalMinutosTrabalho),
@@ -190,15 +231,7 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
   return (
     <div className={`${className}`.trim()}>
       <table className="w-full border-collapse text-[0.9rem] bg-white">
-        <thead className="sticky top-0 bg-white">
-          <tr>
-            <th className="px-4 py-3 text-left font-semibold text-gold uppercase text-xs tracking-wide border-b-2 border-gray-200">Data</th>
-            <th className="px-4 py-3 text-left font-semibold text-gold uppercase text-xs tracking-wide border-b-2 border-gray-200">Hora Entrada</th>
-            <th className="px-4 py-3 text-left font-semibold text-gold uppercase text-xs tracking-wide border-b-2 border-gray-200">Hora Saída</th>
-            <th className="px-4 py-3 text-left font-semibold text-gold uppercase text-xs tracking-wide border-b-2 border-gray-200">Horas Trabalhadas</th>
-            <th className="px-4 py-3 text-left font-semibold text-gold uppercase text-xs tracking-wide border-b-2 border-gray-200">Horas Extras</th>
-          </tr>
-        </thead>
+        {tableHead}
         <tbody>
             {dados.map((item, index) => (
               <TableRow
@@ -210,6 +243,7 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
                 showTooltip={showTooltip}
                 hideTooltip={hideTooltip}
                 openOvertimeManager={openOvertimeManager}
+                onCompensated={handleCompensated}
               />
             ))}
           </tbody>
@@ -217,7 +251,7 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
             <tr>
               <td colSpan="3" className="text-right p-3">Total:</td>
               <td className="text-warning p-3">{totais.totalTrabalho}</td>
-              <td className={`p-3 ${totais.totalExtras.startsWith('-') ? 'text-danger' : 'text-success'}`}>{totais.totalExtras}</td>
+              {/* <td className={`p-3 ${totais.totalExtras.startsWith('-') ? 'text-danger' : 'text-success'}`}>{totais.totalExtras}</td> */}
             </tr>
           </tfoot>
       </table>

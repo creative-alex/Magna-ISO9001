@@ -4,7 +4,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { apiFetch } from '../../../../shared/utils/apiFetch';
 
 
-const LeaveButton = ({ username, fontSize = '1.5vw', buttonHeight = '5vh' }) => {
+const LeaveButton = ({ username, fontSize = '1.5vw', buttonHeight = '5vh', onSuccess }) => {
   const [hasEntry, setHasEntry] = useState(false);
   const [hasLeave, setHasLeave] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -56,10 +56,11 @@ const LeaveButton = ({ username, fontSize = '1.5vw', buttonHeight = '5vh' }) => 
 
       if (response.ok) {
         setHasLeave(true);
-        toast.success(`✓ Saída registada às ${formattedTime}`, { 
-          position: 'top-right', 
-          autoClose: 3000 
+        toast.success(`✓ Saída registada às ${formattedTime}`, {
+          position: 'top-right',
+          autoClose: 3000
         });
+        if (onSuccess) onSuccess();
       } else {
         throw new Error('Resposta não OK do servidor');
       }

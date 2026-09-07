@@ -93,10 +93,10 @@ export default function Dashboard() {
     <div className="flex min-h-screen">
       <Sidebar onSelectFile={handleSelectFile} />
 
-      <div className="ml-[230px] flex-1 flex flex-col min-h-screen">
+      <div className="ml-[var(--sidebar-w,230px)] transition-[margin-left] duration-200 flex-1 min-w-0 flex flex-col min-h-screen">
         <Topbar icon="📊" title="Dashboard" searchTerm={searchTerm} onSearchChange={setSearchTerm} />
 
-        <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
+        <div className="p-4 sm:p-6" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
           {/* KPIs */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(155px, 1fr))", gap: 12 }}>
@@ -115,7 +115,7 @@ export default function Dashboard() {
           </div>
 
           {/* Mapa + Painel lateral */}
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
+          <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4">
 
             {/* Mapa de processos */}
             <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>

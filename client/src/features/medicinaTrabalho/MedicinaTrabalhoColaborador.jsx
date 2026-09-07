@@ -5,48 +5,60 @@ import { UserContext } from "../../shared/context/userContext";
 import Sidebar from "../../shared/components/Sidebar";
 import Topbar from "../../shared/components/Topbar";
 import {
-  FaBriefcaseMedical, FaFileLines, FaPencil, FaCheck, FaArrowLeft, FaTrash,
+  FaFileLines, FaCheck, FaArrowLeft, FaTrash, FaPlus, FaClock, FaXmark, FaPencil,
 } from "react-icons/fa6";
 import { apiFetch } from "../../shared/utils/apiFetch";
 import { getNomeCurto } from "../../shared/utils/nomeCurto";
 
 const GOLD = "#C8932F";
 
-const FORM_FIELDS = [
-  { key: "data_ultimo_exame", label: "Data do último exame", type: "date" },
-  { key: "data_proximo_exame", label: "Data do próximo exame", type: "date" },
-];
+function formatDate(value) {
+  if (!value) return "-";
+  const [y, m, d] = value.split("-");
+  if (!y || !m || !d) return value;
+  return `${d}/${m}/${y}`;
+}
 
-const INITIAL_FORM = FORM_FIELDS.reduce((acc, f) => {
-  acc[f.key] = "";
-  return acc;
-}, {});
+// Data de hoje no formato "AAAA-MM-DD" (comparável diretamente com data_exame).
+function getTodayStr() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 export default function MedicinaTrabalhoColaborador() {
   const navigate = useNavigate();
   const { id } = useParams();
   const location = useLocation();
-  const { uid, nivelAcesso } = useContext(UserContext);
+  const { uid, nivelAcesso, username } = useContext(UserContext);
   const isAdmin = nivelAcesso === "SuperAdmin";
   const isHR = nivelAcesso === "GestorRH";
   const isAdministrador = nivelAcesso === "Administrador";
   const canManage = isAdmin || isHR;
   const isSelf = uid === id;
   // Administrador só tem acesso de leitura (o backend confirma que o colaborador é da
-  // sua entidade); nunca ganha canManage, por isso os botões de edição continuam ocultos.
+  // sua entidade); nunca ganha canManage, por isso os botões de gestão continuam ocultos.
   const canView = canManage || isSelf || isAdministrador;
-  const targetLabel = location.state?.nome || id;
+  const targetLabel = location.state?.nome || (isSelf ? username : null) || id;
   const nomeCurto = getNomeCurto(targetLabel);
 
   const [loading, setLoading] = useState(true);
-  const [editMode, setEditMode] = useState(false);
+  const [exames, setExames] = useState([]);
+
+  const [showModal, setShowModal] = useState(false);
+  const [modalData, setModalData] = useState("");
+  const [modalFile, setModalFile] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState(INITIAL_FORM);
-  const [fichaNomeFicheiro, setFichaNomeFicheiro] = useState(null);
-  const [fichaPath, setFichaPath] = useState(null);
-  const [uploadingFicha, setUploadingFicha] = useState(false);
-  const [viewingFicha, setViewingFicha] = useState(false);
-  const [removingFicha, setRemovingFicha] = useState(false);
+
+  const [editingRowId, setEditingRowId] = useState(null);
+  const [editRowData, setEditRowData] = useState("");
+  const [editRowFile, setEditRowFile] = useState(null);
+  const [savingRow, setSavingRow] = useState(false);
+
+  const [viewingId, setViewingId] = useState(null);
+  const [removingId, setRemovingId] = useState(null);
 
   useEffect(() => {
     if (!canView) {
@@ -61,9 +73,7 @@ export default function MedicinaTrabalhoColaborador() {
       const res = await apiFetch(`/medicina-trabalho/${id}`);
       if (res.ok) {
         const data = await res.json();
-        setForm({ ...INITIAL_FORM, ...(data.form || {}) });
-        setFichaNomeFicheiro(data.ficha_nome_ficheiro || null);
-        setFichaPath(data.ficha_path || null);
+        setExames(data.exames || []);
       } else {
         toast.error("Não foi possível carregar a medicina do trabalho", { position: "top-right" });
       }
@@ -81,76 +91,113 @@ export default function MedicinaTrabalhoColaborador() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const handleChange = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
+  const openModal = () => {
+    setModalData("");
+    setModalFile(null);
+    setShowModal(true);
+  };
 
-  const handleSave = async () => {
+  const closeModal = () => {
+    if (saving) return;
+    setShowModal(false);
+    setModalData("");
+    setModalFile(null);
+  };
+
+  const handleCreateExame = async () => {
+    if (!modalData) {
+      toast.error("Indica a data do exame", { position: "top-right" });
+      return;
+    }
     setSaving(true);
     try {
-      const res = await apiFetch(`/medicina-trabalho/${id}`, {
-        method: "PUT",
-        body: JSON.stringify({ form }),
-      });
+      const formData = new FormData();
+      formData.append("data_exame", modalData);
+      if (modalFile) formData.append("file", modalFile);
+
+      const res = await apiFetch(`/medicina-trabalho/${id}/exames`, { method: "POST", body: formData });
+
       if (res.ok) {
-        setEditMode(false);
+        closeModal();
         await fetchMedicinaTrabalho();
-        toast.success("Medicina do trabalho guardada", { position: "top-right", autoClose: 2500 });
+        toast.success("Exame registado", { position: "top-right", autoClose: 2500 });
       } else {
-        toast.error("Falha ao guardar a medicina do trabalho", { position: "top-right" });
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Falha ao registar o exame", { position: "top-right" });
       }
     } catch (e) {
       console.error(e);
-      toast.error("Falha ao guardar a medicina do trabalho", { position: "top-right" });
+      toast.error("Falha ao registar o exame", { position: "top-right" });
     } finally {
       setSaving(false);
     }
   };
 
-  const handleUploadFicha = async (file) => {
-    if (!file) return;
-    setUploadingFicha(true);
+  const startEditRow = (ex) => {
+    setEditingRowId(ex.id);
+    setEditRowData(ex.data_exame);
+    setEditRowFile(null);
+  };
+
+  const cancelEditRow = () => {
+    if (savingRow) return;
+    setEditingRowId(null);
+    setEditRowData("");
+    setEditRowFile(null);
+  };
+
+  const handleSaveRow = async (exame) => {
+    if (!editRowData) {
+      toast.error("Indica a data do exame", { position: "top-right" });
+      return;
+    }
+    setSavingRow(true);
     try {
       const formData = new FormData();
-      formData.append("file", file);
-      const res = await apiFetch(`/medicina-trabalho/${id}/ficha`, { method: "POST", body: formData });
+      formData.append("data_exame", editRowData);
+      if (editRowFile) formData.append("file", editRowFile);
+
+      const res = await apiFetch(`/medicina-trabalho/${id}/exames/${exame.id}`, { method: "PUT", body: formData });
+
       if (res.ok) {
-        const data = await res.json();
-        setFichaNomeFicheiro(data.ficha_nome_ficheiro);
-        setFichaPath(data.ficha_path);
-        toast.success("Ficha guardada", { position: "top-right", autoClose: 2500 });
+        setEditingRowId(null);
+        setEditRowData("");
+        setEditRowFile(null);
+        await fetchMedicinaTrabalho();
+        toast.success("Exame atualizado", { position: "top-right", autoClose: 2500 });
       } else {
         const data = await res.json().catch(() => ({}));
-        toast.error(data.error || "Falha ao enviar a ficha", { position: "top-right" });
+        toast.error(data.error || "Falha ao atualizar o exame", { position: "top-right" });
       }
     } catch (e) {
       console.error(e);
-      toast.error("Falha ao enviar a ficha", { position: "top-right" });
+      toast.error("Falha ao atualizar o exame", { position: "top-right" });
     } finally {
-      setUploadingFicha(false);
+      setSavingRow(false);
     }
   };
 
-  const handleRemoveFicha = async () => {
-    setRemovingFicha(true);
+  const handleRemoveExame = async (exameId) => {
+    setRemovingId(exameId);
     try {
-      const res = await apiFetch(`/medicina-trabalho/${id}/ficha`, { method: "DELETE" });
+      const res = await apiFetch(`/medicina-trabalho/${id}/exames/${exameId}`, { method: "DELETE" });
       if (res.ok) {
-        setFichaNomeFicheiro(null);
-        setFichaPath(null);
-        toast.success("Ficha removida", { position: "top-right", autoClose: 2000 });
+        setExames(prev => prev.filter(e => e.id !== exameId));
+        toast.success("Exame removido", { position: "top-right", autoClose: 2000 });
       } else {
-        toast.error("Falha ao remover a ficha", { position: "top-right" });
+        toast.error("Falha ao remover exame", { position: "top-right" });
       }
     } catch (e) {
       console.error(e);
-      toast.error("Falha ao remover a ficha", { position: "top-right" });
+      toast.error("Falha ao remover exame", { position: "top-right" });
     } finally {
-      setRemovingFicha(false);
+      setRemovingId(null);
     }
   };
 
-  const handleViewFicha = async () => {
+  const handleViewFicha = async (fichaPath, exameId) => {
     if (!fichaPath) return;
-    setViewingFicha(true);
+    setViewingId(exameId);
     try {
       const res = await apiFetch(`/files/download`, {
         method: "POST",
@@ -166,38 +213,8 @@ export default function MedicinaTrabalhoColaborador() {
       console.error(e);
       toast.error("Falha ao abrir a ficha", { position: "top-right" });
     } finally {
-      setViewingFicha(false);
+      setViewingId(null);
     }
-  };
-
-  const inputStyle = {
-    width: "100%", fontSize: 13, color: "#111827", fontWeight: 500,
-    border: "1px solid #e5e7eb", borderRadius: 6, padding: "7px 9px",
-    outline: "none", background: editMode ? "#fafafa" : "#fff",
-    boxSizing: "border-box",
-  };
-
-  const labelStyle = { fontSize: 11, color: "#6b7280", marginBottom: 4, display: "block" };
-
-  const renderField = (field) => {
-    const { key, label, type } = field;
-    const value = form[key];
-
-    return (
-      <div key={key}>
-        <span style={labelStyle}>{label}</span>
-        {editMode ? (
-          <input
-            type={type}
-            value={value}
-            onChange={e => handleChange(key, e.target.value)}
-            style={inputStyle}
-          />
-        ) : (
-          <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{value || " - "}</div>
-        )}
-      </div>
-    );
   };
 
   const handleSelectFile = (filePath) => {
@@ -205,13 +222,161 @@ export default function MedicinaTrabalhoColaborador() {
     navigate(`/file/${formattedPath}`, { state: { originalFilename: filePath } });
   };
 
+  const labelStyle = { fontSize: 11, color: "#6b7280", marginBottom: 4, display: "block" };
+  const inputStyle = {
+    width: "100%", fontSize: 13, color: "#111827", fontWeight: 500,
+    border: "1px solid #e5e7eb", borderRadius: 6, padding: "7px 9px",
+    outline: "none", background: "#fafafa", boxSizing: "border-box",
+  };
+
   if (!canView) return null;
+
+  const todayStr = getTodayStr();
+  const porFazer = exames.filter(e => e.data_exame > todayStr).sort((a, b) => a.data_exame.localeCompare(b.data_exame));
+  const feitos = exames.filter(e => e.data_exame <= todayStr).sort((a, b) => b.data_exame.localeCompare(a.data_exame));
+
+  const renderExameRow = (ex) => {
+    if (editingRowId === ex.id) {
+      return (
+        <div key={ex.id} style={{ padding: "16px 18px", borderBottom: "1px solid #f3f4f6", background: "#fffbf4" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 24, flexWrap: "wrap", marginBottom: 14 }}>
+            <div style={{ width: 150 }}>
+              <span style={labelStyle}>Data do exame</span>
+              <input
+                type="date"
+                value={editRowData}
+                onChange={e => setEditRowData(e.target.value)}
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <span style={labelStyle}>Ficha (PDF)</span>
+              <label
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 7,
+                  padding: "7px 13px", fontSize: 12, fontWeight: 500,
+                  border: `1px solid ${GOLD}`, borderRadius: 6, background: "#fff", color: GOLD,
+                  cursor: "pointer", whiteSpace: "nowrap",
+                }}
+              >
+                <FaFileLines style={{ fontSize: 12 }} />
+                {ex.ficha_nome_ficheiro ? "Substituir ficheiro" : "Escolher ficheiro"}
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  onChange={e => setEditRowFile(e.target.files?.[0] || null)}
+                  style={{ display: "none" }}
+                />
+              </label>
+              {(editRowFile || ex.ficha_nome_ficheiro) && (
+                <div style={{
+                  fontSize: 11, color: "#6b7280", marginTop: 6, maxWidth: 220,
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>
+                  {editRowFile ? editRowFile.name : `Atual: ${ex.ficha_nome_ficheiro} (mantido)`}
+                </div>
+              )}
+            </div>
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <button
+              type="button"
+              onClick={cancelEditRow}
+              disabled={savingRow}
+              style={{
+                padding: "7px 14px", fontSize: 12, fontWeight: 500, cursor: savingRow ? "not-allowed" : "pointer",
+                border: "1px solid #e5e7eb", borderRadius: 7, background: "#fff", color: "#6b7280",
+              }}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSaveRow(ex)}
+              disabled={savingRow || !editRowData}
+              style={{
+                padding: "7px 14px", fontSize: 12, fontWeight: 500,
+                cursor: savingRow || !editRowData ? "not-allowed" : "pointer",
+                border: `1px solid ${GOLD}`, borderRadius: 7, background: GOLD, color: "#fff",
+                opacity: savingRow || !editRowData ? 0.6 : 1,
+              }}
+            >
+              {savingRow ? "A guardar..." : "Guardar"}
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div key={ex.id} style={{ padding: "12px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ width: 110, flexShrink: 0 }}>
+          <span style={labelStyle}>Data do exame</span>
+          <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{formatDate(ex.data_exame)}</div>
+        </div>
+        {ex.ficha_nome_ficheiro ? (
+          <span style={{
+            display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#111827", flex: 1,
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
+            <FaFileLines style={{ color: "#9ca3af", fontSize: 12, flexShrink: 0 }} />
+            {ex.ficha_nome_ficheiro}
+          </span>
+        ) : (
+          <span style={{ flex: 1, fontSize: 12, color: "#9ca3af" }}>Sem ficha anexada</span>
+        )}
+        {ex.ficha_path && (
+          <button
+            type="button"
+            onClick={() => handleViewFicha(ex.ficha_path, ex.id)}
+            disabled={viewingId === ex.id}
+            style={{
+              padding: "4px 10px", fontSize: 12, fontWeight: 500,
+              cursor: viewingId === ex.id ? "wait" : "pointer",
+              border: "1px solid #e5e7eb", borderRadius: 7, background: "#fff", color: "#6b7280",
+            }}
+          >
+            {viewingId === ex.id ? "A abrir..." : "Ver"}
+          </button>
+        )}
+        {canManage && (
+          <>
+            <button
+              type="button"
+              onClick={() => startEditRow(ex)}
+              title="Editar"
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                width: 26, height: 26, cursor: "pointer",
+                border: "1px solid #e5e7eb", borderRadius: 7, background: "#fff", color: "#6b7280",
+              }}
+            >
+              <FaPencil style={{ fontSize: 10 }} />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleRemoveExame(ex.id)}
+              disabled={removingId === ex.id}
+              title="Remover"
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                width: 26, height: 26, cursor: removingId === ex.id ? "wait" : "pointer",
+                border: "1px solid #fee2e2", borderRadius: 7, background: "#fff", color: "#dc2626",
+              }}
+            >
+              <FaTrash style={{ fontSize: 10 }} />
+            </button>
+          </>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="flex min-h-screen">
       <Sidebar onSelectFile={handleSelectFile} />
 
-      <div className="ml-[230px] flex-1 flex flex-col min-h-screen">
+      <div className="ml-[var(--sidebar-w,230px)] transition-[margin-left] duration-200 flex-1 min-w-0 flex flex-col min-h-screen">
         <Topbar icon="🩺" title="Medicina do Trabalho" />
 
         <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
@@ -235,20 +400,17 @@ export default function MedicinaTrabalhoColaborador() {
             </div>
             {canManage && (
               <button
-                disabled={saving}
-                onClick={() => { if (editMode) handleSave(); else setEditMode(true); }}
+                onClick={openModal}
                 style={{
                   display: "flex", alignItems: "center", gap: 6,
-                  padding: "8px 16px", fontSize: 13, fontWeight: 500, cursor: saving ? "wait" : "pointer",
-                  border: `1px solid ${editMode ? "#22c55e" : GOLD}`,
+                  padding: "8px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer",
+                  border: `1px solid ${GOLD}`,
                   borderRadius: 7, background: "#fff",
-                  color: editMode ? "#22c55e" : GOLD,
-                  transition: "all 0.15s", flexShrink: 0, opacity: saving ? 0.6 : 1,
+                  color: GOLD,
+                  transition: "all 0.15s", flexShrink: 0,
                 }}
               >
-                {saving
-                  ? "A guardar..."
-                  : editMode ? <><FaCheck style={{ fontSize: 12 }} /> Guardar</> : <><FaPencil style={{ fontSize: 12 }} /> Editar</>}
+                <FaPlus style={{ fontSize: 11 }} /> Registar Exame Médico
               </button>
             )}
           </div>
@@ -258,83 +420,119 @@ export default function MedicinaTrabalhoColaborador() {
               A carregar medicina do trabalho...
             </div>
           ) : (
-            <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-              <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 8 }}>
-                <FaBriefcaseMedical style={{ color: GOLD, fontSize: 13 }} />
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>Medicina do trabalho</span>
-              </div>
+            <>
+              <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+                <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 8 }}>
+                  <FaClock style={{ color: GOLD, fontSize: 13 }} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>Por fazer</span>
+                </div>
 
-              <div style={{ padding: 18, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px 20px", marginBottom: 4 }}>
-                {FORM_FIELDS.map(renderField)}
-              </div>
-
-              <div style={{ padding: "0 18px 18px", display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ ...labelStyle, marginBottom: 0 }}>Ficha de aptidão médica:</span>
-                {fichaNomeFicheiro ? (
-                  <>
-                    <span style={{
-                      display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#111827",
-                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 260,
-                    }}>
-                      <FaFileLines style={{ color: "#9ca3af", fontSize: 12, flexShrink: 0 }} />
-                      {fichaNomeFicheiro}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleViewFicha}
-                      disabled={viewingFicha}
-                      style={{
-                        padding: "4px 10px", fontSize: 12, fontWeight: 500,
-                        cursor: viewingFicha ? "wait" : "pointer",
-                        border: "1px solid #e5e7eb", borderRadius: 7, background: "#fff", color: "#6b7280",
-                      }}
-                    >
-                      {viewingFicha ? "A abrir..." : "Ver"}
-                    </button>
-                    {editMode && (
+                {showModal && (
+                  <div style={{ padding: "16px 18px", borderBottom: "1px solid #f3f4f6", background: "#fffbf4" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>
+                        Registar Exame Médico
+                      </span>
                       <button
                         type="button"
-                        onClick={handleRemoveFicha}
-                        disabled={removingFicha}
-                        title="Remover ficha"
+                        onClick={closeModal}
                         style={{
                           display: "flex", alignItems: "center", justifyContent: "center",
-                          width: 26, height: 26, cursor: removingFicha ? "wait" : "pointer",
-                          border: "1px solid #fee2e2", borderRadius: 7, background: "#fff", color: "#dc2626",
+                          width: 24, height: 24, border: "none", background: "transparent", color: "#9ca3af", cursor: "pointer",
                         }}
                       >
-                        <FaTrash style={{ fontSize: 10 }} />
+                        <FaXmark style={{ fontSize: 13 }} />
                       </button>
-                    )}
-                  </>
-                ) : editMode ? (
-                  <label
-                    style={{
-                      display: "flex", alignItems: "center", gap: 6,
-                      padding: "5px 11px", fontSize: 12, fontWeight: 500,
-                      border: `1px solid ${GOLD}`, borderRadius: 7, background: "#fff", color: GOLD,
-                      cursor: uploadingFicha ? "wait" : "pointer",
-                      opacity: uploadingFicha ? 0.6 : 1,
-                    }}
-                  >
-                    {uploadingFicha ? "A enviar..." : "Adicionar ficha"}
-                    <input
-                      type="file"
-                      accept="application/pdf,image/*"
-                      disabled={uploadingFicha}
-                      onChange={e => {
-                        const file = e.target.files?.[0];
-                        e.target.value = "";
-                        handleUploadFicha(file);
-                      }}
-                      style={{ display: "none" }}
-                    />
-                  </label>
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 24, flexWrap: "wrap", marginBottom: 14 }}>
+                      <div style={{ width: 160 }}>
+                        <span style={labelStyle}>Data do exame</span>
+                        <input
+                          type="date"
+                          value={modalData}
+                          onChange={e => setModalData(e.target.value)}
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div>
+                        <span style={labelStyle}>Ficha (PDF)</span>
+                        <label
+                          style={{
+                            display: "inline-flex", alignItems: "center", gap: 7,
+                            padding: "7px 13px", fontSize: 12, fontWeight: 500,
+                            border: `1px solid ${GOLD}`, borderRadius: 6, background: "#fff", color: GOLD,
+                            cursor: "pointer", whiteSpace: "nowrap",
+                          }}
+                        >
+                          <FaFileLines style={{ fontSize: 12 }} />
+                          Escolher ficheiro
+                          <input
+                            type="file"
+                            accept="application/pdf"
+                            onChange={e => setModalFile(e.target.files?.[0] || null)}
+                            style={{ display: "none" }}
+                          />
+                        </label>
+                        {modalFile && (
+                          <div style={{
+                            fontSize: 11, color: "#6b7280", marginTop: 6, maxWidth: 220,
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          }}>
+                            {modalFile.name}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                      <button
+                        type="button"
+                        onClick={closeModal}
+                        disabled={saving}
+                        style={{
+                          padding: "7px 14px", fontSize: 12, fontWeight: 500, cursor: saving ? "not-allowed" : "pointer",
+                          border: "1px solid #e5e7eb", borderRadius: 7, background: "#fff", color: "#6b7280",
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCreateExame}
+                        disabled={saving || !modalData}
+                        style={{
+                          padding: "7px 14px", fontSize: 12, fontWeight: 500,
+                          cursor: saving || !modalData ? "not-allowed" : "pointer",
+                          border: `1px solid ${GOLD}`, borderRadius: 7, background: GOLD, color: "#fff",
+                          opacity: saving || !modalData ? 0.6 : 1,
+                        }}
+                      >
+                        {saving ? "A guardar..." : "Guardar"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {porFazer.length === 0 ? (
+                  <div style={{ padding: 18, fontSize: 13, color: "#9ca3af" }}>Sem exames por fazer.</div>
                 ) : (
-                  <span style={{ fontSize: 13, color: "#9ca3af" }}> - </span>
+                  <div>{porFazer.map(renderExameRow)}</div>
                 )}
               </div>
-            </div>
+
+              <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+                <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 8 }}>
+                  <FaCheck style={{ color: GOLD, fontSize: 13 }} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>Feitos</span>
+                </div>
+
+                {feitos.length === 0 ? (
+                  <div style={{ padding: 18, fontSize: 13, color: "#9ca3af" }}>Sem exames feitos.</div>
+                ) : (
+                  <div>{feitos.map(renderExameRow)}</div>
+                )}
+              </div>
+            </>
           )}
 
         </div>

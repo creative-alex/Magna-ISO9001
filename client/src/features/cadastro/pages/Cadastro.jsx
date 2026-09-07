@@ -4,25 +4,67 @@ import { toast } from "react-toastify";
 import { UserContext } from "../../../shared/context/userContext";
 import Sidebar from "../../../shared/components/Sidebar";
 import Topbar from "../../../shared/components/Topbar";
+import AutocompleteInput from "../../../shared/components/AutocompleteInput";
 import {
-  FaUser, FaLocationDot, FaIdCard, FaUsers, FaFileContract,
+  FaUser, FaLocationDot, FaUsers, FaFileContract,
   FaGraduationCap, FaCloudArrowUp, FaArrowUpRightFromSquare,
   FaCircleMinus, FaPencil, FaCheck, FaArrowLeft,
+  FaUserGraduate, FaPlus, FaChevronDown, FaNotesMedical,
 } from "react-icons/fa6";
 import { apiFetch } from "../../../shared/utils/apiFetch";
 import { getNomeCurto } from "../../../shared/utils/nomeCurto";
+import {
+  SITUACAO_CONJUGAL_OPTIONS, GRAU_PARENTESCO_OPTIONS, IRS_JOVEM_OPTIONS,
+  TIPO_CONTRATO_OPTIONS, SITUACAO_CONTRATUAL_OPTIONS, DEPARTAMENTO_OPTIONS,
+  TIPO_BAIXA_OPTIONS, SITUACAO_CESSADO, MOTIVO_CESSACAO_OPTIONS,
+  LOCAL_OPTIONS, LOCAL_OPTION_LABELS, TIPO_CONTRATO_SEM_TERMO,
+  TIPO_ESTAGIO_OPTIONS, TIPO_ESTAGIO_PROFISSIONAL, HABILITACOES_OPTIONS, FUNCAO,
+} from "../../../shared/utils/formOptions";
 
 const GOLD = "#C8932F";
 
-const SITUACAO_CONJUGAL_OPTIONS = ["Não Casado(a)", "Casado(a)", "Casado(a) 1 titular", "Casado(a) 2 titulares", "Viúvo(a)", "Divorciado(a)",];
-const TIPO_CONTRATO_OPTIONS = [
-  "Contrato sem termo", "Contrato a termo certo", "Contrato a termo incerto",
-  "Prestação de serviços", "Contrato de estágio", "Outro",
-];
-const SITUACAO_CONTRATUAL_OPTIONS = ["Ativo", "Suspenso", "Cessado", "Reformado"];
-const LOCAL_OPTIONS = ["Porto", "Coimbra", "Paredes", "Canedo", "Abrantes", "Vila Nova de Gaia"];
-const TIPO_CONTRATO_ESTAGIO = "Contrato de estágio";
-const TIPO_CONTRATO_SEM_TERMO = "Contrato sem termo";
+// Duração entre duas datas ("aaaa-mm-dd"), devolvida já formatada em meses e dias
+// (ex: "9 meses e 12 dias")  -  ou null se as datas faltarem ou forem inválidas.
+function formatDuracao(inicioStr, fimStr) {
+  if (!inicioStr || !fimStr) return null;
+  const inicio = new Date(inicioStr);
+  const fim = new Date(fimStr);
+  if (Number.isNaN(inicio.getTime()) || Number.isNaN(fim.getTime()) || fim < inicio) return null;
+
+  let meses = (fim.getFullYear() - inicio.getFullYear()) * 12 + (fim.getMonth() - inicio.getMonth());
+  let dias = fim.getDate() - inicio.getDate();
+  if (dias < 0) {
+    meses -= 1;
+    dias += new Date(fim.getFullYear(), fim.getMonth(), 0).getDate();
+  }
+
+  const partes = [];
+  if (meses > 0) partes.push(`${meses} ${meses === 1 ? "mês" : "meses"}`);
+  if (dias > 0 || partes.length === 0) partes.push(`${dias} ${dias === 1 ? "dia" : "dias"}`);
+  return partes.join(" e ");
+}
+
+// Antiguidade entre duas datas, em anos e meses (ex: "1 ano e 8 meses")  -  ao contrário de
+// formatDuracao (meses/dias), pensado para durações longas como o tempo de casa.
+function formatAntiguidade(inicioStr, fimStr) {
+  if (!inicioStr || !fimStr) return null;
+  const inicio = new Date(inicioStr);
+  const fim = new Date(fimStr);
+  if (Number.isNaN(inicio.getTime()) || Number.isNaN(fim.getTime()) || fim < inicio) return null;
+
+  let anos = fim.getFullYear() - inicio.getFullYear();
+  let meses = fim.getMonth() - inicio.getMonth();
+  if (fim.getDate() < inicio.getDate()) meses -= 1;
+  if (meses < 0) {
+    anos -= 1;
+    meses += 12;
+  }
+
+  const partes = [];
+  if (anos > 0) partes.push(`${anos} ${anos === 1 ? "ano" : "anos"}`);
+  if (meses > 0 || partes.length === 0) partes.push(`${meses} ${meses === 1 ? "mês" : "meses"}`);
+  return partes.join(" e ");
+}
 
 const SECTIONS = [
   {
@@ -31,10 +73,12 @@ const SECTIONS = [
     fields: [
       { key: "nome_completo", label: "Nome completo", type: "text" },
       { key: "data_nascimento", label: "Data de nascimento", type: "date" },
+      { key: "nacionalidade", label: "Nacionalidade", type: "text" },
       { key: "n_cartao_cidadao", label: "Nº cartão de cidadão", type: "text" },
-      { key: "nif", label: "NIF", type: "text" },
+      { key: "validade_cc", label: "Validade do CC", type: "date" },
+      { key: "nif", label: "NIF", type: "text", newRow: true },
       { key: "n_seguranca_social", label: "Nº segurança social", type: "text" },
-      { key: "digitalizacao_cc", label: "Digitalização CC (frente e verso)", type: "file" },
+      { key: "digitalizacao_cc", label: "Digitalização CC (frente e verso)", type: "file", storageName: "CC_Frente_Verso" },
     ],
   },
   {
@@ -46,21 +90,25 @@ const SECTIONS = [
       { key: "localidade", label: "Localidade", type: "text" },
       { key: "telefone", label: "Contacto", type: "tel" },
       { key: "telefone_emergencia", label: "Contacto de emergência", type: "tel" },
-      { key: "email_profissional", label: "Email profissional", type: "email" },
+      { key: "grau_parentesco_emergencia", label: "Grau de parentesco (contacto de emergência)", type: "select", options: GRAU_PARENTESCO_OPTIONS },
+      { key: "email", label: "Email", type: "email", readOnly: true },
     ],
   },
   {
     title: "Dados fiscais/IRS",
     Icon: FaUsers,
     fields: [
-      { key: "situacao_conjugal", label: "Situação conjugal", type: "select", options: SITUACAO_CONJUGAL_OPTIONS },
-      { key: "irs_jovem", label: "IRS jovem", type: "toggle" },
-      { key: "percentagem_isencao", label: "Percentagem de isenção", type: "number", showIf: f => f.irs_jovem === true },
+      { key: "situacao_conjugal", label: "Situação conjugal", type: "select", options: SITUACAO_CONJUGAL_OPTIONS, newRow: true },
       { key: "n_titulares", label: "Nº titulares do agregado familiar", type: "number" },
       { key: "n_dependentes", label: "Nº dependentes", type: "number" },
-      { key: "n_dependentes_deficientes", label: "Nº dependentes com deficiência", type: "number" },
+      { key: "tem_dependentes_deficientes", label: "Dependentes com deficiência", type: "toggle" },
+      { key: "n_dependentes_deficientes", label: "Nº dependentes com deficiência", type: "number", showIf: f => f.tem_dependentes_deficientes === true },
       { key: "declarante_deficiente", label: "Tem incapacidade superior a 60%", type: "toggle" },
-      { key: "conjuge_deficiente", label: "Cônjuge com deficiência", type: "toggle" },
+      { key: "irs_jovem", label: "IRS jovem", type: "toggle", newRow: true },
+      { key: "escalao_irs_jovem", label: "Escalão de isenção", type: "select", options: IRS_JOVEM_OPTIONS, showIf: f => f.irs_jovem === true },
+      { key: "digitalizacao_pedido_irs_jovem", label: "Pedido de aplicação de IRS Jovem (PDF)", type: "file", showIf: f => f.irs_jovem === true, storageName: "Pedido_IRS_Jovem" },
+      { key: "IBAN", label: "IBAN", type: "text", newRow: true },
+      { key: "IBAN_digitalizacao", label: "Comprovativo do IBAN", type: "file", storageName: "Comprovativo_IBAN" },
     ],
   },
   {
@@ -68,67 +116,104 @@ const SECTIONS = [
     Icon: FaGraduationCap,
     fields: [
       { key: "area_formacao", label: "Área de formação", type: "text" },
-      { key: "habilitacoes", label: "Habilitações literárias", type: "text" },
-      { key: "certificado_habilitacoes", label: "Certificado de habilitações", type: "file" },
+      { key: "habilitacoes", label: "Habilitações literárias", type: "text", list: "habilitacoes" },
       { key: "ccp", label: "CCP (Certificado de Competências Pedagógicas)", type: "toggle" },
-      { key: "digitalizacao_ccp", label: "Comprovativo do CCP", type: "file", showIf: f => f.ccp === true },
-      { key: "ficha_dgert_atualizada", label: "Ficha curricular DGERT atualizada", type: "file" },
-      { key: "cv_atualizado", label: "CV atualizado", type: "file" },
+      { key: "certificado_habilitacoes", label: "Certificado de habilitações", type: "file", storageName: "Certificado_Habilitacoes" },
+      { key: "digitalizacao_ccp", label: "Comprovativo do CCP", type: "file", showIf: f => f.ccp === true, storageName: "CCP" },
+      { key: "ficha_dgert_atualizada", label: "Ficha curricular DGERT atualizada", type: "file", storageName: "Ficha_DGERT" },
+      { key: "cv_atualizado", label: "CV atualizado", type: "file", storageName: "CV" },
     ],
   },
   {
     title: "Dados contratuais ",
     Icon: FaFileContract,
     restricted: true,
-    monthHistory: true,
     fields: [
-      { key: "sede", label: "Sede", type: "select", options: LOCAL_OPTIONS },
       { key: "tipo_contrato", label: "Tipo de contrato celebrado", type: "select", options: TIPO_CONTRATO_OPTIONS },
       { key: "situacao_contratual", label: "Situação contratual", type: "select", options: SITUACAO_CONTRATUAL_OPTIONS },
-
-      // Campos abaixo só se aplicam a contratos que não sejam de estágio profissional
-      { key: "funcao", label: "Função", type: "text", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO },
-      { key: "data_admissao", label: "Data de admissão", type: "date", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO },
-      { key: "data_fim_contrato", label: "Data de fim de contrato", type: "date", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO &&  f.tipo_contrato !== TIPO_CONTRATO_SEM_TERMO },
-      { key: "digitalizacao_contrato", label: "Contrato (todas as páginas)", type: "file", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO },
-      { key: "cedencia_temporaria", label: "Cedência temporária", type: "toggle", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO },
-      { key: "entidade_cedencia_temporaria", label: "Entidade de céssionaria", type: "text", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO && f.cedencia_temporaria === true },
-      { key: "data_inicio_cedencia", label: "Data de início da cedência", type: "date", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO && f.cedencia_temporaria === true },
-      { key: "data_fim_cedencia", label: "Data de fim da cedência", type: "date", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO && f.cedencia_temporaria === true },
-      { key: "digitalizacao_contrato_cedencia", label: "Digitalização do contrato de cedência temporária", type: "file", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO && f.cedencia_temporaria === true },
-      { key: "digitalizacao_acordos_desvinculacao", label: "Digitalização de acordos de desvinculação", type: "file", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO },
-      { key: "baixa_medica", label: "Em baixa/licença médica", type: "toggle", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO },
-      { key: "data_inicio_baixa_medica", label: "Data de início da baixa/licença", type: "date", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO && f.baixa_medica === true },
-      { key: "data_fim_baixa_medica", label: "Data de fim (prevista)", type: "date", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO && f.baixa_medica === true },
-      { key: "digitalizacao_comprovativo_baixa_medica", label: "Digitalização do comprovativo médico", type: "file", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_ESTAGIO && f.baixa_medica === true },
-
-      // Campos abaixo só se aplicam a contratos de estágio profissional
-      { key: "funcao_estagio", label: "Função no estágio", type: "text", showIf: f => f.tipo_contrato === TIPO_CONTRATO_ESTAGIO },
-      { key: "n_processo_estagio", label: "Nº de processo", type: "text", showIf: f => f.tipo_contrato === TIPO_CONTRATO_ESTAGIO },
-      { key: "duracao_estagio", label: "Duração do estágio", type: "text", placeholder: "ex: 9 meses", showIf: f => f.tipo_contrato === TIPO_CONTRATO_ESTAGIO },
-      { key: "data_inicio_estagio", label: "Data de início do estágio", type: "date", showIf: f => f.tipo_contrato === TIPO_CONTRATO_ESTAGIO },
-      { key: "data_fim_estagio", label: "Data de fim do estágio", type: "date", showIf: f => f.tipo_contrato === TIPO_CONTRATO_ESTAGIO },
-      { key: "entidade_financiadora", label: "Entidade financiadora", type: "text", showIf: f => f.tipo_contrato === TIPO_CONTRATO_ESTAGIO },
-      { key: "valor_apoio_entidade", label: "Valor do apoio à entidade (€)", type: "number", showIf: f => f.tipo_contrato === TIPO_CONTRATO_ESTAGIO },
-      { key: "digitalizacao_contrato_estagio", label: "Digitalização do contrato de estágio", type: "file", showIf: f => f.tipo_contrato === TIPO_CONTRATO_ESTAGIO },
-      { key: "outra_documentacao_estagio", label: "Outra documentação de estágio", type: "file", showIf: f => f.tipo_contrato === TIPO_CONTRATO_ESTAGIO },
+      { key: "motivo_cessacao", label: "Motivo da cessação", type: "select", options: MOTIVO_CESSACAO_OPTIONS, showIf: f => f.situacao_contratual === SITUACAO_CESSADO },
+      { key: "role", label: "Função", type: "text", list: "funcao", newRow: true },
+      { key: "departamento", label: "Departamento", type: "select", options: DEPARTAMENTO_OPTIONS },
+      { key: "sede", label: "Local de trabalho", type: "select", options: LOCAL_OPTIONS, optionLabels: LOCAL_OPTION_LABELS },
+      { key: "data_admissao", label: "Data de admissão", type: "date" },
+      { key: "data_fim_contrato", label: "Data de fim de contrato", type: "date", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_SEM_TERMO },
+      { key: "tempo_casa", label: "Duração do contrato de trabalho", type: "tenure", fromKey: "data_admissao", toKey: "data_fim_contrato" },
+      { key: "digitalizacao_contrato", label: "Contrato (todas as páginas)", type: "file", storageName: "Contrato_Trabalho" },
+      {
+        key: "cedencias_temporarias", label: "Cedências temporárias", type: "blocks", apiKey: "cedencias",
+        storageFolder: "cedenciasTemporarias",
+        itemSingular: "cedência", entidadeLabel: "Entidade de céssionária", dataFimLabel: "Data de fim", pdfName: "PDF",
+        observacaoLabel: "Observação", list: "entidades",
+      },
+      { key: "digitalizacao_acordos_desvinculacao", label: "Digitalização de acordos de desvinculação", type: "file", storageName: "Acordo_Desvinculacao" },
+    ],
+  },
+  {
+    title: "Baixas/Licenças",
+    Icon: FaNotesMedical,
+    restricted: false,
+    fields: [
+      {
+        key: "baixas_medicas", label: "Registos", type: "blocks", apiKey: "baixasMedicas",
+        storageFolder: "baixasMedicas",
+        itemSingular: "baixa médica", dataFimLabel: "Data de fim (prevista)", pdfName: "comprovativo médico",
+        tipoLabel: "Tipo", tipoOptions: TIPO_BAIXA_OPTIONS,
+      },
+    ],
+  },
+  {
+    title: "Dados de estágio",
+    Icon: FaUserGraduate,
+    restricted: true,
+    isEstagio: true,
+    fields: [
+      { key: "tipo_estagio", label: "Tipo de estágio", type: "select", options: TIPO_ESTAGIO_OPTIONS },
+      { key: "n_processo_estagio", label: "Nº de processo", type: "text", showIf: f => f.tipo_estagio === TIPO_ESTAGIO_PROFISSIONAL },
+      { key: "id_processo_estagio", label: "ID do processo", type: "text", showIf: f => f.tipo_estagio === TIPO_ESTAGIO_PROFISSIONAL },
+      { key: "entidade_medida", label: "Entidade/Medida", type: "text", newRow: true },
+      { key: "area_funcao", label: "Área/função", type: "text" },
+      { key: "habilitacoes_estagio", label: "Habilitações", type: "text", list: "habilitacoes" },
+      { key: "data_inicio_estagio", label: "Data de início do estágio", type: "date" },
+      { key: "data_fim_estagio", label: "Data de fim do estágio", type: "date" },
+      { key: "duracao_estagio", label: "Duração", type: "duration", fromKey: "data_inicio_estagio", toKey: "data_fim_estagio" },
+      { key: "entidade_estagio", label: "Entidade de estágio", type: "text", list: "entidades" },
+      { key: "orientador", label: "Orientador", type: "text", list: "colaboradores" },
+      { key: "observacao_estagio", label: "Observações", type: "textarea" },
+      { key: "digitalizacao_contrato_estagio", label: "Digitalização do contrato de estágio", type: "file", storageName: "Contrato_Estagio" },
+      { key: "outra_documentacao_estagio", label: "Outra documentação de estágio", type: "file", multiple: true },
     ],
   },
 ];
 
-function getCurrentMonthStr() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-}
-
-const CONTRATO_HISTORY_SECTION = SECTIONS.find(s => s.monthHistory);
-const CONTRATO_HISTORY_KEYS = CONTRATO_HISTORY_SECTION.fields.filter(f => f.type !== "file").map(f => f.key);
+// Tipos que não correspondem a um campo guardado no "form": "file" vive à parte em
+// docRefs, "duration"/"tenure" são sempre calculados a partir de outro campo (nunca
+// editáveis), "blocks" vive à parte em blockLists (cada um numa subcoleção própria  -  ver BLOCK_FIELDS)
+const NON_STORED_TYPES = ["file", "duration", "blocks", "tenure"];
+const ESTAGIO_SECTION = SECTIONS.find(s => s.isEstagio);
+const ESTAGIO_FIELD_KEYS = ESTAGIO_SECTION.fields.filter(f => f.type !== "duration").map(f => f.key);
 
 const ALL_FIELDS = SECTIONS.flatMap(s => s.fields);
-const INITIAL_FORM = ALL_FIELDS.filter(f => f.type !== "file").reduce((acc, f) => {
+const FIELD_BY_KEY = Object.fromEntries(ALL_FIELDS.map(f => [f.key, f]));
+const INITIAL_FORM = ALL_FIELDS.filter(f => !NON_STORED_TYPES.includes(f.type)).reduce((acc, f) => {
   acc[f.key] = f.type === "toggle" ? false : "";
   return acc;
 }, {});
+
+// Extensão do ficheiro original (com o ponto, ex: ".pdf")  -  "" se não tiver extensão.
+function extensaoFicheiro(filename) {
+  const i = filename.lastIndexOf(".");
+  return i > 0 ? filename.slice(i) : "";
+}
+
+// Campos "blocks" (cedências temporárias, baixas médicas): cada um vive numa subcoleção
+// própria em users/{id}/{apiKey} (ver BLOCK_COLLECTIONS no ca DOdastroController), não no
+// documento do user  -  por isso ficam fora do "form" e são geridos em blockLists.
+const BLOCK_FIELDS = ALL_FIELDS.filter(f => f.type === "blocks");
+const INITIAL_BLOCK_LISTS = BLOCK_FIELDS.reduce((acc, f) => { acc[f.key] = []; return acc; }, {});
+
+function novoBlocoId() {
+  return `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
 
 export default function Cadastro() {
   const navigate = useNavigate();
@@ -139,7 +224,7 @@ export default function Cadastro() {
   const isHR = nivelAcesso === "GestorRH";
   const isAdministrador = nivelAcesso === "Administrador";
   const canEditRestricted = isAdmin || isHR;
-  // Administrador só pode consultar o cadastro de outro colaborador (o backend confirma
+  // Administrador só pode consultar o cadastro de outro colaborador  (o backend confirma
   // que é da sua entidade); nunca ganha canEditRestricted, por isso continua sem poder
   // editar os campos de "Contrato de trabalho"/"Estágio".
   const canViewOther = isAdmin || isHR || isAdministrador;
@@ -152,12 +237,22 @@ export default function Cadastro() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(INITIAL_FORM);
   const [docRefs, setDocRefs] = useState({});
-  const [contratoHistorico, setContratoHistorico] = useState({});
-  const [historyMonth, setHistoryMonth] = useState(getCurrentMonthStr());
+  const [blockLists, setBlockLists] = useState(INITIAL_BLOCK_LISTS);
+  // Estado local (não persistido) de que blocos de "blocks" (cedências, baixas médicas)
+  // estão colapsados  -  por chave de bloco (id), true = colapsado.
+  const [collapsedBlocks, setCollapsedBlocks] = useState({});
+  const toggleBlockCollapsed = (id) => setCollapsedBlocks(prev => ({ ...prev, [id]: !prev[id] }));
   const nomeCurto = getNomeCurto(form.nome_completo) || targetLabel;
   const [uploading, setUploading] = useState({});
   const [viewing, setViewing] = useState({});
   const fileInputRefs = useRef({});
+  // Só usado para revelar a caixa "Dados de estágio" antes de haver qualquer dado guardado
+  // (ex: acabou de clicar "Adicionar dados de estágio"). Uma vez que existam dados, a caixa
+  // mostra-se sozinha (ver hasEstagioData) e este estado deixa de ser necessário.
+  const [estagioAdding, setEstagioAdding] = useState(false);
+  // Opções carregadas da BD para os selects de "Entidade de estágio" e "Orientador".
+  const [entidadesOptions, setEntidadesOptions] = useState([]);
+  const [colaboradoresOptions, setColaboradoresOptions] = useState([]);
 
   useEffect(() => {
     if (isViewingOther && !canViewOther) {
@@ -166,13 +261,61 @@ export default function Cadastro() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isViewingOther, canViewOther]);
 
+  useEffect(() => {
+    setEstagioAdding(false);
+  }, [targetKey, editMode]);
+
+  // Carregadas uma vez para quem pode editar os dados de estágio (as únicas pessoas que
+  // vão ver estes selects preenchidos com opções em vez de só o valor guardado em texto).
+  useEffect(() => {
+    if (!canEditRestricted) return;
+    (async () => {
+      try {
+        const res = await apiFetch("/users/getColaboradores");
+        if (!res.ok) return;
+        const data = await res.json();
+        const nomes = Array.from(new Set((data || []).map(c => c.nome).filter(Boolean))).sort((a, b) => a.localeCompare(b, "pt"));
+        setColaboradoresOptions(nomes);
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+    (async () => {
+      try {
+        const res = await apiFetch("/entities/showEntities", { method: "POST" });
+        if (!res.ok) return;
+        const data = await res.json();
+        setEntidadesOptions(Array.isArray(data.entityNames) ? data.entityNames : []);
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canEditRestricted]);
+
+  const hasEstagioData = (dataSource, docs) => {
+    if (!dataSource) return false;
+    return ESTAGIO_FIELD_KEYS.some(k => {
+      const v = dataSource[k];
+      return v !== undefined && v !== "" && v !== false;
+    }) || ESTAGIO_SECTION.fields.some(f => f.type === "file" && !!docs?.[f.key]);
+  };
+
   const fetchCadastro = async () => {
     const res = await apiFetch(`/cadastro/${targetKey}`);
     if (res.ok) {
       const data = await res.json();
-      setForm({ ...INITIAL_FORM, ...(data.form || {}) });
+      setForm({ ...INITIAL_FORM, ...(data.form || {}), email: data.email || "" });
       setDocRefs(data.docs || {});
-      setContratoHistorico(data.contratoHistorico || {});
+      const novosBlockLists = BLOCK_FIELDS.reduce((acc, f) => { acc[f.key] = data[f.apiKey] || []; return acc; }, {});
+      setBlockLists(novosBlockLists);
+      // Blocos já com data de início preenchida (ou seja, já existiam antes desta consulta)
+      // começam colapsados, para a lista não ficar comprida por omissão. Um bloco novo,
+      // acabado de adicionar em modo de edição, não passa por aqui e fica expandido.
+      setCollapsedBlocks(Object.values(novosBlockLists).flat().reduce((acc, b) => {
+        if (b.dataInicio) acc[b.id] = true;
+        return acc;
+      }, {}));
       return true;
     }
     return false;
@@ -195,23 +338,29 @@ export default function Cadastro() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetKey]);
 
-  const handleChange = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
+  const handleChange = (key, value) => {
+    setForm(prev => ({ ...prev, [key]: value }));
+  };
 
   const handleSave = async () => {
     setSaving(true);
     try {
       const res = await apiFetch(`/cadastro/${targetKey}`, {
         method: "PUT",
-        body: JSON.stringify({ form, docs: docRefs }),
+        body: JSON.stringify({
+          form, docs: docRefs,
+          ...BLOCK_FIELDS.reduce((acc, f) => { acc[f.apiKey] = blockLists[f.key] || []; return acc; }, {}),
+        }),
       });
-      if (res.ok) {
-        await fetchCadastro();
-        setEditMode(false);
-        if (!isViewingOther && nomeCurto) setUsername(nomeCurto);
-        toast.success("Ficha de cadastro guardada", { position: "top-right", autoClose: 2500 });
-      } else {
+      if (!res.ok) {
         toast.error("Falha ao guardar a ficha de cadastro", { position: "top-right" });
+        return;
       }
+
+      await fetchCadastro();
+      setEditMode(false);
+      if (!isViewingOther && nomeCurto) setUsername(nomeCurto);
+      toast.success("Ficha de cadastro guardada", { position: "top-right", autoClose: 2500 });
     } catch (e) {
       console.error(e);
       toast.error("Falha ao guardar a ficha de cadastro", { position: "top-right" });
@@ -220,31 +369,27 @@ export default function Cadastro() {
     }
   };
 
-  const resolveContratoSnapshotForMonth = (mes) => {
-    const keys = Object.keys(contratoHistorico).sort();
-    let snapshot;
-    for (const k of keys) {
-      if (k <= mes) snapshot = contratoHistorico[k];
-      else break;
-    }
-    if (snapshot) return snapshot;
-    if (keys.length === 0) {
-      // Ainda não há histórico guardado (cadastro anterior a esta funcionalidade)  -  melhor esforço com os dados atuais.
-      return CONTRATO_HISTORY_KEYS.reduce((acc, key) => { acc[key] = form[key]; return acc; }, {});
-    }
-    return null;
-  };
-
-  const handleDocUpload = async (docKey, file) => {
+  // Campos "multiple" guardam { files: [{name, path}, ...] } em vez de {name, path}  -  o
+  // backend não olha para a forma do doc (só faz set/delete por chave), por isso não precisa
+  // de mudar nada para suportar isto (ver saveCadastro em cadastroController.js).
+  const handleDocUpload = async (docKey, file, multiple = false) => {
     if (!file) return;
     setUploading(prev => ({ ...prev, [docKey]: true }));
     try {
+      const storageName = FIELD_BY_KEY[docKey]?.storageName;
       const formData = new FormData();
       formData.append("file", file);
       formData.append("folderPath", `Cadastro/${targetKey}/`);
+      if (storageName) formData.append("filename", `${storageName}${extensaoFicheiro(file.name)}`);
       const res = await apiFetch(`/files/upload-document`, { method: "POST", body: formData });
       if (res.ok) {
-        setDocRefs(prev => ({ ...prev, [docKey]: { name: file.name, path: `Cadastro/${targetKey}/${file.name}` } }));
+        const data = await res.json();
+        const newRef = { name: file.name, path: data.path };
+        setDocRefs(prev => {
+          if (!multiple) return { ...prev, [docKey]: newRef };
+          const files = prev[docKey]?.files || [];
+          return { ...prev, [docKey]: { files: [...files, newRef] } };
+        });
       } else {
         toast.error("Falha ao enviar ficheiro", { position: "top-right" });
       }
@@ -256,14 +401,23 @@ export default function Cadastro() {
     }
   };
 
-  const handleViewDoc = async (docKey) => {
-    const ref = docRefs[docKey];
-    if (!ref) return;
-    setViewing(prev => ({ ...prev, [docKey]: true }));
+  const handleRemoveMultiDoc = (docKey, index) => {
+    setDocRefs(prev => {
+      const files = (prev[docKey]?.files || []).filter((_, i) => i !== index);
+      const next = { ...prev };
+      if (files.length) next[docKey] = { files };
+      else delete next[docKey];
+      return next;
+    });
+  };
+
+  const handleViewDoc = async (viewKey, path) => {
+    if (!path) return;
+    setViewing(prev => ({ ...prev, [viewKey]: true }));
     try {
       const res = await apiFetch(`/files/download`, {
         method: "POST",
-        body: JSON.stringify({ path: encodeURIComponent(ref.path) }),
+        body: JSON.stringify({ path: encodeURIComponent(path) }),
       });
       if (res.ok) {
         const blob = await res.blob();
@@ -272,7 +426,61 @@ export default function Cadastro() {
     } catch (e) {
       console.error(e);
     } finally {
-      setViewing(prev => ({ ...prev, [docKey]: false }));
+      setViewing(prev => ({ ...prev, [viewKey]: false }));
+    }
+  };
+
+  // Campos "blocks" (cedências temporárias, baixas médicas, ...): em vez de um único
+  // bloco sim/não, guardam uma lista de {id, entidade?, dataInicio, dataFim, pdf} em
+  // blockLists  -  cada uma vive na sua própria subcoleção no backend (ver BLOCK_COLLECTIONS
+  // no cadastroController), não no documento do user, por isso ficam fora do "form".
+  // "entidade" só é usado pelos campos que definem `entidadeLabel`.
+  const handleAddBlock = (key) => {
+    setBlockLists(prev => ({
+      ...prev,
+      [key]: [...(prev[key] || []), { id: novoBlocoId(), tipo: "", entidade: "", dataInicio: "", dataFim: "", observacao: "", pdf: null }],
+    }));
+  };
+
+  const handleChangeBlock = (key, id, patch) => {
+    setBlockLists(prev => ({
+      ...prev,
+      [key]: (prev[key] || []).map(c => (c.id === id ? { ...c, ...patch } : c)),
+    }));
+  };
+
+  const handleRemoveBlock = (key, id) => {
+    setBlockLists(prev => ({ ...prev, [key]: (prev[key] || []).filter(c => c.id !== id) }));
+  };
+
+  const handleBlockPdfUpload = async (key, id, file) => {
+    if (!file) return;
+    const uploadKey = `${key}_${id}`;
+    setUploading(prev => ({ ...prev, [uploadKey]: true }));
+    try {
+      const field = FIELD_BY_KEY[key];
+      const bloco = (blockLists[key] || []).find(b => b.id === id);
+      // Nome do ficheiro = intervalo de datas do bloco (ex: "2024-01-15_a_2024-06-30.pdf"),
+      // ou o id do bloco se ainda não houver datas preenchidas.
+      const baseName = bloco?.dataInicio && bloco?.dataFim
+        ? `${bloco.dataInicio}_a_${bloco.dataFim}`
+        : `sem_data_${id}`;
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folderPath", `Cadastro/${targetKey}/${field.storageFolder}/`);
+      formData.append("filename", `${baseName}${extensaoFicheiro(file.name)}`);
+      const res = await apiFetch(`/files/upload-document`, { method: "POST", body: formData });
+      if (res.ok) {
+        const data = await res.json();
+        handleChangeBlock(key, id, { pdf: { name: file.name, path: data.path } });
+      } else {
+        toast.error("Falha ao enviar ficheiro", { position: "top-right" });
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Falha ao enviar ficheiro", { position: "top-right" });
+    } finally {
+      setUploading(prev => ({ ...prev, [uploadKey]: false }));
     }
   };
 
@@ -291,7 +499,7 @@ export default function Cadastro() {
       const [y, m, d] = value.split("-");
       return `${d}/${m}/${y}`;
     }
-    if (field.type === "select" || field.type === "text" || field.type === "email" || field.type === "tel" || field.type === "number") {
+    if (field.type === "text" || field.type === "email" || field.type === "tel" || field.type === "number") {
       return value || " - ";
     }
     return " - ";
@@ -299,11 +507,15 @@ export default function Cadastro() {
 
   const renderField = (field, editable, dataSource = form) => {
     const { key, label, type, options, placeholder } = field;
+    if (field.readOnly) editable = false;
+    // "newRow" força o campo a começar numa linha nova mesmo que a linha anterior tenha um
+    // número variável de campos (por causa de showIf)  -  ver os campos das secções em SECTIONS.
+    const layoutStyle = field.newRow ? { minWidth: 0, gridColumnStart: 1 } : { minWidth: 0 };
 
     if (type === "toggle") {
       const value = !!dataSource[key];
       return (
-        <div key={key}>
+        <div key={key} style={layoutStyle}>
           <span style={labelStyle}>{label}</span>
           {editable ? (
             <div style={{ display: "flex", gap: 6 }}>
@@ -336,6 +548,252 @@ export default function Cadastro() {
       );
     }
 
+    if (type === "blocks") {
+      const blocks = blockLists[key] || [];
+      const fmtDate = v => {
+        if (!v) return " - ";
+        const [y, m, d] = v.split("-");
+        return `${d}/${m}/${y}`;
+      };
+      const dataFimLabel = field.dataFimLabel || "Data de fim";
+      const pdfName = field.pdfName || "ficheiro";
+      return (
+        <div key={key} style={{ gridColumn: "1 / -1" }}>
+          <span style={labelStyle}>{label}</span>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {blocks.map(c => {
+              const uploadKey = `${key}_${c.id}`;
+              const isUploading = uploading[uploadKey];
+              const isViewing = viewing[uploadKey];
+              const hasPdf = !!c.pdf;
+              const isCollapsed = !!collapsedBlocks[c.id];
+              const summaryExtra = (field.tipoOptions && c.tipo) || (field.entidadeLabel && c.entidade) || "";
+              const summary = c.dataInicio || c.dataFim
+                ? `${fmtDate(c.dataInicio)} — ${fmtDate(c.dataFim)}${summaryExtra ? ` · ${summaryExtra}` : ""}`
+                : `Adicionar ${field.itemSingular}`;
+              return (
+                <div key={c.id} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12, background: "#fafafa" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div
+                      onClick={() => toggleBlockCollapsed(c.id)}
+                      style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0, cursor: "pointer" }}
+                    >
+                      <FaChevronDown style={{
+                        fontSize: 11, color: "#9ca3af", flexShrink: 0, transition: "transform 0.15s",
+                        transform: isCollapsed ? "rotate(-90deg)" : "none",
+                      }} />
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {summary}
+                      </span>
+                    </div>
+                    {editable && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveBlock(key, c.id)}
+                        title={`Remover ${field.itemSingular}`}
+                        style={{ border: "none", background: "transparent", cursor: "pointer", color: "#9ca3af", fontSize: 14, padding: 4, display: "flex", flexShrink: 0 }}
+                      >
+                        <FaCircleMinus />
+                      </button>
+                    )}
+                  </div>
+                  {!isCollapsed && (
+                    <div style={{ marginTop: 10 }}>
+                      {/* Tipo/Entidade + as duas datas juntos na mesma linha  -  os dois campos são
+                          mutuamente exclusivos por tipo de bloco, por isso nunca passam de 3 por linha. */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+                        {field.tipoOptions && (
+                          <div style={{ minWidth: 0 }}>
+                            <span style={labelStyle}>{field.tipoLabel || "Tipo"}</span>
+                            {editable ? (
+                              <select value={c.tipo || ""} onChange={e => handleChangeBlock(key, c.id, { tipo: e.target.value })} style={inputStyle}>
+                                <option value="">Selecionar...</option>
+                                {field.tipoOptions.map(o => <option key={o} value={o}>{o}</option>)}
+                              </select>
+                            ) : (
+                              <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{c.tipo || " - "}</div>
+                            )}
+                          </div>
+                        )}
+                        {field.entidadeLabel && (
+                          <div style={{ minWidth: 0 }}>
+                            <span style={labelStyle}>{field.entidadeLabel}</span>
+                            {editable ? (
+                              <AutocompleteInput
+                                value={c.entidade}
+                                onChange={v => handleChangeBlock(key, c.id, { entidade: v })}
+                                options={entidadesOptions}
+                                inputStyle={inputStyle}
+                              />
+                            ) : (
+                              <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{c.entidade || " - "}</div>
+                            )}
+                          </div>
+                        )}
+                        <div style={{ minWidth: 0 }}>
+                          <span style={labelStyle}>Data de início</span>
+                          {editable ? (
+                            <input type="date" value={c.dataInicio} onChange={e => handleChangeBlock(key, c.id, { dataInicio: e.target.value })} style={inputStyle} />
+                          ) : (
+                            <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{fmtDate(c.dataInicio)}</div>
+                          )}
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <span style={labelStyle}>{dataFimLabel}</span>
+                          {editable ? (
+                            <input type="date" value={c.dataFim} onChange={e => handleChangeBlock(key, c.id, { dataFim: e.target.value })} style={inputStyle} />
+                          ) : (
+                            <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{fmtDate(c.dataFim)}</div>
+                          )}
+                        </div>
+                      </div>
+                      {field.observacaoLabel && (
+                        <div style={{ marginTop: 10 }}>
+                          <span style={labelStyle}>{field.observacaoLabel}</span>
+                          {editable ? (
+                            <textarea
+                              value={c.observacao || ""}
+                              rows={2}
+                              onChange={e => handleChangeBlock(key, c.id, { observacao: e.target.value })}
+                              style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }}
+                            />
+                          ) : (
+                            <div style={{ fontSize: 13, color: "#111827", fontWeight: 500, whiteSpace: "pre-wrap" }}>{c.observacao || " - "}</div>
+                          )}
+                        </div>
+                      )}
+                      <div style={{ marginTop: 10 }}>
+                        <input
+                          type="file"
+                          accept=".pdf"
+                          style={{ display: "none" }}
+                          ref={el => { fileInputRefs.current[uploadKey] = el; }}
+                          onChange={e => {
+                            const f = e.target.files[0];
+                            if (f) handleBlockPdfUpload(key, c.id, f);
+                            e.target.value = "";
+                          }}
+                        />
+                        <div
+                          onClick={() => {
+                            if (isUploading || isViewing) return;
+                            if (editable) fileInputRefs.current[uploadKey]?.click();
+                            else if (hasPdf) handleViewDoc(uploadKey, c.pdf.path);
+                          }}
+                          style={{
+                            display: "flex", alignItems: "center", gap: 10, padding: "8px 10px",
+                            border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff",
+                            cursor: isUploading || isViewing ? "wait" : editable || hasPdf ? "pointer" : "default",
+                          }}
+                        >
+                          <FaCloudArrowUp style={{ color: hasPdf ? GOLD : "#d1d5db", fontSize: 14, flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0, fontSize: 11.5, color: hasPdf ? "#6b7280" : "#b0b7c3", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {isUploading ? "A enviar..." : isViewing ? "A abrir..." : hasPdf ? c.pdf.name : editable ? `Clique para enviar ${pdfName}` : `Sem ${pdfName} enviado`}
+                          </div>
+                          {hasPdf && !editable && <FaArrowUpRightFromSquare style={{ fontSize: 11, color: GOLD, flexShrink: 0 }} />}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {editable && (
+              <div
+                onClick={() => handleAddBlock(key)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8, padding: "10px 12px",
+                  border: "1px dashed #d1d5db", borderRadius: 8, cursor: "pointer",
+                  color: "#6b7280", fontSize: 12.5, fontWeight: 500, background: "#fafafa",
+                }}
+              >
+                <FaPlus style={{ fontSize: 11 }} /> REGISTAR 
+              </div>
+            )}
+            {!editable && blocks.length === 0 && (
+              <div style={{ fontSize: 11.5, color: "#9ca3af" }}>Sem {label.toLowerCase()} registadas</div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    if (type === "file" && field.multiple) {
+      const files = docRefs[key]?.files || [];
+      const isUploading = uploading[key];
+      return (
+        <div key={key} style={{ gridColumn: "1 / -1" }}>
+          <input
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+            style={{ display: "none" }}
+            ref={el => { fileInputRefs.current[key] = el; }}
+            onChange={e => {
+              const f = e.target.files[0];
+              if (f) handleDocUpload(key, f, true);
+              e.target.value = "";
+            }}
+          />
+          <span style={labelStyle}>{label}</span>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {files.map((f, i) => {
+              const viewKey = `${key}__${i}`;
+              const isViewing = viewing[viewKey];
+              return (
+                <div
+                  key={`${f.path}-${i}`}
+                  onClick={() => { if (!isViewing) handleViewDoc(viewKey, f.path); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 12, padding: "10px 12px",
+                    border: "1px solid #e5e7eb", borderRadius: 8,
+                    cursor: isViewing ? "wait" : "pointer", background: "#fafafa",
+                  }}
+                >
+                  <FaCloudArrowUp style={{ color: GOLD, fontSize: 15, flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12.5, color: "#111827", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {f.name}
+                    </div>
+                    <div style={{ fontSize: 11, marginTop: 2, color: "#6b7280" }}>
+                      {isViewing ? "A abrir..." : "Clique para abrir"}
+                    </div>
+                  </div>
+                  {editable ? (
+                    <button
+                      type="button"
+                      onClick={e => { e.stopPropagation(); handleRemoveMultiDoc(key, i); }}
+                      title="Remover ficheiro"
+                      style={{ flexShrink: 0, border: "none", background: "transparent", cursor: "pointer", color: "#9ca3af", fontSize: 14, padding: 4, display: "flex" }}
+                    >
+                      <FaCircleMinus />
+                    </button>
+                  ) : (
+                    <FaArrowUpRightFromSquare style={{ fontSize: 12, color: GOLD, flexShrink: 0 }} />
+                  )}
+                </div>
+              );
+            })}
+            {editable && (
+              <div
+                onClick={() => { if (!isUploading) fileInputRefs.current[key]?.click(); }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8, padding: "10px 12px",
+                  border: "1px dashed #d1d5db", borderRadius: 8,
+                  cursor: isUploading ? "wait" : "pointer", color: "#6b7280", fontSize: 12.5, fontWeight: 500, background: "#fafafa",
+                }}
+              >
+                <FaPlus style={{ fontSize: 11 }} />
+                {isUploading ? "A enviar..." : "Adicionar ficheiro"}
+              </div>
+            )}
+            {!editable && files.length === 0 && (
+              <div style={{ fontSize: 11.5, color: "#9ca3af" }}>Sem ficheiros enviados</div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     if (type === "file") {
       const ref = docRefs[key];
       const isUploading = uploading[key];
@@ -359,7 +817,7 @@ export default function Cadastro() {
             onClick={() => {
               if (isUploading || isViewing) return;
               if (editable) fileInputRefs.current[key]?.click();
-              else if (hasFile) handleViewDoc(key);
+              else if (hasFile) handleViewDoc(key, ref.path);
             }}
             style={{
               display: "flex", alignItems: "center", gap: 12, padding: "10px 12px",
@@ -386,33 +844,98 @@ export default function Cadastro() {
     }
 
     if (type === "select") {
+      const currentValue = dataSource[key];
+      // "optionLabels" (opcional) mostra um texto mais descritivo por opção  -  ex: "Local de
+      // trabalho" mostra a morada de cada sede junto ao nome, sem precisar de um campo à parte.
+      const optionLabel = o => field.optionLabels?.[o] || o;
       return (
-        <div key={key}>
+        <div key={key} style={layoutStyle}>
           <span style={labelStyle}>{label}</span>
           {editable ? (
-            <select value={form[key]} onChange={e => handleChange(key, e.target.value)} style={inputStyle}>
+            <select value={currentValue} onChange={e => handleChange(key, e.target.value)} style={inputStyle}>
               <option value="">Selecionar...</option>
-              {options.map(o => <option key={o} value={o}>{o}</option>)}
+              {options.map(o => <option key={o} value={o}>{optionLabel(o)}</option>)}
             </select>
           ) : (
-            <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{renderValue(field, dataSource)}</div>
+            <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{currentValue ? optionLabel(currentValue) : " - "}</div>
           )}
         </div>
       );
     }
 
-    // text, email, tel, number, date
+    if (type === "duration") {
+      const duracao = formatDuracao(dataSource[field.fromKey], dataSource[field.toKey]);
+      return (
+        <div key={key} style={layoutStyle}>
+          <span style={labelStyle}>{label}</span>
+          <div style={{ fontSize: 13, color: duracao ? "#111827" : "#9ca3af", fontWeight: 500 }}>
+            {duracao || "Preenche as datas de início e fim"}
+          </div>
+        </div>
+      );
+    }
+
+    if (type === "tenure") {
+      // Conta desde "fromKey" até "toKey"  -  se "toKey" ainda não estiver preenchido
+      // (contrato ainda ativo, sem data de fim), conta até hoje.
+      const fim = dataSource[field.toKey] || new Date().toISOString().slice(0, 10);
+      const tempo = formatAntiguidade(dataSource[field.fromKey], fim);
+      return (
+        <div key={key} style={layoutStyle}>
+          <span style={labelStyle}>{label}</span>
+          <div style={{ fontSize: 13, color: tempo ? "#111827" : "#9ca3af", fontWeight: 500 }}>
+            {tempo || "Preenche a data de admissão"}
+          </div>
+        </div>
+      );
+    }
+
+    if (type === "textarea") {
+      return (
+        <div key={key} style={{ gridColumn: "1 / -1", minWidth: 0 }}>
+          <span style={labelStyle}>{label}</span>
+          {editable ? (
+            <textarea
+              value={dataSource[key]}
+              placeholder={placeholder}
+              rows={3}
+              onChange={e => handleChange(key, e.target.value)}
+              style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }}
+            />
+          ) : (
+            <div style={{ fontSize: 13, color: "#111827", fontWeight: 500, whiteSpace: "pre-wrap" }}>{dataSource[key] || " - "}</div>
+          )}
+        </div>
+      );
+    }
+
+    // text, email, tel, number, date (+ autocomplete estilizado, quando o campo tem "list")
+    const listOptions = field.list === "colaboradores" ? colaboradoresOptions
+      : field.list === "entidades" ? entidadesOptions
+      : field.list === "habilitacoes" ? HABILITACOES_OPTIONS
+      : field.list === "funcao" ? FUNCAO
+      : null;
     return (
-      <div key={key}>
+      <div key={key} style={layoutStyle}>
         <span style={labelStyle}>{label}</span>
         {editable ? (
-          <input
-            type={type}
-            value={form[key]}
-            placeholder={placeholder}
-            onChange={e => handleChange(key, e.target.value)}
-            style={inputStyle}
-          />
+          listOptions ? (
+            <AutocompleteInput
+              value={dataSource[key]}
+              onChange={v => handleChange(key, v)}
+              options={listOptions}
+              placeholder={placeholder}
+              inputStyle={inputStyle}
+            />
+          ) : (
+            <input
+              type={type}
+              value={dataSource[key]}
+              placeholder={placeholder}
+              onChange={e => handleChange(key, e.target.value)}
+              style={inputStyle}
+            />
+          )
         ) : (
           <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{renderValue(field, dataSource)}</div>
         )}
@@ -429,13 +952,13 @@ export default function Cadastro() {
     <div className="flex min-h-screen">
       <Sidebar onSelectFile={handleSelectFile} />
 
-      <div className="ml-[230px] flex-1 flex flex-col min-h-screen">
+      <div className="ml-[var(--sidebar-w,230px)] transition-[margin-left] duration-200 flex-1 min-w-0 flex flex-col min-h-screen">
         <Topbar icon="🪪" title="Cadastro" />
 
-        <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
+        <div className="p-4 sm:p-6" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
           {/* Header */}
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "18px 24px", display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "18px 24px", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16 }}>
             {isViewingOther && (
               <button
                 onClick={() => navigate("/colaboradores")}
@@ -449,7 +972,7 @@ export default function Cadastro() {
                 <FaArrowLeft style={{ fontSize: 12 }} />
               </button>
             )}
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: "1 1 200px", minWidth: 0 }}>
               <div style={{ fontSize: 17, fontWeight: 700, color: "#111827" }}>
                 Ficha de cadastro  -  {nomeCurto}
               </div>
@@ -484,51 +1007,49 @@ export default function Cadastro() {
           {/* Sections */}
           {!loading && SECTIONS.map(section => {
             const sectionEditable = editMode && (!section.restricted || canEditRestricted);
-            const sectionData = section.monthHistory && !editMode
-              ? resolveContratoSnapshotForMonth(historyMonth)
-              : form;
-            const visibleFields = sectionData ? section.fields.filter(f => !f.showIf || f.showIf(sectionData)) : [];
+            const sectionData = form;
+            const visibleFields = section.fields.filter(f => !f.showIf || f.showIf(sectionData));
+
+            if (section.isEstagio) {
+              const estagioHasData = hasEstagioData(sectionData, docRefs);
+              const canAddEstagio = sectionEditable;
+              if (!estagioHasData && !estagioAdding) {
+                if (!canAddEstagio) return null;
+                return (
+                  <button
+                    key={section.title}
+                    type="button"
+                    onClick={() => setEstagioAdding(true)}
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                      padding: "12px 18px", fontSize: 13, fontWeight: 500, cursor: "pointer",
+                      border: "1px dashed #d1d5db", borderRadius: 10, background: "#fafafa",
+                      color: "#6b7280", width: "100%",
+                    }}
+                  >
+                    <FaPlus style={{ fontSize: 11 }} /> Adicionar dados de estágio
+                  </button>
+                );
+              }
+            }
+
             return (
-              <div key={section.title} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-                <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 8 }}>
+              // Sem "overflow: hidden"  -  o dropdown do AutocompleteInput (Orientador, Entidade de estágio, Habilitações) é posicionado absolutamente e não pode ser cortado pela caixa.
+              <div key={section.title} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10 }}>
+                <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
                   <section.Icon style={{ color: GOLD, fontSize: 13 }} />
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{section.title}</span>
-                  <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ marginLeft: "auto", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
                     {section.restricted && editMode && !canEditRestricted && (
                       <span style={{ fontSize: 10.5, fontWeight: 500, color: "#9ca3af" }}>
-                        Apenas RH/Admin pode editar
+                        Apenas Administradores pode editar
                       </span>
-                    )}
-                    {section.monthHistory && (
-                      <>
-                        <span style={{ fontSize: 11.5, color: "#6b7280", whiteSpace: "nowrap" }}>
-                          {(sectionData && sectionData.tipo_contrato) || "Sem registo para este mês"}
-                        </span>
-                        <input
-                          type="month"
-                          value={historyMonth}
-                          disabled={editMode}
-                          onChange={e => e.target.value && setHistoryMonth(e.target.value)}
-                          title={editMode ? "Termina a edição para consultar outro mês" : "Ver o contrato de trabalho num mês específico"}
-                          style={{
-                            fontSize: 12, padding: "5px 8px", border: "1px solid #e5e7eb",
-                            borderRadius: 6, color: "#111827", background: "#fafafa", outline: "none",
-                            opacity: editMode ? 0.6 : 1, cursor: editMode ? "not-allowed" : "pointer",
-                          }}
-                        />
-                      </>
                     )}
                   </div>
                 </div>
-                {sectionData ? (
-                  <div style={{ padding: 18, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px 20px" }}>
-                    {visibleFields.map(f => renderField(f, sectionEditable, sectionData))}
-                  </div>
-                ) : (
-                  <div style={{ padding: 18, fontSize: 12.5, color: "#9ca3af" }}>
-                    Sem registo de contrato de trabalho para este mês.
-                  </div>
-                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-4 p-[18px]">
+                  {visibleFields.map(f => renderField(f, sectionEditable, sectionData))}
+                </div>
               </div>
             );
           })}

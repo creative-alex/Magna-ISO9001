@@ -1,35 +1,7 @@
 const admin = require("firebase-admin");
 const { resolveTargetUid } = require("./helpers");
+const { getHolidaysDDMM } = require("./holidays");
 const db = admin.firestore();
-
-function calculateEaster(year) {
-  const a = year % 19;
-  const b = Math.floor(year / 100);
-  const c = year % 100;
-  const d = Math.floor(b / 4);
-  const e = b % 4;
-  const f = Math.floor((b + 8) / 25);
-  const g = Math.floor((b - f + 1) / 3);
-  const h = (19 * a + b - d - g + 15) % 30;
-  const i = Math.floor(c / 4);
-  const k = c % 4;
-  const l = (32 + 2 * e + 2 * i - h - k) % 7;
-  const m = Math.floor((a + 11 * h + 22 * l) / 451);
-  const month = Math.floor((h + l - 7 * m + 114) / 31);
-  const day = ((h + l - 7 * m + 114) % 31) + 1;
-  return new Date(year, month - 1, day);
-}
-
-function getMoveableHolidays(year) {
-  const easter = calculateEaster(year);
-  const goodFriday = new Date(easter);
-  goodFriday.setDate(goodFriday.getDate() - 2);
-  const corpusChristi = new Date(easter);
-  corpusChristi.setDate(corpusChristi.getDate() + 60);
-  const toDDMM = (d) =>
-    `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  return [toDDMM(goodFriday), toDDMM(corpusChristi)];
-}
 
 // Função auxiliar para calcular horas (similar à do frontend)
 function calcularHorasHelper(horaEntrada, horaSaida, date = null) {
@@ -106,6 +78,60 @@ async function getUserCreatedAt(uid) {
     console.error("Erro ao buscar data de criação do colaborador:", error);
     return null;
   }
+}
+
+// Sede do colaborador (users/{uid}.sede)  -  usada para saber que feriado
+// municipal aplicar no cálculo de faltas (ver ./holidays.js).
+async function getUserSede(uid) {
+  try {
+    const userDoc = await db.collection('users').doc(uid).get();
+    return userDoc.exists ? (userDoc.data().sede || null) : null;
+  } catch (error) {
+    console.error("Erro ao buscar sede do colaborador:", error);
+    return null;
+  }
+}
+
+// Saldo anual de horas extra: bruto acumulado (Registos + HorasExtraManual do ano,
+// sem subtrair faltas  -  o mensal passa a não se mexer, ver compensateShortDay em
+// timeTrackingController.js) menos o que já foi usado para compensar dias curtos
+// (campo "horas_compensatorias", gravado no próprio Registos do dia compensado).
+async function computeAnnualOvertimeBalance(uid, year) {
+  const yearStart = new Date(year, 0, 1);
+  const yearEnd = new Date(year, 11, 31, 23, 59, 59);
+
+  const registosSnapshot = await db
+    .collection("registo-ponto")
+    .doc(uid)
+    .collection("Registos")
+    .where("timestamp", ">=", yearStart)
+    .where("timestamp", "<=", yearEnd)
+    .get();
+
+  let grossMinutes = 0;
+  let compensatedMinutes = 0;
+  registosSnapshot.forEach(doc => {
+    const data = doc.data();
+    if (data.horaEntrada && data.horaSaida) {
+      const { minutosExtras } = calcularHorasHelper(data.horaEntrada, data.horaSaida, data.timestamp.toDate());
+      grossMinutes += minutosExtras;
+    }
+    compensatedMinutes += data.horas_compensatorias || 0;
+  });
+
+  const manualOvertimeSnapshot = await db
+    .collection("registo-ponto")
+    .doc(uid)
+    .collection("HorasExtraManual")
+    .get();
+
+  manualOvertimeSnapshot.forEach(doc => {
+    const data = doc.data();
+    const docYear = parseInt((data.date || "").split("-")[2]);
+    if (docYear === year) grossMinutes += data.totalMinutes || 0;
+  });
+
+  return { grossMinutes, compensatedMinutes, netMinutes: grossMinutes - compensatedMinutes };
 }
 
 const getUserRecords = async (req, res) => {
@@ -209,12 +235,18 @@ const getUserRecords = async (req, res) => {
       manualOvertimeInfos.push(
         ...manualOvertimeSnapshot.docs.map((doc) => {
           const data = doc.data();
+          const totalMinutes = data.totalMinutes || 0;
+          // Registos antigos foram gravados só com totalMinutes, sem hours/minutes
+          // -  derivar a partir do total em vez de assumir 0h 0m (ver ManualOvertimeModal.jsx,
+          // que mostra "{entry.hours}h {entry.minutes}m").
+          const hours = data.hours !== undefined && data.hours !== null ? data.hours : Math.floor(totalMinutes / 60);
+          const minutes = data.minutes !== undefined && data.minutes !== null ? data.minutes : totalMinutes % 60;
           return {
             id: doc.id,
             date: data.date,
-            hours: data.hours || 0,
-            minutes: data.minutes || 0,
-            totalMinutes: data.totalMinutes || 0,
+            hours,
+            minutes,
+            totalMinutes,
             description: data.description || "",
             startHour: data.startHour || "",
             endHour: data.endHour || ""
@@ -223,18 +255,10 @@ const getUserRecords = async (req, res) => {
       );
     }
 
-    // Buscar deduções de horas extras para o mês
-    const deductionsRef = db
-      .collection("registo-ponto")
-      .doc(userId)
-      .collection("DeducoesHorasExtras");
-
-    const monthKey = `${selectedYear}-${String(month).padStart(2, "0")}`;
-    const deductionDoc = await deductionsRef.doc(monthKey).get();
-    const deductionMinutes = deductionDoc.exists ? (deductionDoc.data().deductionMinutes || 0) : 0;
-
     // Data de criação do colaborador, para o frontend não contar faltas antes da conta existir
     const userCreatedAt = await getUserCreatedAt(userId);
+    // Sede do colaborador, para o frontend saber que feriado municipal aplicar
+    const sede = await getUserSede(userId);
 
     const registos = snapshot.docs.map((doc) => {
       const data = doc.data();
@@ -273,7 +297,8 @@ const getUserRecords = async (req, res) => {
         manualOvertime: hasManualOvertime ? `${Math.floor(manualOvertimeTotalMinutes / 60)}h ${manualOvertimeTotalMinutes % 60}m` : null,
         manualOvertimeMinutes: manualOvertimeTotalMinutes,
         manualOvertimeEntries: manualOvertimeForDay,
-        manualOvertimeDescription: manualOvertimeForDay.map(mo => mo.description).join(', ')
+        manualOvertimeDescription: manualOvertimeForDay.map(mo => mo.description).join(', '),
+        horasCompensatorias: data.horas_compensatorias || 0
       };
     });
 
@@ -283,8 +308,8 @@ const getUserRecords = async (req, res) => {
       baixas: baixasInfos,
       aniversario: aniversarioInfos,
       manualOvertime: manualOvertimeInfos,
-      deductionMinutes: deductionMinutes,
-      createdAt: userCreatedAt ? userCreatedAt.toISOString() : null
+      createdAt: userCreatedAt ? userCreatedAt.toISOString() : null,
+      sede
     });
   } catch (error) {
     return res.status(500).json({ error: error.message });
@@ -315,25 +340,11 @@ const getOvertimeSummary = async (req, res) => {
       .orderBy("timestamp", "asc")
       .get();
 
-    // Buscar deduções de horas extras
-    const deductionsRef = db
-      .collection("registo-ponto")
-      .doc(userId)
-      .collection("DeducoesHorasExtras");
-
-    const deductionsSnapshot = await deductionsRef.get();
-    const deductionsMap = {};
-    let totalDeductionMinutes = 0;
-
-    deductionsSnapshot.forEach(doc => {
-      const data = doc.data();
-      const monthKey = `${String(data.month).padStart(2, "0")}`;
-      deductionsMap[monthKey] = data.deductionMinutes || 0;
-      totalDeductionMinutes += data.deductionMinutes || 0;
-    });
-
     const monthlyData = {};
     let totalOvertimeMinutes = 0;
+    // Compensações de dias curtos usadas no ano (campo "horas_compensatorias" no
+    // próprio Registos do dia)  -  descontam do saldo anual, nunca do mês.
+    let totalCompensatedMinutes = 0;
 
     snapshot.forEach(doc => {
       const data = doc.data();
@@ -348,18 +359,22 @@ const getOvertimeSummary = async (req, res) => {
           totalMinutes: 0,
           overtimeMinutes: 0,
           manualOvertimeMinutes: 0,
-          deductionMinutes: deductionsMap[monthKey] || 0,
           workDays: 0
         };
       }
 
       if (data.horaEntrada && data.horaSaida) {
         const { minutos, minutosExtras } = calcularHorasHelper(data.horaEntrada, data.horaSaida, date);
-        monthlyData[monthKey].totalMinutes += minutos;
+        // Dia compensado: soma-se o que foi coberto pelo saldo anual (o utilizador
+        // escolhe quanto, pode não ser o défice todo), para que as 40h
+        // semanais/mensais reflitam sempre a compensação  -  ver compensateShortDay.
+        monthlyData[monthKey].totalMinutes += minutos + (data.horas_compensatorias || 0);
         monthlyData[monthKey].overtimeMinutes += minutosExtras;
         monthlyData[monthKey].workDays++;
         totalOvertimeMinutes += minutosExtras;
       }
+
+      totalCompensatedMinutes += data.horas_compensatorias || 0;
     });
 
     // Buscar horas extras manuais
@@ -390,7 +405,6 @@ const getOvertimeSummary = async (req, res) => {
           totalMinutes: 0,
           overtimeMinutes: 0,
           manualOvertimeMinutes: 0,
-          deductionMinutes: deductionsMap[monthKey] || 0,
           workDays: 0
         };
       }
@@ -402,7 +416,6 @@ const getOvertimeSummary = async (req, res) => {
     // Somar horas extras automáticas e manuais
     totalOvertimeMinutes += totalManualOvertimeMinutes;
 
-    // Garantir que todos os meses têm deduções (mesmo que 0)
     for (let month = 1; month <= 12; month++) {
       const monthKey = `${String(month).padStart(2, "0")}`;
       if (!monthlyData[monthKey]) {
@@ -412,39 +425,38 @@ const getOvertimeSummary = async (req, res) => {
           totalMinutes: 0,
           overtimeMinutes: 0,
           manualOvertimeMinutes: 0,
-          deductionMinutes: deductionsMap[monthKey] || 0,
           workDays: 0
         };
-      } else if (!monthlyData[monthKey].deductionMinutes) {
-        monthlyData[monthKey].deductionMinutes = deductionsMap[monthKey] || 0;
       }
     }
 
+    // O mensal é sempre bruto (nunca reduzido por faltas ou deduções  -  ver
+    // compensateShortDay/computeAnnualOvertimeBalance, que descontam do anual).
     const monthlyArray = Object.values(monthlyData)
       .filter(month => month.workDays > 0 || month.manualOvertimeMinutes > 0) // Mostrar meses com registos ou horas extras manuais
       .sort((a, b) => a.month - b.month) // Ordenar por número do mês (1=Janeiro, 2=Fevereiro, etc.)
       .map(month => {
         const totalMonthOvertimeMinutes = month.overtimeMinutes + month.manualOvertimeMinutes;
-        const netOvertimeMinutes = Math.max(0, totalMonthOvertimeMinutes - month.deductionMinutes);
         return {
           ...month,
           totalHours: formatarMinutosHelper(month.totalMinutes),
           overtimeHours: formatarMinutosHelper(month.overtimeMinutes),
           manualOvertimeHours: month.manualOvertimeMinutes > 0 ? formatarMinutosHelper(month.manualOvertimeMinutes) : null,
           totalOvertimeHours: formatarMinutosHelper(totalMonthOvertimeMinutes),
-          deductionHours: month.deductionMinutes > 0 ? formatarMinutosHelper(month.deductionMinutes) : null,
-          netOvertimeHours: formatarMinutosHelper(netOvertimeMinutes),
-          netOvertimeMinutes
+          netOvertimeHours: formatarMinutosHelper(totalMonthOvertimeMinutes),
+          netOvertimeMinutes: totalMonthOvertimeMinutes
         };
       });
 
-    const totalNetOvertimeMinutes = Math.max(0, totalOvertimeMinutes - totalDeductionMinutes);
+    const totalNetOvertimeMinutes = Math.max(0, totalOvertimeMinutes - totalCompensatedMinutes);
 
     return res.status(200).json({
       monthlyOvertime: monthlyArray,
       totalOvertimeHours: formatarMinutosHelper(totalOvertimeMinutes),
-      totalDeductionHours: totalDeductionMinutes > 0 ? formatarMinutosHelper(totalDeductionMinutes) : null,
+      totalCompensatedHours: totalCompensatedMinutes > 0 ? formatarMinutosHelper(totalCompensatedMinutes) : null,
+      totalCompensatedMinutes,
       totalNetOvertimeHours: formatarMinutosHelper(totalNetOvertimeMinutes),
+      totalNetOvertimeMinutes,
       year: currentYear
     });
 
@@ -454,6 +466,11 @@ const getOvertimeSummary = async (req, res) => {
   }
 };
 
+// Resumo anual de assiduidade (Faltas/Férias/Baixas Médicas) para a página de
+// detalhe do colaborador. Reutiliza calculateMonthlyAttendanceSummary (mesma
+// lógica usada no processamento de salários) mês a mês, para que os totais
+// anuais fiquem consistentes com a tabela mensal do livro de ponto: dias
+// inteiros (não frações) e feriados/férias/baixas/aniversário excluídos.
 const getYearlySummary = async (req, res) => {
   try {
     const { year } = req.body;
@@ -464,141 +481,22 @@ const getYearlySummary = async (req, res) => {
     const now = new Date();
     const currentYear = year || now.getFullYear();
 
-    // Buscar a data de criação do colaborador
-    const userCreatedAt = await getUserCreatedAt(userId);
-
-    let totalFeriasAprovadas = 0;
-    let totalBaixasAprovadas = 0;
-    let totalFaltas = 0;
+    let diasFerias = 0;
+    let diasBaixaMedica = 0;
+    let diasFalta = 0;
 
     for (let month = 1; month <= 12; month++) {
-      const feriasRef = db
-        .collection("registo-ponto")
-        .doc(userId)
-        .collection("Ferias");
-
-      const feriasSnapshot = await feriasRef.get();
-
-      feriasSnapshot.forEach(doc => {
-        const data = doc.data();
-        const dateStr = data.date;
-
-        if (dateStr && dateStr.includes('-')) {
-          const parts = dateStr.split('-');
-          let docMonth, docYear;
-
-          if (parts.length === 2) {
-            docMonth = parseInt(parts[1]);
-            docYear = currentYear;
-          } else if (parts.length === 3) {
-            if (parts[0].length === 4) {
-              docYear = parseInt(parts[0]);
-              docMonth = parseInt(parts[1]);
-            } else {
-              docMonth = parseInt(parts[1]);
-              docYear = parseInt(parts[2]);
-            }
-          }
-
-          if (docMonth === month && docYear === currentYear && data.Approved === true) {
-            totalFeriasAprovadas++;
-          }
-        }
-      });
-
-      const baixasRef = db
-        .collection("registo-ponto")
-        .doc(userId)
-        .collection("BaixasMedicas");
-
-      const baixasSnapshot = await baixasRef.get();
-
-      baixasSnapshot.forEach(doc => {
-        const data = doc.data();
-        const dateStr = data.date;
-
-        if (dateStr && dateStr.includes('-')) {
-          const parts = dateStr.split('-');
-          let docMonth, docYear;
-
-          if (parts.length === 2) {
-            docMonth = parseInt(parts[1]);
-            docYear = currentYear;
-          } else if (parts.length === 3) {
-            if (parts[0].length === 4) {
-              docYear = parseInt(parts[0]);
-              docMonth = parseInt(parts[1]);
-            } else {
-              docMonth = parseInt(parts[1]);
-              docYear = parseInt(parts[2]);
-            }
-          }
-
-          if (docMonth === month && docYear === currentYear && data.Approved === true) {
-            totalBaixasAprovadas++;
-          }
-        }
-      });
+      const monthSummary = await calculateMonthlyAttendanceSummary({ uid: userId, year: currentYear, month });
+      diasFerias += monthSummary.diasFerias;
+      diasBaixaMedica += monthSummary.diasBaixaMedica;
+      diasFalta += monthSummary.diasFalta;
     }
-
-    const registosRef = db
-      .collection("registo-ponto")
-      .doc(userId)
-      .collection("Registos");
-
-    const yearStart = new Date(currentYear, 0, 1);
-    const yearEnd = new Date(currentYear, 11, 31, 23, 59, 59);
-
-    const snapshot = await registosRef
-      .where("timestamp", ">=", yearStart)
-      .where("timestamp", "<=", yearEnd)
-      .get();
-
-    let totalHorasEmFalta = 0; // Em minutos
-    let totalDiasComFaltas = 0;
-
-    snapshot.forEach(doc => {
-      const registo = doc.data();
-      const date = new Date(registo.timestamp.toDate());
-      const dayOfWeek = date.getDay();
-      const isDiaUtil = dayOfWeek >= 1 && dayOfWeek <= 5;
-
-      // Verificar se a data é após a criação do colaborador
-      const isAfterCreation = !userCreatedAt || date >= userCreatedAt;
-
-      const isFeriado = registo.horaEntrada === "feriado" || registo.horaSaida === "feriado";
-      const isFerias = registo.horaEntrada === "ferias" || registo.horaSaida === "ferias";
-      const isBaixaMedica = registo.horaEntrada === "baixa medica" || registo.horaSaida === "baixa medica";
-
-      if (isDiaUtil && isAfterCreation && !isFeriado && !isFerias && !isBaixaMedica) {
-        // Calcular horas trabalhadas no dia
-        if (registo.horaEntrada && registo.horaSaida) {
-          const { minutos } = calcularHorasHelper(registo.horaEntrada, registo.horaSaida, date);
-          const minutosObrigatorios = 480; // 8 horas
-
-          if (minutos < minutosObrigatorios) {
-            const minutosEmFalta = minutosObrigatorios - minutos;
-            totalHorasEmFalta += minutosEmFalta;
-            totalDiasComFaltas += minutosEmFalta / minutosObrigatorios; // Fração do dia
-          }
-        } else if (!registo.horaEntrada && !registo.horaSaida) {
-          // Falta completa
-          totalHorasEmFalta += 480;
-          totalDiasComFaltas += 1;
-        }
-      }
-    });
-
-    // Arredondar dias com faltas para 2 casas decimais
-    totalFaltas = Math.round(totalDiasComFaltas * 100) / 100;
 
     return res.status(200).json({
       year: currentYear,
-      diasFerias: totalFeriasAprovadas,
-      diasBaixaMedica: totalBaixasAprovadas,
-      diasFalta: totalFaltas,
-      horasEmFalta: formatarMinutosHelper(totalHorasEmFalta),
-      minutosEmFalta: totalHorasEmFalta
+      diasFerias,
+      diasBaixaMedica,
+      diasFalta
     });
 
   } catch (error) {
@@ -613,6 +511,7 @@ const getYearlySummary = async (req, res) => {
 // secundários (não grava nada), ao contrário de processOvertimeDeduction.
 async function calculateMonthlyAttendanceSummary({ uid, year, month }) {
   const userCreatedAt = await getUserCreatedAt(uid);
+  const sede = await getUserSede(uid);
   const now = new Date();
 
   const firstDay = new Date(year, month - 1, 1);
@@ -686,13 +585,9 @@ async function calculateMonthlyAttendanceSummary({ uid, year, month }) {
     aniversarioDias.add(parsed.dia);
   });
 
-  // Feriados portugueses (Porto)  -  fixos + móveis calculados para o ano (mesma
-  // lista usada em processOvertimeDeduction, abaixo).
-  const holidays = [
-    "01-01", "25-04", "01-05", "10-06", "15-08", "05-10",
-    "01-11", "01-12", "08-12", "25-12", "24-06",
-    ...getMoveableHolidays(year),
-  ];
+  // Feriados nacionais + móveis + feriado municipal da sede do colaborador (mesma
+  // lógica usada em processOvertimeDeduction, abaixo).
+  const holidays = getHolidaysDDMM(sede, year);
 
   const diasNoMes = new Date(year, month, 0).getDate();
   let diasFalta = 0;
@@ -722,266 +617,10 @@ async function calculateMonthlyAttendanceSummary({ uid, year, month }) {
   return { diasTrabalhados, diasFerias, diasBaixaMedica, diasAniversario, diasFalta };
 }
 
-// Processar deduções de horas extras baseadas em faltas
-const processOvertimeDeduction = async (req, res) => {
-  try {
-    const { uid, month } = req.body;
-
-    if (!uid || !month) {
-      return res.status(400).json({ error: "uid e mês são obrigatórios" });
-    }
-
-    // Buscar a data de criação do colaborador
-    const userCreatedAt = await getUserCreatedAt(uid);
-
-    const now = new Date();
-    const year = now.getFullYear();
-    const firstDay = new Date(year, month - 1, 1);
-    const lastDay = new Date(year, month, 0, 23, 59, 59);
-
-    // Buscar registos do mês
-    const registosRef = db
-      .collection("registo-ponto")
-      .doc(uid)
-      .collection("Registos");
-
-    const snapshot = await registosRef
-      .where("timestamp", ">=", firstDay)
-      .where("timestamp", "<=", lastDay)
-      .orderBy("timestamp", "asc")
-      .get();
-
-    // Buscar férias e baixas médicas do mês
-    const feriasRef = db
-      .collection("registo-ponto")
-      .doc(uid)
-      .collection("Ferias");
-
-    const baixasRef = db
-      .collection("registo-ponto")
-      .doc(uid)
-      .collection("BaixasMedicas");
-
-    const aniversarioRef = db
-      .collection("registo-ponto")
-      .doc(uid)
-      .collection("DiasAniversario");
-
-    const feriasSnapshot = await feriasRef.get();
-    const baixasSnapshot = await baixasRef.get();
-    const aniversarioSnapshot = await aniversarioRef.get();
-
-    // Mapear férias, baixas e dia de aniversário por data
-    const feriasMap = {};
-    const baixasMap = {};
-    const aniversarioMap = {};
-
-    feriasSnapshot.forEach(doc => {
-      const data = doc.data();
-      const dateStr = data.date;
-      let key;
-
-      if (dateStr.length === 10 && dateStr[2] === "-") {
-        key = dateStr.slice(0, 5); // "DD-MM"
-      } else if (dateStr.length === 10 && dateStr[4] === "-") {
-        key = dateStr.slice(8, 10) + "-" + dateStr.slice(5, 7); // "DD-MM"
-      } else {
-        key = dateStr;
-      }
-
-      if (data.Approved === true) {
-        feriasMap[key] = true;
-      }
-    });
-
-    baixasSnapshot.forEach(doc => {
-      const data = doc.data();
-      const dateStr = data.date;
-      let key;
-
-      if (dateStr.length === 10 && dateStr[2] === "-") {
-        key = dateStr.slice(0, 5); // "DD-MM"
-      } else if (dateStr.length === 10 && dateStr[4] === "-") {
-        key = dateStr.slice(8, 10) + "-" + dateStr.slice(5, 7); // "DD-MM"
-      } else {
-        key = dateStr;
-      }
-
-      if (data.Approved === true) {
-        baixasMap[key] = true;
-      }
-    });
-
-    aniversarioSnapshot.forEach(doc => {
-      const data = doc.data();
-      const dateStr = data.date;
-      let key;
-
-      if (dateStr.length === 10 && dateStr[2] === "-") {
-        key = dateStr.slice(0, 5); // "DD-MM"
-      } else if (dateStr.length === 10 && dateStr[4] === "-") {
-        key = dateStr.slice(8, 10) + "-" + dateStr.slice(5, 7); // "DD-MM"
-      } else {
-        key = dateStr;
-      }
-
-      if (data.Approved === true) {
-        aniversarioMap[key] = true;
-      }
-    });
-
-    // Feriados portugueses (Porto)  -  fixos + móveis calculados para o ano
-    const holidays = [
-      "01-01", "25-04", "01-05", "10-06", "15-08", "05-10",
-      "01-11", "01-12", "08-12", "25-12", "24-06",
-      ...getMoveableHolidays(year),
-    ];
-
-    // Calcular faltas
-    const diasNoMes = new Date(year, month, 0).getDate();
-    let minutosEmFalta = 0;
-    let diasFalta = 0;
-    const diasDetalhe = []; // { data: "DD-MM", minutosEmFalta, tipo }
-
-    for (let dia = 1; dia <= diasNoMes; dia++) {
-      const dataAtual = new Date(year, month - 1, dia);
-      const diaSemana = dataAtual.getDay();
-      const diaString = `${String(dia).padStart(2, "0")}-${String(month).padStart(2, "0")}`;
-
-      // Só considerar dias úteis (segunda a sexta)
-      if (diaSemana >= 1 && diaSemana <= 5) {
-        const isFeriado = holidays.includes(diaString);
-        const isFerias = feriasMap[diaString];
-        const isBaixaMedica = baixasMap[diaString];
-        const isAniversario = aniversarioMap[diaString];
-
-        if (!isFeriado && !isFerias && !isBaixaMedica && !isAniversario) {
-          // Verificar se a data é após a criação do colaborador
-          const isAfterCreation = !userCreatedAt || dataAtual >= userCreatedAt;
-
-          if (isAfterCreation && dataAtual < new Date() && dataAtual.toDateString() !== new Date().toDateString()) {
-            // Verificar se há registo para este dia e calcular horas trabalhadas
-            const registosDoDia = snapshot.docs.filter(doc => {
-              const registo = doc.data();
-              const dataRegisto = new Date(registo.timestamp.toDate());
-              return dataRegisto.getDate() === dia;
-            });
-
-            let minutosTrabalhadosNoDia = 0;
-            let temRegistoCompleto = false;
-
-            registosDoDia.forEach(doc => {
-              const registo = doc.data();
-              if (registo.horaEntrada && registo.horaSaida) {
-                const { minutos } = calcularHorasHelper(registo.horaEntrada, registo.horaSaida, dataAtual);
-                minutosTrabalhadosNoDia += minutos;
-                temRegistoCompleto = true;
-              }
-            });
-
-            // 8 horas = 480 minutos
-            const minutosObrigatorios = 480;
-
-            if (!temRegistoCompleto) {
-              // Falta completa - deduzir 8 horas
-              minutosEmFalta += minutosObrigatorios;
-              diasFalta++;
-              diasDetalhe.push({ data: diaString, minutosEmFalta: minutosObrigatorios });
-            } else if (minutosTrabalhadosNoDia < minutosObrigatorios) {
-              // Trabalhou menos que 8 horas - deduzir a diferença
-              const minutosEmFaltaNoDia = minutosObrigatorios - minutosTrabalhadosNoDia;
-              minutosEmFalta += minutosEmFaltaNoDia;
-              diasDetalhe.push({ data: diaString, minutosEmFalta: minutosEmFaltaNoDia });
-
-              // Contar como dia parcial em falta se for mais de 30 minutos
-              if (minutosEmFaltaNoDia > 30) {
-                diasFalta += minutosEmFaltaNoDia / minutosObrigatorios; // Fração do dia
-              }
-            }
-          }
-        }
-      }
-    }
-
-    if (minutosEmFalta > 0) {
-      // Salvar a dedução na coleção DeducoesHorasExtras
-      const deductionRef = db
-        .collection("registo-ponto")
-        .doc(uid)
-        .collection("DeducoesHorasExtras");
-
-      const deductionId = `${year}-${String(month).padStart(2, "0")}`;
-
-      await deductionRef.doc(deductionId).set({
-        month: month,
-        year: year,
-        deductionMinutes: minutosEmFalta,
-        deductionHours: formatarMinutosHelper(minutosEmFalta),
-        diasFalta: diasFalta,
-        dias: diasDetalhe,
-        processedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-
-      console.log(`[processOvertimeDeduction] Dedução salva: ${formatarMinutosHelper(minutosEmFalta)} para ${diasFalta} dias`);
-    }
-
-    return res.status(200).json({
-      success: true,
-      month: month,
-      year: year,
-      minutosEmFalta,
-      deductionHours: formatarMinutosHelper(minutosEmFalta),
-      diasFalta,
-      dias: diasDetalhe
-    });
-
-  } catch (error) {
-    console.error("[processOvertimeDeduction] Erro:", error);
-    return res.status(500).json({ error: error.message });
-  }
-};
-
-// Limpar todas as deduções (função de debug)
-const clearOvertimeDeductions = async (req, res) => {
-  try {
-    const { uid } = req.body;
-
-    if (!uid) {
-      return res.status(400).json({ error: "uid é obrigatório" });
-    }
-
-    const deductionRef = db
-      .collection("registo-ponto")
-      .doc(uid)
-      .collection("DeducoesHorasExtras");
-
-    const snapshot = await deductionRef.get();
-    let deletedCount = 0;
-
-    const batch = db.batch();
-    snapshot.docs.forEach(doc => {
-      batch.delete(doc.ref);
-      deletedCount++;
-    });
-
-    await batch.commit();
-
-    return res.status(200).json({
-      success: true,
-      deletedCount
-    });
-
-  } catch (error) {
-    console.error("[clearOvertimeDeductions] Erro:", error);
-    return res.status(500).json({ error: error.message });
-  }
-};
-
 module.exports = {
   getUserRecords,
   getOvertimeSummary,
   getYearlySummary,
-  processOvertimeDeduction,
-  clearOvertimeDeductions,
-  calculateMonthlyAttendanceSummary
+  calculateMonthlyAttendanceSummary,
+  computeAnnualOvertimeBalance
 };

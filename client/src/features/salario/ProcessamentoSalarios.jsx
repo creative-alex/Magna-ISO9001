@@ -5,16 +5,17 @@ import { UserContext } from "../../shared/context/userContext";
 import Sidebar from "../../shared/components/Sidebar";
 import Topbar from "../../shared/components/Topbar";
 import ColaboradoresGroupedList from "../../shared/components/ColaboradoresGroupedList";
-import { FaPencil, FaCheck, FaSliders } from "react-icons/fa6";
+import { FaPencil, FaCheck, FaSliders, FaChevronDown } from "react-icons/fa6";
 import { apiFetch } from "../../shared/utils/apiFetch";
 
 const GOLD = "#C8932F";
 
-function ParametrosSalario() {
+function ParametrosSalario({ canEdit }) {
   const [parametros, setParametros] = useState({ valor_subsidio_alimentacao: "", valor_km_deslocacao: "", escaloes: [] });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -68,31 +69,48 @@ function ParametrosSalario() {
 
   return (
     <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-      <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 8 }}>
-        <FaSliders style={{ color: GOLD, fontSize: 13 }} />
-        <span style={{ fontSize: 13, fontWeight: 600, color: "#111827", flex: 1 }}>Parâmetros de salário</span>
+      <div style={{ padding: "14px 18px", borderBottom: collapsed ? "none" : "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 8 }}>
         <button
-          disabled={saving || loading}
-          onClick={() => { if (editMode) handleSave(); else setEditMode(true); }}
-          style={{
-            display: "flex", alignItems: "center", gap: 6,
-            padding: "6px 12px", fontSize: 12, fontWeight: 500, cursor: saving ? "wait" : "pointer",
-            border: `1px solid ${editMode ? "#22c55e" : GOLD}`,
-            borderRadius: 7, background: "#fff",
-            color: editMode ? "#22c55e" : GOLD,
-          }}
+          onClick={() => setCollapsed(c => !c)}
+          title={collapsed ? "Expandir parâmetros" : "Colapsar parâmetros"}
+          style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", padding: 4, margin: -4, cursor: "pointer" }}
         >
-          {saving
-            ? "A guardar..."
-            : editMode ? <><FaCheck style={{ fontSize: 11 }} /> Guardar</> : <><FaPencil style={{ fontSize: 11 }} /> Editar</>}
+          <FaSliders style={{ color: GOLD, fontSize: 13 }} />
         </button>
+        <span
+          onClick={() => setCollapsed(c => !c)}
+          style={{ fontSize: 13, fontWeight: 600, color: "#111827", flex: 1, cursor: "pointer" }}
+        >
+          Parâmetros de salário
+        </span>
+        {!collapsed && canEdit && (
+          <button
+            disabled={saving || loading}
+            onClick={() => { if (editMode) handleSave(); else setEditMode(true); }}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "6px 12px", fontSize: 12, fontWeight: 500, cursor: saving ? "wait" : "pointer",
+              border: `1px solid ${editMode ? "#22c55e" : GOLD}`,
+              borderRadius: 7, background: "#fff",
+              color: editMode ? "#22c55e" : GOLD,
+            }}
+          >
+            {saving
+              ? "A guardar..."
+              : editMode ? <><FaCheck style={{ fontSize: 11 }} /> Guardar</> : <><FaPencil style={{ fontSize: 11 }} /> Editar</>}
+          </button>
+        )}
+        <FaChevronDown
+          onClick={() => setCollapsed(c => !c)}
+          style={{ color: "#9ca3af", fontSize: 12, cursor: "pointer", transition: "transform 0.15s", transform: collapsed ? "rotate(-90deg)" : "none" }}
+        />
       </div>
 
-      {loading ? (
+      {!collapsed && (loading ? (
         <div style={{ padding: 24, textAlign: "center", fontSize: 13, color: "#9ca3af" }}>A carregar parâmetros...</div>
       ) : (
         <>
-          <div style={{ padding: 18, display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16, borderBottom: "1px solid #f3f4f6" }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-[18px] border-b border-[#f3f4f6]">
             <div>
               <span style={{ fontSize: 11, color: "#6b7280", marginBottom: 4, display: "block" }}>Valor do subsídio de alimentação (€/dia)</span>
               {editMode ? (
@@ -124,7 +142,7 @@ function ParametrosSalario() {
           </div>
 
           <div style={{ padding: "12px 18px 6px", fontSize: 12, fontWeight: 600, color: "#111827" }}>Tabela de vencimento por escalão</div>
-          <div style={{ padding: "0 18px 18px", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 px-[18px] pb-[18px]">
             {parametros.escaloes.map(e => (
               <div key={e.escalao} style={{ border: "1px solid #f3f4f6", borderRadius: 8, padding: 12 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginBottom: 8 }}>Escalão {e.escalao}</div>
@@ -158,7 +176,7 @@ function ParametrosSalario() {
             ))}
           </div>
         </>
-      )}
+      ))}
     </div>
   );
 }
@@ -169,7 +187,8 @@ export default function ProcessamentoSalarios() {
   const isAdmin = nivelAcesso === "SuperAdmin";
   const isHR = nivelAcesso === "GestorRH";
   const isAdministrador = nivelAcesso === "Administrador";
-  const canView = isAdmin || isHR || isAdministrador;
+  const isGestorFinanceiro = nivelAcesso === "GestorFinanceiro";
+  const canView = isAdmin || isHR || isAdministrador || isGestorFinanceiro;
 
   useEffect(() => {
     // Esta página (parâmetros + lista de colaboradores) é só para admin/RH/
@@ -191,14 +210,16 @@ export default function ProcessamentoSalarios() {
     <div className="flex min-h-screen">
       <Sidebar onSelectFile={handleSelectFile} />
 
-      <div className="ml-[230px] flex-1 flex flex-col min-h-screen">
+      <div className="ml-[var(--sidebar-w,230px)] transition-[margin-left] duration-200 flex-1 min-w-0 flex flex-col min-h-screen">
         <Topbar icon="💰" title="Processamento Salários" />
 
         {/* Parâmetros de salário são globais (não são "dados dos colaboradores da
-            entidade"), por isso continuam só para admin/RH  -  Administrador não os edita. */}
-        {(isAdmin || isHR) && (
-          <div style={{ padding: "24px 24px 0", display: "flex", flexDirection: "column", gap: 20 }}>
-            <ParametrosSalario />
+            entidade"), por isso continuam fora do alcance do Administrador. GestorRH
+            mantém consulta mas a edição passou a ser exclusiva de SuperAdmin/Gestor
+            Financeiro  -  separação de funções entre RH e Financeiro. */}
+        {(isAdmin || isHR || isGestorFinanceiro) && (
+          <div className="px-4 sm:px-6 pt-4 sm:pt-6" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            <ParametrosSalario canEdit={isAdmin || isGestorFinanceiro} />
           </div>
         )}
 

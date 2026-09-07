@@ -1,12 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const { verifyTokenAndGetUserInfo, getAllUsers, getColaboradores, createUser, getFavorites, updateFavorite, updateFirstLogin } = require('./usersController');
+const {
+  verifyTokenAndGetUserInfo, getAllUsers, getColaboradores, getColaboradoresStatusHoje,
+  createUser, getFavorites, updateFavorite, updateFirstLogin,
+} = require('./usersController');
 const { requireAuth, requireAdmin, requireCanViewColaboradores } = require('../../shared/middleware/auth');
 
 
 router.post("/verifyTokenAndGetUserInfo", verifyTokenAndGetUserInfo);
 router.get("/getAllUsers", requireAuth, requireAdmin, getAllUsers);
 router.get("/getColaboradores", requireAuth, requireCanViewColaboradores, getColaboradores);
+router.get("/getColaboradoresStatusHoje", requireAuth, requireCanViewColaboradores, getColaboradoresStatusHoje);
 router.post("/createUser", requireAuth, requireAdmin, createUser);
 router.get("/favorites/:username", requireAuth, getFavorites);
 router.post("/favorites", requireAuth, updateFavorite);

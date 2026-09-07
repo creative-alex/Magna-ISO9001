@@ -8,19 +8,34 @@ import {
 } from "react-icons/fa6";
 import { apiFetch } from "../../../shared/utils/apiFetch";
 import { UserContext } from "../../../shared/context/userContext";
-import { HOLIDAYS_PORTO, getMoveableHolidays } from "../../../shared/utils/holidays";
+import { NATIONAL_HOLIDAYS_DDMM, getMunicipalHolidayDDMM, getMoveableHolidays } from "../../../shared/utils/holidays";
 
 const MONTH_NAMES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
+// Índice = Date.getDay() (0 = Domingo)
+const WEEKDAY_LETTERS = ["DOM.", "SEG.", "TER.", "QUA.", "QUI.", "SEX.", "SÁB."];
 const DISPENSA_DAYS = [24, 31]; // Dezembro: dias de dispensa da empresa, não contam como férias
 // 24 e 31 de dezembro já são tratados à parte como "dispensa", por isso saem
 // daqui para não aparecerem duplicados como "feriado" e "dispensa" ao mesmo tempo.
-const FIXED_HOLIDAYS_DDMM = HOLIDAYS_PORTO.filter((ddmm) => ddmm !== "24-12" && ddmm !== "31-12");
+const FIXED_HOLIDAYS_DDMM = NATIONAL_HOLIDAYS_DDMM.filter((ddmm) => ddmm !== "24-12" && ddmm !== "31-12");
 
 function pad2(n) {
   return String(n).padStart(2, "0");
+}
+
+function getMonday(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function formatDateStr(dateObj) {
+  return `${pad2(dateObj.getDate())}-${pad2(dateObj.getMonth() + 1)}-${dateObj.getFullYear()}`;
 }
 
 function getInitials(nome) {
@@ -56,7 +71,22 @@ export default function VacationTimeline({ year, onYearChange }) {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState("timeline"); // "timeline" | "resumo"
   const [dayMode, setDayMode] = useState("ferias"); // "ferias" | "aniversario"  -  o que o clique num dia marca, na timeline
+  // Em ecrãs estreitos arranca em "semana" (7 colunas cabem bem); no desktop
+  // continua a arrancar em "mês", como antes.
+  const [rangeMode, setRangeMode] = useState(() =>
+    (window.matchMedia("(max-width: 767px)").matches ? "week" : "month")
+  ); // "month" | "week"  -  quantos dias a timeline mostra de cada vez
   const [activeMonth, setActiveMonth] = useState(new Date().getMonth());
+  const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
+  // Permite marcar/desmarcar vários dias seguidos arrastando o rato: guarda a
+  // linha e o estado-alvo (marcar ou desmarcar) definidos pelo primeiro dia clicado.
+  const [dragInfo, setDragInfo] = useState(null);
+
+  useEffect(() => {
+    const clearDrag = () => setDragInfo(null);
+    window.addEventListener("mouseup", clearDrag);
+    return () => window.removeEventListener("mouseup", clearDrag);
+  }, []);
 
   const loadMap = useCallback(async () => {
     try {
@@ -67,7 +97,13 @@ export default function VacationTimeline({ year, onYearChange }) {
       });
       if (!response.ok) throw new Error("Falha ao carregar o mapa de férias");
       const data = await response.json();
-      const sorted = [...(data.employees || [])].sort((a, b) => a.nome.localeCompare(b.nome, "pt"));
+      const alphabetical = [...(data.employees || [])].sort((a, b) => a.nome.localeCompare(b.nome, "pt"));
+      // O colaborador com sessão iniciada aparece sempre em primeiro lugar,
+      // mantendo o resto da lista por ordem alfabética.
+      const currentIndex = alphabetical.findIndex((e) => e.uid === uid);
+      const sorted = currentIndex > 0
+        ? [alphabetical[currentIndex], ...alphabetical.slice(0, currentIndex), ...alphabetical.slice(currentIndex + 1)]
+        : alphabetical;
       setEmployees(sorted);
       setVacationMap(buildVacationMap(sorted));
       setBirthdayMap(buildBirthdayMap(sorted));
@@ -77,7 +113,7 @@ export default function VacationTimeline({ year, onYearChange }) {
     } finally {
       setLoading(false);
     }
-  }, [year]);
+  }, [year, uid]);
 
   useEffect(() => {
     loadMap();
@@ -89,18 +125,40 @@ export default function VacationTimeline({ year, onYearChange }) {
     return map;
   }, [employees]);
 
-  const holidaySet = useMemo(
+  // Feriados nacionais/móveis  -  iguais para todos; o feriado municipal varia por
+  // sede, por isso é calculado por colaborador (ver rowHolidaySet, mais abaixo).
+  const nationalHolidaySet = useMemo(
     () => new Set([...FIXED_HOLIDAYS_DDMM, ...getMoveableHolidays(year)]),
     [year]
   );
 
   const canEdit = (rowUid) => rowUid === uid || isAdminOrHR;
 
+  const handleDayMouseDown = (rowUid, dateStr, isMarkedInMode, canToggle, toggleHandler) => {
+    if (!canToggle) return;
+    setDragInfo({ rowUid, targetState: !isMarkedInMode, toggleHandler });
+    toggleHandler(rowUid, dateStr);
+  };
+
+  const handleDayMouseEnter = (rowUid, dateStr, isMarkedInMode, canToggle) => {
+    if (!dragInfo || dragInfo.rowUid !== rowUid || !canToggle) return;
+    if (isMarkedInMode === dragInfo.targetState) return;
+    dragInfo.toggleHandler(rowUid, dateStr);
+  };
+
   const goToMonth = (delta) => {
     let nextMonth = activeMonth + delta;
     if (nextMonth < 0) { nextMonth = 11; onYearChange(year - 1); }
     else if (nextMonth > 11) { nextMonth = 0; onYearChange(year + 1); }
     setActiveMonth(nextMonth);
+  };
+
+  const goToWeek = (delta) => {
+    const next = new Date(weekStart);
+    next.setDate(next.getDate() + delta * 7);
+    setWeekStart(next);
+    setActiveMonth(next.getMonth());
+    if (next.getFullYear() !== year) onYearChange(next.getFullYear());
   };
 
   const toggleVacationDay = async (rowUid, dateStr) => {
@@ -211,23 +269,36 @@ export default function VacationTimeline({ year, onYearChange }) {
   }
 
   const daysInMonth = new Date(year, activeMonth + 1, 0).getDate();
-  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const visibleDays = rangeMode === "week"
+    ? Array.from({ length: 7 }, (_, i) => { const d = new Date(weekStart); d.setDate(d.getDate() + i); return d; })
+    : Array.from({ length: daysInMonth }, (_, i) => new Date(year, activeMonth, i + 1));
   const today = new Date();
+
+  // Em vista de mês (até 31 colunas) força uma largura mínima por dia, para as
+  // células nunca ficarem ilegíveis em ecrãs estreitos - a grelha passa a ter
+  // scroll horizontal próprio nesse caso (ver overflow-x-auto mais abaixo).
+  const dayTrackMinWidth = visibleDays.length * (rangeMode === "month" ? 36 : 32);
+
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+  const weekLabel = weekStart.getMonth() === weekEnd.getMonth()
+    ? `${weekStart.getDate()} - ${weekEnd.getDate()} ${MONTH_NAMES[weekStart.getMonth()]}`
+    : `${weekStart.getDate()} ${MONTH_NAMES[weekStart.getMonth()].slice(0, 3)} - ${weekEnd.getDate()} ${MONTH_NAMES[weekEnd.getMonth()].slice(0, 3)}`;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
-      <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-100">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 bg-white border-b border-gray-100">
         <div className="flex items-center gap-3">
           <span className="w-10 h-10 rounded-xl bg-gold-light text-gold flex items-center justify-center shrink-0">
             <FaUmbrellaBeach size={16} />
           </span>
           <div>
             <h2 className="text-lg font-semibold text-gray-800 leading-tight">Mapa de Férias</h2>
-            <p className="text-xs text-gray-400">Consulta e gestão dos dias de férias da equipa</p>
+            <p className="text-xs text-gray-400 hidden sm:block">Consulta e gestão dos dias de férias da equipa</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {viewMode === "timeline" && (
             <div className="flex items-center gap-1 bg-gray-50 rounded-full border border-gray-100 p-1">
               <button
@@ -250,19 +321,39 @@ export default function VacationTimeline({ year, onYearChange }) {
               </button>
             </div>
           )}
+          {viewMode === "timeline" && (
+            <div className="flex items-center gap-1 bg-gray-50 rounded-full border border-gray-100 p-1">
+              <button
+                onClick={() => setRangeMode("month")}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  rangeMode === "month" ? "bg-gold text-white shadow-sm" : "text-gray-500 hover:bg-gray-100"
+                }`}
+              >
+                Mês
+              </button>
+              <button
+                onClick={() => setRangeMode("week")}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  rangeMode === "week" ? "bg-gold text-white shadow-sm" : "text-gray-500 hover:bg-gray-100"
+                }`}
+              >
+                Semana
+              </button>
+            </div>
+          )}
           {viewMode === "timeline" ? (
             <div className="flex items-center gap-1">
               <button
-                onClick={() => goToMonth(-1)}
+                onClick={() => (rangeMode === "week" ? goToWeek(-1) : goToMonth(-1))}
                 className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gold hover:bg-gold-light rounded-full transition-colors"
               >
                 <FaChevronLeft size={12} />
               </button>
               <span className="text-sm font-semibold text-gray-700 min-w-[120px] text-center">
-                {MONTH_NAMES[activeMonth]} {year}
+                {rangeMode === "week" ? weekLabel : `${MONTH_NAMES[activeMonth]} ${year}`}
               </span>
               <button
-                onClick={() => goToMonth(1)}
+                onClick={() => (rangeMode === "week" ? goToWeek(1) : goToMonth(1))}
                 className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gold hover:bg-gold-light rounded-full transition-colors"
               >
                 <FaChevronRight size={12} />
@@ -306,7 +397,7 @@ export default function VacationTimeline({ year, onYearChange }) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto px-6 py-5">
+      <div className="flex-1 overflow-auto px-3 sm:px-6 py-3 sm:py-5">
         {viewMode === "resumo" ? (
           <ResumoTab
             employees={employees}
@@ -319,16 +410,23 @@ export default function VacationTimeline({ year, onYearChange }) {
             currentUid={uid}
           />
         ) : (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 sm:p-5">
+            <div className="overflow-x-auto">
             {/* Régua de dias, alinhada com as faixas de cada colaborador em baixo */}
             <div className="flex mb-1.5">
-              <div className="w-[190px] shrink-0" />
-              <div className="flex flex-1">
-                {days.map((day) => {
-                  const isToday = day === today.getDate() && activeMonth === today.getMonth() && year === today.getFullYear();
+              <div className="w-[52px] sm:w-[190px] shrink-0 sticky left-0 z-10 bg-white" />
+              <div className="flex flex-1" style={{ minWidth: dayTrackMinWidth }}>
+                {visibleDays.map((dateObj) => {
+                  const day = dateObj.getDate();
+                  const isToday = dateObj.toDateString() === today.toDateString();
+                  const weekday = dateObj.getDay();
+                  const isWeekend = weekday === 0 || weekday === 6;
                   return (
-                    <div key={day} className="flex-1 text-center">
-                      <span className={`text-[10px] font-medium ${isToday ? "text-gold" : "text-gray-300"}`}>
+                    <div key={formatDateStr(dateObj)} className="flex-1 text-center overflow-hidden">
+                      <div className={`text-[8px] font-semibold leading-none mb-0.5 whitespace-nowrap ${isToday ? "text-gold" : isWeekend ? "text-gray-500" : "text-gray-300"}`}>
+                        {WEEKDAY_LETTERS[weekday]}
+                      </div>
+                      <span className={`text-xs font-medium ${isToday ? "text-gold" : isWeekend ? "text-gray-500" : "text-gray-300"}`}>
                         {day}
                       </span>
                     </div>
@@ -343,46 +441,53 @@ export default function VacationTimeline({ year, onYearChange }) {
                 const rowBirthdaySet = birthdayMap.get(emp.uid) || new Set();
                 const editable = canEdit(emp.uid);
                 const isCurrentUser = emp.uid === uid;
+                // Feriado municipal da sede do colaborador, somado aos nacionais/móveis.
+                const rowHolidaySet = new Set([...nationalHolidaySet, getMunicipalHolidayDDMM(emp.sede, year)]);
                 return (
                   <div
                     key={emp.uid}
                     className={`flex items-center group -mx-2 px-2 py-0.5 rounded-lg transition-colors ${
-                      isCurrentUser ? "bg-gold-light/70 ring-1 ring-gold-mid" : ""
+                      isCurrentUser ? "ring-1 ring-gold-mid" : ""
                     }`}
                   >
-                    <div className="w-[190px] shrink-0 flex items-center gap-2 pr-3">
+                    <div
+                      title={emp.nome}
+                      className={`w-[52px] sm:w-[190px] shrink-0 flex items-center gap-2 pr-0 sm:pr-3 sticky left-0 z-10 ${isCurrentUser ? "bg-gold-light/70" : "bg-white"}`}
+                    >
                       <span className="w-7 h-7 shrink-0 rounded-full bg-gold-light text-gold text-[11px] font-semibold flex items-center justify-center">
                         {getInitials(emp.nome)}
                       </span>
-                      <div className="min-w-0">
+                      <div className="min-w-0 hidden sm:block">
                         <div className={`text-sm truncate ${isCurrentUser ? "text-gray-900 font-semibold" : "text-gray-700"}`}>
                           {emp.nome}
                         </div>
                       </div>
                     </div>
-                    <div className="flex flex-1 h-7 rounded-lg overflow-hidden bg-gray-50 group-hover:bg-gray-100/70 transition-colors">
-                      {days.map((day) => {
-                        const isDispensa = activeMonth === 11 && DISPENSA_DAYS.includes(day);
-                        const dateStr = `${pad2(day)}-${pad2(activeMonth + 1)}-${year}`;
+                    <div className="flex flex-1 h-9 sm:h-7 rounded-lg overflow-hidden bg-gray-50 group-hover:bg-gray-100/70 transition-colors" style={{ minWidth: dayTrackMinWidth }}>
+                      {visibleDays.map((dateObj, idx) => {
+                        const day = dateObj.getDate();
+                        const dayMonth = dateObj.getMonth();
+                        const isDispensa = dayMonth === 11 && DISPENSA_DAYS.includes(day);
+                        const dateStr = formatDateStr(dateObj);
                         const isChecked = rowSet.has(dateStr);
                         const isBirthday = rowBirthdaySet.has(dateStr);
 
-                        const prevDateStr = day > 1 ? `${pad2(day - 1)}-${pad2(activeMonth + 1)}-${year}` : null;
-                        const nextDateStr = day < daysInMonth ? `${pad2(day + 1)}-${pad2(activeMonth + 1)}-${year}` : null;
-                        const prevChecked = prevDateStr ? rowSet.has(prevDateStr) : false;
-                        const nextChecked = nextDateStr ? rowSet.has(nextDateStr) : false;
+                        const prevDateObj = visibleDays[idx - 1];
+                        const nextDateObj = visibleDays[idx + 1];
+                        const prevChecked = prevDateObj ? rowSet.has(formatDateStr(prevDateObj)) : false;
+                        const nextChecked = nextDateObj ? rowSet.has(formatDateStr(nextDateObj)) : false;
 
-                        const dayOfWeek = new Date(year, activeMonth, day).getDay();
+                        const dayOfWeek = dateObj.getDay();
                         const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                        const ddmm = `${pad2(day)}-${pad2(activeMonth + 1)}`;
-                        const isHoliday = !isDispensa && holidaySet.has(ddmm);
-                        const isToday = day === today.getDate() && activeMonth === today.getMonth() && year === today.getFullYear();
+                        const ddmm = `${pad2(day)}-${pad2(dayMonth + 1)}`;
+                        const isHoliday = !isDispensa && rowHolidaySet.has(ddmm);
+                        const isToday = dateObj.toDateString() === today.toDateString();
 
                         if (isDispensa) {
                           return (
                             <div
-                              key={day}
-                              title={`${pad2(day)}/${pad2(activeMonth + 1)}  -  Dia de dispensa da empresa`}
+                              key={dateStr}
+                              title={`${pad2(day)}/${pad2(dayMonth + 1)}  -  Dia de dispensa da empresa`}
                               className="flex-1 bg-gray-200"
                             />
                           );
@@ -391,7 +496,7 @@ export default function VacationTimeline({ year, onYearChange }) {
                         // Fins de semana e feriados nunca podem ser marcados de novo, mas um
                         // dia já marcado (ex.: dado antigo) continua a poder ser desmarcado.
                         const blockedReason = isHoliday ? "holiday" : isWeekend ? "weekend" : null;
-                        const blockedLabel = blockedReason === "holiday" ? "  -  Feriado nacional" : blockedReason === "weekend" ? "  -  Fim de semana" : "";
+                        const blockedLabel = blockedReason === "holiday" ? "  -  Feriado" : blockedReason === "weekend" ? "  -  Fim de semana" : "";
 
                         // O clique marca férias ou dia de aniversário, segundo o modo ativo;
                         // o dia de aniversário tem quota fixa de 1/ano (sem transição).
@@ -410,16 +515,18 @@ export default function VacationTimeline({ year, onYearChange }) {
 
                         return (
                           <button
-                            key={day}
+                            key={dateStr}
                             type="button"
-                            title={`${pad2(day)}/${pad2(activeMonth + 1)}/${year}${statusLabel}`}
+                            title={`${pad2(day)}/${pad2(dayMonth + 1)}/${dateObj.getFullYear()}${statusLabel}`}
                             disabled={!canToggle}
-                            onClick={() => toggleHandler(emp.uid, dateStr)}
+                            onMouseDown={(e) => { e.preventDefault(); handleDayMouseDown(emp.uid, dateStr, isMarkedInMode, canToggle, toggleHandler); }}
+                            onMouseEnter={() => handleDayMouseEnter(emp.uid, dateStr, isMarkedInMode, canToggle)}
                             className={[
-                              "flex-1 h-full transition-colors relative",
-                              isChecked ? "bg-gold" : isBirthday ? "bg-rose-400" : isHoliday ? "bg-warning/20" : isWeekend ? "bg-gray-100" : "bg-transparent",
-                              isChecked && !prevChecked ? "rounded-l-full" : "",
-                              isChecked && !nextChecked ? "rounded-r-full" : "",
+                              "flex-1 h-full transition-colors relative select-none",
+                              isChecked ? "bg-gold" : isBirthday ? "bg-rose-400" : isHoliday ? "bg-warning/20" : isWeekend ? "bg-gray-300" : "bg-transparent",
+                              (isChecked && !prevChecked) || isBirthday ? "rounded-l-md" : "",
+                              (isChecked && !nextChecked) || isBirthday ? "rounded-r-md" : "",
+                              idx !== visibleDays.length - 1 && !isWeekend && !(isChecked && nextChecked) ? "border-r border-gray-200/80" : "",
                               canToggle && !isMarkedInMode ? "hover:bg-gold-mid/50 cursor-pointer" : "",
                               canToggle && isMarkedInMode ? "cursor-pointer hover:brightness-110" : "",
                               !canToggle ? "cursor-not-allowed" : "",
@@ -432,6 +539,7 @@ export default function VacationTimeline({ year, onYearChange }) {
                   </div>
                 );
               })}
+            </div>
             </div>
           </div>
         )}

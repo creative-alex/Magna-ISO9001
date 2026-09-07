@@ -20,6 +20,7 @@ const {
   getManualOvertimeForMonth,
   updateManualOvertime,
   deleteManualOvertime,
+  compensateShortDay,
   debugCorruptOvertime,
   deleteCorruptOvertime,
 } = require('./timeTrackingController');
@@ -35,8 +36,6 @@ const {
   getUserRecords,
   getOvertimeSummary,
   getYearlySummary,
-  processOvertimeDeduction,
-  clearOvertimeDeductions,
 } = require('./reportsController');
 const { ping } = require('./utilsController');
 const {
@@ -67,6 +66,7 @@ router.post("/register-manual-overtime", requireAuth, registerManualOvertime);
 router.post("/get-manual-overtime", requireAuth, getManualOvertimeForMonth);
 router.put("/update-manual-overtime", requireAuth, updateManualOvertime);
 router.delete("/delete-manual-overtime", requireAuth, deleteManualOvertime);
+router.post("/compensate-short-day", requireAuth, compensateShortDay);
 router.get("/ping", requireAuth, ping);
 // Calendário de férias de toda a equipa  -  informação visível a qualquer
 // colaborador autenticado (não é dado sensível de admin), usado tanto pela
@@ -101,8 +101,6 @@ router.post("/updateUserDetails", requireAuth, requireAdminOrEntidadeAdmin, upda
 router.post("/approve-vacation", requireAuth, requireAdmin, approveVacation);
 router.post("/reject-vacation", requireAuth, requireAdmin, rejectVacation);
 router.post("/pending-vacations", requireAuth, requireAdmin, getPendingVacations);
-router.post("/process-overtime-deduction", requireAuth, requireAdmin, processOvertimeDeduction);
-router.post("/clear-overtime-deductions", requireAuth, requireAdmin, clearOvertimeDeductions);
 router.post("/debug-corrupt-overtime", requireAuth, requireAdmin, debugCorruptOvertime);
 router.post("/delete-corrupt-overtime", requireAuth, requireAdmin, deleteCorruptOvertime);
 router.delete("/deleteRegister", requireAuth, requireAdmin, deleteRegister);

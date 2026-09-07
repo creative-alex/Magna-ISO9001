@@ -3,7 +3,7 @@ import { UserContext } from "../../../shared/context/userContext";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { confirmPasswordReset, verifyPasswordResetCode } from "firebase/auth";
+import { confirmPasswordReset, verifyPasswordResetCode, sendPasswordResetEmail } from "firebase/auth";
 import Logo from "../../../shared/assets/logo.svg";
 import LoginBackground from "../../../shared/assets/capa.jpg";
 import LoginFooter from "../../../shared/assets/footer.png";
@@ -20,6 +20,8 @@ const FirstLoginComponent = ({ onComplete, mode = "firstLogin" }) => {
     const [loading, setLoading] = useState(false);
     const [resetCode, setResetCode] = useState(null);
     const [isValidResetCode, setIsValidResetCode] = useState(false);
+    const [forgotEmail, setForgotEmail] = useState("");
+    const [resetEmailSent, setResetEmailSent] = useState(false);
     const { userEmail, auth } = useContext(UserContext);
     const navigate = useNavigate();
     const location = useLocation();
@@ -27,8 +29,15 @@ const FirstLoginComponent = ({ onComplete, mode = "firstLogin" }) => {
 
     const emailToUse = location.state?.email || userEmail;
 
+    // "reset" (link de recuperação, com oobCode) tem sempre prioridade sobre a prop "mode"
+    // recebida pela rota  -  é o que permite que /forgot-password sirva tanto o pedido de
+    // email (ver isForgotRequest) como o link que o utilizador recebe depois por email.
     const isResetMode = mode === "reset" || searchParams.get("mode") === "reset" || !!searchParams.get("oobCode");
-    const isFirstLogin = !isResetMode;
+    // Pedido de recuperação (mode="forgot", vindo do botão "Esqueceu a senha?" no login):
+    // ainda não há oobCode, por isso começa por pedir o email antes de mostrar os campos
+    // de nova senha (ver handleSendResetEmail).
+    const isForgotRequest = mode === "forgot" && !isResetMode;
+    const isFirstLogin = !isResetMode && !isForgotRequest;
 
     useEffect(() => {
         if (!isResetMode) return;
@@ -73,6 +82,33 @@ const FirstLoginComponent = ({ onComplete, mode = "firstLogin" }) => {
         }
     };
 
+    const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+
+    const handleSendResetEmail = async () => {
+        if (loading) return;
+        setLoading(true);
+        try {
+            if (!isValidEmail(forgotEmail)) throw new Error("Insira um email válido.");
+            // "handleCodeInApp" + "url" fazem o link do email trazer o utilizador de volta a
+            // esta mesma página (/forgot-password?oobCode=...), em vez da página de recuperação
+            // genérica do Firebase  -  é o oobCode na URL que ativa o isResetMode acima.
+            await sendPasswordResetEmail(auth, forgotEmail.trim(), {
+                url: `${window.location.origin}/forgot-password`,
+                handleCodeInApp: true,
+            });
+            setResetEmailSent(true);
+        } catch (err) {
+            const msg = err.code === 'auth/user-not-found'
+                ? "Não existe uma conta associada a este email."
+                : err.code === 'auth/invalid-email' || err.message === "Insira um email válido."
+                    ? "Insira um email válido."
+                    : "Não foi possível enviar o email de recuperação. Tente novamente.";
+            toast.error(msg);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handlePasswordChange = async () => {
         if (loading) return;
         setLoading(true);
@@ -105,28 +141,34 @@ const FirstLoginComponent = ({ onComplete, mode = "firstLogin" }) => {
     const handleSubmit = (e) => {
         e.preventDefault();
         if (isResetMode) handleFirebasePasswordReset();
+        else if (isForgotRequest) handleSendResetEmail();
         else handlePasswordChange();
     };
 
-    const isFormReady = isFirstLogin
-        ? isPasswordValid && passwordsMatch
-        : isPasswordValid && passwordsMatch && isValidResetCode;
+    const isFormReady = isForgotRequest
+        ? isValidEmail(forgotEmail)
+        : isFirstLogin
+            ? isPasswordValid && passwordsMatch
+            : isPasswordValid && passwordsMatch && isValidResetCode;
 
-    const pageTitle    = "Definir Nova Senha";
-    const pageSubtitle = "Crie uma nova senha pessoal para aceder ao sistema";
+    const pageTitle    = isForgotRequest ? (resetEmailSent ? "Verifique o Email" : "Recuperar Senha") : "Definir Nova Senha";
+    const pageSubtitle = isForgotRequest
+        ? (resetEmailSent ? "Enviámos um link de recuperação para o email indicado" : "Indique o seu email para receber um link de recuperação de senha")
+        : "Crie uma nova senha pessoal para aceder ao sistema";
 
     return (
-        <div className="flex min-h-screen font-sans">
-            {/* Painel de marca  -  igual ao login */}
+        <div className="flex min-h-screen font-sans max-md:flex-col">
+            {/* Painel de marca  -  igual ao login: coluna à esquerda no desktop, fundo
+                fixo de ecrã inteiro em mobile (com o form por cima). */}
             <div
-                className="w-[35%] min-w-[300px] flex flex-col items-center justify-center relative overflow-hidden px-10 py-12 before:content-[''] before:absolute before:-top-[100px] before:-right-[100px] before:w-[420px] before:h-[420px] before:rounded-full before:bg-white/[.06] before:pointer-events-none after:content-[''] after:absolute after:-bottom-[130px] after:-left-[80px] after:w-[400px] after:h-[400px] after:rounded-full after:bg-white/[.05] after:pointer-events-none"
+                className="w-[35%] min-w-[300px] max-md:fixed max-md:inset-0 max-md:w-full max-md:min-w-0 flex flex-col items-center justify-center relative overflow-hidden px-10 py-12 before:content-[''] before:absolute before:-top-[100px] before:-right-[100px] before:w-[420px] before:h-[420px] before:rounded-full before:bg-white/[.06] before:pointer-events-none after:content-[''] after:absolute after:-bottom-[130px] after:-left-[80px] after:w-[400px] after:h-[400px] after:rounded-full after:bg-white/[.05] after:pointer-events-none"
                 style={{
                     backgroundImage: `linear-gradient(145deg, rgba(74,28,0,0.45) 0%, rgba(122,64,16,0.4) 38%, rgba(200,147,47,0.35) 100%), url(${LoginBackground})`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                 }}
             >
-                <div className="text-center relative z-[1]">
+                <div className="text-center relative z-[1] max-md:hidden">
                     <div className="w-[90px] h-[90px] bg-white/[.18] border border-white/[.28] rounded-[22px] flex items-center justify-center mx-auto mb-7 shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
                         <img src={Logo} alt="Logo Magna" className="w-[54px] h-[54px] brightness-0 invert" />
                     </div>
@@ -137,11 +179,12 @@ const FirstLoginComponent = ({ onComplete, mode = "firstLogin" }) => {
                         Sistema de Gestão<br />de Qualidade
                     </p>
                 </div>
-                <span className="absolute bottom-[22px] text-[10.5px] text-white/75 tracking-[0.3px] drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">© 2026 Magna · Qualidade &amp; Excelência</span>
+                <span className="absolute bottom-[22px] text-[10.5px] text-white/75 tracking-[0.3px] drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] max-md:hidden">© 2026 Magna · Qualidade &amp; Excelência</span>
             </div>
 
-            {/* Painel do formulário */}
-            <div className="flex-1 flex flex-col overflow-y-auto relative px-8 py-6 bg-[#FDFCF9] max-sm:px-5 max-sm:py-5">
+            {/* Painel do formulário: cartão translúcido sobreposto à imagem em mobile,
+                painel sólido normal a partir do md  -  igual ao login. */}
+            <div className="flex-1 flex flex-col overflow-y-auto relative z-10 px-8 py-6 bg-[#FDFCF9] max-sm:px-5 max-sm:py-5 max-md:mt-[26vh] max-md:min-h-[74vh] max-md:bg-white/95 max-md:backdrop-blur-sm max-md:rounded-t-[28px] max-md:shadow-[0_-10px_40px_rgba(0,0,0,0.18)]">
                 <div className="flex-1 flex flex-col justify-center w-full max-w-[900px] mx-auto">
                 <div className="w-full max-w-[400px]">
                     <div className="mb-6 max-sm:mb-6">
@@ -171,6 +214,54 @@ const FirstLoginComponent = ({ onComplete, mode = "firstLogin" }) => {
                                 </>
                             )}
                         </div>
+                    ) : isForgotRequest ? (
+                        resetEmailSent ? (
+                            <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                                <p style={{ color: '#16a34a', fontSize: 14, marginBottom: 20 }}>
+                                    Enviámos um email para <strong>{forgotEmail}</strong> com um link para definir uma nova senha.
+                                </p>
+                                <button
+                                    className="h-[52px] bg-gradient-to-br from-[#C8932F] to-[#DFA847] text-white border-0 rounded-[10px] text-[14px] font-bold cursor-pointer tracking-[1.8px] uppercase flex items-center justify-center shadow-[0_4px_18px_rgba(200,147,47,0.38)] transition-all duration-200 hover:opacity-[.92] hover:-translate-y-px"
+                                    onClick={() => navigate("/")}
+                                    style={{ width: 'auto', padding: '0 32px' }}
+                                >
+                                    Voltar ao Login
+                                </button>
+                            </div>
+                        ) : (
+                            <form className="flex flex-col gap-[22px]" onSubmit={handleSubmit}>
+                                <div className="flex flex-col gap-[7px]">
+                                    <label htmlFor="forgot-email" className="text-[11px] font-bold text-gray-700 uppercase tracking-[0.8px]">Email</label>
+                                    <input
+                                        id="forgot-email"
+                                        type="email"
+                                        value={forgotEmail}
+                                        onChange={(e) => setForgotEmail(e.target.value)}
+                                        placeholder="o.seu@email.com"
+                                        autoComplete="email"
+                                        required
+                                        autoFocus
+                                        className="h-[50px] px-4 border-[1.5px] border-gray-200 rounded-[10px] text-[15px] text-gray-900 bg-white w-full box-border transition-all duration-200 focus:outline-none focus:border-[#C8932F] focus:shadow-[0_0_0_3px_rgba(200,147,47,0.12)] placeholder:text-[#c9d0d8]"
+                                    />
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    className="h-[52px] w-full bg-gradient-to-br from-[#C8932F] to-[#DFA847] text-white border-0 rounded-[10px] text-[14px] font-bold cursor-pointer tracking-[1.8px] uppercase mt-1 flex items-center justify-center shadow-[0_4px_18px_rgba(200,147,47,0.38)] transition-all duration-200 hover:enabled:opacity-[.92] hover:enabled:-translate-y-px active:enabled:translate-y-0 disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
+                                    disabled={loading || !isFormReady}
+                                >
+                                    {loading ? <span className="inline-block w-5 h-5 border-[2.5px] border-white/30 border-t-white rounded-full animate-loginSpin" /> : 'Enviar Link de Recuperação'}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className="bg-transparent border-0 p-0 text-[13px] text-[#C8932F] cursor-pointer font-medium underline underline-offset-2 transition-colors duration-150 hover:text-[#b8832a] block mx-auto mt-4"
+                                    onClick={() => navigate("/")}
+                                >
+                                    Voltar ao Login
+                                </button>
+                            </form>
+                        )
                     ) : (
                         <form className="flex flex-col gap-[22px]" onSubmit={handleSubmit}>
                             {/* Email info (primeiro acesso) */}
@@ -295,7 +386,7 @@ const FirstLoginComponent = ({ onComplete, mode = "firstLogin" }) => {
                 <img
                     src={LoginFooter}
                     alt=""
-                    className="w-auto h-auto max-w-[700px] max-h-[240px] object-contain mx-auto mt-6 shrink-0 max-sm:max-w-[220px] max-sm:max-h-[55px] max-sm:mt-6"
+                    className="w-auto h-auto max-w-[700px] max-h-[240px] object-contain mx-auto mt-6 shrink-0 max-sm:max-w-[85%] max-sm:max-h-[110px] max-sm:mt-6"
                 />
             </div>
         </div>

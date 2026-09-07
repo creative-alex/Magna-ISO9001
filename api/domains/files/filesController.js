@@ -531,7 +531,11 @@ const uploadDocument = async (req, res) => {
     console.log("Tamanho:", req.file.size);
 
     const folderPath = req.body.folderPath || '';
-    const filename = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+    const originalFilename = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+    // "filename" é opcional  -  quando enviado, o ficheiro fica guardado com este nome em
+    // vez do nome original (ex: cadastro guarda "Contrato_Trabalho.pdf" em vez do nome
+    // com que o utilizador tinha o ficheiro no computador).
+    const filename = req.body.filename || originalFilename;
     const filePath = folderPath + filename;
     
     console.log("Caminho completo do ficheiro:", filePath);

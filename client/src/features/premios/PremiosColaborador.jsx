@@ -36,16 +36,21 @@ export default function PremiosColaborador() {
   const navigate = useNavigate();
   const { id } = useParams();
   const location = useLocation();
-  const { uid, nivelAcesso } = useContext(UserContext);
+  const { uid, nivelAcesso, username } = useContext(UserContext);
   const isAdmin = nivelAcesso === "SuperAdmin";
-  const isHR = nivelAcesso === "GestorRH";
   const isAdministrador = nivelAcesso === "Administrador";
-  const canManage = isAdmin || isHR;
+  const isGestorFinanceiro = nivelAcesso === "GestorFinanceiro";
+  // Edição exclusiva de SuperAdmin/Gestor Financeiro. GestorRH não entra em canViewList:
+  // só consulta os seus próprios prémios (via isSelf), nunca os de outro colaborador
+  // (ver canRead em premiosController)  -  ao contrário de Cadastro/Formação/Medicina
+  // de Trabalho, onde GestorRH continua a gerir toda a gente.
+  const canManage = isAdmin || isGestorFinanceiro;
+  const canViewList = isAdmin || isGestorFinanceiro;
   const isSelf = uid === id;
   // Administrador só tem acesso de leitura (o backend confirma que o colaborador é da
   // sua entidade); nunca ganha canManage, por isso os botões de edição continuam ocultos.
-  const canView = canManage || isSelf || isAdministrador;
-  const targetLabel = location.state?.nome || id;
+  const canView = canViewList || isSelf || isAdministrador;
+  const targetLabel = location.state?.nome || (isSelf ? username : null) || id;
   const nomeCurto = getNomeCurto(targetLabel);
 
   const [loading, setLoading] = useState(true);
@@ -356,15 +361,15 @@ export default function PremiosColaborador() {
     <div className="flex min-h-screen">
       <Sidebar onSelectFile={handleSelectFile} />
 
-      <div className="ml-[230px] flex-1 flex flex-col min-h-screen">
+      <div className="ml-[var(--sidebar-w,230px)] transition-[margin-left] duration-200 flex-1 min-w-0 flex flex-col min-h-screen">
         <Topbar icon="🏆" title="Prémios" />
 
         <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
 
           <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "18px 24px", display: "flex", alignItems: "center", gap: 16 }}>
             <button
-              onClick={() => navigate(canManage || isAdministrador ? "/premios" : "/dashboard")}
-              title={canManage || isAdministrador ? "Voltar à lista de colaboradores" : "Voltar ao dashboard"}
+              onClick={() => navigate(canViewList || isAdministrador ? "/premios" : "/dashboard")}
+              title={canViewList || isAdministrador ? "Voltar à lista de colaboradores" : "Voltar ao dashboard"}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center",
                 width: 32, height: 32, border: "1px solid #e5e7eb", borderRadius: 7,

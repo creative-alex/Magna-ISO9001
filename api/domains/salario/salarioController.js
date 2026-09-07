@@ -1,20 +1,23 @@
 const admin = require("firebase-admin");
 const db = require("../../shared/db/firebase").db;
 const { calculateMonthlyAttendanceSummary } = require("../timeTracking/reportsController");
-const { isAdminOrHR, isAdministrador } = require("../../shared/middleware/auth");
+const { isAdminOrHR, isAdministrador, isGestorFinanceiro, isSuperAdminOrGestorFinanceiro } = require("../../shared/middleware/auth");
 const { sendMail, renderEmail } = require("../../shared/services/mailer");
 
 const bucket = admin.storage().bucket();
 
+// Edição (guardar dados salariais / enviar recibo): exclusiva de SuperAdmin e
+// Gestor Financeiro. GestorRH mantém leitura (ver canRead) mas já não edita  -
+// separação de funções entre RH e Financeiro.
 function canAccess(req) {
-  return isAdminOrHR(req.user?.nivelAcesso);
+  return isSuperAdminOrGestorFinanceiro(req.user?.nivelAcesso);
 }
 
-// Leitura: admin/RH vê qualquer colaborador; Administrador vê os colaboradores da
-// sua própria entidade; um colaborador comum só pode consultar os seus próprios
-// dados (nunca editar nem enviar recibos - isso continua restrito a canAccess).
+// Leitura: admin/RH/Gestor Financeiro vê qualquer colaborador; Administrador vê os
+// colaboradores da sua própria entidade; um colaborador comum só pode consultar os
+// seus próprios dados (nunca editar nem enviar recibos - isso continua restrito a canAccess).
 function canRead(req, id, targetEntidade) {
-  return canAccess(req) || req.user?.uid === id
+  return isAdminOrHR(req.user?.nivelAcesso) || isGestorFinanceiro(req.user?.nivelAcesso) || req.user?.uid === id
     || (isAdministrador(req.user?.nivelAcesso) && !!targetEntidade && targetEntidade === req.user?.entidade);
 }
 

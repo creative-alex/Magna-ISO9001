@@ -1,6 +1,24 @@
 const admin = require("firebase-admin");
 const { resolveTargetUid } = require("./helpers");
+const { computeAnnualOvertimeBalance } = require("./reportsController");
 const db = admin.firestore();
+
+// Mesma regra de cálculo de horas de calcHours.js (frontend) e calcularHorasHelper
+// (reportsController.js): pausa de 30min descontada acima de 5h trabalhadas, dia
+// obrigatório de 480min (8h), só para dias de semana (fins de semana não têm falta).
+function calcularMinutosFaltaDia(horaEntrada, horaSaida, date) {
+  const diaSemana = date.getDay();
+  if (diaSemana === 0 || diaSemana === 6) return 0;
+
+  const [hEntrada, mEntrada] = (horaEntrada || "").split(":").map(Number);
+  const [hSaida, mSaida] = (horaSaida || "").split(":").map(Number);
+  if ([hEntrada, mEntrada, hSaida, mSaida].some(Number.isNaN)) return 0;
+
+  let minutosTrabalhados = (hSaida * 60 + mSaida) - (hEntrada * 60 + mEntrada);
+  if (minutosTrabalhados > 300) minutosTrabalhados -= 30;
+
+  return Math.max(0, 480 - minutosTrabalhados);
+}
 
 // NOTA: o ID do documento em "registo-ponto" é, por omissão, o UID do
 // Firebase Auth do utilizador autenticado (req.user.uid)  -  nunca um valor
@@ -335,17 +353,24 @@ const registerManualOvertime = async (req, res) => {
       return res.status(400).json({ error: "Horas e minutos devem ser números válidos e não negativos" });
     }
 
-    // Verificar limites razoáveis (máx 24h por registo)
-    if (hoursNum > 24 || minutesNum > 59) {
+    // Verificar limites razoáveis (minutos sempre 0-59; total máx 24h por registo)
+    if (minutesNum > 59) {
       console.log("Erro: Valores fora dos limites permitidos.");
-      return res.status(400).json({ error: "Horas devem ser no máximo 24 e minutos no máximo 59" });
+      return res.status(400).json({ error: "Minutos devem estar entre 0 e 59" });
     }
 
-    // Verificar se o total é maior que 0
+    // Verificar se o total é maior que 0 e não excede 24h (evita registos corrompidos
+    // por horários invertidos, ex.: início 21:20 / fim 20:30 interpretado como
+    // atravessando a meia-noite  -  ver debugCorruptOvertime/deleteCorruptOvertime,
+    // que existem para limpar registos antigos deste tipo).
     const totalMinutes = hoursNum * 60 + minutesNum;
     if (totalMinutes <= 0) {
       console.log("Erro: Total de minutos deve ser maior que 0.");
       return res.status(400).json({ error: "Total de horas extras deve ser maior que 0" });
+    }
+    if (totalMinutes > 1440) {
+      console.log("Erro: Total de minutos excede 24h.");
+      return res.status(400).json({ error: "Total de horas extras não pode exceder 24h. Confirme as horas de início e término." });
     }
 
     const userId = req.user.uid;
@@ -357,11 +382,36 @@ const registerManualOvertime = async (req, res) => {
     const [yyyy, mm, dd] = date.split('-');
     const formattedDate = `${dd}-${mm}-${yyyy}`;
 
+    console.log("Data recebida:", date, "-> Formatada:", formattedDate);
+
+    // Idempotência: o ID do documento inclui Date.now(), por isso um reenvio do
+    // mesmo formulário (ex.: resposta perdida por wifi instável em sessões de
+    // formação no terreno, utilizador não vê confirmação e volta a submeter)
+    // criava sempre um registo novo e duplicava as horas extras. Se já existir
+    // um registo igual (mesmo dia + mesmo horário) para este colaborador, tratar
+    // como já guardado em vez de criar outro.
+    const overtimeCollection = userDocRef.collection("HorasExtraManual");
+    const existingSnapshot = await overtimeCollection
+      .where("date", "==", formattedDate)
+      .where("startHour", "==", startHour)
+      .where("endHour", "==", endHour)
+      .limit(1)
+      .get();
+
+    if (!existingSnapshot.empty) {
+      const existingDoc = existingSnapshot.docs[0];
+      console.log("Horas extras manuais já existiam para este horário, a ignorar duplicado:", existingDoc.id);
+      return res.status(200).json({
+        message: "Horas extras já estavam registadas para este horário",
+        overtimeId: existingDoc.id,
+        totalMinutes: existingDoc.data().totalMinutes,
+        duplicate: true
+      });
+    }
+
     const overtimeId = `overtime_${dd}${mm}${yyyy}_${Date.now()}`;
 
-    console.log("Data recebida:", date, "-> Formatada:", formattedDate, "-> ID:", overtimeId);
-
-    await userDocRef.collection("HorasExtraManual").doc(overtimeId).set({
+    await overtimeCollection.doc(overtimeId).set({
       startHour: startHour,
       endHour: endHour,
       date: formattedDate,
@@ -460,11 +510,22 @@ const updateManualOvertime = async (req, res) => {
       return res.status(400).json({ error: "Horas e minutos devem ser números válidos e não negativos" });
     }
 
-    // Verificar se o total é maior que 0
+    if (minutesNum > 59) {
+      console.log("Erro: Valores fora dos limites permitidos.");
+      return res.status(400).json({ error: "Minutos devem estar entre 0 e 59" });
+    }
+
+    // Verificar se o total é maior que 0 e não excede 24h (mesma validação do registo,
+    // que faltava aqui  -  permitia gravar edições com horários invertidos, ex.:
+    // início 21:20 / fim 20:30, sem aviso).
     const totalMinutes = hoursNum * 60 + minutesNum;
     if (totalMinutes <= 0) {
       console.log("Erro: Total de minutos deve ser maior que 0.");
       return res.status(400).json({ error: "Total de horas extras deve ser maior que 0" });
+    }
+    if (totalMinutes > 1440) {
+      console.log("Erro: Total de minutos excede 24h.");
+      return res.status(400).json({ error: "Total de horas extras não pode exceder 24h. Confirme as horas de início e término." });
     }
 
     const userId = req.user.uid;
@@ -540,6 +601,81 @@ const deleteManualOvertime = async (req, res) => {
     });
   } catch (error) {
     console.error("Erro ao excluir horas extras manuais:", error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+// Compensa um dia com menos de 8h descontando do saldo anual de horas extra a
+// quantidade que o próprio utilizador escolher (até ao défice do dia, nunca mais
+// -  ver CompensateOvertimeButton, que também oferece um preenchimento automático
+// até ao défice completo). Nunca mexe no mês, que passa a acumular sempre  -  ver
+// computeAnnualOvertimeBalance em reportsController.js. Guarda o valor usado no
+// próprio Registos do dia (campo "horas_compensatorias", mesmo doc/ID determinístico
+// "registo_DDMMYYYY" usado por registerEntry/updateUserTime), sem coleção separada.
+// Suporta tanto o próprio colaborador como um admin a compensar em nome de outro
+// (resolveTargetUid), tal como getUserRecords/getOvertimeSummary.
+const compensateShortDay = async (req, res) => {
+  try {
+    const { date, minutes } = req.body;
+
+    if (!date || !/^\d{2}-\d{2}-\d{4}$/.test(date)) {
+      return res.status(400).json({ error: "Campo obrigatório: date (formato DD-MM-YYYY)" });
+    }
+
+    const minutosPedidos = parseInt(minutes);
+    if (!Number.isInteger(minutosPedidos) || minutosPedidos <= 0) {
+      return res.status(400).json({ error: "Indica quantos minutos queres compensar" });
+    }
+
+    const { uid: userId, error: authError } = resolveTargetUid(req);
+    if (authError) return res.status(403).json({ error: authError });
+
+    const [dd, mm, yyyy] = date.split("-").map(Number);
+    const dataAtual = new Date(yyyy, mm - 1, dd);
+    if (dataAtual.getDate() !== dd || dataAtual.getMonth() !== mm - 1) {
+      return res.status(400).json({ error: "Data inválida" });
+    }
+
+    const registoRef = db
+      .collection("registo-ponto")
+      .doc(userId)
+      .collection("Registos")
+      .doc(`registo_${String(dd).padStart(2, "0")}${String(mm).padStart(2, "0")}${yyyy}`);
+
+    const registoDoc = await registoRef.get();
+    const registo = registoDoc.exists ? registoDoc.data() : null;
+
+    if (!registo || !registo.horaEntrada || !registo.horaSaida) {
+      return res.status(400).json({ error: "Este dia não tem défice de horas para compensar" });
+    }
+
+    if (registo.horas_compensatorias > 0) {
+      return res.status(400).json({ error: "Este dia já foi compensado" });
+    }
+
+    const minutosFalta = calcularMinutosFaltaDia(registo.horaEntrada, registo.horaSaida, dataAtual);
+    if (minutosFalta <= 0) {
+      return res.status(400).json({ error: "Este dia não tem défice de horas para compensar" });
+    }
+
+    if (minutosPedidos > minutosFalta) {
+      return res.status(400).json({ error: `Não é possível compensar mais do que o défice deste dia (${Math.floor(minutosFalta / 60)}h ${minutosFalta % 60}m)` });
+    }
+
+    const { netMinutes } = await computeAnnualOvertimeBalance(userId, yyyy);
+    if (netMinutes < minutosPedidos) {
+      return res.status(400).json({ error: "Saldo anual de horas extra insuficiente para compensar este dia" });
+    }
+
+    await registoRef.update({ horas_compensatorias: minutosPedidos });
+
+    return res.status(200).json({
+      message: "Dia compensado com sucesso",
+      date,
+      minutesCompensated: minutosPedidos
+    });
+  } catch (error) {
+    console.error("Erro ao compensar dia:", error);
     return res.status(500).json({ error: error.message });
   }
 };
@@ -645,6 +781,7 @@ module.exports = {
   getManualOvertimeForMonth,
   updateManualOvertime,
   deleteManualOvertime,
+  compensateShortDay,
   debugCorruptOvertime,
   deleteCorruptOvertime,
 };

@@ -1,16 +1,19 @@
 const admin = require("firebase-admin");
 const db = require("../../shared/db/firebase").db;
-const { isAdminOrHR, isAdministrador } = require("../../shared/middleware/auth");
+const { isAdministrador, isSuperAdminOrGestorFinanceiro } = require("../../shared/middleware/auth");
 
-// Leitura: admin/RH vê qualquer colaborador; Administrador vê os colaboradores da
-// sua própria entidade; o próprio colaborador só pode consultar, nunca editar.
+// Leitura: SuperAdmin/Gestor Financeiro vê qualquer colaborador; Administrador vê os
+// colaboradores da sua própria entidade; GestorRH e o próprio colaborador só podem
+// consultar os seus próprios prémios (nunca de outro colaborador), nunca editar.
 function canRead(req, id, targetEntidade) {
-  return isAdminOrHR(req.user?.nivelAcesso) || req.user?.uid === id
+  return isSuperAdminOrGestorFinanceiro(req.user?.nivelAcesso) || req.user?.uid === id
     || (isAdministrador(req.user?.nivelAcesso) && !!targetEntidade && targetEntidade === req.user?.entidade);
 }
 
+// Edição (criar/atualizar/apagar prémio): exclusiva de SuperAdmin e Gestor Financeiro
+// (GestorRH nunca edita nem lê prémios de outro colaborador  -  separação de funções).
 function canManage(req) {
-  return isAdminOrHR(req.user?.nivelAcesso);
+  return isSuperAdminOrGestorFinanceiro(req.user?.nivelAcesso);
 }
 
 // Cada prémio é o seu próprio documento em users/{id}/premios/{premioId}  -  uma

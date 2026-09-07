@@ -1,6 +1,7 @@
 const admin = require("firebase-admin");
 const db = admin.firestore();
 const { isAdminOrHR, isSuperAdmin } = require("../../shared/middleware/auth");
+const { getHolidaysDDMM } = require("./holidays");
 
 const STANDARD_ANNUAL_QUOTA = 22;
 
@@ -45,57 +46,22 @@ function isApprovedDoc(data) {
   return data.Approved === true || data.Approved === "true" || data.Approved === 1;
 }
 
-// Feriados fixos portugueses (Porto), formato DD-MM  -  mantido em sincronia
-// com HOLIDAYS_PORTO em client/src/utils/timeTracking/constants.js. 24 e 31
-// de dezembro ficam de fora daqui porque são tratados à parte como "dias de
-// dispensa" (categoria distinta pedida pela empresa, não são feriados legais).
-const FIXED_HOLIDAYS_DDMM = [
-  "01-01", "25-04", "01-05", "10-06", "24-06", "15-08",
-  "05-10", "01-11", "01-12", "08-12", "25-12",
-];
+// 24 e 31 de dezembro ficam de fora dos feriados (ver ./holidays.js) porque são
+// tratados à parte como "dias de dispensa" (categoria distinta pedida pela
+// empresa, não são feriados legais).
 const DISPENSA_DDMM = ["24-12", "31-12"];
 
-// Páscoa pelo algoritmo de Meeus/Jones/Butcher  -  mesmo cálculo usado em
-// client/src/utils/timeTracking/constants.js (getMoveableHolidays).
-function calculateEaster(year) {
-  const a = year % 19;
-  const b = Math.floor(year / 100);
-  const c = year % 100;
-  const d = Math.floor(b / 4);
-  const e = b % 4;
-  const f = Math.floor((b + 8) / 25);
-  const g = Math.floor((b - f + 1) / 3);
-  const h = (19 * a + b - d - g + 15) % 30;
-  const i = Math.floor(c / 4);
-  const k = c % 4;
-  const l = (32 + 2 * e + 2 * i - h - k) % 7;
-  const m = Math.floor((a + 11 * h + 22 * l) / 451);
-  const month = Math.floor((h + l - 7 * m + 114) / 31);
-  const day = ((h + l - 7 * m + 114) % 31) + 1;
-  return new Date(year, month - 1, day);
-}
-
-function getMoveableHolidaysDDMM(year) {
-  const easter = calculateEaster(year);
-  const goodFriday = new Date(easter);
-  goodFriday.setDate(goodFriday.getDate() - 2);
-  const corpusChristi = new Date(easter);
-  corpusChristi.setDate(corpusChristi.getDate() + 60);
-  const toDDMM = (d) => `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  return [toDDMM(goodFriday), toDDMM(corpusChristi)];
-}
-
-// Não é permitido marcar férias em fins de semana, feriados nacionais ou nos
-// dias de dispensa da empresa (24/31 dez)  -  devolve o motivo do bloqueio, ou
-// null se o dia for marcável.
-function getBlockedReason(day, month, year) {
+// Não é permitido marcar férias em fins de semana, no feriado nacional/municipal
+// da sede do colaborador, ou nos dias de dispensa da empresa (24/31 dez)  -
+// devolve o motivo do bloqueio, ou null se o dia for marcável.
+function getBlockedReason(day, month, year, sede) {
   const ddmm = `${String(day).padStart(2, "0")}-${String(month).padStart(2, "0")}`;
   if (DISPENSA_DDMM.includes(ddmm)) return "dispensa";
 
   const dayOfWeek = new Date(year, month - 1, day).getDay();
   if (dayOfWeek === 0 || dayOfWeek === 6) return "weekend";
 
-  if (FIXED_HOLIDAYS_DDMM.includes(ddmm) || getMoveableHolidaysDDMM(year).includes(ddmm)) return "holiday";
+  if (getHolidaysDDMM(sede, year).includes(ddmm)) return "holiday";
 
   return null;
 }
@@ -198,6 +164,7 @@ const getVacationMap = async (req, res) => {
       employees.push({
         uid,
         nome: data.nome || "Nome não disponível",
+        sede: data.sede || null,
         entidade: entidadeId ? entidadeNomes[entidadeId] || entidadeId : null,
         approvedDaysCurrentYear,
         quotaAtual,
@@ -242,26 +209,27 @@ const toggleVacationDay = async (req, res) => {
       return res.status(200).json({ message: "Dia de férias removido", action: "removed", date });
     }
 
+    const userRef = db.collection("users").doc(uid);
+    const userDoc = await userRef.get();
+    const userData = userDoc.exists ? userDoc.data() : {};
+
     // Só valida fins de semana / feriados / saldo ao marcar um novo dia (nunca
     // ao desmarcar, para não impedir a limpeza de registos antigos/inválidos).
-    const blockedReason = getBlockedReason(parseInt(day, 10), parseInt(month, 10), targetYear);
+    const blockedReason = getBlockedReason(parseInt(day, 10), parseInt(month, 10), targetYear, userData.sede);
     if (blockedReason) {
       const messages = {
         weekend: "Não é possível marcar férias num fim de semana",
-        holiday: "Não é possível marcar férias num feriado nacional",
+        holiday: "Não é possível marcar férias num feriado nacional/municipal",
         dispensa: "Não é possível marcar férias num dia de dispensa da empresa",
       };
       return res.status(400).json({ error: messages[blockedReason] });
     }
 
-    const userRef = db.collection("users").doc(uid);
-    const [userDoc, quotaOverrideDoc, diasTransitadosDoc, usedThisYear] = await Promise.all([
-      userRef.get(),
+    const [quotaOverrideDoc, diasTransitadosDoc, usedThisYear] = await Promise.all([
       userRef.collection("quotaOverrides").doc(String(targetYear)).get(),
       userRef.collection("diasTransitados").doc(String(targetYear)).get(),
       getUsedDaysForYear(uid, targetYear),
     ]);
-    const userData = userDoc.exists ? userDoc.data() : {};
     const quota = computeQuotaForYear(userData.data_admissao, targetYear, quotaOverrideDoc.exists ? quotaOverrideDoc.data().quota : undefined);
     const carryover = diasTransitadosDoc.exists ? diasTransitadosDoc.data().dias : 0;
 
@@ -308,11 +276,14 @@ const toggleBirthdayDay = async (req, res) => {
       return res.status(200).json({ message: "Dia de aniversário removido", action: "removed", date });
     }
 
-    const blockedReason = getBlockedReason(parseInt(day, 10), parseInt(month, 10), targetYear);
+    const userDoc = await db.collection("users").doc(uid).get();
+    const sede = userDoc.exists ? userDoc.data().sede : null;
+
+    const blockedReason = getBlockedReason(parseInt(day, 10), parseInt(month, 10), targetYear, sede);
     if (blockedReason) {
       const messages = {
         weekend: "Não é possível marcar o dia de aniversário num fim de semana",
-        holiday: "Não é possível marcar o dia de aniversário num feriado nacional",
+        holiday: "Não é possível marcar o dia de aniversário num feriado nacional/municipal",
         dispensa: "Não é possível marcar o dia de aniversário num dia de dispensa da empresa",
       };
       return res.status(400).json({ error: messages[blockedReason] });

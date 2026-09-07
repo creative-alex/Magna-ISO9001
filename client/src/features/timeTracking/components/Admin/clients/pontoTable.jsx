@@ -5,7 +5,8 @@ import RegisterVacation from "../../Shared/vacationButton";
 import DeleteRegister from "./deleteRegisterButton";
 import MedicalLeave from "../../Shared/medicalLeave";
 import BirthdayButton from "../../Shared/birthdayButton";
-import { HOLIDAYS_PORTO, getMoveableHolidays } from "../../../../../shared/utils/holidays";
+import CompensateOvertimeButton from "../../Shared/compensateOvertimeButton";
+import { getHolidaysForSede } from "../../../../../shared/utils/holidays";
 
 
 
@@ -120,7 +121,7 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
         : [];
 
       const hoje = new Date();
-      const allHolidays = [...HOLIDAYS_PORTO, ...getMoveableHolidays(year)];
+      const allHolidays = getHolidaysForSede(data.sede, year);
       novosDados = novosDados.map((item, index) => {
         const registo = registos.find((r) => {
           const registoData = new Date(r.timestamp);
@@ -195,16 +196,25 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
           }
           
           // Caso seja um registo normal de trabalho
-          const { total, extra, minutos, minutosExtras } = calcularHoras(registo.horaEntrada, registo.horaSaida, dataAtual);
-          totalMinutos += minutos;
-          totalMinutosNormais += minutos;
+          const { total, extra, minutos, minutosExtras, minutosFalta } = calcularHoras(registo.horaEntrada, registo.horaSaida, dataAtual);
+          const minutosCompensados = registo.horasCompensatorias || 0;
+          const isCompensado = minutosCompensados > 0;
+          // Dia compensado: soma-se o que foi trabalhado com o que foi coberto
+          // pelo saldo anual de horas extra (o utilizador escolhe quanto quer
+          // compensar, pode não ser o défice todo  -  ver CompensateOvertimeButton).
+          const minutosNormaisFinal = isCompensado ? (minutos + minutosCompensados) : minutos;
+          totalMinutos += minutosNormaisFinal;
+          totalMinutosNormais += minutosNormaisFinal;
           totalMinutosExtras += minutosExtras;
           return {
             ...item,
             horaEntrada: registo.horaEntrada || "-",
             horaSaida: registo.horaSaida || "-",
-            total,
+            total: isCompensado ? formatarMinutos(minutosNormaisFinal) : total,
             extra,
+            compensated: isCompensado,
+            compensatedMinutes: minutosCompensados,
+            minutosFalta: minutosFalta || 0,
           };
         }
       
@@ -359,7 +369,12 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
           </thead>
           <tbody>
             {dados.map((item, index) => {
+              // O utilizador escolhe quanto quer compensar, por isso o dia pode
+              // continuar a mostrar menos de 8h mesmo já compensado (só é possível
+              // compensar um dia uma vez  -  ver isCompensavel abaixo).
               const isLessThanEightHours = item.total !== "-" && parseInt(item.total.split("h")[0]) < 8;
+              // Só faz sentido compensar um dia com registo real (défice, não ausência total) e ainda não compensado
+              const isCompensavel = isLessThanEightHours && item.horaEntrada !== "-" && !item.compensated;
 
               return (
                 <tr key={index} onContextMenu={(e) => abrirContextMenu(e, index)} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
@@ -408,7 +423,15 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
                       item.horaSaida
                     )}
                   </td>
-                  <td className={`px-4 py-3 text-left border-b border-gray-200 ${isLessThanEightHours ? "text-danger font-semibold" : ""}`}>{item.total}</td>
+                  <td className={`px-4 py-3 text-left border-b border-gray-200 ${item.compensated ? "text-blue-600 font-semibold" : isLessThanEightHours ? "text-danger font-semibold" : ""}`}>
+                    {item.total}
+                    {item.compensated && (
+                      <span className="font-normal"> ({Math.floor(item.compensatedMinutes / 60)}h {item.compensatedMinutes % 60}m compensadas)</span>
+                    )}
+                    {isCompensavel && (
+                      <CompensateOvertimeButton uid={username} date={`${item.dia}-${year}`} deficitMinutes={item.minutosFalta} onSuccess={fetchData} />
+                    )}
+                  </td>
                   {/*<td>{item.extra}</td>*/}
                 </tr>
               );

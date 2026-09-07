@@ -1,11 +1,17 @@
 const admin = require("firebase-admin");
 const db = require("../../shared/db/firebase").db;
-const { isAdminOrHR } = require("../../shared/middleware/auth");
+const { isAdminOrHR, isGestorFinanceiro, isSuperAdminOrGestorFinanceiro } = require("../../shared/middleware/auth");
 
 const ESCALOES = ["I", "II", "III", "IV"];
 
-function canAccess(req) {
-  return isAdminOrHR(req.user?.nivelAcesso);
+// Leitura: admin/RH mantém consulta (só perdeu a edição); Gestor Financeiro também vê.
+function canRead(req) {
+  return isAdminOrHR(req.user?.nivelAcesso) || isGestorFinanceiro(req.user?.nivelAcesso);
+}
+
+// Edição: exclusiva de SuperAdmin e Gestor Financeiro.
+function canManage(req) {
+  return isSuperAdminOrGestorFinanceiro(req.user?.nivelAcesso);
 }
 
 function normalizeNumber(value) {
@@ -14,7 +20,7 @@ function normalizeNumber(value) {
 
 const getParametros = async (req, res) => {
   try {
-    if (!canAccess(req)) {
+    if (!canRead(req)) {
       return res.status(403).json({ error: "Acesso restrito a administradores e gestores de recursos humanos" });
     }
 
@@ -42,7 +48,7 @@ const getParametros = async (req, res) => {
 
 const updateParametros = async (req, res) => {
   try {
-    if (!canAccess(req)) {
+    if (!canManage(req)) {
       return res.status(403).json({ error: "Acesso restrito a administradores e gestores de recursos humanos" });
     }
 

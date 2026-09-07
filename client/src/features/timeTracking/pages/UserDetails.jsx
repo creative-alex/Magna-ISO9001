@@ -43,9 +43,13 @@ const UserDetails = ({ selectedUser }) => {
   const [dados, setDados] = useState([]);
   const { username, nivelAcesso: actorNivelAcesso } = useContext(UserContext);
   // Um Administrador só gere colaboradores da sua própria entidade e nunca pode
-  // atribuir/manter um nível de acesso igual ou superior ao seu  -  o backend também
-  // impõe isto (updateUserDetails), mas o formulário fica coerente com o que é aceite.
+  // atribuir/manter um nível de acesso igual ou superior ao seu; um GestorRH pode
+  // atribuir Administrador mas nunca GestorRH/GestorFinanceiro/SuperAdmin, que
+  // continuam exclusivos do SuperAdmin  -  o backend também impõe isto
+  // (updateUserDetails/normalizeNivelAcessoForActor), mas o formulário fica
+  // coerente com o que é aceite.
   const isAdministrador = actorNivelAcesso === "Administrador";
+  const isSuperAdmin = actorNivelAcesso === "SuperAdmin";
 
   const handleSelectFile = (filePath) => {
     const formattedPath = filePath.replace(/\s/g, '-').replace(/\//g, '__');
@@ -386,7 +390,7 @@ const normalizedEntityUrl = userDetails?.entidade
     <div className="flex min-h-screen">
       <Sidebar onSelectFile={handleSelectFile} />
 
-      <div className="ml-[230px] flex-1 flex flex-col min-h-screen">
+      <div className="ml-[var(--sidebar-w,230px)] transition-[margin-left] duration-200 flex-1 min-w-0 flex flex-col min-h-screen">
         <Topbar icon="👤" title="Colaborador" />
 
         <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
@@ -449,8 +453,9 @@ const normalizedEntityUrl = userDetails?.entidade
                           <select name="nivelAcesso" style={selectStyle} value={editedData?.nivelAcesso || "Colaborador"} onChange={handleInputChange}>
                             <option value="Colaborador">Colaborador</option>
                             {!isAdministrador && <option value="Administrador">Administrador</option>}
-                            {!isAdministrador && <option value="GestorRH">Gestor(a) de Recursos Humanos</option>}
-                            {!isAdministrador && <option value="SuperAdmin">SuperAdmin</option>}
+                            {isSuperAdmin && <option value="GestorRH">Gestor(a) de Recursos Humanos</option>}
+                            {isSuperAdmin && <option value="GestorFinanceiro">Gestor(a) Financeiro</option>}
+                            {isSuperAdmin && <option value="SuperAdmin">SuperAdmin</option>}
                           </select>
                         </div>
                         <div>

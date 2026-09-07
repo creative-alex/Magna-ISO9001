@@ -7,6 +7,8 @@ import Topbar from '../../../shared/components/Topbar';
 import { FaEye, FaEyeSlash, FaCircleExclamation } from "react-icons/fa6";
 import { apiFetch } from '../../../shared/utils/apiFetch';
 import { UserContext } from '../../../shared/context/userContext';
+import AutocompleteInput from '../../../shared/components/AutocompleteInput';
+import { FUNCAO } from '../../../shared/utils/formOptions';
 
 const Register = () => {
     const { nivelAcesso: actorNivelAcesso, entidadeNome: actorEntidadeNome } = useContext(UserContext);
@@ -14,9 +16,11 @@ const Register = () => {
     // nunca pode atribuir um nível de acesso igual ou superior ao seu  -  o backend
     // também impõe isto, mas mantemos o formulário coerente com o que vai ser aceite.
     const isAdministrador = actorNivelAcesso === 'Administrador';
-    // Só o SuperAdmin pode escolher o nível de acesso do novo user  -  os restantes
-    // criam sempre um Colaborador, tal como o backend já impõe.
+    // SuperAdmin escolhe qualquer nível de acesso; GestorRH só pode criar Colaborador
+    // ou Administrador (nunca GestorRH/GestorFinanceiro/SuperAdmin, esses continuam
+    // exclusivos do SuperAdmin)  -  o backend também impõe isto (normalizeNivelAcessoForActor).
     const isSuperAdmin = actorNivelAcesso === 'SuperAdmin';
+    const isHR = actorNivelAcesso === 'GestorRH';
 
     const [nome, setNome] = useState('');
     const [email, setEmail] = useState('');
@@ -47,6 +51,12 @@ const Register = () => {
             }
         })();
     }, []);
+
+    // Inclui sempre a própria entidade do Administrador nas sugestões, mesmo que por
+    // algum motivo não venha na lista carregada do backend (ver <select> antigo).
+    const entidadeOptions = isAdministrador && actorEntidadeNome && !entidades.includes(actorEntidadeNome)
+        ? [actorEntidadeNome, ...entidades]
+        : entidades;
 
     const handleSubmit = async (event) => {
         event.preventDefault();
@@ -119,7 +129,7 @@ const Register = () => {
         <div className="flex min-h-screen">
             <Sidebar onSelectFile={(path) => navigate(`/file/${path.replace(/\s/g, '-').replace(/\//g, '__')}`)} />
 
-            <div className="ml-[230px] flex-1 flex flex-col min-h-screen">
+            <div className="ml-[var(--sidebar-w,230px)] transition-[margin-left] duration-200 flex-1 min-w-0 flex flex-col min-h-screen">
                 <Topbar icon="👤" title="Criar Nova Conta" />
 
                 <div className="p-6 flex-1">
@@ -210,18 +220,18 @@ const Register = () => {
 
                                 <div className="flex flex-col gap-1.5 mb-4 last:mb-0">
                                     <label htmlFor="reg-role" className="text-[11px] font-bold text-gray-700 uppercase tracking-[0.7px]">Função</label>
-                                    <input
+                                    <AutocompleteInput
                                         id="reg-role"
-                                        type="text"
                                         className="w-full px-[14px] py-2.5 border-[1.5px] border-gray-200 rounded-lg text-[14px] text-gray-900 bg-white box-border transition-all duration-200 focus:outline-none focus:border-[#C8932F] focus:shadow-[0_0_0_3px_rgba(200,147,47,0.1)] placeholder:text-[#c9d0d8]"
                                         value={role}
-                                        onChange={(e) => setRole(e.target.value)}
+                                        onChange={setRole}
+                                        options={FUNCAO}
                                         placeholder="Ex: Colaborador Administrativo"
                                         required
                                     />
                                 </div>
 
-                                {isSuperAdmin && (
+                                {(isSuperAdmin || isHR) && (
                                     <div className="flex flex-col gap-1.5 mb-4 last:mb-0">
                                         <label htmlFor="reg-nivelAcesso" className="text-[11px] font-bold text-gray-700 uppercase tracking-[0.7px]">Nível de Acesso</label>
                                         <select
@@ -233,30 +243,29 @@ const Register = () => {
                                         >
                                             <option value="Colaborador">Colaborador</option>
                                             <option value="Administrador">Administrador</option>
-                                            <option value="GestorRH">Gestor(a) de Recursos Humanos</option>
-                                            <option value="SuperAdmin">SuperAdmin</option>
+                                            {isSuperAdmin && (
+                                                <>
+                                                    <option value="GestorRH">Gestor(a) de Recursos Humanos</option>
+                                                    <option value="GestorFinanceiro">Gestor(a) Financeiro</option>
+                                                    <option value="SuperAdmin">SuperAdmin</option>
+                                                </>
+                                            )}
                                         </select>
                                     </div>
                                 )}
 
                                 <div className="flex flex-col gap-1.5 mb-4 last:mb-0">
                                     <label htmlFor="reg-entidade" className="text-[11px] font-bold text-gray-700 uppercase tracking-[0.7px]">Entidade</label>
-                                    <select
+                                    <AutocompleteInput
                                         id="reg-entidade"
                                         className="w-full px-[14px] py-2.5 border-[1.5px] border-gray-200 rounded-lg text-[14px] text-gray-900 bg-white box-border transition-all duration-200 focus:outline-none focus:border-[#C8932F] focus:shadow-[0_0_0_3px_rgba(200,147,47,0.1)] disabled:cursor-not-allowed disabled:opacity-70"
                                         value={entidade}
-                                        onChange={(e) => setEntidade(e.target.value)}
+                                        onChange={setEntidade}
+                                        options={entidadeOptions}
+                                        placeholder={entidadesLoading ? 'A carregar entidades...' : 'Escreve ou seleciona uma entidade'}
                                         disabled={isAdministrador || entidadesLoading}
                                         required
-                                    >
-                                        <option value="" disabled>{entidadesLoading ? 'A carregar entidades...' : 'Seleciona uma entidade'}</option>
-                                        {isAdministrador && actorEntidadeNome && !entidades.includes(actorEntidadeNome) && (
-                                            <option value={actorEntidadeNome}>{actorEntidadeNome}</option>
-                                        )}
-                                        {entidades.map((nome) => (
-                                            <option key={nome} value={nome}>{nome}</option>
-                                        ))}
-                                    </select>
+                                    />
                                     {isAdministrador && (
                                         <span className="text-[12px] text-gray-400">Como Administrador, só podes criar colaboradores na tua própria entidade.</span>
                                     )}

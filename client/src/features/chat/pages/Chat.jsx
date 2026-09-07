@@ -26,7 +26,7 @@ export default function Chat() {
     <div className="flex h-screen">
       <Sidebar />
 
-      <div className="ml-[230px] flex-1 flex flex-col h-screen overflow-hidden">
+      <div className="ml-[var(--sidebar-w,230px)] transition-[margin-left] duration-200 flex-1 min-w-0 flex flex-col h-screen overflow-hidden">
         <Topbar icon="💬" title="Chat com RH" />
 
         <div className="flex-1 flex min-h-0 bg-white">

@@ -1,34 +1,17 @@
 // Feriados nacionais fixos, formato DD-MM (não inclui feriados municipais, que
 // variam por sede  -  ver MUNICIPAL_HOLIDAY_DDMM_BY_SEDE/getMunicipalHolidayDDMM).
-export const NATIONAL_HOLIDAYS_DDMM = [
-  "01-01",   // Ano Novo
-  "25-04",   // Dia da Liberdade
-  "01-05",   // Dia do Trabalhador
-  "10-06",   // Dia de Portugal, de Camões e das Comunidades Portuguesas
-  "15-08",   // Assunção de Nossa Senhora
-  "05-10",   // Implantação da República
-  "01-11",   // Todos os Santos
-  "01-12",   // Restauração da Independência
-  "08-12",   // Imaculada Conceição
-  "24-12",   // Véspera de Natal
-  "25-12",   // Natal
-  "31-12",   // Véspera de Ano Novo
+// 24 e 31 de dezembro ficam de fora porque são tratados à parte como "dias de
+// dispensa" nalguns pontos do sistema (categoria distinta, não são feriados legais).
+const NATIONAL_HOLIDAYS_DDMM = [
+  "01-01", "25-04", "01-05", "10-06", "15-08",
+  "05-10", "01-11", "01-12", "08-12", "25-12",
 ];
-
-// Feriados portugueses fixos (Porto)  -  mantido por compatibilidade com código
-// que ainda não é sensível à sede do colaborador; equivale a usar getHolidaysForSede
-// com sede "Porto" (sem os feriados móveis, que dependem do ano). Preferir
-// getHolidaysForSede em código novo.
-export const HOLIDAYS_PORTO = [...NATIONAL_HOLIDAYS_DDMM, "24-06"];
 
 // Feriado municipal fixo de cada sede, formato DD-MM. Paredes fica de fora daqui
 // porque o seu feriado municipal é móvel (ver getMunicipalHolidayDDMM). Sedes sem
 // entrada aqui (ou por preencher) caem no feriado do Porto/Gaia (24-06)  -  era o
 // comportamento de toda a gente antes de existirem feriados por sede.
-export const MUNICIPAL_HOLIDAY_DDMM_BY_SEDE = {
-  "Porto": "24-06",              // São João
-  "Vila Nova de Gaia": "24-06",  // São João
-  "Canedo": "24-06",             // freguesia do concelho de Vila Nova de Gaia
+const MUNICIPAL_HOLIDAY_DDMM_BY_SEDE = {
   "Coimbra": "04-07",            // Rainha Santa Isabel
   "Abrantes": "14-06",           // Elevação de Abrantes a cidade
 };
@@ -49,12 +32,12 @@ function getParedesHolidayDDMM(year) {
 }
 
 // Feriado municipal da sede para o ano indicado (fixo ou móvel, consoante a sede).
-export function getMunicipalHolidayDDMM(sede, year) {
+function getMunicipalHolidayDDMM(sede, year) {
   if (sede === "Paredes") return getParedesHolidayDDMM(year);
   return MUNICIPAL_HOLIDAY_DDMM_BY_SEDE[sede] || DEFAULT_MUNICIPAL_HOLIDAY_DDMM;
 }
 
-// Calcula a Páscoa pelo algoritmo de Meeus/Jones/Butcher
+// Páscoa pelo algoritmo de Meeus/Jones/Butcher.
 function calculateEaster(year) {
   const a = year % 19;
   const b = Math.floor(year / 100);
@@ -73,26 +56,32 @@ function calculateEaster(year) {
   return new Date(year, month - 1, day);
 }
 
-// Retorna os feriados móveis do ano em formato DD-MM
-export const getMoveableHolidays = (year) => {
+// Feriados móveis nacionais (Sexta-feira Santa, Corpo de Deus), formato DD-MM.
+function getMoveableHolidaysDDMM(year) {
   const easter = calculateEaster(year);
-
   const goodFriday = new Date(easter);
   goodFriday.setDate(goodFriday.getDate() - 2);
-
   const corpusChristi = new Date(easter);
   corpusChristi.setDate(corpusChristi.getDate() + 60);
-
-  const toDDMM = (d) =>
-    `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-
+  const toDDMM = (d) => `${pad2(d.getDate())}-${pad2(d.getMonth() + 1)}`;
   return [toDDMM(goodFriday), toDDMM(corpusChristi)];
-};
+}
 
 // Lista completa de feriados (nacionais fixos + móveis + municipal da sede) para
-// o ano indicado, formato DD-MM. Usar isto (em vez de HOLIDAYS_PORTO) sempre que
-// se souber a sede do colaborador, para não contar o feriado municipal de outra
-// sede como falta, nem deixar de contar o da sua própria.
-export function getHolidaysForSede(sede, year) {
-  return [...NATIONAL_HOLIDAYS_DDMM, getMunicipalHolidayDDMM(sede, year), ...getMoveableHolidays(year)];
+// o ano indicado, formato DD-MM. Usar isto para saber que dias não contam como
+// falta/dia útil para um colaborador desta sede.
+function getHolidaysDDMM(sede, year) {
+  return [
+    ...NATIONAL_HOLIDAYS_DDMM,
+    getMunicipalHolidayDDMM(sede, year),
+    ...getMoveableHolidaysDDMM(year),
+  ];
 }
+
+module.exports = {
+  NATIONAL_HOLIDAYS_DDMM,
+  MUNICIPAL_HOLIDAY_DDMM_BY_SEDE,
+  getMunicipalHolidayDDMM,
+  getMoveableHolidaysDDMM,
+  getHolidaysDDMM,
+};

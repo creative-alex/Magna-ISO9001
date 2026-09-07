@@ -31,12 +31,13 @@ export default function Colaboradores() {
     <div className="flex min-h-screen">
       <Sidebar onSelectFile={handleSelectFile} />
 
-      <div className="ml-[230px] flex-1 flex flex-col min-h-screen">
+      <div className="ml-[var(--sidebar-w,230px)] transition-[margin-left] duration-200 flex-1 min-w-0 flex flex-col min-h-screen">
         <Topbar icon="🪪" title="Cadastro" />
         <ColaboradoresGroupedList
           title="Colaboradores"
           subtitle="Agrupados por entidade. Seleciona um colaborador para consultar ou preencher a respetiva ficha de cadastro."
           onSelect={(c) => navigate(`/cadastro/${c.id}`, { state: { nome: c.nome, email: c.email } })}
+          showStatusHoje
         />
       </div>
     </div>

@@ -5,7 +5,7 @@ const { isSuperAdmin: hasSuperAdminAccess, isAdministrador } = require("../../sh
 // Únicos valores válidos para o nível de acesso (controla permissões). Distinto
 // de "role", que é só o cargo/título mostrado (texto livre, ex: "Gestora RH /
 // Coordenadora Pedagógica") e nunca deve ser usado para decidir permissões.
-const NIVEIS_ACESSO = ["SuperAdmin", "GestorRH", "Administrador", "Colaborador"];
+const NIVEIS_ACESSO = ["SuperAdmin", "GestorRH", "Administrador", "GestorFinanceiro", "Colaborador"];
 function normalizeNivelAcesso(nivelAcesso) {
   return NIVEIS_ACESSO.includes(nivelAcesso) ? nivelAcesso : "Colaborador";
 }
@@ -290,6 +290,82 @@ const getColaboradores = async (req, res) => {
   }
 };
 
+// "baixasMedicas" guarda tanto baixas médicas como as várias licenças (parental, luto, ...)
+// no mesmo bloco, distinguidas pelo campo "tipo" (ver TIPO_BAIXA_OPTIONS no Cadastro.jsx)  -
+// os valores de licença começam todos por "Licença", por isso chega este prefixo.
+function labelBaixaOuLicenca(tipo) {
+  if (!tipo) return "Baixa médica";
+  return tipo.startsWith("Licença") ? "Licença" : "Baixa médica";
+}
+
+// Um bloco (baixa médica/licença ou cedência temporária) está ativo "hoje" se já começou
+// e ou não tem data de fim definida (ainda a decorrer) ou a data de fim ainda não passou.
+function isBlocoAtivoHoje(bloco, todayIso) {
+  if (!bloco?.dataInicio || bloco.dataInicio > todayIso) return false;
+  return !bloco.dataFim || bloco.dataFim >= todayIso;
+}
+
+// Estado "hoje" de cada colaborador, para a lista de /colaboradores  -  por ordem de
+// prioridade: situação contratual não-ativa (cessado/suspenso/reformado) > baixa/licença
+// a decorrer > cedência temporária a decorrer > férias aprovadas para hoje > ativo.
+const getColaboradoresStatusHoje = async (req, res) => {
+  try {
+    const db = admin.firestore();
+    const hoje = new Date();
+    const todayIso = hoje.toISOString().slice(0, 10);
+    const todayBr = `${String(hoje.getDate()).padStart(2, "0")}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${hoje.getFullYear()}`;
+
+    const usersSnapshot = await db.collection('users').get();
+
+    // Mesmo âmbito de visibilidade que getColaboradores (ver requireCanViewColaboradores).
+    const actorNivelAcesso = req.user?.nivelAcesso;
+    const scopeToOwnEntidade = isAdministrador(actorNivelAcesso);
+    const actorEntidade = req.user?.entidade || null;
+
+    const alvo = [];
+    usersSnapshot.forEach(doc => {
+      const data = doc.data();
+      if (hasSuperAdminAccess(data.nivelAcesso)) return;
+      if (scopeToOwnEntidade && data.entidade !== actorEntidade) return;
+      alvo.push({ id: doc.id, situacao_contratual: data.situacao_contratual || null });
+    });
+
+    const estados = await Promise.all(alvo.map(async ({ id, situacao_contratual }) => {
+      // Situação contratual diferente de "Ativo" (Cessado, Suspenso, Reformado) é sempre
+      // a informação mais relevante  -  ignora baixas/cedências/férias nesse caso.
+      if (situacao_contratual && situacao_contratual !== "Ativo") {
+        return { id, estado: situacao_contratual };
+      }
+
+      const userRef = db.collection('users').doc(id);
+      const [baixasSnap, cedenciasSnap, feriasSnap] = await Promise.all([
+        userRef.collection('baixasMedicas').get(),
+        userRef.collection('cedencias').get(),
+        db.collection('registo-ponto').doc(id).collection('Ferias').where('date', '==', todayBr).get(),
+      ]);
+
+      const baixaAtiva = baixasSnap.docs.map(d => d.data()).find(b => isBlocoAtivoHoje(b, todayIso));
+      if (baixaAtiva) return { id, estado: labelBaixaOuLicenca(baixaAtiva.tipo) };
+
+      const cedenciaAtiva = cedenciasSnap.docs.some(d => isBlocoAtivoHoje(d.data(), todayIso));
+      if (cedenciaAtiva) return { id, estado: "Cedência temporária" };
+
+      const emFerias = feriasSnap.docs.some(d => {
+        const data = d.data();
+        return data.Approved === true || data.Approved === 'true' || data.Approved === 1;
+      });
+      if (emFerias) return { id, estado: "Férias" };
+
+      return { id, estado: "Ativo" };
+    }));
+
+    res.json(estados);
+  } catch (error) {
+    console.error("Erro ao calcular estado dos colaboradores:", error);
+    res.status(500).json({ error: "Erro interno do servidor", details: error.message });
+  }
+};
+
 const updateFirstLogin = async (req, res) => {
   try {
     const { userEmail, newPassword, isFirstLogin } = req.body;
@@ -434,5 +510,6 @@ const updateFavorite = async (req, res) => {
 };
 
 module.exports = {
-  verifyTokenAndGetUserInfo, createUser, getAllUsers, getColaboradores, getFavorites, updateFavorite, updateFirstLogin
+  verifyTokenAndGetUserInfo, createUser, getAllUsers, getColaboradores, getColaboradoresStatusHoje,
+  getFavorites, updateFavorite, updateFirstLogin
 };

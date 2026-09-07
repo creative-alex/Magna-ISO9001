@@ -27,7 +27,6 @@ import TratamentoNaoConformidade from "./features/naoConformidade/TratamentoNaoC
 import FirstLogin from "./features/auth/pages/FirstLogin";
 import { ToastContainer } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
-import TimeTrackingUserDashboard from "./features/timeTracking/pages/UserDashboard";
 import TimeTrackingRegistos from "./features/timeTracking/pages/RegistosPage";
 import TimeTrackingEntities from "./features/timeTracking/pages/EntitiesPage";
 import TimeTrackingEntityUsers from "./features/timeTracking/pages/EntityUsers";
@@ -258,18 +257,11 @@ function App() {
           path="/ponto"
           element={
             <ProtectedRoute>
-              <TimeTrackingUserDashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/ponto/registos"
-          element={
-            <ProtectedRoute>
               <TimeTrackingRegistos />
             </ProtectedRoute>
           }
         />
+        <Route path="/ponto/registos" element={<Navigate to="/ponto" replace />} />
         <Route
           path="/ponto/entidades"
           element={

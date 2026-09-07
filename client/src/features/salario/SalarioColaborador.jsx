@@ -49,11 +49,15 @@ export default function SalarioColaborador() {
   const isAdmin = nivelAcesso === "SuperAdmin";
   const isHR = nivelAcesso === "GestorRH";
   const isAdministrador = nivelAcesso === "Administrador";
-  const canManage = isAdmin || isHR;
+  const isGestorFinanceiro = nivelAcesso === "GestorFinanceiro";
+  // Edição exclusiva de SuperAdmin/Gestor Financeiro  -  GestorRH mantém consulta
+  // (ver canViewList/canView) mas já não pode editar dados salariais.
+  const canManage = isAdmin || isGestorFinanceiro;
+  const canViewList = isAdmin || isHR || isGestorFinanceiro;
   const isSelf = uid === id;
   // Administrador só tem acesso de leitura (o backend confirma que o colaborador é da
   // sua entidade); nunca ganha canManage, por isso os botões de edição continuam ocultos.
-  const canView = canManage || isSelf || isAdministrador;
+  const canView = canViewList || isSelf || isAdministrador;
   const targetLabel = location.state?.nome || id;
   const nomeCurto = getNomeCurto(targetLabel);
 
@@ -278,15 +282,15 @@ export default function SalarioColaborador() {
     <div className="flex min-h-screen">
       <Sidebar onSelectFile={handleSelectFile} />
 
-      <div className="ml-[230px] flex-1 flex flex-col min-h-screen">
+      <div className="ml-[var(--sidebar-w,230px)] transition-[margin-left] duration-200 flex-1 min-w-0 flex flex-col min-h-screen">
         <Topbar icon="💰" title="Processamento Salários" />
 
         <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
 
           <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "18px 24px", display: "flex", alignItems: "center", gap: 16 }}>
             <button
-              onClick={() => navigate(canManage ? "/salarios" : "/dashboard")}
-              title={canManage ? "Voltar à lista de colaboradores" : "Voltar ao dashboard"}
+              onClick={() => navigate(canViewList ? "/salarios" : "/dashboard")}
+              title={canViewList ? "Voltar à lista de colaboradores" : "Voltar ao dashboard"}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center",
                 width: 32, height: 32, border: "1px solid #e5e7eb", borderRadius: 7,

@@ -10,14 +10,14 @@ export default function Topbar({ icon, title, searchTerm, onSearchChange, adminB
 
   return (
     <>
-      <div className="bg-white border-b border-gray-200 px-6 h-[54px] flex items-center gap-3 sticky top-0 z-50">
-        <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-          <span style={{ fontSize: 14 }}>{icon}</span>
-          <span className="text-gray-300">›</span>
-          <span className="text-gray-900 font-semibold">{title}</span>
+      <div className="bg-white border-b border-gray-200 px-3 sm:px-6 h-[54px] flex items-center gap-2 sm:gap-3 sticky top-0 z-50">
+        <div className="flex items-center gap-1.5 text-[13px] text-gray-500 min-w-0">
+          <span style={{ fontSize: 14 }} className="shrink-0">{icon}</span>
+          <span className="text-gray-300 shrink-0">›</span>
+          <span className="text-gray-900 font-semibold truncate">{title}</span>
         </div>
         {onSearchChange && (
-          <div className="ml-auto relative flex items-center">
+          <div className="ml-auto relative items-center hidden sm:flex">
             <span className="absolute left-[10px] text-[14px] text-gray-400">🔍</span>
             <input
               type="text"
@@ -28,17 +28,17 @@ export default function Topbar({ icon, title, searchTerm, onSearchChange, adminB
             />
           </div>
         )}
-        {adminButtons && <div className="flex gap-2">{adminButtons}</div>}
-        <span className={`text-[13px] text-gray-500 whitespace-nowrap${!onSearchChange ? " ml-auto" : ""}`}>
+        {adminButtons && <div className="flex gap-2 shrink-0">{adminButtons}</div>}
+        <span className={`text-[13px] text-gray-500 whitespace-nowrap hidden sm:inline${!onSearchChange ? " ml-auto" : ""}`}>
           Olá, {username}
         </span>
         <button
           onClick={() => setShowLogoutModal(true)}
-          className="flex items-center gap-1.5 px-3 py-[6px] text-[13px] text-red-600 bg-red-50 border border-red-200 rounded-lg cursor-pointer transition-colors duration-150 hover:bg-red-100 shrink-0"
+          className="flex items-center gap-1.5 px-3 py-[6px] text-[13px] text-red-600 bg-red-50 border border-red-200 rounded-lg cursor-pointer transition-colors duration-150 hover:bg-red-100 shrink-0 ml-auto sm:ml-0"
           title="Terminar sessão"
         >
           <FaArrowRightFromBracket style={{ fontSize: 13 }} />
-          Sair
+          <span className="hidden sm:inline">Sair</span>
         </button>
       </div>
 
