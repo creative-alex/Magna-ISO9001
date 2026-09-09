@@ -15,7 +15,7 @@ const Login = ({ onLoginSuccess }) => {
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
-    const [destination, setDestination] = useState("/dashboard");
+    const [destination, setDestination] = useState("/ponto");
     const [destinationTouched, setDestinationTouched] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();

@@ -309,65 +309,67 @@ export default function MedicinaTrabalhoColaborador() {
     }
 
     return (
-      <div key={ex.id} style={{ padding: "12px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 10 }}>
+      <div key={ex.id} style={{ padding: "12px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <div style={{ width: 110, flexShrink: 0 }}>
           <span style={labelStyle}>Data do exame</span>
           <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{formatDate(ex.data_exame)}</div>
         </div>
         {ex.ficha_nome_ficheiro ? (
           <span style={{
-            display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#111827", flex: 1,
-            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#111827", flex: "1 1 140px",
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0,
           }}>
             <FaFileLines style={{ color: "#9ca3af", fontSize: 12, flexShrink: 0 }} />
             {ex.ficha_nome_ficheiro}
           </span>
         ) : (
-          <span style={{ flex: 1, fontSize: 12, color: "#9ca3af" }}>Sem ficha anexada</span>
+          <span style={{ flex: "1 1 140px", fontSize: 12, color: "#9ca3af" }}>Sem ficha anexada</span>
         )}
-        {ex.ficha_path && (
-          <button
-            type="button"
-            onClick={() => handleViewFicha(ex.ficha_path, ex.id)}
-            disabled={viewingId === ex.id}
-            style={{
-              padding: "4px 10px", fontSize: 12, fontWeight: 500,
-              cursor: viewingId === ex.id ? "wait" : "pointer",
-              border: "1px solid #e5e7eb", borderRadius: 7, background: "#fff", color: "#6b7280",
-            }}
-          >
-            {viewingId === ex.id ? "A abrir..." : "Ver"}
-          </button>
-        )}
-        {canManage && (
-          <>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, marginLeft: "auto" }}>
+          {ex.ficha_path && (
             <button
               type="button"
-              onClick={() => startEditRow(ex)}
-              title="Editar"
+              onClick={() => handleViewFicha(ex.ficha_path, ex.id)}
+              disabled={viewingId === ex.id}
               style={{
-                display: "flex", alignItems: "center", justifyContent: "center",
-                width: 26, height: 26, cursor: "pointer",
+                padding: "4px 10px", fontSize: 12, fontWeight: 500,
+                cursor: viewingId === ex.id ? "wait" : "pointer",
                 border: "1px solid #e5e7eb", borderRadius: 7, background: "#fff", color: "#6b7280",
               }}
             >
-              <FaPencil style={{ fontSize: 10 }} />
+              {viewingId === ex.id ? "A abrir..." : "Ver"}
             </button>
-            <button
-              type="button"
-              onClick={() => handleRemoveExame(ex.id)}
-              disabled={removingId === ex.id}
-              title="Remover"
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "center",
-                width: 26, height: 26, cursor: removingId === ex.id ? "wait" : "pointer",
-                border: "1px solid #fee2e2", borderRadius: 7, background: "#fff", color: "#dc2626",
-              }}
-            >
-              <FaTrash style={{ fontSize: 10 }} />
-            </button>
-          </>
-        )}
+          )}
+          {canManage && (
+            <>
+              <button
+                type="button"
+                onClick={() => startEditRow(ex)}
+                title="Editar"
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  width: 26, height: 26, cursor: "pointer",
+                  border: "1px solid #e5e7eb", borderRadius: 7, background: "#fff", color: "#6b7280",
+                }}
+              >
+                <FaPencil style={{ fontSize: 10 }} />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRemoveExame(ex.id)}
+                disabled={removingId === ex.id}
+                title="Remover"
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  width: 26, height: 26, cursor: removingId === ex.id ? "wait" : "pointer",
+                  border: "1px solid #fee2e2", borderRadius: 7, background: "#fff", color: "#dc2626",
+                }}
+              >
+                <FaTrash style={{ fontSize: 10 }} />
+              </button>
+            </>
+          )}
+        </div>
       </div>
     );
   };
@@ -379,30 +381,36 @@ export default function MedicinaTrabalhoColaborador() {
       <div className="ml-[var(--sidebar-w,230px)] transition-[margin-left] duration-200 flex-1 min-w-0 flex flex-col min-h-screen">
         <Topbar icon="🩺" title="Medicina do Trabalho" />
 
-        <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
+        <div className="p-4 sm:p-6" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "18px 24px", display: "flex", alignItems: "center", gap: 16 }}>
-            <button
-              onClick={() => navigate(canManage || isAdministrador ? "/medicina-trabalho" : "/dashboard")}
-              title={canManage || isAdministrador ? "Voltar à lista de colaboradores" : "Voltar ao dashboard"}
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "center",
-                width: 32, height: 32, border: "1px solid #e5e7eb", borderRadius: 7,
-                background: "#fff", color: "#6b7280", cursor: "pointer", flexShrink: 0,
-              }}
-            >
-              <FaArrowLeft style={{ fontSize: 12 }} />
-            </button>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 17, fontWeight: 700, color: "#111827" }}>
-                Medicina do trabalho  -  {nomeCurto}
+          <div
+            className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
+            style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "16px 18px" }}
+          >
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 min-w-0" style={{ flex: 1 }}>
+              <button
+                onClick={() => navigate(canManage || isAdministrador ? "/medicina-trabalho" : "/dashboard")}
+                title={canManage || isAdministrador ? "Voltar à lista de colaboradores" : "Voltar ao dashboard"}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  width: 32, height: 32, border: "1px solid #e5e7eb", borderRadius: 7,
+                  background: "#fff", color: "#6b7280", cursor: "pointer", flexShrink: 0,
+                }}
+              >
+                <FaArrowLeft style={{ fontSize: 12 }} />
+              </button>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 17, fontWeight: 700, color: "#111827" }}>
+                  Medicina do trabalho  -  {nomeCurto}
+                </div>
               </div>
             </div>
             {canManage && (
               <button
                 onClick={openModal}
+                className="w-full sm:w-auto"
                 style={{
-                  display: "flex", alignItems: "center", gap: 6,
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                   padding: "8px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer",
                   border: `1px solid ${GOLD}`,
                   borderRadius: 7, background: "#fff",

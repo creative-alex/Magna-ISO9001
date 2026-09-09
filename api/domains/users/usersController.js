@@ -1,6 +1,7 @@
 const admin = require("firebase-admin");
 const db = require("../../shared/db/firebase").db;
 const { isSuperAdmin: hasSuperAdminAccess, isAdministrador } = require("../../shared/middleware/auth");
+const { isBlocoAtivoEm, labelBaixaOuLicenca } = require("../../shared/lib/absenceBlocks");
 
 // Únicos valores válidos para o nível de acesso (controla permissões). Distinto
 // de "role", que é só o cargo/título mostrado (texto livre, ex: "Gestora RH /
@@ -290,21 +291,6 @@ const getColaboradores = async (req, res) => {
   }
 };
 
-// "baixasMedicas" guarda tanto baixas médicas como as várias licenças (parental, luto, ...)
-// no mesmo bloco, distinguidas pelo campo "tipo" (ver TIPO_BAIXA_OPTIONS no Cadastro.jsx)  -
-// os valores de licença começam todos por "Licença", por isso chega este prefixo.
-function labelBaixaOuLicenca(tipo) {
-  if (!tipo) return "Baixa médica";
-  return tipo.startsWith("Licença") ? "Licença" : "Baixa médica";
-}
-
-// Um bloco (baixa médica/licença ou cedência temporária) está ativo "hoje" se já começou
-// e ou não tem data de fim definida (ainda a decorrer) ou a data de fim ainda não passou.
-function isBlocoAtivoHoje(bloco, todayIso) {
-  if (!bloco?.dataInicio || bloco.dataInicio > todayIso) return false;
-  return !bloco.dataFim || bloco.dataFim >= todayIso;
-}
-
 // Estado "hoje" de cada colaborador, para a lista de /colaboradores  -  por ordem de
 // prioridade: situação contratual não-ativa (cessado/suspenso/reformado) > baixa/licença
 // a decorrer > cedência temporária a decorrer > férias aprovadas para hoje > ativo.
@@ -344,10 +330,10 @@ const getColaboradoresStatusHoje = async (req, res) => {
         db.collection('registo-ponto').doc(id).collection('Ferias').where('date', '==', todayBr).get(),
       ]);
 
-      const baixaAtiva = baixasSnap.docs.map(d => d.data()).find(b => isBlocoAtivoHoje(b, todayIso));
+      const baixaAtiva = baixasSnap.docs.map(d => d.data()).find(b => isBlocoAtivoEm(b, todayIso));
       if (baixaAtiva) return { id, estado: labelBaixaOuLicenca(baixaAtiva.tipo) };
 
-      const cedenciaAtiva = cedenciasSnap.docs.some(d => isBlocoAtivoHoje(d.data(), todayIso));
+      const cedenciaAtiva = cedenciasSnap.docs.some(d => isBlocoAtivoEm(d.data(), todayIso));
       if (cedenciaAtiva) return { id, estado: "Cedência temporária" };
 
       const emFerias = feriasSnap.docs.some(d => {

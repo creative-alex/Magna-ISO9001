@@ -22,11 +22,10 @@ import MedicinaTrabalhoColaborador from "./features/medicinaTrabalho/MedicinaTra
 import Premios from "./features/premios/Premios"
 import PremiosColaborador from "./features/premios/PremiosColaborador"
 import Chat from "./features/chat/pages/Chat";
-import RegistoNaoConformidade from "./features/naoConformidade/RegistoNaoConformidade";
-import TratamentoNaoConformidade from "./features/naoConformidade/TratamentoNaoConformidade";
 import FirstLogin from "./features/auth/pages/FirstLogin";
 import { ToastContainer } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
+import MaintenancePage from "./shared/components/MaintenancePage";
 import TimeTrackingRegistos from "./features/timeTracking/pages/RegistosPage";
 import TimeTrackingEntities from "./features/timeTracking/pages/EntitiesPage";
 import TimeTrackingEntityUsers from "./features/timeTracking/pages/EntityUsers";
@@ -37,7 +36,7 @@ function App() {
   const navigate = useNavigate();
   const { setUsername, setUserEmail, setUserRole, setIsAuthenticated, isAuthenticated } = useContext(UserContext);
 
-  const handleLoginSuccess = (userData, destination = "/dashboard") => {
+  const handleLoginSuccess = (userData, destination = "/ponto") => {
     setUsername(userData.nome);
     setUserEmail(userData.email);
     setUserRole(userData.role);
@@ -53,7 +52,7 @@ function App() {
           path="/"
           element={
             isAuthenticated ?
-              <Navigate to="/dashboard" replace /> :
+              <Navigate to="/ponto" replace /> :
               <Login onLoginSuccess={handleLoginSuccess} />
           }
         />
@@ -231,7 +230,7 @@ function App() {
           path="/registar-nao-conformidade"
           element={
             <ProtectedRoute>
-              <RegistoNaoConformidade />
+              <MaintenancePage title="Registo de Não Conformidades" />
             </ProtectedRoute>
           }
         />
@@ -239,7 +238,7 @@ function App() {
           path="/tratar-nao-conformidade"
           element={
             <ProtectedRoute>
-              <TratamentoNaoConformidade />
+              <MaintenancePage title="Tratamento de Não Conformidades" />
             </ProtectedRoute>
           }
         />

@@ -6,7 +6,11 @@ import { apiFetch } from '../../../../shared/utils/apiFetch';
 const MedicalLeave = ({ username, date, onSuccess }) => {
   const { nivelAcesso } = useContext(UserContext);
   const [loading, setLoading] = useState(false);
-  const isAdmin = nivelAcesso === "SuperAdmin";
+  // Tem de espelhar exatamente quem o backend deixa marcar baixa médica por outro
+  // colaborador (resolveTargetUid)  -  SuperAdmin/GestorRH sem restrições, Administrador
+  // também (o backend confirma que é da sua própria entidade). Caso contrário o pedido
+  // sai sem "uid" e acaba registado (pendente) na conta de quem clicou.
+  const isAdmin = nivelAcesso === "SuperAdmin" || nivelAcesso === "GestorRH" || nivelAcesso === "Administrador";
 
   const handleRequest = async () => {
     if (!date) {

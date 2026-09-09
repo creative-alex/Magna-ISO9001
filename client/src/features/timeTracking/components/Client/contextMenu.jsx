@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { FaStopwatch } from 'react-icons/fa6';
 import VacationButton from '../Shared/vacationButton';
 import MedicalLeave from '../Shared/medicalLeave';
 import ManualOvertimeButton from './manualOvertime';
@@ -70,11 +71,12 @@ const ContextMenu = ({ visible, x, y, onClose, date, username, month, isAdmin = 
       onClick={(e) => e.stopPropagation()}
     >
       <div className="cursor-pointer select-none transition-colors hover:bg-gray-100">
-        <span 
+        <span
           className="py-2.5 px-4 flex items-center gap-2 text-sm text-gray-800"
           onClick={handleOpenOvertimeModal}
         >
-          📊 Horas Extras Manuais
+          <FaStopwatch className="text-[#C8932F]" />
+          Registar Horas Extra
         </span>
       </div>
       {isAdmin && (

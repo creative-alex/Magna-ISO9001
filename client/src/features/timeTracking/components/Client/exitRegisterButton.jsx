@@ -82,8 +82,8 @@ const LeaveButton = ({ username, fontSize = '1.5vw', buttonHeight = '5vh', onSuc
   }
 
   const getButtonState = () => {
-    if (hasLeave) {
-      return 'Saída Já Registrada';
+        if (hasLeave) {
+      return 'Saída Já Registada';
     } else {
       return 'Registar Saída';
     }

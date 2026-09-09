@@ -33,10 +33,10 @@ const RegistosPage = () => {
             <div className="flex-1 min-w-0 w-full flex flex-col gap-4">
               <div className="flex flex-wrap gap-3">
                 <div className="flex-1 min-w-[160px]">
-                  <Client.EntryRegisterButton username={username} fontSize="0.85rem" buttonHeight="46px" onSuccess={reloadRegistos} />
+                  <Client.EntryRegisterButton key={refreshKey} username={username} fontSize="0.85rem" buttonHeight="46px" onSuccess={reloadRegistos} />
                 </div>
                 <div className="flex-1 min-w-[160px]">
-                  <Client.ExitRegisterButton username={username} fontSize="0.85rem" buttonHeight="46px" onSuccess={reloadRegistos} />
+                  <Client.ExitRegisterButton key={refreshKey} username={username} fontSize="0.85rem" buttonHeight="46px" onSuccess={reloadRegistos} />
                 </div>
               </div>
 

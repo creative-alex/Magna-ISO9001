@@ -20,6 +20,10 @@ const PREMIO_FIELDS = [
   },
 ];
 
+// Classes literais (não interpoladas) para o Tailwind conseguir gerá-las  -  o
+// número de colunas das datas de transferência depende de quantas existem.
+const DATAS_GRID_CLASS = { 1: "sm:grid-cols-1", 2: "sm:grid-cols-2", 3: "sm:grid-cols-3", 4: "sm:grid-cols-4" };
+
 function toggleInSet(set, value) {
   const next = new Set(set);
   if (next.has(value)) next.delete(value); else next.add(value);
@@ -266,7 +270,7 @@ export default function PremiosColaborador() {
       );
     }
     return (
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${datas.length}, 1fr)`, gap: "14px 16px" }}>
+      <div className={`grid grid-cols-1 ${DATAS_GRID_CLASS[datas.length] || "sm:grid-cols-1"}`} style={{ gap: "14px 16px" }}>
         {datas.map((data, index) => (
           <div key={index}>
             <span style={labelStyle}>Data de transferência {index + 1}</span>
@@ -296,7 +300,7 @@ export default function PremiosColaborador() {
     const isSaving = savingIds.has(premio.id);
     return (
       <div key={premio.id} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-        <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <FaTrophy style={{ color: GOLD, fontSize: 13, flexShrink: 0 }} />
           {renderNomeField(premio, isEditing)}
           <span style={{
@@ -305,7 +309,7 @@ export default function PremiosColaborador() {
           }}>
             {premio.recebido ? "Recebido" : "A receber"}
           </span>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginLeft: "auto" }}>
             {canManage && isEditing && (
               <button
                 type="button"
@@ -343,7 +347,7 @@ export default function PremiosColaborador() {
           </div>
         </div>
         <div style={{ padding: 18, display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "14px 16px" }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: "14px 16px" }}>
             {PREMIO_FIELDS.map(field => renderField(premio, field, isEditing))}
           </div>
           {renderDatasTransferencia(premio, isEditing)}
@@ -364,23 +368,28 @@ export default function PremiosColaborador() {
       <div className="ml-[var(--sidebar-w,230px)] transition-[margin-left] duration-200 flex-1 min-w-0 flex flex-col min-h-screen">
         <Topbar icon="🏆" title="Prémios" />
 
-        <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
+        <div className="p-4 sm:p-6" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "18px 24px", display: "flex", alignItems: "center", gap: 16 }}>
-            <button
-              onClick={() => navigate(canViewList || isAdministrador ? "/premios" : "/dashboard")}
-              title={canViewList || isAdministrador ? "Voltar à lista de colaboradores" : "Voltar ao dashboard"}
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "center",
-                width: 32, height: 32, border: "1px solid #e5e7eb", borderRadius: 7,
-                background: "#fff", color: "#6b7280", cursor: "pointer", flexShrink: 0,
-              }}
-            >
-              <FaArrowLeft style={{ fontSize: 12 }} />
-            </button>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 17, fontWeight: 700, color: "#111827" }}>
-                Prémios  -  {nomeCurto}
+          <div
+            className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
+            style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "16px 18px" }}
+          >
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 min-w-0" style={{ flex: 1 }}>
+              <button
+                onClick={() => navigate(canViewList || isAdministrador ? "/premios" : "/dashboard")}
+                title={canViewList || isAdministrador ? "Voltar à lista de colaboradores" : "Voltar ao dashboard"}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  width: 32, height: 32, border: "1px solid #e5e7eb", borderRadius: 7,
+                  background: "#fff", color: "#6b7280", cursor: "pointer", flexShrink: 0,
+                }}
+              >
+                <FaArrowLeft style={{ fontSize: 12 }} />
+              </button>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 17, fontWeight: 700, color: "#111827" }}>
+                  Prémios  -  {nomeCurto}
+                </div>
               </div>
             </div>
             {canManage && (
@@ -388,8 +397,9 @@ export default function PremiosColaborador() {
                 type="button"
                 onClick={handleAddPremio}
                 disabled={addingPremio}
+                className="w-full sm:w-auto"
                 style={{
-                  display: "flex", alignItems: "center", gap: 6,
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                   padding: "8px 14px", fontSize: 13, fontWeight: 500,
                   cursor: addingPremio ? "wait" : "pointer",
                   border: `1px dashed ${GOLD}`, borderRadius: 7, background: "#fff", color: GOLD,

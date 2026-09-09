@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { FaStopwatch } from 'react-icons/fa6';
 import { calcularHoras, formatarMinutos } from '../../utils/calcHours';
 import { getHolidaysForSede } from '../../../../shared/utils/holidays';
+import { isBlocoAtivoEm, isDiaForaDeAtivo } from '../../../../shared/utils/absenceBlocks';
 import ManualOvertimeButton from './manualOvertime';
 import TimeTrackingTable from './pontoTable';
 import { apiFetch } from '../../../../shared/utils/apiFetch';
@@ -58,6 +60,10 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1 }) => {
         const baixas = data.baixas || [];
         const aniversario = data.aniversario || [];
         const manualOvertime = data.manualOvertime || [];
+        const cedencias = data.cedencias || [];
+        const licencasOuBaixasCadastro = data.licencasOuBaixasCadastro || [];
+        const situacaoContratual = data.situacaoContratual || "Ativo";
+        const dataFimContrato = data.dataFimContrato || null;
 
         const allHolidays = getHolidaysForSede(data.sede, currentYear);
         const isSpecialStatus = (h) => {
@@ -91,6 +97,13 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1 }) => {
           const isPast = dataAtual < hoje && dataAtual.toDateString() !== hoje.toDateString();
           const isWorkday = diaSemana >= 1 && diaSemana <= 5;
 
+          // Cedência temporária, licença/baixa médica (do Cadastro) ou contrato já não
+          // ativo (cessado/suspenso/reformado)  -  também não devem contar como falta.
+          const dataIso = `${currentYear}-${String(month).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`;
+          const isCedencia = cedencias.some((b) => isBlocoAtivoEm(b, dataIso));
+          const isLicencaOuBaixaCadastro = licencasOuBaixasCadastro.some((b) => isBlocoAtivoEm(b, dataIso));
+          const isForaDeAtivo = isDiaForaDeAtivo(situacaoContratual, dataFimContrato, dataIso);
+
           if (registo && registo.horaEntrada && registo.horaSaida && !isSpecialStatus(registo.horaEntrada)) {
             const horaEntrada = extractTime(registo.horaEntrada);
             const horaSaida = extractTime(registo.horaSaida);
@@ -105,7 +118,7 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1 }) => {
               totalMinutosExtras += resCalc.minutosExtras;
               totalMinutosCompensados += registo.horasCompensatorias || 0;
             }
-          } else if (isPast && isWorkday && !isHoliday && !isFerias && !isBaixa && !isAniversario && !registo) {
+          } else if (isPast && isWorkday && !isHoliday && !isFerias && !isBaixa && !isAniversario && !isCedencia && !isLicencaOuBaixaCadastro && !isForaDeAtivo && !registo) {
             diasFalta++;
           }
         }
@@ -289,8 +302,8 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1 }) => {
       <div className="flex flex-col p-6 text-gold w-full lg:w-[280px] shrink-0 bg-[rgba(169,169,169,0.1)] rounded-lg">
         <h2 className="text-2xl font-bold mb-4">Totais</h2>
         <p className="mb-2"><strong>Horas Normais:</strong> {totais.totalHoras}</p>
-        <p className="mb-2"><strong>Horas Extras (mês):</strong> <span className={totais.totalExtras.startsWith('-') ? 'text-danger' : ''}>{totais.totalExtras}</span></p>
-        <p className="mb-2"><strong>Horas Extras (total):</strong> {accumulatedExtras === null ? '...' : <span className={accumulatedExtras < 0 ? 'text-danger' : ''}>{formatarMinutos(accumulatedExtras)}</span>}</p>
+        <p className="mb-2"><strong>Horas Extra (mês):</strong> <span className={totais.totalExtras.startsWith('-') ? 'text-danger' : ''}>{totais.totalExtras}</span></p>
+        <p className="mb-2"><strong>Horas Extra (total):</strong> {accumulatedExtras === null ? '...' : <span className={accumulatedExtras < 0 ? 'text-danger' : ''}>{formatarMinutos(accumulatedExtras)}</span>}</p>
         <p className="mb-2"><strong>Horas Compensadas (mês):</strong> <span className="text-blue-600">{totais.totalCompensado}</span></p>
         <p className="mb-2"><strong>Horas Compensadas (total):</strong> {accumulatedCompensated === null ? '...' : <span className="text-blue-600">{formatarMinutos(accumulatedCompensated)}</span>}</p>
         <p className="mb-2"><strong>Faltas:</strong> {totais.diasFalta}</p>
@@ -304,9 +317,10 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1 }) => {
         </button>
         <button
           onClick={handleOpenOvertimeModal}
-          className="mt-2 underline cursor-pointer bg-transparent border-none text-sm font-medium block text-gold"
+          className="mt-2 underline cursor-pointer bg-transparent border-none text-sm font-medium flex items-center justify-center gap-1.5 text-gold"
         >
-          📊 Horas Extras Manuais
+          <FaStopwatch />
+          Registar Horas Extra
         </button>
       </div>
 

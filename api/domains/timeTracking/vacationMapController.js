@@ -1,6 +1,6 @@
 const admin = require("firebase-admin");
 const db = admin.firestore();
-const { isAdminOrHR, isSuperAdmin } = require("../../shared/middleware/auth");
+const { isAdminOrHR, isSuperAdmin, isAdministrador } = require("../../shared/middleware/auth");
 const { getHolidaysDDMM } = require("./holidays");
 
 const STANDARD_ANNUAL_QUOTA = 22;
@@ -115,6 +115,12 @@ const getVacationMap = async (req, res) => {
     for (const userDoc of usersSnapshot.docs) {
       const data = userDoc.data();
       if (isSuperAdmin(data.nivelAcesso)) continue;
+      // Administrador de entidade ("manda chuva") não tem férias, ao contrário de
+      // GestorRH/GestorFinanceiro (staff normal, continuam a aparecer no mapa).
+      if (isAdministrador(data.nivelAcesso)) continue;
+      // Cessados/reformados/suspensos não devem aparecer no mapa de férias  -  já não
+      // acumulam nem gozam férias (ver situacao_contratual no Cadastro).
+      if (data.situacao_contratual && data.situacao_contratual !== "Ativo") continue;
 
       const uid = userDoc.id;
       const entidadeId = data.entidade ? data.entidade.replace("entidades/", "") : null;
@@ -164,6 +170,7 @@ const getVacationMap = async (req, res) => {
       employees.push({
         uid,
         nome: data.nome || "Nome não disponível",
+        role: data.role || null,
         sede: data.sede || null,
         entidade: entidadeId ? entidadeNomes[entidadeId] || entidadeId : null,
         approvedDaysCurrentYear,

@@ -10,7 +10,7 @@ const createVacation = async (req, res) => {
       return res.status(400).json({ error: "Falta o campo obrigatório: date" });
     }
 
-    const { uid: userId, error: authError } = resolveTargetUid(req);
+    const { uid: userId, error: authError } = await resolveTargetUid(req);
     if (authError) return res.status(403).json({ error: authError });
 
     // Um admin a registar férias por um colaborador fica automaticamente
@@ -112,7 +112,7 @@ const createMedicalLeave = async (req, res) => {
       return res.status(400).json({ error: "Falta o campo obrigatório: date" });
     }
 
-    const { uid: userId, error: authError } = resolveTargetUid(req);
+    const { uid: userId, error: authError } = await resolveTargetUid(req);
     if (authError) return res.status(403).json({ error: authError });
 
     const Approved = userId !== req.user.uid;

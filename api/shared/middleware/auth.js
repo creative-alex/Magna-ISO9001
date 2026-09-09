@@ -54,6 +54,10 @@ function isAdminOrHR(nivelAcesso) {
   return nivel === "superadmin" || nivel === "gestorrh";
 }
 
+function isGestorRH(nivelAcesso) {
+  return (nivelAcesso || "").toLowerCase() === "gestorrh";
+}
+
 // Nível intermédio entre "Colaborador" e "GestorRH": vê os dados de cadastro/salário/
 // formação dos colaboradores da sua própria entidade (nunca de outras) e pode gerir
 // (criar/editar/apagar) as respetivas contas, mas sem os direitos de edição de RH
@@ -123,6 +127,7 @@ module.exports = {
   requireCanViewColaboradores,
   isSuperAdmin,
   isAdminOrHR,
+  isGestorRH,
   isAdministrador,
   isAdminOrHRorAdministrador,
   isGestorFinanceiro,

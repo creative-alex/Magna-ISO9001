@@ -36,9 +36,13 @@ export default function Dashboard() {
     reloadFileTree();
     apiFetch(`/files/process-owners`)
       .then(r => r.json()).then(setProcessOwners).catch(() => {});
-    apiFetch(`/users/getAllUsers`)
-      .then(r => r.json()).then(data => setTotalUsers(Array.isArray(data) ? data.length : data.users?.length ?? null)).catch(() => {});
-  }, []);
+    // "/users/getAllUsers" é restrito a SuperAdmin (ver requireAdmin em userRoutes.js) -
+    // só vale a pena chamar para quem tem acesso, senão é sempre um 403.
+    if (isAdmin) {
+      apiFetch(`/users/getAllUsers`)
+        .then(r => r.json()).then(data => setTotalUsers(Array.isArray(data) ? data.length : data.users?.length ?? null)).catch(() => {});
+    }
+  }, [isAdmin]);
 
   const handleSelectFile = (filePath) => {
     const formattedPath = filePath.replace(/\s/g, '-').replace(/\//g, '__');

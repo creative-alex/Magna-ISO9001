@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { UserContext } from "../context/userContext";
 import { FavoritesContext } from "../context/favoritesContext";
+import Logo from "../assets/logo.svg";
 import {
   FaChartBar,
   FaBuilding,
@@ -196,7 +197,7 @@ export default function Sidebar({ onSelectFile }) {
       <aside className={`${collapsed ? 'w-16' : 'w-[230px]'} bg-[#FAF3E6] border-r border-[#E8D0A0] flex flex-col fixed top-0 left-0 h-screen z-[500] shrink-0 transition-[width] duration-200 overflow-visible${isMobile && !collapsed ? ' shadow-2xl' : ''}`}>
         {/* Logo */}
         <div className={`px-4 pt-5 pb-4 border-b border-[#E8D0A0] flex items-center gap-2.5 ${collapsed ? 'justify-center px-0' : ''}`}>
-          <div className="w-[34px] h-[34px] rounded-lg bg-[#C8932F] flex items-center justify-center text-[15px] font-semibold text-white shrink-0">C</div>
+          <img src={Logo} alt="Logo Magna" className="w-auto h-[55px] shrink-0" />
           {!collapsed && (
             <div>
               <div className="text-[13px] font-semibold text-[#4A2E08] leading-[1.3]">Magna ISO9001</div>
@@ -217,7 +218,7 @@ export default function Sidebar({ onSelectFile }) {
         <div className="flex-1 overflow-y-auto">
         {/* Principal */}
         {sectionLabel("Principal")}
-        <div className={navItemClass("/dashboard")} onClick={() => navigate("/dashboard")} title={collapsed ? "ISO 9001" : undefined}>
+        <div className={navItemClass("/dashboard")} onClick={() => navigate("/dashboard")} title={collapsed ? "ISO9001" : undefined}>
           <FaChartBar style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> {!collapsed && "ISO 9001"}</div>
         <div className={navItemClass("/chat")} onClick={() => navigate("/chat")} title={collapsed ? "Chat com RH" : undefined}>
           <FaComments style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> {!collapsed && "Chat com RH"}</div>

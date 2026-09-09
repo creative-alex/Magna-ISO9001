@@ -242,6 +242,10 @@ export default function Cadastro() {
   // estão colapsados  -  por chave de bloco (id), true = colapsado.
   const [collapsedBlocks, setCollapsedBlocks] = useState({});
   const toggleBlockCollapsed = (id) => setCollapsedBlocks(prev => ({ ...prev, [id]: !prev[id] }));
+  // Estado local (não persistido) de que secções ("zonas") estão colapsadas  -  por título
+  // de secção, true = colapsada. Começam todas abertas.
+  const [collapsedSections, setCollapsedSections] = useState({});
+  const toggleSectionCollapsed = (title) => setCollapsedSections(prev => ({ ...prev, [title]: !prev[title] }));
   const nomeCurto = getNomeCurto(form.nome_completo) || targetLabel;
   const [uploading, setUploading] = useState({});
   const [viewing, setViewing] = useState({});
@@ -1033,10 +1037,19 @@ export default function Cadastro() {
               }
             }
 
+            const isCollapsed = !!collapsedSections[section.title];
+
             return (
               // Sem "overflow: hidden"  -  o dropdown do AutocompleteInput (Orientador, Entidade de estágio, Habilitações) é posicionado absolutamente e não pode ser cortado pela caixa.
               <div key={section.title} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10 }}>
-                <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+                <div
+                  onClick={() => toggleSectionCollapsed(section.title)}
+                  style={{ padding: "14px 18px", borderBottom: isCollapsed ? "none" : "1px solid #f3f4f6", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, cursor: "pointer" }}
+                >
+                  <FaChevronDown style={{
+                    fontSize: 11, color: "#9ca3af", flexShrink: 0, transition: "transform 0.15s",
+                    transform: isCollapsed ? "rotate(-90deg)" : "none",
+                  }} />
                   <section.Icon style={{ color: GOLD, fontSize: 13 }} />
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{section.title}</span>
                   <div style={{ marginLeft: "auto", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
@@ -1047,9 +1060,11 @@ export default function Cadastro() {
                     )}
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-4 p-[18px]">
-                  {visibleFields.map(f => renderField(f, sectionEditable, sectionData))}
-                </div>
+                {!isCollapsed && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-4 p-[18px]">
+                    {visibleFields.map(f => renderField(f, sectionEditable, sectionData))}
+                  </div>
+                )}
               </div>
             );
           })}

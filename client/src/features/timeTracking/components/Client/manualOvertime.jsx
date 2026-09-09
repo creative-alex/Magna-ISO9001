@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { toast } from 'react-toastify';
+import { FaStopwatch } from 'react-icons/fa6';
 import { apiFetch } from '../../../../shared/utils/apiFetch';
 
 
@@ -79,9 +80,8 @@ const ManualOvertimeButton = ({ username, onOvertimeRegistered, isOpen = false, 
       }
 
       const data = await response.json();
-      console.log("Horas extras registradas:", data);
       
-      toast.success(`Horas extras registradas com sucesso! (${hours}h ${minutes}m)`);
+      toast.success(`Horas extras registadas com sucesso! (${hours}h ${minutes}m)`);
       
       // Resetar formulário
       setFormData({
@@ -99,8 +99,8 @@ const ManualOvertimeButton = ({ username, onOvertimeRegistered, isOpen = false, 
       }
       
     } catch (error) {
-      console.error("Erro ao registrar horas extras:", error);
-      toast.error('Erro ao registrar horas extras. Tente novamente.');
+      console.error("Erro ao registar horas extras:", error);
+      toast.error('Erro ao registar horas extras. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -141,7 +141,7 @@ const ManualOvertimeButton = ({ username, onOvertimeRegistered, isOpen = false, 
               >
                 ×
               </button>
-              <h2 className="text-2xl font-bold text-gray-800 mb-5">Registrar Horas Extras</h2>
+              <h2 className="text-2xl font-bold text-gray-800 mb-5">Registar Horas Extras</h2>
 
               <form onSubmit={handleSubmit} className="mt-5">
                 <div className="mb-5">
@@ -232,9 +232,10 @@ const ManualOvertimeButton = ({ username, onOvertimeRegistered, isOpen = false, 
       <button
         onClick={() => setShowModal(true)}
         className="w-full py-2.5 px-4 bg-transparent text-gray-800 border-none rounded-none text-sm font-normal cursor-pointer flex items-center gap-2 text-left transition-colors hover:bg-gray-100"
-        title="Registrar horas extras trabalhadas após o horário normal"
+        title="Registar horas extras trabalhadas após o horário normal"
       >
-        <span>📊 Horas Extras Manuais</span>
+        <FaStopwatch />
+        <span>Registar Horas Extra</span>
       </button>
 
       {showModal && (
@@ -252,7 +253,7 @@ const ManualOvertimeButton = ({ username, onOvertimeRegistered, isOpen = false, 
             >
               ×
             </button>
-            <h2 className="text-2xl font-bold text-gray-800 mb-5">Registrar Horas Extras</h2>
+            <h2 className="text-2xl font-bold text-gray-800 mb-5">Registar Horas Extras</h2>
 
             <form onSubmit={handleSubmit} className="mt-5">
               <div className="mb-5">

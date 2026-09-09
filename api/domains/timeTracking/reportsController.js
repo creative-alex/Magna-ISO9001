@@ -1,6 +1,7 @@
 const admin = require("firebase-admin");
 const { resolveTargetUid } = require("./helpers");
 const { getHolidaysDDMM } = require("./holidays");
+const { isBlocoAtivoEm } = require("../../shared/lib/absenceBlocks");
 const db = admin.firestore();
 
 // Função auxiliar para calcular horas (similar à do frontend)
@@ -92,6 +93,40 @@ async function getUserSede(uid) {
   }
 }
 
+// Situação contratual e ausências geridas no módulo de Cadastro (situacao_contratual/
+// data_fim_contrato no próprio documento do colaborador, e as subcoleções
+// users/{uid}/cedencias e users/{uid}/baixasMedicas  -  ver cadastroController.js).
+// Distintas das coleções Ferias/BaixasMedicas do livro de ponto acima, e até agora nunca
+// cruzadas com o cálculo de faltas (ver isDiaForaDeAtivo, usado em
+// calculateMonthlyAttendanceSummary).
+async function getUserCadastroAusencias(uid) {
+  const userDoc = await db.collection("users").doc(uid).get();
+  const userData = userDoc.exists ? userDoc.data() : {};
+
+  const [cedenciasSnap, licencasSnap] = await Promise.all([
+    db.collection("users").doc(uid).collection("cedencias").get(),
+    db.collection("users").doc(uid).collection("baixasMedicas").get(),
+  ]);
+
+  return {
+    situacaoContratual: userData.situacao_contratual || "Ativo",
+    dataFimContrato: userData.data_fim_contrato || null,
+    cedencias: cedenciasSnap.docs.map(doc => doc.data()),
+    licencasOuBaixas: licencasSnap.docs.map(doc => doc.data()),
+  };
+}
+
+// Situação contratual diferente de "Ativo" exclui o dia de contar como falta, exceto
+// quando é "Cessado" com data de fim de contrato conhecida  -  nesse caso só os dias
+// depois dessa data ficam de fora (antes dela o colaborador estava mesmo ativo). Sem
+// essa data (ou "Suspenso"/"Reformado", que não têm campo de data próprio no cadastro),
+// não há como delimitar o período, por isso o mês inteiro fica de fora por segurança.
+function isDiaForaDeAtivo({ situacaoContratual, dataFimContrato }, dataIso) {
+  if (situacaoContratual === "Ativo") return false;
+  if (situacaoContratual === "Cessado" && dataFimContrato) return dataIso > dataFimContrato;
+  return true;
+}
+
 // Saldo anual de horas extra: bruto acumulado (Registos + HorasExtraManual do ano,
 // sem subtrair faltas  -  o mensal passa a não se mexer, ver compensateShortDay em
 // timeTrackingController.js) menos o que já foi usado para compensar dias curtos
@@ -142,7 +177,7 @@ const getUserRecords = async (req, res) => {
       return res.status(400).json({ error: "O mês é obrigatório" });
     }
 
-    const { uid: userId, error: authError } = resolveTargetUid(req);
+    const { uid: userId, error: authError } = await resolveTargetUid(req);
     if (authError) return res.status(403).json({ error: authError });
 
     const now = new Date();
@@ -259,6 +294,9 @@ const getUserRecords = async (req, res) => {
     const userCreatedAt = await getUserCreatedAt(userId);
     // Sede do colaborador, para o frontend saber que feriado municipal aplicar
     const sede = await getUserSede(userId);
+    // Situação contratual, cedências e licenças/baixas do Cadastro, para o frontend não
+    // marcar esses dias como falta (ver isDiaForaDeAtivo/getUserCadastroAusencias acima).
+    const cadastroAusencias = await getUserCadastroAusencias(userId);
 
     const registos = snapshot.docs.map((doc) => {
       const data = doc.data();
@@ -309,7 +347,11 @@ const getUserRecords = async (req, res) => {
       aniversario: aniversarioInfos,
       manualOvertime: manualOvertimeInfos,
       createdAt: userCreatedAt ? userCreatedAt.toISOString() : null,
-      sede
+      sede,
+      situacaoContratual: cadastroAusencias.situacaoContratual,
+      dataFimContrato: cadastroAusencias.dataFimContrato,
+      cedencias: cadastroAusencias.cedencias,
+      licencasOuBaixasCadastro: cadastroAusencias.licencasOuBaixas
     });
   } catch (error) {
     return res.status(500).json({ error: error.message });
@@ -320,7 +362,7 @@ const getOvertimeSummary = async (req, res) => {
   try {
     const { year } = req.body;
 
-    const { uid: userId, error: authError } = resolveTargetUid(req);
+    const { uid: userId, error: authError } = await resolveTargetUid(req);
     if (authError) return res.status(403).json({ error: authError });
 
     const now = new Date();
@@ -475,7 +517,7 @@ const getYearlySummary = async (req, res) => {
   try {
     const { year } = req.body;
 
-    const { uid: userId, error: authError } = resolveTargetUid(req);
+    const { uid: userId, error: authError } = await resolveTargetUid(req);
     if (authError) return res.status(403).json({ error: authError });
 
     const now = new Date();
@@ -510,8 +552,11 @@ const getYearlySummary = async (req, res) => {
 // e passam a vir do livro de ponto). Função pura, sem req/res e sem efeitos
 // secundários (não grava nada), ao contrário de processOvertimeDeduction.
 async function calculateMonthlyAttendanceSummary({ uid, year, month }) {
-  const userCreatedAt = await getUserCreatedAt(uid);
-  const sede = await getUserSede(uid);
+  const [userCreatedAt, sede, cadastroAusencias] = await Promise.all([
+    getUserCreatedAt(uid),
+    getUserSede(uid),
+    getUserCadastroAusencias(uid),
+  ]);
   const now = new Date();
 
   const firstDay = new Date(year, month - 1, 1);
@@ -599,6 +644,13 @@ async function calculateMonthlyAttendanceSummary({ uid, year, month }) {
 
     const diaString = `${String(dia).padStart(2, "0")}-${String(month).padStart(2, "0")}`;
     if (holidays.includes(diaString) || feriasDias.has(dia) || baixasDias.has(dia) || aniversarioDias.has(dia)) continue;
+
+    // Cedência temporária, licença/baixa médica (registada no Cadastro) ou contrato já
+    // não ativo (cessado/suspenso/reformado)  -  ver getUserCadastroAusencias acima.
+    const diaIso = `${year}-${String(month).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+    if (isDiaForaDeAtivo(cadastroAusencias, diaIso)) continue;
+    if (cadastroAusencias.cedencias.some(bloco => isBlocoAtivoEm(bloco, diaIso))) continue;
+    if (cadastroAusencias.licencasOuBaixas.some(bloco => isBlocoAtivoEm(bloco, diaIso))) continue;
 
     const isAfterCreation = !userCreatedAt || dataAtual >= userCreatedAt;
     if (!isAfterCreation) continue;

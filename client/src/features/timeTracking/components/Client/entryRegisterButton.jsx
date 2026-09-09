@@ -79,7 +79,7 @@ const EntryButton = ({ username, fontSize = '1.5vw', buttonHeight = '5vh', onSuc
       disabled={hasEntry}
       style={{ fontSize, height: buttonHeight }}
     >
-      {hasEntry ? 'Entrada Já Registrada' : 'Registar Entrada'}
+      {hasEntry ? 'Entrada Já Registada' : 'Registar Entrada'}
     </button>
   );
 };

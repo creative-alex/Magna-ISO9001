@@ -47,6 +47,8 @@ const TableRow = ({
     rowClass = "bg-warning-light";
   } else if (isBaixaPendente) {
     rowClass = "bg-danger-light";
+  } else if (isFimDeSemana) {
+    rowClass = "bg-gray-100 text-gray-400";
   } else if (isLessThanEightHours && !isCompensado) {
     rowClass = "text-danger";
   }
@@ -57,7 +59,7 @@ const TableRow = ({
       className={rowClass}
     >
       <td className="px-4 py-3 text-left border-b border-gray-200">
-        {item.dia}
+        {item.dia.replace(/-/g, '/')}
         {item.manualOvertime && (
           <span
             className="text-gold font-bold ml-[5px] cursor-pointer"

@@ -98,6 +98,10 @@ const FirstLoginComponent = ({ onComplete, mode = "firstLogin" }) => {
             });
             setResetEmailSent(true);
         } catch (err) {
+            // err.code é o que distingue as várias causas de falha do sendPasswordResetEmail
+            // (user-not-found, invalid-email, unauthorized-continue-uri, too-many-requests,
+            // etc.)  -  não aparece na consola por defeito, só se lermos err.code aqui.
+            console.error("sendPasswordResetEmail falhou:", err.code, err.message);
             const msg = err.code === 'auth/user-not-found'
                 ? "Não existe uma conta associada a este email."
                 : err.code === 'auth/invalid-email' || err.message === "Insira um email válido."

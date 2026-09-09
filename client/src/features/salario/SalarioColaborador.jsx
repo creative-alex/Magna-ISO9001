@@ -6,7 +6,7 @@ import Sidebar from "../../shared/components/Sidebar";
 import Topbar from "../../shared/components/Topbar";
 import {
   FaSackDollar, FaCalendarDays, FaCreditCard, FaFileInvoiceDollar, FaCarSide,
-  FaPencil, FaCheck, FaArrowLeft, FaArrowsRotate,
+  FaPencil, FaCheck, FaArrowLeft,
 } from "react-icons/fa6";
 import { apiFetch } from "../../shared/utils/apiFetch";
 import { getNomeCurto } from "../../shared/utils/nomeCurto";
@@ -45,7 +45,7 @@ export default function SalarioColaborador() {
   const navigate = useNavigate();
   const { id } = useParams();
   const location = useLocation();
-  const { uid, nivelAcesso } = useContext(UserContext);
+  const { uid, nivelAcesso, username } = useContext(UserContext);
   const isAdmin = nivelAcesso === "SuperAdmin";
   const isHR = nivelAcesso === "GestorRH";
   const isAdministrador = nivelAcesso === "Administrador";
@@ -58,13 +58,15 @@ export default function SalarioColaborador() {
   // Administrador só tem acesso de leitura (o backend confirma que o colaborador é da
   // sua entidade); nunca ganha canManage, por isso os botões de edição continuam ocultos.
   const canView = canViewList || isSelf || isAdministrador;
-  const targetLabel = location.state?.nome || id;
+  // Quando o próprio colaborador é redirecionado para o seu salário (sem vir da
+  // lista, logo sem "nome" na navegação), usa-se o nome do utilizador autenticado
+  // em vez de cair no id em bruto  -  mesma lógica de Formação/Prémios/Medicina.
+  const targetLabel = location.state?.nome || (isSelf ? username : null) || id;
   const nomeCurto = getNomeCurto(targetLabel);
 
   const [mes, setMes] = useState(getCurrentMonth());
   const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [escalaoVencimento, setEscalaoVencimento] = useState("");
   const [valorBruto, setValorBruto] = useState(null);
@@ -91,8 +93,8 @@ export default function SalarioColaborador() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchSalario = useCallback(async ({ silent = false } = {}) => {
-    if (silent) setRefreshing(true); else setLoading(true);
+  const fetchSalario = useCallback(async () => {
+    setLoading(true);
     try {
       const res = await apiFetch(`/salario/${id}/${mes}`);
       if (res.ok) {
@@ -111,7 +113,6 @@ export default function SalarioColaborador() {
         setDiasFalta(data.dias_falta);
         setForm({ ...INITIAL_FORM, ...(data.form || {}) });
         setReciboPath(data.recibo_path || null);
-        if (silent) toast.success("Dados do livro de ponto atualizados", { position: "top-right", autoClose: 2000 });
       } else {
         toast.error("Não foi possível carregar os dados salariais", { position: "top-right" });
       }
@@ -119,7 +120,7 @@ export default function SalarioColaborador() {
       console.error(e);
       toast.error("Não foi possível carregar os dados salariais", { position: "top-right" });
     } finally {
-      if (silent) setRefreshing(false); else setLoading(false);
+      setLoading(false);
     }
   }, [id, mes]);
 
@@ -285,57 +286,66 @@ export default function SalarioColaborador() {
       <div className="ml-[var(--sidebar-w,230px)] transition-[margin-left] duration-200 flex-1 min-w-0 flex flex-col min-h-screen">
         <Topbar icon="💰" title="Processamento Salários" />
 
-        <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
+        <div className="p-4 sm:p-6" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "18px 24px", display: "flex", alignItems: "center", gap: 16 }}>
-            <button
-              onClick={() => navigate(canViewList ? "/salarios" : "/dashboard")}
-              title={canViewList ? "Voltar à lista de colaboradores" : "Voltar ao dashboard"}
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "center",
-                width: 32, height: 32, border: "1px solid #e5e7eb", borderRadius: 7,
-                background: "#fff", color: "#6b7280", cursor: "pointer", flexShrink: 0,
-              }}
-            >
-              <FaArrowLeft style={{ fontSize: 12 }} />
-            </button>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 17, fontWeight: 700, color: "#111827" }}>
-                Processamento de salário  -  {nomeCurto}
-              </div>
-              <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 3 }}>
-                {getMesLabel(mes)}
-              </div>
-            </div>
-            <input
-              type="month"
-              value={mes}
-              disabled={editMode || saving}
-              onChange={e => e.target.value && setMes(e.target.value)}
-              title={editMode ? "Termina a edição para mudar de mês" : "Mudar de mês"}
-              style={{
-                fontSize: 13, padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 7,
-                background: editMode ? "#f3f4f6" : "#fafafa", color: "#111827", flexShrink: 0,
-              }}
-            />
-            {canManage && (
+          <div
+            className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
+            style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "16px 18px" }}
+          >
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 min-w-0" style={{ flex: 1 }}>
               <button
-                disabled={saving}
-                onClick={() => { if (editMode) handleSave(); else setEditMode(true); }}
+                onClick={() => navigate(canViewList ? "/salarios" : "/dashboard")}
+                title={canViewList ? "Voltar à lista de colaboradores" : "Voltar ao dashboard"}
                 style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  padding: "8px 16px", fontSize: 13, fontWeight: 500, cursor: saving ? "wait" : "pointer",
-                  border: `1px solid ${editMode ? "#22c55e" : GOLD}`,
-                  borderRadius: 7, background: "#fff",
-                  color: editMode ? "#22c55e" : GOLD,
-                  transition: "all 0.15s", flexShrink: 0, opacity: saving ? 0.6 : 1,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  width: 32, height: 32, border: "1px solid #e5e7eb", borderRadius: 7,
+                  background: "#fff", color: "#6b7280", cursor: "pointer", flexShrink: 0,
                 }}
               >
-                {saving
-                  ? "A guardar..."
-                  : editMode ? <><FaCheck style={{ fontSize: 12 }} /> Guardar</> : <><FaPencil style={{ fontSize: 12 }} /> Editar</>}
+                <FaArrowLeft style={{ fontSize: 12 }} />
               </button>
-            )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 17, fontWeight: 700, color: "#111827" }}>
+                  Processamento de salário  -  {nomeCurto}
+                </div>
+                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 3 }}>
+                  {getMesLabel(mes)}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2 sm:gap-3">
+              <input
+                type="month"
+                value={mes}
+                disabled={editMode || saving}
+                onChange={e => e.target.value && setMes(e.target.value)}
+                title={editMode ? "Termina a edição para mudar de mês" : "Mudar de mês"}
+                className="flex-1 sm:flex-none"
+                style={{
+                  fontSize: 13, padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 7,
+                  background: editMode ? "#f3f4f6" : "#fafafa", color: "#111827", minWidth: 0,
+                }}
+              />
+              {canManage && (
+                <button
+                  disabled={saving}
+                  onClick={() => { if (editMode) handleSave(); else setEditMode(true); }}
+                  className="flex-1 sm:flex-none"
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                    padding: "8px 16px", fontSize: 13, fontWeight: 500, cursor: saving ? "wait" : "pointer",
+                    border: `1px solid ${editMode ? "#22c55e" : GOLD}`,
+                    borderRadius: 7, background: "#fff",
+                    color: editMode ? "#22c55e" : GOLD,
+                    transition: "all 0.15s", opacity: saving ? 0.6 : 1,
+                  }}
+                >
+                  {saving
+                    ? "A guardar..."
+                    : editMode ? <><FaCheck style={{ fontSize: 12 }} /> Guardar</> : <><FaPencil style={{ fontSize: 12 }} /> Editar</>}
+                </button>
+              )}
+            </div>
           </div>
 
           {loading ? (
@@ -346,14 +356,14 @@ export default function SalarioColaborador() {
             <>
               {/* Vencimento  -  escalão editável; valores vêm sempre da tabela de vencimentos */}
               <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-                <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <FaSackDollar style={{ color: GOLD, fontSize: 13 }} />
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>Vencimento</span>
                   <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: "auto" }}>
                     Bruto vem da tabela de vencimento; isenção depende do escalão
                   </span>
                 </div>
-                <div style={{ padding: 18, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px 20px" }}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" style={{ padding: 18, gap: "16px 20px" }}>
                   <div>
                     <span style={labelStyle}>Escalão de vencimento</span>
                     {editMode ? (
@@ -412,14 +422,14 @@ export default function SalarioColaborador() {
 
               {/* Subsídio de alimentação  -  valor/dia fixo (parâmetros gerais); só varia o cartão e os dias trabalhados */}
               <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-                <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <FaCreditCard style={{ color: GOLD, fontSize: 13 }} />
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>Subsídio de alimentação</span>
                   <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: "auto" }}>
                     {valorSubsidioAlimentacao != null ? `${valorSubsidioAlimentacao} €/dia` : "Valor por dia não definido"}
                   </span>
                 </div>
-                <div style={{ padding: 18, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px 20px" }}>
+                <div className="grid grid-cols-1 sm:grid-cols-3" style={{ padding: 18, gap: "16px 20px" }}>
                   {SUBSIDIO_FIELDS.map(renderField)}
                   <div>
                     <span style={labelStyle}>Dias trabalhados</span>
@@ -433,14 +443,14 @@ export default function SalarioColaborador() {
               </div>
 
               <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-                <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <FaCarSide style={{ color: GOLD, fontSize: 13 }} />
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>Deslocações</span>
                   <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: "auto" }}>
                     {valorKmDeslocacao != null ? `${valorKmDeslocacao} €/km` : "Valor por km não definido"}
                   </span>
                 </div>
-                <div style={{ padding: 18, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px 20px" }}>
+                <div className="grid grid-cols-1 sm:grid-cols-3" style={{ padding: 18, gap: "16px 20px" }}>
                   {DESLOCACOES_FIELDS.filter(f => !f.conditionalOn || form[f.conditionalOn] === true).map(renderField)}
                   <div>
                     <span style={labelStyle}>Valor a receber (€)</span>
@@ -451,32 +461,14 @@ export default function SalarioColaborador() {
 
               {/* Ajustes do mês  -  vem sempre do livro de ponto, não é editável aqui */}
               <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-                <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <FaCalendarDays style={{ color: GOLD, fontSize: 13 }} />
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>Ajustes do mês</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginLeft: "auto" }}>
-                    <span style={{ fontSize: 11, color: "#9ca3af" }}>
-                      Calculado a partir do livro de ponto
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => fetchSalario({ silent: true })}
-                      disabled={editMode || loading || refreshing || saving}
-                      title={editMode ? "Termina a edição para atualizar" : "Ir buscar os dias do livro de ponto outra vez"}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 5,
-                        padding: "4px 9px", fontSize: 11, fontWeight: 500,
-                        border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", color: "#6b7280",
-                        cursor: (editMode || loading || refreshing || saving) ? "not-allowed" : "pointer",
-                        opacity: (editMode || loading || refreshing || saving) ? 0.5 : 1,
-                      }}
-                    >
-                      <FaArrowsRotate style={{ fontSize: 10 }} />
-                      {refreshing ? "A atualizar..." : "Atualizar"}
-                    </button>
-                  </div>
+                  <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: "auto" }}>
+                    Calculado a partir do livro de ponto
+                  </span>
                 </div>
-                <div style={{ padding: 18, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px 20px" }}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" style={{ padding: 18, gap: "16px 20px" }}>
                   <div>
                     <span style={labelStyle}>Baixas</span>
                     <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{diasBaixaMedica ?? " - "}</div>
@@ -501,7 +493,7 @@ export default function SalarioColaborador() {
                   <FaFileInvoiceDollar style={{ color: GOLD, fontSize: 13 }} />
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>Recibos</span>
                 </div>
-                <div style={{ padding: 18, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px 20px" }}>
+                <div className="grid grid-cols-1 sm:grid-cols-3" style={{ padding: 18, gap: "16px 20px" }}>
                   <div>
                     <span style={labelStyle}>Recibo emitido/enviado este mês</span>
                     <span style={{
@@ -513,7 +505,7 @@ export default function SalarioColaborador() {
                   </div>
                   <div>
                     <span style={labelStyle}>Recibo (PDF)</span>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       {editMode && (
                         <label
                           style={{

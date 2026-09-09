@@ -214,7 +214,7 @@ const updateUserTime = async (req, res) => {
       return res.status(400).json({ error: "Todos os campos são obrigatórios" });
     }
 
-    const { uid: userId, error: authError } = resolveTargetUid(req);
+    const { uid: userId, error: authError } = await resolveTargetUid(req);
     if (authError) return res.status(403).json({ error: authError });
 
     const dateParts = date.split("-");
@@ -627,7 +627,7 @@ const compensateShortDay = async (req, res) => {
       return res.status(400).json({ error: "Indica quantos minutos queres compensar" });
     }
 
-    const { uid: userId, error: authError } = resolveTargetUid(req);
+    const { uid: userId, error: authError } = await resolveTargetUid(req);
     if (authError) return res.status(403).json({ error: authError });
 
     const [dd, mm, yyyy] = date.split("-").map(Number);
@@ -645,15 +645,20 @@ const compensateShortDay = async (req, res) => {
     const registoDoc = await registoRef.get();
     const registo = registoDoc.exists ? registoDoc.data() : null;
 
-    if (!registo || !registo.horaEntrada || !registo.horaSaida) {
+    // Um dia com registo mas incompleto (só entrada ou só saída) não dá para calcular
+    // o défice  -  bloqueado tal como antes. Sem registo nenhum (falta total) já é
+    // permitido: conta como défice do dia inteiro (ver minutosFalta abaixo).
+    if (registo && (!registo.horaEntrada || !registo.horaSaida)) {
       return res.status(400).json({ error: "Este dia não tem défice de horas para compensar" });
     }
 
-    if (registo.horas_compensatorias > 0) {
+    if (registo?.horas_compensatorias > 0) {
       return res.status(400).json({ error: "Este dia já foi compensado" });
     }
 
-    const minutosFalta = calcularMinutosFaltaDia(registo.horaEntrada, registo.horaSaida, dataAtual);
+    const minutosFalta = registo
+      ? calcularMinutosFaltaDia(registo.horaEntrada, registo.horaSaida, dataAtual)
+      : 480;
     if (minutosFalta <= 0) {
       return res.status(400).json({ error: "Este dia não tem défice de horas para compensar" });
     }
@@ -667,7 +672,15 @@ const compensateShortDay = async (req, res) => {
       return res.status(400).json({ error: "Saldo anual de horas extra insuficiente para compensar este dia" });
     }
 
-    await registoRef.update({ horas_compensatorias: minutosPedidos });
+    const updateData = { horas_compensatorias: minutosPedidos };
+    if (!registoDoc.exists) {
+      // Dia sem nenhum registo (falta total)  -  cria o documento só para guardar a
+      // compensação. "timestamp" tem de ser a data compensada, nunca a data de hoje
+      // (serverTimestamp), porque é usado noutros sítios (ex.: registoPorDia em
+      // calculateMonthlyAttendanceSummary) para saber a que dia do mês pertence.
+      updateData.timestamp = dataAtual;
+    }
+    await registoRef.set(updateData, { merge: true });
 
     return res.status(200).json({
       message: "Dia compensado com sucesso",

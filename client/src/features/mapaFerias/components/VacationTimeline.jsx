@@ -25,17 +25,20 @@ function pad2(n) {
   return String(n).padStart(2, "0");
 }
 
-function getMonday(date) {
+function getSunday(date) {
   const d = new Date(date);
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
+  d.setDate(d.getDate() - d.getDay());
   d.setHours(0, 0, 0, 0);
   return d;
 }
 
 function formatDateStr(dateObj) {
   return `${pad2(dateObj.getDate())}-${pad2(dateObj.getMonth() + 1)}-${dateObj.getFullYear()}`;
+}
+
+// Ignora acentos/maiúsculas para a pesquisa (ex.: "gestao" encontra "Gestão").
+function normalizeText(str) {
+  return (str || "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 }
 
 function getInitials(nome) {
@@ -70,23 +73,33 @@ export default function VacationTimeline({ year, onYearChange }) {
   const [birthdayMap, setBirthdayMap] = useState(new Map());
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState("timeline"); // "timeline" | "resumo"
-  const [dayMode, setDayMode] = useState("ferias"); // "ferias" | "aniversario"  -  o que o clique num dia marca, na timeline
+  const [search, setSearch] = useState(""); // filtra por nome, função, entidade ou local (ver filteredEmployees)
   // Em ecrãs estreitos arranca em "semana" (7 colunas cabem bem); no desktop
   // continua a arrancar em "mês", como antes.
   const [rangeMode, setRangeMode] = useState(() =>
     (window.matchMedia("(max-width: 767px)").matches ? "week" : "month")
   ); // "month" | "week"  -  quantos dias a timeline mostra de cada vez
   const [activeMonth, setActiveMonth] = useState(new Date().getMonth());
-  const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
+  const [weekStart, setWeekStart] = useState(() => getSunday(new Date()));
   // Permite marcar/desmarcar vários dias seguidos arrastando o rato: guarda a
   // linha e o estado-alvo (marcar ou desmarcar) definidos pelo primeiro dia clicado.
   const [dragInfo, setDragInfo] = useState(null);
+  // Mini-tooltip que sugere trocar um dia de férias recém-marcado para aniversário
+  // (ver handleDayMouseDown)  -  { rowUid, dateStr, x, y } | null.
+  const [birthdaySuggestion, setBirthdaySuggestion] = useState(null);
 
   useEffect(() => {
     const clearDrag = () => setDragInfo(null);
     window.addEventListener("mouseup", clearDrag);
     return () => window.removeEventListener("mouseup", clearDrag);
   }, []);
+
+  // Desaparece sozinho passado um tempo, para não ficar pendurado no ecrã.
+  useEffect(() => {
+    if (!birthdaySuggestion) return;
+    const timer = setTimeout(() => setBirthdaySuggestion(null), 6000);
+    return () => clearTimeout(timer);
+  }, [birthdaySuggestion]);
 
   const loadMap = useCallback(async () => {
     try {
@@ -97,23 +110,17 @@ export default function VacationTimeline({ year, onYearChange }) {
       });
       if (!response.ok) throw new Error("Falha ao carregar o mapa de férias");
       const data = await response.json();
-      const alphabetical = [...(data.employees || [])].sort((a, b) => a.nome.localeCompare(b.nome, "pt"));
-      // O colaborador com sessão iniciada aparece sempre em primeiro lugar,
-      // mantendo o resto da lista por ordem alfabética.
-      const currentIndex = alphabetical.findIndex((e) => e.uid === uid);
-      const sorted = currentIndex > 0
-        ? [alphabetical[currentIndex], ...alphabetical.slice(0, currentIndex), ...alphabetical.slice(currentIndex + 1)]
-        : alphabetical;
-      setEmployees(sorted);
-      setVacationMap(buildVacationMap(sorted));
-      setBirthdayMap(buildBirthdayMap(sorted));
+      const list = data.employees || [];
+      setEmployees(list);
+      setVacationMap(buildVacationMap(list));
+      setBirthdayMap(buildBirthdayMap(list));
     } catch (err) {
       console.error("Erro ao carregar mapa de férias:", err);
       toast.error("Erro ao carregar o mapa de férias");
     } finally {
       setLoading(false);
     }
-  }, [year, uid]);
+  }, [year]);
 
   useEffect(() => {
     loadMap();
@@ -125,6 +132,26 @@ export default function VacationTimeline({ year, onYearChange }) {
     return map;
   }, [employees]);
 
+  // Ordem por omissão da timeline (e base para o Resumo, que tem o seu próprio
+  // controlo para reordenar por entidade  -  ver ResumoTab): por nome, com o
+  // colaborador com sessão iniciada sempre em primeiro lugar.
+  const sortedEmployees = useMemo(() => {
+    const sorted = [...employees].sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt"));
+    const currentIndex = sorted.findIndex((e) => e.uid === uid);
+    return currentIndex > 0
+      ? [sorted[currentIndex], ...sorted.slice(0, currentIndex), ...sorted.slice(currentIndex + 1)]
+      : sorted;
+  }, [employees, uid]);
+
+  // Pesquisa por nome, função, entidade ou local  -  aplica-se às duas vistas.
+  const filteredEmployees = useMemo(() => {
+    const query = normalizeText(search.trim());
+    if (!query) return sortedEmployees;
+    return sortedEmployees.filter((emp) =>
+      [emp.nome, emp.role, emp.entidade, emp.sede].some((field) => normalizeText(field).includes(query))
+    );
+  }, [sortedEmployees, search]);
+
   // Feriados nacionais/móveis  -  iguais para todos; o feriado municipal varia por
   // sede, por isso é calculado por colaborador (ver rowHolidaySet, mais abaixo).
   const nationalHolidaySet = useMemo(
@@ -134,10 +161,32 @@ export default function VacationTimeline({ year, onYearChange }) {
 
   const canEdit = (rowUid) => rowUid === uid || isAdminOrHR;
 
-  const handleDayMouseDown = (rowUid, dateStr, isMarkedInMode, canToggle, toggleHandler) => {
+  const handleDayMouseDown = (rowUid, dateStr, isMarkedInMode, canToggle, toggleHandler, event) => {
     if (!canToggle) return;
     setDragInfo({ rowUid, targetState: !isMarkedInMode, toggleHandler });
     toggleHandler(rowUid, dateStr);
+
+    // Um dia em branco só pode ficar marcado como férias (é o único destino possível
+    // nesse caso  -  ver toggleHandler mais abaixo); se o colaborador ainda não usou o
+    // dia de aniversário deste ano, sugere trocar este dia para aniversário em vez de
+    // férias, já marcadas de imediato (o mini-tooltip é só um atalho para corrigir). Só
+    // no clique que inicia a interação, nunca durante um arrasto (ver
+    // handleDayMouseEnter), para não interromper a marcação em série.
+    setBirthdaySuggestion(null);
+    if (!isMarkedInMode) {
+      const hasBirthdayThisYear = (birthdayMap.get(rowUid)?.size || 0) > 0;
+      if (!hasBirthdayThisYear) {
+        setBirthdaySuggestion({ rowUid, dateStr, x: event.clientX, y: event.clientY });
+      }
+    }
+  };
+
+  const acceptBirthdaySuggestion = () => {
+    if (!birthdaySuggestion) return;
+    const { rowUid, dateStr } = birthdaySuggestion;
+    toggleVacationDay(rowUid, dateStr); // desmarca as férias que tinham acabado de ser marcadas
+    toggleBirthdayDay(rowUid, dateStr); // marca aniversário no lugar
+    setBirthdaySuggestion(null);
   };
 
   const handleDayMouseEnter = (rowUid, dateStr, isMarkedInMode, canToggle) => {
@@ -299,48 +348,16 @@ export default function VacationTimeline({ year, onYearChange }) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          {viewMode === "timeline" && (
-            <div className="flex items-center gap-1 bg-gray-50 rounded-full border border-gray-100 p-1">
-              <button
-                onClick={() => setDayMode("ferias")}
-                title="Clicar num dia marca/desmarca férias"
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  dayMode === "ferias" ? "bg-gold text-white shadow-sm" : "text-gray-500 hover:bg-gray-100"
-                }`}
-              >
-                Férias
-              </button>
-              <button
-                onClick={() => setDayMode("aniversario")}
-                title="Clicar num dia marca/desmarca o dia de aniversário (1/ano)"
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  dayMode === "aniversario" ? "bg-rose-400 text-white shadow-sm" : "text-gray-500 hover:bg-gray-100"
-                }`}
-              >
-                🎂 Aniversário
-              </button>
-            </div>
-          )}
-          {viewMode === "timeline" && (
-            <div className="flex items-center gap-1 bg-gray-50 rounded-full border border-gray-100 p-1">
-              <button
-                onClick={() => setRangeMode("month")}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  rangeMode === "month" ? "bg-gold text-white shadow-sm" : "text-gray-500 hover:bg-gray-100"
-                }`}
-              >
-                Mês
-              </button>
-              <button
-                onClick={() => setRangeMode("week")}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  rangeMode === "week" ? "bg-gold text-white shadow-sm" : "text-gray-500 hover:bg-gray-100"
-                }`}
-              >
-                Semana
-              </button>
-            </div>
-          )}
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none">🔍</span>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Procurar por nome, função, entidade ou local de trabalho"
+              className="text-sm bg-gray-50 border border-gray-100 rounded-lg pl-8 pr-3 py-2 w-72 sm:w-[28rem] focus:outline-none focus:ring-2 focus:ring-gold/30 placeholder:text-gray-400"
+            />
+          </div>
           {viewMode === "timeline" ? (
             <div className="flex items-center gap-1">
               <button
@@ -376,19 +393,20 @@ export default function VacationTimeline({ year, onYearChange }) {
               </button>
             </div>
           )}
-          <div className="flex items-center gap-1 bg-gray-50 rounded-full border border-gray-100 p-1">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => setViewMode("timeline")}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                viewMode === "timeline" ? "bg-gold text-white shadow-sm" : "text-gray-500 hover:bg-gray-100"
+              className={`text-xs font-medium transition-colors underline-offset-4 ${
+                viewMode === "timeline" ? "text-gold underline" : "text-gray-400 hover:text-gray-600 no-underline"
               }`}
             >
               Linha do tempo
             </button>
+            <span className="text-gray-300 text-xs">/</span>
             <button
               onClick={() => setViewMode("resumo")}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                viewMode === "resumo" ? "bg-gold text-white shadow-sm" : "text-gray-500 hover:bg-gray-100"
+              className={`text-xs font-medium transition-colors underline-offset-4 ${
+                viewMode === "resumo" ? "text-gold underline" : "text-gray-400 hover:text-gray-600 no-underline"
               }`}
             >
               Resumo
@@ -400,7 +418,7 @@ export default function VacationTimeline({ year, onYearChange }) {
       <div className="flex-1 overflow-auto px-3 sm:px-6 py-3 sm:py-5">
         {viewMode === "resumo" ? (
           <ResumoTab
-            employees={employees}
+            employees={filteredEmployees}
             vacationMap={vacationMap}
             birthdayMap={birthdayMap}
             year={year}
@@ -411,10 +429,28 @@ export default function VacationTimeline({ year, onYearChange }) {
           />
         ) : (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 sm:p-5">
-            <div className="overflow-x-auto">
+            <div className="">
             {/* Régua de dias, alinhada com as faixas de cada colaborador em baixo */}
             <div className="flex mb-1.5">
-              <div className="w-[52px] sm:w-[190px] shrink-0 sticky left-0 z-10 bg-white" />
+              <div className="w-[52px] sm:w-[190px] shrink-0 sticky left-0 z-10 bg-white flex items-center gap-2 pl-1">
+                <button
+                  onClick={() => setRangeMode("month")}
+                  className={`text-xs font-medium transition-colors underline-offset-4 ${
+                    rangeMode === "month" ? "text-gold underline" : "text-gray-400 hover:text-gray-600 no-underline"
+                  }`}
+                >
+                  Mês
+                </button>
+                <span className="text-gray-300 text-xs">/</span>
+                <button
+                  onClick={() => setRangeMode("week")}
+                  className={`text-xs font-medium transition-colors underline-offset-4 ${
+                    rangeMode === "week" ? "text-gold underline" : "text-gray-400 hover:text-gray-600 no-underline"
+                  }`}
+                >
+                  Semana
+                </button>
+              </div>
               <div className="flex flex-1" style={{ minWidth: dayTrackMinWidth }}>
                 {visibleDays.map((dateObj) => {
                   const day = dateObj.getDate();
@@ -436,7 +472,7 @@ export default function VacationTimeline({ year, onYearChange }) {
             </div>
 
             <div className="flex flex-col gap-1">
-              {employees.map((emp) => {
+              {filteredEmployees.map((emp) => {
                 const rowSet = vacationMap.get(emp.uid) || new Set();
                 const rowBirthdaySet = birthdayMap.get(emp.uid) || new Set();
                 const editable = canEdit(emp.uid);
@@ -463,19 +499,14 @@ export default function VacationTimeline({ year, onYearChange }) {
                         </div>
                       </div>
                     </div>
-                    <div className="flex flex-1 h-9 sm:h-7 rounded-lg overflow-hidden bg-gray-50 group-hover:bg-gray-100/70 transition-colors" style={{ minWidth: dayTrackMinWidth }}>
-                      {visibleDays.map((dateObj, idx) => {
+                    <div className="flex flex-1 gap-x-px h-9 sm:h-7 rounded-lg overflow-hidden bg-gray-50 group-hover:bg-gray-100/70 transition-colors" style={{ minWidth: dayTrackMinWidth }}>
+                      {visibleDays.map((dateObj) => {
                         const day = dateObj.getDate();
                         const dayMonth = dateObj.getMonth();
                         const isDispensa = dayMonth === 11 && DISPENSA_DAYS.includes(day);
                         const dateStr = formatDateStr(dateObj);
                         const isChecked = rowSet.has(dateStr);
                         const isBirthday = rowBirthdaySet.has(dateStr);
-
-                        const prevDateObj = visibleDays[idx - 1];
-                        const nextDateObj = visibleDays[idx + 1];
-                        const prevChecked = prevDateObj ? rowSet.has(formatDateStr(prevDateObj)) : false;
-                        const nextChecked = nextDateObj ? rowSet.has(formatDateStr(nextDateObj)) : false;
 
                         const dayOfWeek = dateObj.getDay();
                         const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
@@ -488,7 +519,7 @@ export default function VacationTimeline({ year, onYearChange }) {
                             <div
                               key={dateStr}
                               title={`${pad2(day)}/${pad2(dayMonth + 1)}  -  Dia de dispensa da empresa`}
-                              className="flex-1 bg-gray-200"
+                              className="flex-1 rounded-md bg-gray-200"
                             />
                           );
                         }
@@ -498,19 +529,18 @@ export default function VacationTimeline({ year, onYearChange }) {
                         const blockedReason = isHoliday ? "holiday" : isWeekend ? "weekend" : null;
                         const blockedLabel = blockedReason === "holiday" ? "  -  Feriado" : blockedReason === "weekend" ? "  -  Fim de semana" : "";
 
-                        // O clique marca férias ou dia de aniversário, segundo o modo ativo;
-                        // o dia de aniversário tem quota fixa de 1/ano (sem transição).
-                        const isMarkedInMode = dayMode === "ferias" ? isChecked : isBirthday;
-                        const quotaExhausted = dayMode === "aniversario" && !isBirthday && rowBirthdaySet.size >= 1;
-                        const canToggle = editable && (isMarkedInMode || (!blockedReason && !quotaExhausted));
-                        const toggleHandler = dayMode === "ferias" ? toggleVacationDay : toggleBirthdayDay;
+                        // Um dia em branco só pode ficar marcado como férias (o dia de
+                        // aniversário passa a marcar-se só através da sugestão pós-clique  -
+                        // ver handleDayMouseDown/acceptBirthdaySuggestion); um dia já marcado
+                        // clica para desmarcar o que já lá está, seja férias ou aniversário.
+                        const isMarkedInMode = isChecked || isBirthday;
+                        const canToggle = editable && (isMarkedInMode || !blockedReason);
+                        const toggleHandler = isBirthday ? toggleBirthdayDay : toggleVacationDay;
 
                         const statusLabel = isChecked
                           ? "  -  Férias"
                           : isBirthday
                           ? "  -  🎂 Dia de aniversário"
-                          : quotaExhausted
-                          ? "  -  Dia de aniversário já utilizado este ano"
                           : blockedLabel;
 
                         return (
@@ -519,14 +549,11 @@ export default function VacationTimeline({ year, onYearChange }) {
                             type="button"
                             title={`${pad2(day)}/${pad2(dayMonth + 1)}/${dateObj.getFullYear()}${statusLabel}`}
                             disabled={!canToggle}
-                            onMouseDown={(e) => { e.preventDefault(); handleDayMouseDown(emp.uid, dateStr, isMarkedInMode, canToggle, toggleHandler); }}
+                            onMouseDown={(e) => { e.preventDefault(); handleDayMouseDown(emp.uid, dateStr, isMarkedInMode, canToggle, toggleHandler, e); }}
                             onMouseEnter={() => handleDayMouseEnter(emp.uid, dateStr, isMarkedInMode, canToggle)}
                             className={[
-                              "flex-1 h-full transition-colors relative select-none",
+                              "flex-1 h-full rounded-md transition-colors relative select-none",
                               isChecked ? "bg-gold" : isBirthday ? "bg-rose-400" : isHoliday ? "bg-warning/20" : isWeekend ? "bg-gray-300" : "bg-transparent",
-                              (isChecked && !prevChecked) || isBirthday ? "rounded-l-md" : "",
-                              (isChecked && !nextChecked) || isBirthday ? "rounded-r-md" : "",
-                              idx !== visibleDays.length - 1 && !isWeekend && !(isChecked && nextChecked) ? "border-r border-gray-200/80" : "",
                               canToggle && !isMarkedInMode ? "hover:bg-gold-mid/50 cursor-pointer" : "",
                               canToggle && isMarkedInMode ? "cursor-pointer hover:brightness-110" : "",
                               !canToggle ? "cursor-not-allowed" : "",
@@ -544,11 +571,53 @@ export default function VacationTimeline({ year, onYearChange }) {
           </div>
         )}
       </div>
+
+      {birthdaySuggestion && (
+        <div
+          className="fixed z-[2000] flex items-center gap-2 bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 text-sm"
+          style={{ top: birthdaySuggestion.y + 14, left: birthdaySuggestion.x + 14 }}
+        >
+          <span className="text-gray-600">🎂 Foi o aniversário?</span>
+          <button
+            type="button"
+            onClick={acceptBirthdaySuggestion}
+            className="text-rose-500 font-semibold hover:underline"
+          >
+            Marcar
+          </button>
+          <button
+            type="button"
+            onClick={() => setBirthdaySuggestion(null)}
+            title="Fechar"
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <FaXmark size={12} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
 function ResumoTab({ employees, vacationMap, birthdayMap, year, isAdminOrHR, onQuotaChange, onCarryoverChange, currentUid }) {
+  // Ordenação exclusiva desta tabela  -  a timeline mantém sempre a ordem por nome
+  // (ver sortedEmployees em VacationTimeline).
+  const [sortBy, setSortBy] = useState("nome"); // "nome" | "entidade"
+
+  const sortedEmployees = useMemo(() => {
+    if (sortBy !== "entidade") return employees;
+    const sorted = [...employees].sort((a, b) => {
+      const cmp = (a.entidade || "").localeCompare(b.entidade || "", "pt");
+      if (cmp !== 0) return cmp;
+      return (a.nome || "").localeCompare(b.nome || "", "pt");
+    });
+    // O colaborador com sessão iniciada continua sempre em primeiro lugar.
+    const currentIndex = sorted.findIndex((e) => e.uid === currentUid);
+    return currentIndex > 0
+      ? [sorted[currentIndex], ...sorted.slice(0, currentIndex), ...sorted.slice(currentIndex + 1)]
+      : sorted;
+  }, [employees, sortBy, currentUid]);
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="overflow-auto">
@@ -556,16 +625,27 @@ function ResumoTab({ employees, vacationMap, birthdayMap, year, isAdminOrHR, onQ
           <thead>
             <tr className="bg-gray-50">
               <th className="sticky top-0 bg-gray-50 px-4 py-3 text-left font-medium text-gray-500 border-b border-gray-100">Colaborador</th>
-              <th className="sticky top-0 bg-gray-50 px-4 py-3 text-left font-medium text-gray-500 border-b border-gray-100">Entidade</th>
-              <th className="sticky top-0 bg-gray-50 px-4 py-3 font-medium text-gray-500 border-b border-gray-100">Transição {year - 1}</th>
-              <th className="sticky top-0 bg-gray-50 px-4 py-3 font-medium text-gray-500 border-b border-gray-100">Quota {year}</th>
-              <th className="sticky top-0 bg-gray-50 px-4 py-3 font-medium text-gray-500 border-b border-gray-100">Usado {year}</th>
-              <th className="sticky top-0 bg-gray-50 px-4 py-3 font-medium text-gray-500 border-b border-gray-100">Por usar</th>
+              <th className="sticky top-0 bg-gray-50 px-4 py-3 text-left font-medium text-gray-500 border-b border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setSortBy(sortBy === "entidade" ? "nome" : "entidade")}
+                  title="Ordenar por entidade"
+                  className="inline-flex items-center gap-1.5 font-medium text-gray-500 hover:text-gold transition-colors"
+                >
+                  Entidade
+                  <span className={sortBy === "entidade" ? "text-gold" : "text-gray-300"}>⇅</span>
+                </button>
+              </th>
+              <th className="sticky top-0 bg-gray-50 px-4 py-3 font-medium text-gray-500 border-b border-gray-100">Dias {year}</th>
+              <th className="sticky top-0 bg-gray-50 px-4 py-3 font-medium text-gray-500 border-b border-gray-100">Dias Transitados {year - 1}</th>
+              <th className="sticky top-0 bg-gray-50 px-4 py-3 font-medium text-gray-500 border-b border-gray-100">Total Dias</th>
+              <th className="sticky top-0 bg-gray-50 px-4 py-3 font-medium text-gray-500 border-b border-gray-100">Dias Marcados</th>
+              <th className="sticky top-0 bg-gray-50 px-4 py-3 font-medium text-gray-500 border-b border-gray-100">Dias por utilizar</th>
               <th className="sticky top-0 bg-gray-50 px-4 py-3 font-medium text-gray-500 border-b border-gray-100">🎂 Aniversário</th>
             </tr>
           </thead>
           <tbody>
-            {employees.map((emp, rowIndex) => {
+            {sortedEmployees.map((emp, rowIndex) => {
               const usadoAtualLive = vacationMap.get(emp.uid)?.size ?? emp.usadoAtual;
               const saldoLive = emp.quotaAtual + emp.carryoverAtual - usadoAtualLive;
               const birthdaySetLive = birthdayMap.get(emp.uid);
@@ -585,18 +665,6 @@ function ResumoTab({ employees, vacationMap, birthdayMap, year, isAdminOrHR, onQ
                   <td className="px-4 py-2 text-center border-b border-gray-50">
                     {isAdminOrHR ? (
                       <InlineNumberEditor
-                        value={emp.carryoverAtual}
-                        isOverride={emp.carryoverOverrideAtual !== null}
-                        resetTitle="Repor para 0"
-                        onSave={(newDays) => onCarryoverChange(emp.uid, newDays)}
-                      />
-                    ) : (
-                      <span className="text-gray-700">{emp.carryoverAtual}</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2 text-center border-b border-gray-50">
-                    {isAdminOrHR ? (
-                      <InlineNumberEditor
                         value={emp.quotaAtual}
                         isOverride={emp.quotaOverrideAtual !== null}
                         resetTitle="Repor cálculo automático"
@@ -606,6 +674,19 @@ function ResumoTab({ employees, vacationMap, birthdayMap, year, isAdminOrHR, onQ
                       <span className="text-gray-700">{emp.quotaAtual}</span>
                     )}
                   </td>
+                  <td className="px-4 py-2 text-center border-b border-gray-50">
+                    {isAdminOrHR ? (
+                      <InlineNumberEditor
+                        value={emp.carryoverAtual}
+                        isOverride={emp.carryoverOverrideAtual !== null}
+                        resetTitle="Repor para 0"
+                        onSave={(newDays) => onCarryoverChange(emp.uid, newDays)}
+                      />
+                    ) : (
+                      <span className="text-gray-700">{emp.carryoverAtual}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2 text-center text-gray-700 border-b border-gray-50">{emp.quotaAtual + emp.carryoverAtual}</td>
                   <td className="px-4 py-2 text-center text-gray-700 border-b border-gray-50">{usadoAtualLive}</td>
                   <td className={`px-4 py-2 text-center font-semibold border-b border-gray-50 ${saldoLive < 0 ? "text-danger" : "text-gray-800"}`}>
                     {saldoLive}

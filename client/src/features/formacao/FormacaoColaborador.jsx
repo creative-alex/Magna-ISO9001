@@ -13,6 +13,13 @@ import { getNomeCurto } from "../../shared/utils/nomeCurto";
 
 const GOLD = "#C8932F";
 
+// Classes literais (não interpoladas) para o Tailwind conseguir gerá-las -  os
+// campos usam "span 2"/"span 3" pensados para a grelha de 3 colunas do ecrã
+// largo; aplicados só a partir de "sm" para não forçarem colunas extra quando
+// o telemóvel está em grid-cols-1 (o CSS Grid cria colunas implícitas para
+// caber um span maior do que a grelha explícita).
+const SPAN_CLASS = { 1: "sm:col-span-1", 2: "sm:col-span-2", 3: "sm:col-span-3" };
+
 const ACAO_FIELDS = [
   { key: "nome_acao", label: "Nome da ação", type: "text", span: 2 },
   { key: "entidade_formadora", label: "Entidade formadora", type: "text", span: 1 },
@@ -359,7 +366,7 @@ export default function FormacaoColaborador() {
 
     if (type === "select") {
       return (
-        <div key={key} style={{ gridColumn: `span ${span}` }}>
+        <div key={key} className={SPAN_CLASS[span]}>
           <span style={labelStyle}>{label}</span>
           {isEditing ? (
             <select value={value} onChange={e => handleChange(acao.id, key, e.target.value)} style={inputStyle(isEditing)}>
@@ -374,7 +381,7 @@ export default function FormacaoColaborador() {
     }
 
     return (
-      <div key={key} style={{ gridColumn: `span ${span}` }}>
+      <div key={key} className={SPAN_CLASS[span]}>
         <span style={labelStyle}>{label}</span>
 
         {isEditing ? (
@@ -445,7 +452,7 @@ export default function FormacaoColaborador() {
           title={acao.concluida && !isEditing ? (showBody ? "Colapsar" : "Expandir") : undefined}
           style={{
             padding: "14px 18px", borderBottom: "1px solid #f3f4f6", borderLeft: `3px solid ${GOLD}`,
-            background: `${GOLD}26`, display: "flex", alignItems: "center", gap: 8,
+            background: `${GOLD}26`, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
             cursor: acao.concluida && !isEditing ? "pointer" : "default",
           }}
         >
@@ -463,11 +470,11 @@ export default function FormacaoColaborador() {
           )}
           <div
             onClick={e => e.stopPropagation()}
-            style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}
+            style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginLeft: "auto" }}
           >
             {isSelf && !acao.concluida && (
               isConfirmingDone ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                   <input
                     type="date"
                     value={dataConclusaoDraft}
@@ -661,7 +668,7 @@ export default function FormacaoColaborador() {
 
         {showBody && (
           <div style={{ padding: 18 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "14px 20px" }}>
+            <div className="grid grid-cols-1 sm:grid-cols-3" style={{ gap: "14px 20px" }}>
               {ACAO_FIELDS
                 .filter(field => field.key !== "prazo_ano" || !acao.concluida)
                 .map(field => renderAcaoField(acao, field, isEditing))}
@@ -679,26 +686,31 @@ export default function FormacaoColaborador() {
       <div className="ml-[var(--sidebar-w,230px)] transition-[margin-left] duration-200 flex-1 min-w-0 flex flex-col min-h-screen">
         <Topbar icon="🎓" title="Plano de Formação" />
 
-        <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
+        <div className="p-4 sm:p-6" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "18px 24px", display: "flex", alignItems: "center", gap: 16 }}>
-            <button
-              onClick={() => navigate(canManage ? "/plano-formacao" : "/dashboard")}
-              title={canManage ? "Voltar à lista de colaboradores" : "Voltar ao dashboard"}
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "center",
-                width: 32, height: 32, border: "1px solid #e5e7eb", borderRadius: 7,
-                background: "#fff", color: "#6b7280", cursor: "pointer", flexShrink: 0,
-              }}
-            >
-              <FaArrowLeft style={{ fontSize: 12 }} />
-            </button>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 17, fontWeight: 700, color: "#111827" }}>
-                Plano de formação  -  {nomeCurto}
-              </div>
-              <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 3 }}>
-                Ano civil de {ano}
+          <div
+            className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
+            style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "16px 18px" }}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                onClick={() => navigate(canManage ? "/plano-formacao" : "/dashboard")}
+                title={canManage ? "Voltar à lista de colaboradores" : "Voltar ao dashboard"}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  width: 32, height: 32, border: "1px solid #e5e7eb", borderRadius: 7,
+                  background: "#fff", color: "#6b7280", cursor: "pointer", flexShrink: 0,
+                }}
+              >
+                <FaArrowLeft style={{ fontSize: 12 }} />
+              </button>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 17, fontWeight: 700, color: "#111827" }}>
+                  Plano de formação  -  {nomeCurto}
+                </div>
+                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 3 }}>
+                  Ano civil de {ano}
+                </div>
               </div>
             </div>
             <select
@@ -706,6 +718,7 @@ export default function FormacaoColaborador() {
               disabled={editingIds.size > 0 || anySaving}
               onChange={e => setAno(e.target.value)}
               title={editingIds.size > 0 ? "Termina a edição para mudar de ano" : "Mudar de ano"}
+              className="w-full sm:w-auto sm:ml-auto"
               style={{
                 fontSize: 13, padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 7,
                 background: editingIds.size > 0 ? "#f3f4f6" : "#fafafa", color: "#111827", flexShrink: 0,
@@ -786,9 +799,9 @@ export default function FormacaoColaborador() {
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>
                   Nova ação de formação já concluída
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "14px 20px" }}>
+                <div className="grid grid-cols-1 sm:grid-cols-3" style={{ gap: "14px 20px" }}>
                   {ACAO_FIELDS.filter(field => field.key !== "prazo_ano").map(field => (
-                    <div key={field.key} style={{ gridColumn: `span ${field.span}` }}>
+                    <div key={field.key} className={SPAN_CLASS[field.span]}>
                       <span style={labelStyle}>{field.label}</span>
                       {field.type === "select" ? (
                         <select
@@ -863,12 +876,13 @@ export default function FormacaoColaborador() {
                   type="button"
                   onClick={handleAbrirNovaConcluida}
                   style={{
-                    display: "flex", alignItems: "center", gap: 6,
+                    display: "flex", alignItems: "center", gap: 6, textAlign: "center",
                     padding: "8px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer",
                     border: "1px dashed #22c55e", borderRadius: 7, background: "#fff", color: "#22c55e",
+                    maxWidth: "100%", whiteSpace: "normal",
                   }}
                 >
-                  <FaPlus style={{ fontSize: 11 }} />
+                  <FaPlus style={{ fontSize: 11, flexShrink: 0 }} />
                   Registar Formação Interna por Iniciativa do Colaborador/a
                 </button>
               </div>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { FaSpinner } from 'react-icons/fa6';
+import Logo from '../assets/logo.svg';
 
 const LoadingPage = () => {
   const [progress, setProgress] = useState(0);
@@ -29,13 +30,7 @@ const LoadingPage = () => {
 
       {/* Marca */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 40 }}>
-        <div style={{
-          width: 44, height: 44, borderRadius: 10,
-          background: '#C8932F',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 20, fontWeight: 700, color: '#fff',
-          flexShrink: 0,
-        }}>C</div>
+        <img src={Logo} alt="Logo Magna" style={{ width: 'auto', height: 75, flexShrink: 0 }} />
         <div>
           <div style={{ fontSize: 17, fontWeight: 700, color: '#111827', lineHeight: 1.2 }}>Magna ISO9001</div>
           <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Cooperativa Comenius</div>

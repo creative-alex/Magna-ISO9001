@@ -1,7 +1,7 @@
 const admin = require("firebase-admin");
 const { normalizeUserId } = require("./helpers");
 const { normalizeEntityId } = require("../../shared/lib/normalizeEntityId");
-const { isSuperAdmin, isAdminOrHR, isAdministrador, isGestorFinanceiro } = require("../../shared/middleware/auth");
+const { isSuperAdmin, isAdminOrHR, isGestorRH, isAdministrador, isGestorFinanceiro } = require("../../shared/middleware/auth");
 const db = admin.firestore();
 
 // Únicos valores válidos para o nível de acesso (controla permissões). Distinto
@@ -229,7 +229,14 @@ const updateUserDetails = async (req, res) => {
     // nome muda  -  os dados em "registo-ponto/{uid}" continuam válidos sem
     // precisar de nenhuma migração.
     const updatedData = { entidade: entidadeRef, nome, role, updatedAt: new Date() };
-    if (nivelAcesso !== undefined) {
+    // Ninguém pode alterar o seu próprio nível de acesso, nem o de outro GestorRH
+    // (exceto SuperAdmin)  -  GestorRH é um nível de pares entre si, e um
+    // GestorRH/Administrador consegue chegar a qualquer ficha em /ponto/user-details
+    // (requireAdminOrEntidadeAdmin não distingue "editar outro" de "editar-se a si
+    // próprio"), por isso este bloqueio tem de ficar aqui e não só no formulário.
+    const isSelfEdit = uid === req.user?.uid;
+    const nivelAcessoBloqueado = !isSuperAdmin(req.user?.nivelAcesso) && (isSelfEdit || isGestorRH(userDoc.data().nivelAcesso));
+    if (nivelAcesso !== undefined && !nivelAcessoBloqueado) {
       updatedData.nivelAcesso = normalizeNivelAcessoForActor(req.user?.nivelAcesso, nivelAcesso);
     }
 

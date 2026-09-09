@@ -7,6 +7,7 @@ import MedicalLeave from "../../Shared/medicalLeave";
 import BirthdayButton from "../../Shared/birthdayButton";
 import CompensateOvertimeButton from "../../Shared/compensateOvertimeButton";
 import { getHolidaysForSede } from "../../../../../shared/utils/holidays";
+import { isBlocoAtivoEm, isDiaForaDeAtivo, labelBaixaOuLicenca } from "../../../../../shared/utils/absenceBlocks";
 
 
 
@@ -67,6 +68,9 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
         isFerias: false,
         isBaixaMedica: false,
         isAniversario: false,
+        isCedencia: false,
+        isLicencaOuBaixaCadastro: false,
+        isForaDeAtivo: false,
       }));
 
       const data = response.ok ? await response.json() : { registos: [] };
@@ -120,6 +124,11 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
             })
         : [];
 
+      const cedencias = Array.isArray(data.cedencias) ? data.cedencias : [];
+      const licencasOuBaixasCadastro = Array.isArray(data.licencasOuBaixasCadastro) ? data.licencasOuBaixasCadastro : [];
+      const situacaoContratual = data.situacaoContratual || "Ativo";
+      const dataFimContrato = data.dataFimContrato || null;
+
       const hoje = new Date();
       const allHolidays = getHolidaysForSede(data.sede, year);
       novosDados = novosDados.map((item, index) => {
@@ -136,6 +145,47 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
         const estaDeFerias = ferias.includes(item.dia);
         const estaDeBaixaMedica = baixas.includes(item.dia);
         const estaDeAniversario = aniversarios.includes(item.dia);
+
+        // Cedência temporária, licença/baixa médica (registada no Cadastro) ou contrato
+        // já não ativo (cessado/suspenso/reformado)  -  também não contam como falta.
+        const dataIso = `${year}-${String(month).padStart(2, "0")}-${String(index + 1).padStart(2, "0")}`;
+        const blocoLicencaOuBaixaCadastro = licencasOuBaixasCadastro.find((b) => isBlocoAtivoEm(b, dataIso));
+        const blocoCedencia = cedencias.find((b) => isBlocoAtivoEm(b, dataIso));
+        const foraDeAtivo = isDiaForaDeAtivo(situacaoContratual, dataFimContrato, dataIso);
+
+        if (blocoLicencaOuBaixaCadastro) {
+          const label = labelBaixaOuLicenca(blocoLicencaOuBaixaCadastro.tipo);
+          return {
+            ...item,
+            horaEntrada: label,
+            horaSaida: label,
+            total: label,
+            extra: label,
+            isLicencaOuBaixaCadastro: true,
+          };
+        }
+
+        if (blocoCedencia) {
+          return {
+            ...item,
+            horaEntrada: "Cedência",
+            horaSaida: "Cedência",
+            total: "Cedência",
+            extra: "Cedência",
+            isCedencia: true,
+          };
+        }
+
+        if (foraDeAtivo) {
+          return {
+            ...item,
+            horaEntrada: situacaoContratual,
+            horaSaida: situacaoContratual,
+            total: situacaoContratual,
+            extra: situacaoContratual,
+            isForaDeAtivo: true,
+          };
+        }
 
         if (estaDeAniversario) {
           return {
@@ -226,13 +276,15 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
           diaSemana !== 6 &&
           !feriado
         ) {
-          return { ...item, horaEntrada: "-", horaSaida: "-", total: "0h 0m", extra: "0h 0m" };
+          // Falta total (sem registo nenhum): défice do dia inteiro, para poder ser
+          // compensada com o saldo anual de horas extra (ver isCompensavel abaixo).
+          return { ...item, horaEntrada: "-", horaSaida: "-", total: "0h 0m", extra: "0h 0m", minutosFalta: 480 };
         }
       
         return item;
       });
 
-      const diasFalta = novosDados.filter((d) => d.total === "0h 0m" && !d.isFerias && !d.isBaixaMedica && !d.isAniversario).length;
+      const diasFalta = novosDados.filter((d) => d.total === "0h 0m" && !d.isFerias && !d.isBaixaMedica && !d.isAniversario && !d.isCedencia && !d.isLicencaOuBaixaCadastro && !d.isForaDeAtivo).length;
       const diasFerias = novosDados.filter((d) => d.isFerias).length;
       const diasBaixaMedica = novosDados.filter((d) => d.isBaixaMedica).length;
       const diasAniversario = novosDados.filter((d) => d.isAniversario).length;
@@ -373,8 +425,9 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
               // continuar a mostrar menos de 8h mesmo já compensado (só é possível
               // compensar um dia uma vez  -  ver isCompensavel abaixo).
               const isLessThanEightHours = item.total !== "-" && parseInt(item.total.split("h")[0]) < 8;
-              // Só faz sentido compensar um dia com registo real (défice, não ausência total) e ainda não compensado
-              const isCompensavel = isLessThanEightHours && item.horaEntrada !== "-" && !item.compensated;
+              // Compensável tanto com registo parcial (défice) como com falta total (0h 0m,
+              // sem registo)  -  em ambos os casos item.total é numérico e ainda não compensado.
+              const isCompensavel = isLessThanEightHours && !item.compensated;
 
               return (
                 <tr key={index} onContextMenu={(e) => abrirContextMenu(e, index)} className={index % 2 === 0 ? 'bg-gray-50' : ''}>

@@ -8,6 +8,8 @@ import Sidebar from '../../../shared/components/Sidebar';
 import Topbar from '../../../shared/components/Topbar';
 import TableHours from '../components/Admin/clients/pontoTable';
 import UserStats from '../components/Admin/clients/userStats';
+import AutocompleteInput from '../../../shared/components/AutocompleteInput';
+import { FUNCAO } from '../../../shared/utils/formOptions';
 
 const GOLD = "#C8932F";
 
@@ -41,7 +43,7 @@ const UserDetails = ({ selectedUser }) => {
   const location = useLocation();
   const { uid: uidParam } = useParams();
   const [dados, setDados] = useState([]);
-  const { username, nivelAcesso: actorNivelAcesso } = useContext(UserContext);
+  const { username, uid: actorUid, nivelAcesso: actorNivelAcesso } = useContext(UserContext);
   // Um Administrador só gere colaboradores da sua própria entidade e nunca pode
   // atribuir/manter um nível de acesso igual ou superior ao seu; um GestorRH pode
   // atribuir Administrador mas nunca GestorRH/GestorFinanceiro/SuperAdmin, que
@@ -63,6 +65,13 @@ const UserDetails = ({ selectedUser }) => {
 
   // Pega o uid do parâmetro da rota, depois do selectedUser, depois do localStorage (legado)
   const userName = uidParam || selectedUser?.uid || localStorage.getItem("selectedUserUID");
+
+  // Ninguém pode alterar o seu próprio nível de acesso, nem o de outro GestorRH
+  // (exceto SuperAdmin)  -  o backend já recusa em silêncio (updateUserDetails), aqui
+  // só se evita mostrar um campo editável que na prática não tem efeito.
+  const isEditingSelf = !!actorUid && actorUid === userName;
+  const targetIsGestorRH = userDetails?.nivelAcesso === "GestorRH";
+  const nivelAcessoBloqueado = !isSuperAdmin && (isEditingSelf || targetIsGestorRH);
 
   // Guarda o uid no localStorage quando selectedUser mudar
   useEffect(() => {
@@ -446,17 +455,33 @@ const normalizedEntityUrl = userDetails?.entidade
                         </div>
                         <div>
                           <span style={labelStyle}>Função</span>
-                          <input type="text" name="role" style={inputStyle} value={editedData?.role || ""} onChange={handleInputChange} />
+                          <AutocompleteInput
+                            value={editedData?.role || ""}
+                            onChange={(v) => setEditedData({ ...editedData, role: v })}
+                            options={FUNCAO}
+                            inputStyle={inputStyle}
+                          />
                         </div>
                         <div>
                           <span style={labelStyle}>Nível de acesso</span>
-                          <select name="nivelAcesso" style={selectStyle} value={editedData?.nivelAcesso || "Colaborador"} onChange={handleInputChange}>
-                            <option value="Colaborador">Colaborador</option>
-                            {!isAdministrador && <option value="Administrador">Administrador</option>}
-                            {isSuperAdmin && <option value="GestorRH">Gestor(a) de Recursos Humanos</option>}
-                            {isSuperAdmin && <option value="GestorFinanceiro">Gestor(a) Financeiro</option>}
-                            {isSuperAdmin && <option value="SuperAdmin">SuperAdmin</option>}
-                          </select>
+                          {nivelAcessoBloqueado ? (
+                            <div style={{ ...valueStyle, ...inputStyle, cursor: "not-allowed", opacity: 0.7 }}>
+                              {editedData?.nivelAcesso || "Colaborador"}
+                              <span style={{ display: "block", fontSize: 10.5, color: "#9ca3af", fontWeight: 400, marginTop: 2 }}>
+                                {isEditingSelf
+                                  ? "Não podes alterar o teu próprio nível de acesso."
+                                  : "Só um SuperAdmin pode alterar o nível de acesso de outro Gestor(a) de RH."}
+                              </span>
+                            </div>
+                          ) : (
+                            <select name="nivelAcesso" style={selectStyle} value={editedData?.nivelAcesso || "Colaborador"} onChange={handleInputChange}>
+                              <option value="Colaborador">Colaborador</option>
+                              {!isAdministrador && <option value="Administrador">Administrador</option>}
+                              {isSuperAdmin && <option value="GestorRH">Gestor(a) de Recursos Humanos</option>}
+                              {isSuperAdmin && <option value="GestorFinanceiro">Gestor(a) Financeiro</option>}
+                              {isSuperAdmin && <option value="SuperAdmin">SuperAdmin</option>}
+                            </select>
+                          )}
                         </div>
                         <div>
                           <span style={labelStyle}>Nova Password Temporária</span>
