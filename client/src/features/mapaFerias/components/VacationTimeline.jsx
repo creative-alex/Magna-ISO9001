@@ -32,6 +32,28 @@ function getSunday(date) {
   return d;
 }
 
+// Semanas completas (domingo a sábado) cobrindo o mês, incluindo os dias dos
+// meses anterior/seguinte que preenchem a primeira e última semana  -  para a
+// grelha mensal ao estilo Google Calendar (ver MobileMonthCalendar).
+function getMonthGridWeeks(year, month) {
+  const start = getSunday(new Date(year, month, 1));
+  const lastOfMonth = new Date(year, month + 1, 0);
+  const end = new Date(lastOfMonth);
+  end.setDate(end.getDate() + (6 - end.getDay()));
+
+  const weeks = [];
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    const week = [];
+    for (let i = 0; i < 7; i++) {
+      week.push(new Date(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    weeks.push(week);
+  }
+  return weeks;
+}
+
 function formatDateStr(dateObj) {
   return `${pad2(dateObj.getDate())}-${pad2(dateObj.getMonth() + 1)}-${dateObj.getFullYear()}`;
 }
@@ -74,6 +96,12 @@ export default function VacationTimeline({ year, onYearChange }) {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState("timeline"); // "timeline" | "resumo"
   const [search, setSearch] = useState(""); // filtra por nome, função, entidade ou local (ver filteredEmployees)
+  // Pesquisa própria da lista de colaboradores no calendário mensal de telemóvel
+  // (ver MobileMonthCalendar)  -  independente da pesquisa da timeline no desktop.
+  const [mobileSearch, setMobileSearch] = useState("");
+  // Colaborador cujo calendário está a ser mostrado na vista mensal de telemóvel
+  // (arranca no próprio utilizador, mas pode escolher qualquer colega na lista).
+  const [selectedMobileUid, setSelectedMobileUid] = useState(uid);
   // Em ecrãs estreitos arranca em "semana" (7 colunas cabem bem); no desktop
   // continua a arrancar em "mês", como antes.
   const [rangeMode, setRangeMode] = useState(() =>
@@ -151,6 +179,16 @@ export default function VacationTimeline({ year, onYearChange }) {
       [emp.nome, emp.role, emp.entidade, emp.sede].some((field) => normalizeText(field).includes(query))
     );
   }, [sortedEmployees, search]);
+
+  // A mesma pesquisa, mas para a lista de colaboradores do calendário mensal de
+  // telemóvel (ver MobileMonthCalendar)  -  usa o seu próprio termo de pesquisa.
+  const mobileFilteredEmployees = useMemo(() => {
+    const query = normalizeText(mobileSearch.trim());
+    if (!query) return sortedEmployees;
+    return sortedEmployees.filter((emp) =>
+      [emp.nome, emp.role, emp.entidade, emp.sede].some((field) => normalizeText(field).includes(query))
+    );
+  }, [sortedEmployees, mobileSearch]);
 
   // Feriados nacionais/móveis  -  iguais para todos; o feriado municipal varia por
   // sede, por isso é calculado por colaborador (ver rowHolidaySet, mais abaixo).
@@ -317,6 +355,19 @@ export default function VacationTimeline({ year, onYearChange }) {
     return <div className="p-10 text-center text-gray-500">A carregar mapa de férias...</div>;
   }
 
+  // Dados do colaborador escolhido na lista, para a vista mensal em telemóvel
+  // (ver MobileMonthCalendar)  -  a timeline continua a mostrar toda a equipa.
+  // Arranca no próprio utilizador mas pode mudar para qualquer colega.
+  const mobileEmployee = employeesByUid[selectedMobileUid];
+  const mobileVacationSet = vacationMap.get(selectedMobileUid) || new Set();
+  const mobileBirthdaySet = birthdayMap.get(selectedMobileUid) || new Set();
+  const mobileHolidaySet = mobileEmployee
+    ? new Set([...nationalHolidaySet, getMunicipalHolidayDDMM(mobileEmployee.sede, year)])
+    : nationalHolidaySet;
+  const mobileSaldo = mobileEmployee
+    ? mobileEmployee.quotaAtual + mobileEmployee.carryoverAtual - mobileVacationSet.size
+    : 0;
+
   const daysInMonth = new Date(year, activeMonth + 1, 0).getDate();
   const visibleDays = rangeMode === "week"
     ? Array.from({ length: 7 }, (_, i) => { const d = new Date(weekStart); d.setDate(d.getDate() + i); return d; })
@@ -348,7 +399,9 @@ export default function VacationTimeline({ year, onYearChange }) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <div className="relative">
+          {/* No telemóvel a pesquisa e a navegação por mês vivem dentro do calendário
+              mensal (ver MobileMonthCalendar); aqui é só para o desktop. */}
+          <div className="relative hidden md:block">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none">🔍</span>
             <input
               type="text"
@@ -359,7 +412,7 @@ export default function VacationTimeline({ year, onYearChange }) {
             />
           </div>
           {viewMode === "timeline" ? (
-            <div className="flex items-center gap-1">
+            <div className="hidden md:flex items-center gap-1">
               <button
                 onClick={() => (rangeMode === "week" ? goToWeek(-1) : goToMonth(-1))}
                 className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gold hover:bg-gold-light rounded-full transition-colors"
@@ -377,7 +430,7 @@ export default function VacationTimeline({ year, onYearChange }) {
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-1">
+            <div className="hidden md:flex items-center gap-1">
               <button
                 onClick={() => onYearChange(year - 1)}
                 className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gold hover:bg-gold-light rounded-full transition-colors"
@@ -393,7 +446,9 @@ export default function VacationTimeline({ year, onYearChange }) {
               </button>
             </div>
           )}
-          <div className="flex items-center gap-2">
+          {/* O Resumo é uma vista só de desktop  -  no telemóvel a lista de
+              colaboradores do calendário mensal já cobre a mesma necessidade. */}
+          <div className="hidden md:flex items-center gap-2">
             <button
               onClick={() => setViewMode("timeline")}
               className={`text-xs font-medium transition-colors underline-offset-4 ${
@@ -416,18 +471,88 @@ export default function VacationTimeline({ year, onYearChange }) {
       </div>
 
       <div className="flex-1 overflow-auto px-3 sm:px-6 py-3 sm:py-5">
-        {viewMode === "resumo" ? (
-          <ResumoTab
-            employees={filteredEmployees}
-            vacationMap={vacationMap}
-            birthdayMap={birthdayMap}
+        {/* Telemóvel: sempre o calendário mensal ao estilo Google Calendar do
+            colaborador escolhido na lista abaixo (começa no próprio utilizador).
+            Não depende do viewMode  -  no telemóvel não há Resumo. */}
+        <div className="md:hidden flex flex-col gap-3">
+          <MobileMonthCalendar
             year={year}
-            isAdminOrHR={isAdminOrHR}
-            onQuotaChange={updateQuotaOverride}
-            onCarryoverChange={updateCarryover}
-            currentUid={uid}
+            activeMonth={activeMonth}
+            onPrevMonth={() => goToMonth(-1)}
+            onNextMonth={() => goToMonth(1)}
+            employee={mobileEmployee}
+            isSelf={selectedMobileUid === uid}
+            vacationSet={mobileVacationSet}
+            birthdaySet={mobileBirthdaySet}
+            holidaySet={mobileHolidaySet}
+            editable={canEdit(selectedMobileUid)}
+            saldo={mobileSaldo}
+            onDayTap={(dateStr, isMarkedInMode, isBirthday, event) => {
+              const toggleHandler = isBirthday ? toggleBirthdayDay : toggleVacationDay;
+              handleDayMouseDown(selectedMobileUid, dateStr, isMarkedInMode, true, toggleHandler, event);
+            }}
           />
-        ) : (
+
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3">
+            <div className="relative mb-2">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none">🔍</span>
+              <input
+                type="text"
+                value={mobileSearch}
+                onChange={(e) => setMobileSearch(e.target.value)}
+                placeholder="Procurar por nome, função, entidade ou local de trabalho"
+                className="w-full text-sm bg-gray-50 border border-gray-100 rounded-lg pl-8 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-gold/30 placeholder:text-gray-400"
+              />
+            </div>
+
+            {mobileFilteredEmployees.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-3">Nenhum colaborador encontrado</p>
+            ) : (
+              <div className="flex flex-col gap-0.5">
+                {mobileFilteredEmployees.map((emp) => {
+                  const isSelected = emp.uid === selectedMobileUid;
+                  return (
+                    <button
+                      key={emp.uid}
+                      type="button"
+                      onClick={() => setSelectedMobileUid(emp.uid)}
+                      className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-xl transition-colors text-left ${
+                        isSelected ? "bg-gold-light ring-1 ring-gold-mid" : "hover:bg-gray-50"
+                      }`}
+                    >
+                      <span className="w-9 h-9 shrink-0 rounded-full bg-gold-light text-gold text-xs font-semibold flex items-center justify-center">
+                        {getInitials(emp.nome)}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className={`text-sm truncate ${isSelected ? "text-gray-900 font-semibold" : "text-gray-700"}`}>
+                          {emp.nome}{emp.uid === uid ? " (eu)" : ""}
+                        </div>
+                        {(emp.role || emp.entidade) && (
+                          <div className="text-xs text-gray-400 truncate">{emp.role || emp.entidade}</div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Desktop: alterna entre a timeline da equipa e o Resumo. */}
+        <div className="hidden md:block">
+          {viewMode === "resumo" ? (
+            <ResumoTab
+              employees={filteredEmployees}
+              vacationMap={vacationMap}
+              birthdayMap={birthdayMap}
+              year={year}
+              isAdminOrHR={isAdminOrHR}
+              onQuotaChange={updateQuotaOverride}
+              onCarryoverChange={updateCarryover}
+              currentUid={uid}
+            />
+          ) : (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 sm:p-5">
             <div className="">
             {/* Régua de dias, alinhada com as faixas de cada colaborador em baixo */}
@@ -569,7 +694,8 @@ export default function VacationTimeline({ year, onYearChange }) {
             </div>
             </div>
           </div>
-        )}
+          )}
+        </div>
       </div>
 
       {birthdaySuggestion && (
@@ -596,6 +722,128 @@ export default function VacationTimeline({ year, onYearChange }) {
         </div>
       )}
     </div>
+  );
+}
+
+// Vista mensal só do colaborador com sessão iniciada, para telemóvel  -  uma
+// grelha ao estilo Google Calendar em vez das faixas horizontais da equipa
+// (que não cabem bem num ecrã estreito). Reutiliza as mesmas regras de
+// marcação/desmarcação da timeline (ver handleDayMouseDown em VacationTimeline).
+function MobileMonthCalendar({
+  year,
+  activeMonth,
+  onPrevMonth,
+  onNextMonth,
+  employee,
+  isSelf,
+  vacationSet,
+  birthdaySet,
+  holidaySet,
+  editable,
+  saldo,
+  onDayTap,
+}) {
+  const weeks = getMonthGridWeeks(year, activeMonth);
+  const today = new Date();
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className="min-w-0">
+          <h3 className="text-base font-semibold text-gray-800 leading-tight truncate">
+            {isSelf || !employee ? `${MONTH_NAMES[activeMonth]} ${year}` : employee.nome}
+          </h3>
+          {employee && (
+            <p className="text-xs text-gray-400 truncate">
+              {!isSelf && `${MONTH_NAMES[activeMonth]} ${year}  -  `}
+              {saldo} {saldo === 1 ? "dia disponível" : "dias disponíveis"}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onPrevMonth}
+            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gold hover:bg-gold-light rounded-full transition-colors"
+          >
+            <FaChevronLeft size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={onNextMonth}
+            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gold hover:bg-gold-light rounded-full transition-colors"
+          >
+            <FaChevronRight size={13} />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-7">
+        {WEEKDAY_LETTERS.map((label, i) => (
+          <div key={i} className="text-center text-[10px] font-semibold text-gray-300 py-1">
+            {label[0]}
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-1">
+        {weeks.flat().map((dateObj) => {
+          const inMonth = dateObj.getMonth() === activeMonth;
+          const day = dateObj.getDate();
+          const dayMonth = dateObj.getMonth();
+          const isDispensa = dayMonth === 11 && DISPENSA_DAYS.includes(day);
+          const dateStr = formatDateStr(dateObj);
+          const isChecked = vacationSet.has(dateStr);
+          const isBirthday = birthdaySet.has(dateStr);
+          const dayOfWeek = dateObj.getDay();
+          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+          const ddmm = `${pad2(day)}-${pad2(dayMonth + 1)}`;
+          const isHoliday = !isDispensa && holidaySet.has(ddmm);
+          const isToday = dateObj.toDateString() === today.toDateString();
+          const isMarkedInMode = isChecked || isBirthday;
+          const blockedReason = isHoliday ? "holiday" : isWeekend ? "weekend" : null;
+          const canToggle = editable && !isDispensa && (isMarkedInMode || !blockedReason);
+
+          return (
+            <button
+              key={dateStr}
+              type="button"
+              disabled={!canToggle}
+              onClick={(e) => onDayTap(dateStr, isMarkedInMode, isBirthday, e)}
+              className={[
+                "aspect-square rounded-lg flex items-center justify-center text-sm relative select-none transition-colors",
+                !inMonth ? "text-gray-300" : "text-gray-700",
+                isDispensa ? "bg-gray-200" : "",
+                isChecked ? "bg-gold text-white font-semibold" : "",
+                isBirthday && !isChecked ? "bg-rose-400 text-white font-semibold" : "",
+                !isMarkedInMode && !isDispensa && isHoliday ? "bg-warning/20" : "",
+                !isMarkedInMode && !isDispensa && !isHoliday && isWeekend ? "bg-gray-50" : "",
+                isToday && !isMarkedInMode ? "ring-2 ring-inset ring-gold text-gold font-semibold" : "",
+                canToggle ? "cursor-pointer active:scale-95" : "cursor-not-allowed",
+              ].join(" ")}
+            >
+              {day}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-4 pt-3 border-t border-gray-50">
+        <LegendDot className="bg-gold" label="Férias" />
+        <LegendDot className="bg-rose-400" label="Aniversário" />
+        <LegendDot className="bg-warning/40" label="Feriado" />
+        <LegendDot className="ring-2 ring-inset ring-gold bg-white" label="Hoje" />
+      </div>
+    </div>
+  );
+}
+
+function LegendDot({ className, label }) {
+  return (
+    <span className="flex items-center gap-1.5 text-[11px] text-gray-500">
+      <span className={`w-2.5 h-2.5 rounded-full ${className}`} />
+      {label}
+    </span>
   );
 }
 

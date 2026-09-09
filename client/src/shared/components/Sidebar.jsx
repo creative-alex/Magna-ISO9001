@@ -219,7 +219,7 @@ export default function Sidebar({ onSelectFile }) {
         {/* Principal */}
         {sectionLabel("Principal")}
         <div className={navItemClass("/dashboard")} onClick={() => navigate("/dashboard")} title={collapsed ? "ISO9001" : undefined}>
-          <FaChartBar style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> {!collapsed && "ISO 9001"}</div>
+          <FaChartBar style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> {!collapsed && "ISO9001"}</div>
         <div className={navItemClass("/chat")} onClick={() => navigate("/chat")} title={collapsed ? "Chat com RH" : undefined}>
           <FaComments style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> {!collapsed && "Chat com RH"}</div>
         {/* Gestão de Pessoas accordion */}
