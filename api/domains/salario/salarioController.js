@@ -238,6 +238,7 @@ const uploadRecibo = async (req, res) => {
           to: userData.email,
           subject: `Recibo de vencimento disponível  -  ${mesLabel}`,
           html: renderEmail("recibo-vencimento", { nome, mesLabel, eyebrow: "Recibo de vencimento" }),
+          entidade: userData.entidade,
         });
       } catch (mailError) {
         console.error("Erro ao enviar email de notificação de recibo:", mailError);
@@ -253,4 +254,40 @@ const uploadRecibo = async (req, res) => {
   }
 };
 
-module.exports = { getSalario, saveSalario, uploadRecibo };
+const deleteRecibo = async (req, res) => {
+  try {
+    if (!canAccess(req)) {
+      return res.status(403).json({ error: "Acesso restrito a administradores e gestores de recursos humanos" });
+    }
+
+    const { id, mes } = req.params;
+    if (!MES_REGEX.test(mes)) {
+      return res.status(400).json({ error: "Mês inválido (formato esperado AAAA-MM)" });
+    }
+
+    const mesRef = db.collection("users").doc(id).collection("salarios").doc(mes);
+    const mesDoc = await mesRef.get();
+    if (!mesDoc.exists) {
+      return res.status(404).json({ error: "Recibo não encontrado" });
+    }
+
+    const { recibo_path } = mesDoc.data();
+    if (recibo_path) {
+      await bucket.file(recibo_path).delete({ ignoreNotFound: true });
+    }
+
+    await mesRef.update({
+      emissao_envio_recibos: false,
+      recibo_path: admin.firestore.FieldValue.delete(),
+      recibo_uploaded_at: admin.firestore.FieldValue.delete(),
+      recibo_uploaded_by: admin.firestore.FieldValue.delete(),
+    });
+
+    res.json({ message: "Recibo removido com sucesso" });
+  } catch (error) {
+    console.error("Erro ao remover recibo:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+};
+
+module.exports = { getSalario, saveSalario, uploadRecibo, deleteRecibo };

@@ -39,6 +39,7 @@ const UserDetails = ({ selectedUser }) => {
   const [totais, setTotais] = useState(null);
   const [totaisAnuais, setTotaisAnuais] = useState(null);
   const [feriasPendentes, setFeriasPendentes] = useState([]);
+  const [entidadesOptions, setEntidadesOptions] = useState([]);
   const navigate = useNavigate(); // Obtém a função navigate
   const location = useLocation();
   const { uid: uidParam } = useParams();
@@ -81,6 +82,22 @@ const UserDetails = ({ selectedUser }) => {
       console.error("❌ Nenhum userName disponível!");
     }
   }, [selectedUser]);
+
+  // Lista de entidades para o autocomplete do campo "Entidade"  -  só é preciso para
+  // quem pode mesmo editá-la (Administrador tem o campo sempre desativado).
+  useEffect(() => {
+    if (isAdministrador) return;
+    (async () => {
+      try {
+        const res = await apiFetch("/entities/showEntities", { method: "POST" });
+        if (!res.ok) return;
+        const data = await res.json();
+        setEntidadesOptions(Array.isArray(data.entityNames) ? data.entityNames : []);
+      } catch (err) {
+        console.error("Erro ao buscar entidades:", err);
+      }
+    })();
+  }, [isAdministrador]);
 
   useEffect(() => {
 
@@ -445,11 +462,11 @@ const normalizedEntityUrl = userDetails?.entidade
                         </div>
                         <div>
                           <span style={labelStyle}>Entidade</span>
-                          <input
-                            type="text"
-                            style={{ ...inputStyle, ...(isAdministrador ? { cursor: "not-allowed", opacity: 0.7 } : {}) }}
+                          <AutocompleteInput
                             value={editedData?.entidade || ""}
-                            onChange={(e) => setEditedData({ ...editedData, entidade: e.target.value })}
+                            onChange={(v) => setEditedData({ ...editedData, entidade: v })}
+                            options={entidadesOptions}
+                            inputStyle={{ ...inputStyle, ...(isAdministrador ? { cursor: "not-allowed", opacity: 0.7 } : {}) }}
                             disabled={isAdministrador}
                           />
                         </div>
@@ -483,20 +500,6 @@ const normalizedEntityUrl = userDetails?.entidade
                             </select>
                           )}
                         </div>
-                        <div>
-                          <span style={labelStyle}>Nova Password Temporária</span>
-                          <input
-                            type="password"
-                            name="newPassword"
-                            style={inputStyle}
-                            minLength="6"
-                            autoComplete="new-password"
-                            value={editedData?.newPassword || ""}
-                            onChange={handleInputChange}
-                            placeholder="Deixar em branco para não alterar"
-                          />
-                        </div>
-
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4, paddingTop: 14, borderTop: "1px solid #f3f4f6" }}>
                           <div style={{ display: "flex", gap: 8 }}>
                             <button style={btnSolid} onClick={handleSubmitClick}>Submeter</button>

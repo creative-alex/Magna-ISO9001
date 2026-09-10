@@ -6,7 +6,7 @@ import Sidebar from "../../shared/components/Sidebar";
 import Topbar from "../../shared/components/Topbar";
 import {
   FaSackDollar, FaCalendarDays, FaCreditCard, FaFileInvoiceDollar, FaCarSide,
-  FaPencil, FaCheck, FaArrowLeft,
+  FaPencil, FaCheck, FaArrowLeft, FaTrash,
 } from "react-icons/fa6";
 import { apiFetch } from "../../shared/utils/apiFetch";
 import { getNomeCurto } from "../../shared/utils/nomeCurto";
@@ -84,6 +84,7 @@ export default function SalarioColaborador() {
   const [reciboPath, setReciboPath] = useState(null);
   const [uploadingRecibo, setUploadingRecibo] = useState(false);
   const [viewingRecibo, setViewingRecibo] = useState(false);
+  const [removingRecibo, setRemovingRecibo] = useState(false);
   const isencaoDependePessoa = escalaoVencimento === "II";
 
   useEffect(() => {
@@ -203,6 +204,25 @@ export default function SalarioColaborador() {
       toast.error("Falha ao abrir o recibo", { position: "top-right" });
     } finally {
       setViewingRecibo(false);
+    }
+  };
+
+  const handleRemoveRecibo = async () => {
+    setRemovingRecibo(true);
+    try {
+      const res = await apiFetch(`/salario/${id}/${mes}/recibo`, { method: "DELETE" });
+      if (res.ok) {
+        await fetchSalario();
+        toast.success("Recibo removido", { position: "top-right", autoClose: 2000 });
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Falha ao remover o recibo", { position: "top-right" });
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Falha ao remover o recibo", { position: "top-right" });
+    } finally {
+      setRemovingRecibo(false);
     }
   };
 
@@ -541,6 +561,21 @@ export default function SalarioColaborador() {
                           }}
                         >
                           {viewingRecibo ? "A abrir..." : "Ver"}
+                        </button>
+                      )}
+                      {reciboPath && canManage && (
+                        <button
+                          type="button"
+                          onClick={handleRemoveRecibo}
+                          disabled={removingRecibo}
+                          title="Remover recibo"
+                          style={{
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            width: 30, height: 30, cursor: removingRecibo ? "wait" : "pointer",
+                            border: "1px solid #fee2e2", borderRadius: 7, background: "#fff", color: "#dc2626",
+                          }}
+                        >
+                          <FaTrash style={{ fontSize: 11 }} />
                         </button>
                       )}
                     </div>

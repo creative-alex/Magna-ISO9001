@@ -33,20 +33,38 @@ function compileTemplate(name) {
 }
 
 // Renderiza um template hbs (o corpo do email) dentro do layout base (cabeçalho/rodapé
-// com a marca MAGNA ISO9001), devolvendo o HTML final pronto a enviar.
+// com a marca da entidade), devolvendo o HTML final pronto a enviar.
 function renderEmail(templateName, data) {
   const body = compileTemplate(templateName)(data);
   return compileTemplate("base-layout")({ ...data, body, logoCid: LOGO_CID });
 }
 
 const LOGO_CID = "magna-logo";
-const LOGO_ATTACHMENT = {
+const ENTIDADES_LOGOS_DIR = path.join(__dirname, "emailTemplates", "assets", "entidades");
+const DEFAULT_LOGO_ATTACHMENT = {
   filename: "logo.png",
   path: path.join(__dirname, "emailTemplates", "assets", "logo.png"),
   cid: LOGO_CID,
 };
+const LOGO_EXTENSIONS = [".png", ".jpg", ".jpeg"];
 
-async function sendMail({ to, subject, html }) {
+// Cada entidade pode ter o seu próprio logo em assets/entidades/<entityId>.{png,jpg},
+// nomeado com o mesmo ID normalizado usado em entityController (normalizeEntityId).
+// Quando não existe ficheiro para a entidade, usa-se o logo genérico como fallback.
+function getLogoAttachment(entidadeRef) {
+  const entityId = entidadeRef?.replace(/^entidades\//, "");
+  if (entityId) {
+    for (const ext of LOGO_EXTENSIONS) {
+      const filePath = path.join(ENTIDADES_LOGOS_DIR, `${entityId}${ext}`);
+      if (fs.existsSync(filePath)) {
+        return { filename: `logo${ext}`, path: filePath, cid: LOGO_CID };
+      }
+    }
+  }
+  return DEFAULT_LOGO_ATTACHMENT;
+}
+
+async function sendMail({ to, subject, html, entidade }) {
   if (!to) {
     console.error("Sem destinatário  -  email não enviado:", subject);
     return;
@@ -56,6 +74,8 @@ async function sendMail({ to, subject, html }) {
     return;
   }
 
+  const logoAttachment = getLogoAttachment(entidade);
+
   let lastError = null;
   for (const account of ACCOUNTS) {
     try {
@@ -64,7 +84,7 @@ async function sendMail({ to, subject, html }) {
         to,
         subject,
         html,
-        attachments: [LOGO_ATTACHMENT],
+        attachments: [logoAttachment],
       });
       return;
     } catch (error) {

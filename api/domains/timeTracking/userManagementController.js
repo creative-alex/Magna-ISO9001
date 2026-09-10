@@ -193,7 +193,7 @@ const getUsersByEntity = async (req, res) => {
 
 const updateUserDetails = async (req, res) => {
   try {
-    const { uid, nome, role, nivelAcesso, newPassword } = req.body;
+    const { uid, nome, role, nivelAcesso } = req.body;
     const actorIsAdministrador = isAdministrador(req.user?.nivelAcesso);
 
     const userDocRef = db.collection("users").doc(uid);
@@ -238,11 +238,6 @@ const updateUserDetails = async (req, res) => {
     const nivelAcessoBloqueado = !isSuperAdmin(req.user?.nivelAcesso) && (isSelfEdit || isGestorRH(userDoc.data().nivelAcesso));
     if (nivelAcesso !== undefined && !nivelAcessoBloqueado) {
       updatedData.nivelAcesso = normalizeNivelAcessoForActor(req.user?.nivelAcesso, nivelAcesso);
-    }
-
-    if (newPassword) {
-      updatedData.isFirstLogin = true;
-      await admin.auth().updateUser(uid, { password: newPassword });
     }
 
     await userDocRef.update(updatedData);

@@ -67,7 +67,7 @@ function getBlockedReason(day, month, year, sede) {
 }
 
 async function getUsedDaysForYear(uid, targetYear) {
-  const feriasSnapshot = await db.collection("registo-ponto").doc(uid).collection("Ferias").get();
+  const feriasSnapshot = await db.collection("registo-ponto").doc(uid).collection("Ferias").where("year", "==", targetYear).get();
   let count = 0;
   feriasSnapshot.forEach((doc) => {
     const data = doc.data();
@@ -84,7 +84,7 @@ async function getUsedDaysForYear(uid, targetYear) {
 const BIRTHDAY_ANNUAL_QUOTA = 1;
 
 async function getUsedBirthdayDaysForYear(uid, targetYear) {
-  const snapshot = await db.collection("registo-ponto").doc(uid).collection("DiasAniversario").get();
+  const snapshot = await db.collection("registo-ponto").doc(uid).collection("DiasAniversario").where("year", "==", targetYear).get();
   let count = 0;
   snapshot.forEach((doc) => {
     const data = doc.data();
@@ -126,8 +126,8 @@ const getVacationMap = async (req, res) => {
       const entidadeId = data.entidade ? data.entidade.replace("entidades/", "") : null;
 
       const [feriasSnapshot, aniversarioSnapshot, quotaOverrideDoc, diasTransitadosDoc] = await Promise.all([
-        db.collection("registo-ponto").doc(uid).collection("Ferias").get(),
-        db.collection("registo-ponto").doc(uid).collection("DiasAniversario").get(),
+        db.collection("registo-ponto").doc(uid).collection("Ferias").where("year", "==", currentYear).get(),
+        db.collection("registo-ponto").doc(uid).collection("DiasAniversario").where("year", "==", currentYear).get(),
         userDoc.ref.collection("quotaOverrides").doc(String(currentYear)).get(),
         userDoc.ref.collection("diasTransitados").doc(String(currentYear)).get(),
       ]);
@@ -246,6 +246,7 @@ const toggleVacationDay = async (req, res) => {
 
     await docRef.set({
       date: `${day}-${month}-${year}`,
+      year: targetYear,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
       Approved: true,
       createdBy: req.user.uid,
@@ -303,6 +304,7 @@ const toggleBirthdayDay = async (req, res) => {
 
     await docRef.set({
       date: `${day}-${month}-${year}`,
+      year: targetYear,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
       Approved: true,
       createdBy: req.user.uid,
