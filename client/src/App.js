@@ -13,6 +13,7 @@ import NewTable from "./features/cadastro/pages/NovoProcedimento"
 import Cadastro from "./features/cadastro/pages/Cadastro"
 import Colaboradores from "./features/cadastro/pages/Colaboradores"
 import MapaFerias from "./features/mapaFerias/pages/MapaFerias"
+import FechoMensalAdmin from "./features/timeTracking/pages/FechoMensalAdmin"
 import ProcessamentoSalarios from "./features/salario/ProcessamentoSalarios"
 import SalarioColaborador from "./features/salario/SalarioColaborador"
 import PlanoFormacao from "./features/formacao/PlanoFormacao"
@@ -21,7 +22,7 @@ import MedicinaTrabalho from "./features/medicinaTrabalho/MedicinaTrabalho"
 import MedicinaTrabalhoColaborador from "./features/medicinaTrabalho/MedicinaTrabalhoColaborador"
 import Premios from "./features/premios/Premios"
 import PremiosColaborador from "./features/premios/PremiosColaborador"
-import Chat from "./features/chat/pages/Chat";
+import Chat from "./features/chat/pages/Chat"
 import FirstLogin from "./features/auth/pages/FirstLogin";
 import { ToastContainer } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
@@ -143,6 +144,14 @@ function App() {
           element={
             <ProtectedRoute>
               <MapaFerias />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/fecho-mensal"
+          element={
+            <ProtectedRoute>
+              <FechoMensalAdmin />
             </ProtectedRoute>
           }
         />

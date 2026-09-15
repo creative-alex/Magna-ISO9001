@@ -29,9 +29,18 @@ const {
   approveVacation,
   rejectVacation,
   createMedicalLeave,
+  getPendingMedicalLeaves,
+  approveMedicalLeave,
+  rejectMedicalLeave,
   getPendingVacations,
   getAllUsersVacations,
 } = require('./vacationController');
+const {
+  requestTimeEdit,
+  getPendingTimeEdits,
+  approveTimeEdit,
+  rejectTimeEdit,
+} = require('./timeEditRequestController');
 const {
   getUserRecords,
   getOvertimeSummary,
@@ -60,6 +69,14 @@ router.post("/checkTimeTracking", requireAuth, checkTimeTracking);
 router.post("/update-time", requireAuth, updateUserTime);
 router.post("/vacation", requireAuth, createVacation);
 router.post("/medicalLeave", requireAuth, createMedicalLeave);
+// Pedido de alteração das horas de um dia passado: um Colaborador só pode pedir sobre
+// si próprio (fica pendente); GestorRH/Administrador(própria entidade)/SuperAdmin podem
+// aprovar/rejeitar ou editar em nome de outro (aplica-se de imediato)  -  autorização
+// fina feita dentro do controller via resolveTargetUid, tal como em /vacation.
+router.post("/request-time-edit", requireAuth, requestTimeEdit);
+router.post("/pending-time-edits", requireAuth, getPendingTimeEdits);
+router.post("/approve-time-edit", requireAuth, approveTimeEdit);
+router.post("/reject-time-edit", requireAuth, rejectTimeEdit);
 router.post("/overtime-summary", requireAuth, getOvertimeSummary);
 router.post("/yearly-summary", requireAuth, getYearlySummary);
 router.post("/register-manual-overtime", requireAuth, registerManualOvertime);
@@ -101,6 +118,9 @@ router.post("/updateUserDetails", requireAuth, requireAdminOrEntidadeAdmin, upda
 router.post("/approve-vacation", requireAuth, requireAdmin, approveVacation);
 router.post("/reject-vacation", requireAuth, requireAdmin, rejectVacation);
 router.post("/pending-vacations", requireAuth, requireAdmin, getPendingVacations);
+router.post("/pending-medical-leaves", requireAuth, requireAdmin, getPendingMedicalLeaves);
+router.post("/approve-medical-leave", requireAuth, requireAdmin, approveMedicalLeave);
+router.post("/reject-medical-leave", requireAuth, requireAdmin, rejectMedicalLeave);
 router.post("/debug-corrupt-overtime", requireAuth, requireAdmin, debugCorruptOvertime);
 router.post("/delete-corrupt-overtime", requireAuth, requireAdmin, deleteCorruptOvertime);
 router.delete("/deleteRegister", requireAuth, requireAdmin, deleteRegister);

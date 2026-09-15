@@ -2,6 +2,7 @@ const admin = require("firebase-admin");
 const db = admin.firestore();
 const { isAdminOrHR, isSuperAdmin, isAdministrador } = require("../../shared/middleware/auth");
 const { getHolidaysDDMM } = require("./holidays");
+const { isMonthClosed, refreshFechoMensalSnapshotIfClosed, MENSAGEM_MES_FECHADO } = require("../../shared/lib/monthLock");
 
 const STANDARD_ANNUAL_QUOTA = 22;
 
@@ -125,12 +126,24 @@ const getVacationMap = async (req, res) => {
       const uid = userDoc.id;
       const entidadeId = data.entidade ? data.entidade.replace("entidades/", "") : null;
 
-      const [feriasSnapshot, aniversarioSnapshot, quotaOverrideDoc, diasTransitadosDoc] = await Promise.all([
+      const [feriasSnapshot, aniversarioSnapshot, quotaOverrideDoc, diasTransitadosDoc, fechoMensalSnapshot] = await Promise.all([
         db.collection("registo-ponto").doc(uid).collection("Ferias").where("year", "==", currentYear).get(),
         db.collection("registo-ponto").doc(uid).collection("DiasAniversario").where("year", "==", currentYear).get(),
         userDoc.ref.collection("quotaOverrides").doc(String(currentYear)).get(),
         userDoc.ref.collection("diasTransitados").doc(String(currentYear)).get(),
+        userDoc.ref.collection("fechoMensal").get(),
       ]);
+
+      // Meses já confirmados (ver api/domains/fechoMensal/) deste ano  -  usado pelo mapa
+      // para mostrar visualmente que esses dias já não podem ser alterados pelo próprio
+      // colaborador (ver isMonthClosed, aplicado em toggleVacationDay/toggleBirthdayDay).
+      const closedMonths = [];
+      fechoMensalSnapshot.forEach((doc) => {
+        const fechoData = doc.data();
+        if (fechoData.confirmed === true && typeof fechoData.mes === "string" && fechoData.mes.startsWith(`${currentYear}-`)) {
+          closedMonths.push(fechoData.mes);
+        }
+      });
 
       const approvedDaysCurrentYear = [];
 
@@ -183,6 +196,7 @@ const getVacationMap = async (req, res) => {
         birthdayDaysCurrentYear,
         birthdayUsadoAtual,
         birthdaySaldoDisponivel,
+        closedMonths,
       });
     }
 
@@ -205,6 +219,12 @@ const toggleVacationDay = async (req, res) => {
       return res.status(403).json({ error: "Sem permissão para alterar férias deste colaborador" });
     }
 
+    // O próprio colaborador não pode alterar férias num mês já fechado (ver
+    // api/shared/lib/monthLock.js); um admin/RH continua a poder, como correção.
+    if (isSelf && await isMonthClosed(uid, date)) {
+      return res.status(403).json({ error: MENSAGEM_MES_FECHADO });
+    }
+
     const [day, month, year] = date.split("-");
     const targetYear = parseInt(year, 10);
     const registoId = `registo_${day}${month}${year}`;
@@ -213,6 +233,7 @@ const toggleVacationDay = async (req, res) => {
 
     if (existing.exists) {
       await docRef.delete();
+      if (!isSelf) await refreshFechoMensalSnapshotIfClosed(uid, date, req.user.uid);
       return res.status(200).json({ message: "Dia de férias removido", action: "removed", date });
     }
 
@@ -251,6 +272,7 @@ const toggleVacationDay = async (req, res) => {
       Approved: true,
       createdBy: req.user.uid,
     });
+    if (!isSelf) await refreshFechoMensalSnapshotIfClosed(uid, date, req.user.uid);
     return res.status(201).json({ message: "Dia de férias marcado", action: "added", date });
   } catch (error) {
     console.error("Erro ao alternar dia de férias:", error);
@@ -273,6 +295,12 @@ const toggleBirthdayDay = async (req, res) => {
       return res.status(403).json({ error: "Sem permissão para alterar o dia de aniversário deste colaborador" });
     }
 
+    // O próprio colaborador não pode alterar o dia de aniversário num mês já fechado (ver
+    // api/shared/lib/monthLock.js); um admin/RH continua a poder, como correção.
+    if (isSelf && await isMonthClosed(uid, date)) {
+      return res.status(403).json({ error: MENSAGEM_MES_FECHADO });
+    }
+
     const [day, month, year] = date.split("-");
     const targetYear = parseInt(year, 10);
     const registoId = `registo_${day}${month}${year}`;
@@ -281,6 +309,7 @@ const toggleBirthdayDay = async (req, res) => {
 
     if (existing.exists) {
       await docRef.delete();
+      if (!isSelf) await refreshFechoMensalSnapshotIfClosed(uid, date, req.user.uid);
       return res.status(200).json({ message: "Dia de aniversário removido", action: "removed", date });
     }
 
@@ -309,6 +338,7 @@ const toggleBirthdayDay = async (req, res) => {
       Approved: true,
       createdBy: req.user.uid,
     });
+    if (!isSelf) await refreshFechoMensalSnapshotIfClosed(uid, date, req.user.uid);
     return res.status(201).json({ message: "Dia de aniversário marcado", action: "added", date });
   } catch (error) {
     console.error("Erro ao alternar dia de aniversário:", error);

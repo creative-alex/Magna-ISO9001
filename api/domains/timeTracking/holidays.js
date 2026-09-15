@@ -78,10 +78,22 @@ function getHolidaysDDMM(sede, year) {
   ];
 }
 
+// Fim de semana ou feriado (nacional/móvel/municipal da sede) nesse dia  -  regra
+// partilhada por tudo o que não pode ser marcado/pedido num dia não útil (férias no
+// mapa de férias, baixa médica, pedidos de alteração de horas, ...).
+function isWeekendOrHolidayDDMM(day, month, year, sede) {
+  const dayOfWeek = new Date(year, month - 1, day).getDay();
+  if (dayOfWeek === 0 || dayOfWeek === 6) return true;
+  const ddmm = `${pad2(day)}-${pad2(month)}`;
+  return getHolidaysDDMM(sede, year).includes(ddmm);
+}
+
 module.exports = {
   NATIONAL_HOLIDAYS_DDMM,
   MUNICIPAL_HOLIDAY_DDMM_BY_SEDE,
   getMunicipalHolidayDDMM,
   getMoveableHolidaysDDMM,
   getHolidaysDDMM,
+  isWeekendOrHolidayDDMM,
+  pad2,
 };

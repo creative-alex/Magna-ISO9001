@@ -1,4 +1,5 @@
 import React from 'react';
+import { FaHourglassHalf } from 'react-icons/fa6';
 import CompensateOvertimeButton from '../Shared/compensateOvertimeButton';
 
 const TableRow = ({
@@ -74,8 +75,28 @@ const TableRow = ({
           </span>
         )}
       </td>
-      <td className="px-4 py-3 text-left border-b border-gray-200">{extractTime(item.horaEntrada)}</td>
-      <td className="px-4 py-3 text-left border-b border-gray-200">{extractTime(item.horaSaida)}</td>
+      <td className="px-4 py-3 text-left border-b border-gray-200">
+        {extractTime(item.horaEntrada)}
+        {item.edicaoPendente?.horaEntrada && (
+          <span
+            className="inline-flex ml-[5px] text-[#C8932F] cursor-help"
+            title={`Pedido de alteração pendente: entrada ${item.edicaoPendente.horaEntrada} — ${item.edicaoPendente.justificativa}`}
+          >
+            <FaHourglassHalf />
+          </span>
+        )}
+      </td>
+      <td className="px-4 py-3 text-left border-b border-gray-200">
+        {extractTime(item.horaSaida)}
+        {item.edicaoPendente?.horaSaida && (
+          <span
+            className="inline-flex ml-[5px] text-[#C8932F] cursor-help"
+            title={`Pedido de alteração pendente: saída ${item.edicaoPendente.horaSaida} — ${item.edicaoPendente.justificativa}`}
+          >
+            <FaHourglassHalf />
+          </span>
+        )}
+      </td>
       <td className={`px-4 py-3 text-left border-b border-gray-200 ${isCompensado ? "text-blue-600 font-semibold" : ""}`}>
         {item.total}
         {isCompensado && (

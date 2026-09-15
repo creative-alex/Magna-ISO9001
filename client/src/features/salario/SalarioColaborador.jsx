@@ -80,6 +80,7 @@ export default function SalarioColaborador() {
   const [diasFerias, setDiasFerias] = useState(null);
   const [diasBaixaMedica, setDiasBaixaMedica] = useState(null);
   const [diasFalta, setDiasFalta] = useState(null);
+  const [fechoConfirmado, setFechoConfirmado] = useState(false);
   const [form, setForm] = useState(INITIAL_FORM);
   const [reciboPath, setReciboPath] = useState(null);
   const [uploadingRecibo, setUploadingRecibo] = useState(false);
@@ -112,6 +113,7 @@ export default function SalarioColaborador() {
         setDiasFerias(data.dias_ferias);
         setDiasBaixaMedica(data.dias_baixa_medica);
         setDiasFalta(data.dias_falta);
+        setFechoConfirmado(!!data.fecho_confirmado);
         setForm({ ...INITIAL_FORM, ...(data.form || {}) });
         setReciboPath(data.recibo_path || null);
       } else {
@@ -484,8 +486,15 @@ export default function SalarioColaborador() {
                 <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <FaCalendarDays style={{ color: GOLD, fontSize: 13 }} />
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>Ajustes do mês</span>
-                  <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: "auto" }}>
-                    Calculado a partir do livro de ponto
+                  <span
+                    style={{
+                      fontSize: 11, marginLeft: "auto", padding: "2px 8px", borderRadius: 999, fontWeight: 500,
+                      background: fechoConfirmado ? "#DCFCE7" : "#FEF3C7",
+                      color: fechoConfirmado ? "#15803D" : "#92400E",
+                    }}
+                    title={fechoConfirmado ? "Dados fixos pela confirmação do fecho mensal" : "Ainda não confirmado pelo colaborador - calculado ao vivo a partir do livro de ponto"}
+                  >
+                    {fechoConfirmado ? "Fecho mensal confirmado" : "Fecho mensal não confirmado"}
                   </span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" style={{ padding: 18, gap: "16px 20px" }}>

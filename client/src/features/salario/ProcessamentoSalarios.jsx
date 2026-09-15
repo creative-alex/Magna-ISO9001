@@ -1,10 +1,11 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { UserContext } from "../../shared/context/userContext";
 import Sidebar from "../../shared/components/Sidebar";
 import Topbar from "../../shared/components/Topbar";
 import ColaboradoresGroupedList from "../../shared/components/ColaboradoresGroupedList";
+import ExportFechoMensalButton from "./ExportFechoMensalButton";
 import { FaPencil, FaCheck, FaSliders, FaChevronDown } from "react-icons/fa6";
 import { apiFetch } from "../../shared/utils/apiFetch";
 
@@ -181,6 +182,44 @@ function ParametrosSalario({ canEdit }) {
   );
 }
 
+// Estado do fecho mensal (mês corrente) + reenvio do email de aviso, por colaborador -
+// mesma informação/ação da página /fecho-mensal (ver FechoMensalAdmin.jsx), trazida para
+// aqui para o processamento de salários poder ver de imediato quem ainda falta fechar.
+function FechoMensalRowBadge({ status, onSendReminder, sending }) {
+  if (!status) return null;
+
+  if (status.confirmed) {
+    return (
+      <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 6, background: "#DCFCE7", color: "#15803D", whiteSpace: "nowrap" }}>
+        Mês fechado
+      </span>
+    );
+  }
+
+  const badgeStyle = status.flagged
+    ? { background: "#FEE2E2", color: "#B91C1C" }
+    : { background: "#FEF3C7", color: "#92400E" };
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 6, whiteSpace: "nowrap", ...badgeStyle }}>
+        {status.flagged ? "Não confirmado" : "Mês por fechar"}
+      </span>
+      <button
+        type="button"
+        onClick={onSendReminder}
+        disabled={sending}
+        style={{
+          fontSize: 11, fontWeight: 500, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap",
+          border: `1px solid ${GOLD}`, color: GOLD, background: "#fff", cursor: sending ? "wait" : "pointer",
+        }}
+      >
+        {sending ? "A enviar..." : "Enviar email"}
+      </button>
+    </div>
+  );
+}
+
 export default function ProcessamentoSalarios() {
   const navigate = useNavigate();
   const { uid, nivelAcesso } = useContext(UserContext);
@@ -189,6 +228,9 @@ export default function ProcessamentoSalarios() {
   const isAdministrador = nivelAcesso === "Administrador";
   const isGestorFinanceiro = nivelAcesso === "GestorFinanceiro";
   const canView = isAdmin || isHR || isAdministrador || isGestorFinanceiro;
+  // Fecho mensal (estado + exportação) só faz sentido para quem processa vencimentos a
+  // nível global - Administrador continua de fora, tal como nos Parâmetros de salário.
+  const canSeeFechoMensal = isAdmin || isHR || isGestorFinanceiro;
 
   useEffect(() => {
     // Esta página (parâmetros + lista de colaboradores) é só para admin/RH/
@@ -198,6 +240,78 @@ export default function ProcessamentoSalarios() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const mesAtual = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }, []);
+
+  const [fechoStatusList, setFechoStatusList] = useState([]);
+  const [sendingUid, setSendingUid] = useState(null);
+
+  const fetchFechoStatus = useCallback(async () => {
+    if (!canSeeFechoMensal) return;
+    try {
+      const response = await apiFetch("/fecho-mensal/all-status", {
+        method: "POST",
+        body: JSON.stringify({ mes: mesAtual }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setFechoStatusList(data.colaboradores || []);
+      }
+    } catch (err) {
+      console.error("Erro ao carregar o estado do fecho mensal:", err);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canSeeFechoMensal, mesAtual]);
+
+  useEffect(() => {
+    fetchFechoStatus();
+  }, [fetchFechoStatus]);
+
+  const fechoStatusByUid = useMemo(
+    () => new Map(fechoStatusList.map((s) => [s.uid, s])),
+    [fechoStatusList]
+  );
+
+  // Por entidade: só "fechado" (dourado) quando TODOS os colaboradores dessa entidade já
+  // confirmaram o mês corrente; havendo pelo menos um por confirmar, o botão fica vermelho.
+  const entidadeClosedMap = useMemo(() => {
+    const totals = new Map();
+    fechoStatusList.forEach((s) => {
+      const key = s.entidade || "Sem entidade";
+      const agg = totals.get(key) || { total: 0, confirmed: 0 };
+      agg.total += 1;
+      if (s.confirmed) agg.confirmed += 1;
+      totals.set(key, agg);
+    });
+    const result = new Map();
+    totals.forEach((agg, key) => result.set(key, agg.total > 0 && agg.confirmed === agg.total));
+    return result;
+  }, [fechoStatusList]);
+
+  const handleSendReminder = async (uidToRemind) => {
+    setSendingUid(uidToRemind);
+    try {
+      const response = await apiFetch("/fecho-mensal/send-reminder", {
+        method: "POST",
+        body: JSON.stringify({ uid: uidToRemind, mes: mesAtual }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        toast.success("Email enviado");
+        await fetchFechoStatus();
+      } else {
+        toast.error(data.error || "Erro ao enviar o email");
+      }
+    } catch (err) {
+      console.error("Erro ao enviar email de fecho mensal:", err);
+      toast.error("Erro ao enviar o email");
+    } finally {
+      setSendingUid(null);
+    }
+  };
 
   const handleSelectFile = (filePath) => {
     const formattedPath = filePath.replace(/\s/g, "-").replace(/\//g, "__");
@@ -217,7 +331,7 @@ export default function ProcessamentoSalarios() {
             entidade"), por isso continuam fora do alcance do Administrador. GestorRH
             mantém consulta mas a edição passou a ser exclusiva de SuperAdmin/Gestor
             Financeiro  -  separação de funções entre RH e Financeiro. */}
-        {(isAdmin || isHR || isGestorFinanceiro) && (
+        {canSeeFechoMensal && (
           <div className="px-4 sm:px-6 pt-4 sm:pt-6" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             <ParametrosSalario canEdit={isAdmin || isGestorFinanceiro} />
           </div>
@@ -227,6 +341,23 @@ export default function ProcessamentoSalarios() {
           title="Colaboradores"
           subtitle="Agrupados por entidade. Seleciona um colaborador para consultar ou preencher os dados de processamento salarial do mês."
           onSelect={(c) => navigate(`/salarios/${c.id}`, { state: { nome: c.nome, email: c.email } })}
+          renderHeaderExtra={canSeeFechoMensal ? () => <ExportFechoMensalButton /> : undefined}
+          renderGroupExtra={
+            canSeeFechoMensal
+              ? (entidade) => <ExportFechoMensalButton entidade={entidade} compact closed={entidadeClosedMap.get(entidade)} />
+              : undefined
+          }
+          renderMemberExtra={
+            canSeeFechoMensal
+              ? (c) => (
+                  <FechoMensalRowBadge
+                    status={fechoStatusByUid.get(c.id)}
+                    onSendReminder={() => handleSendReminder(c.id)}
+                    sending={sendingUid === c.id}
+                  />
+                )
+              : undefined
+          }
         />
       </div>
     </div>

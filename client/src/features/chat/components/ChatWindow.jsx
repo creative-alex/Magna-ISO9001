@@ -3,6 +3,7 @@ import { FaPaperPlane } from "react-icons/fa6";
 import { UserContext } from "../../../shared/context/userContext";
 import { apiFetch } from "../../../shared/utils/apiFetch";
 import { API_CONFIG } from "../../../shared/utils/constants";
+import UserAvatar from "../../../shared/components/UserAvatar";
 import { useChatSocket } from "../hooks/useChatSocket";
 
 const GOLD = "#C8932F";
@@ -67,9 +68,7 @@ export default function ChatWindow({ colaboradorId, colaboradorNome, onLobbyUpda
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <div className="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
-        <div className="w-[30px] h-[30px] rounded-full bg-[#C8932F] flex items-center justify-center text-[11px] font-semibold text-white shrink-0">
-          {(colaboradorNome || "?").slice(0, 2).toUpperCase()}
-        </div>
+        <UserAvatar nome={colaboradorNome} size={30} fontSize={11} />
         <span className="text-[14px] font-semibold text-gray-900">{colaboradorNome || "Conversa"}</span>
         {!connected && <span className="ml-auto text-[11px] text-gray-400">A ligar...</span>}
       </div>

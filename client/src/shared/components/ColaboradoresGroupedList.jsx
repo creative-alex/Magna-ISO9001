@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { FaIdCard, FaMagnifyingGlass, FaChevronRight, FaBuilding } from "react-icons/fa6";
 import { apiFetch } from "../utils/apiFetch";
+import UserAvatar from "./UserAvatar";
 
 const GOLD = "#C8932F";
 const SEM_ENTIDADE = "Sem entidade";
@@ -20,7 +21,7 @@ const STATUS_STYLES = {
 };
 const STATUS_STYLE_DEFAULT = { bg: "#F3F4F6", color: "#374151" };
 
-export default function ColaboradoresGroupedList({ title, subtitle, onSelect, showStatusHoje = false }) {
+export default function ColaboradoresGroupedList({ title, subtitle, onSelect, showStatusHoje = false, renderGroupExtra, renderMemberExtra, renderHeaderExtra }) {
   const [colaboradores, setColaboradores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -76,7 +77,6 @@ export default function ColaboradoresGroupedList({ title, subtitle, onSelect, sh
   }, [filtered]);
 
   const renderColaborador = (c, isLast) => {
-    const initials = c.nome ? c.nome.slice(0, 2).toUpperCase() : "??";
     return (
       <div
         key={c.id}
@@ -89,13 +89,7 @@ export default function ColaboradoresGroupedList({ title, subtitle, onSelect, sh
         onMouseEnter={e => e.currentTarget.style.background = "#fafafa"}
         onMouseLeave={e => e.currentTarget.style.background = ""}
       >
-        <div style={{
-          width: 36, height: 36, borderRadius: "50%", background: GOLD, flexShrink: 0,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 13, fontWeight: 700, color: "#fff",
-        }}>
-          {initials}
-        </div>
+        <UserAvatar nome={c.nome} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13.5, fontWeight: 600, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.nome}</div>
           <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.email}</div>
@@ -111,6 +105,11 @@ export default function ColaboradoresGroupedList({ title, subtitle, onSelect, sh
             </span>
           );
         })()}
+        {renderMemberExtra && (
+          <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+            {renderMemberExtra(c)}
+          </div>
+        )}
         <FaIdCard style={{ fontSize: 13, color: "#d1d5db", flexShrink: 0 }} />
         <FaChevronRight style={{ fontSize: 11, color: "#d1d5db", flexShrink: 0 }} />
       </div>
@@ -136,6 +135,7 @@ export default function ColaboradoresGroupedList({ title, subtitle, onSelect, sh
             }}
           />
         </div>
+        {renderHeaderExtra && renderHeaderExtra()}
       </div>
 
       {loading ? (
@@ -161,6 +161,7 @@ export default function ColaboradoresGroupedList({ title, subtitle, onSelect, sh
                 >
                   <FaBuilding style={{ fontSize: 13, color: GOLD, flexShrink: 0 }} />
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#111827", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entidade}</span>
+                  {renderGroupExtra && renderGroupExtra(entidade, membros)}
                   <span style={{ fontSize: 11, color: "#9ca3af" }}>{membros.length}</span>
                   <FaChevronRight style={{
                     fontSize: 11, color: "#9ca3af", flexShrink: 0,

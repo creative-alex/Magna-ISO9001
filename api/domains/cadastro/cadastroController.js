@@ -1,6 +1,10 @@
 const admin = require("firebase-admin");
 const db = require("../../shared/db/firebase").db;
 const { isAdminOrHR, isAdministrador } = require("../../shared/middleware/auth");
+const { sendMail, renderEmail } = require("../../shared/services/mailer");
+const {
+  validarNIF, validarNISS, validarCodigoPostal, validarTelefone, validarCartaoCidadao, validarIBAN,
+} = require("../../shared/utils/validators");
 
 function canAccess(req, id) {
   return req.user?.uid === id || isAdminOrHR(req.user?.nivelAcesso);
@@ -133,6 +137,25 @@ const getCadastro = async (req, res) => {
   }
 };
 
+// Rede de segurança do lado do servidor  -  o frontend já bloqueia o "Guardar" com estes
+// mesmos problemas (ver getFieldErrors/getBlockErrors em Cadastro.jsx), mas a API não
+// deve confiar apenas nisso. Só valida formato/consistência de campos preenchidos - um
+// campo em branco não é aqui rejeitado (isso é tratado à parte, como "cadastro incompleto").
+function validarCadastroForm(form) {
+  const erros = [];
+  if (form.nif && !validarNIF(form.nif)) erros.push("NIF inválido");
+  if (form.n_seguranca_social && !validarNISS(form.n_seguranca_social)) erros.push("Nº de segurança social inválido");
+  if (form.n_cartao_cidadao && !validarCartaoCidadao(form.n_cartao_cidadao)) erros.push("Nº de cartão de cidadão inválido");
+  if (form.codigo_postal && !validarCodigoPostal(form.codigo_postal)) erros.push("Código postal inválido");
+  if (form.telefone && !validarTelefone(form.telefone)) erros.push("Contacto inválido");
+  if (form.telefone_emergencia && !validarTelefone(form.telefone_emergencia)) erros.push("Contacto de emergência inválido");
+  if (form.IBAN && !validarIBAN(form.IBAN)) erros.push("IBAN inválido");
+  if (form.data_nascimento && form.validade_cc && form.validade_cc < form.data_nascimento) erros.push("Validade do CC anterior à data de nascimento");
+  if (form.data_admissao && form.data_fim_contrato && form.data_fim_contrato < form.data_admissao) erros.push("Data de fim de contrato anterior à data de admissão");
+  if (form.data_inicio_estagio && form.data_fim_estagio && form.data_fim_estagio < form.data_inicio_estagio) erros.push("Data de fim de estágio anterior à data de início");
+  return erros;
+}
+
 const saveCadastro = async (req, res) => {
   try {
     const { id } = req.params;
@@ -145,6 +168,11 @@ const saveCadastro = async (req, res) => {
       return res.status(400).json({ error: "Dados de cadastro inválidos" });
     }
 
+    const erros = validarCadastroForm(form);
+    if (erros.length > 0) {
+      return res.status(400).json({ error: erros.join("; ") });
+    }
+
     const userDocRef = db.collection("users").doc(id);
     const userDoc = await userDocRef.get();
     if (!userDoc.exists) {
@@ -152,6 +180,20 @@ const saveCadastro = async (req, res) => {
     }
 
     const privileged = canEditRestricted(req);
+
+    if (privileged) {
+      const errosBlocos = [];
+      BLOCK_COLLECTIONS.forEach(({ requestKey }) => {
+        (Array.isArray(req.body[requestKey]) ? req.body[requestKey] : []).forEach(bloco => {
+          if (bloco.dataInicio && bloco.dataFim && bloco.dataFim < bloco.dataInicio) {
+            errosBlocos.push(`Data de fim anterior à data de início (${requestKey})`);
+          }
+        });
+      });
+      if (errosBlocos.length > 0) {
+        return res.status(400).json({ error: errosBlocos.join("; ") });
+      }
+    }
 
     const update = {};
     CADASTRO_FIELD_KEYS.forEach(key => {
@@ -210,4 +252,40 @@ const saveCadastro = async (req, res) => {
   }
 };
 
-module.exports = { getCadastro, saveCadastro };
+// Notifica por email um colaborador cujo cadastro o frontend detetou como incompleto
+// (contagem de campos em falta é calculada no cliente - ver COMPLETENESS_FIELDS em
+// Cadastro.jsx - este endpoint só envia o aviso, sem repetir essa lógica no servidor).
+// Mesma permissão de leitura do cadastro: quem pode consultar a ficha de alguém pode avisá-lo.
+const notifyPerfilIncompleto = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const userDoc = await db.collection("users").doc(id).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: "Colaborador não encontrado" });
+    }
+
+    const userData = userDoc.data();
+    if (!canRead(req, id, userData.entidade)) {
+      return res.status(403).json({ error: "Sem permissão para notificar este colaborador" });
+    }
+
+    if (!userData.email) {
+      return res.status(400).json({ error: "Colaborador sem email associado" });
+    }
+
+    await sendMail({
+      to: userData.email,
+      subject: "O seu cadastro na MAGNA ISO 9001 está incompleto",
+      html: renderEmail("perfil-incompleto", { nome: userData.nome || "", eyebrow: "Cadastro incompleto" }),
+      entidade: userData.entidade,
+    });
+
+    res.json({ message: "Notificação enviada com sucesso" });
+  } catch (error) {
+    console.error("Erro ao notificar perfil incompleto:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+};
+
+module.exports = { getCadastro, saveCadastro, notifyPerfilIncompleto };

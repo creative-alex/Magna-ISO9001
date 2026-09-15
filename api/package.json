@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "start": "node server.js"
+    "start": "nodemon server.js",
+    "dev": "nodemon server.js"
   },
   "dependencies": {
     "@react-native-firebase/storage": "^22.2.0",
@@ -12,10 +13,14 @@
     "groq-sdk": "^1.2.1",
     "handlebars": "^4.7.9",
     "multer": "^2.0.0",
+    "node-cron": "^4.6.0",
     "nodemailer": "^9.0.5",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^1.1.1",
     "react-router-dom": "^7.6.0",
     "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
   }
 }

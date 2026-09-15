@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { UserContext } from "../context/userContext";
 import { FavoritesContext } from "../context/favoritesContext";
+import UserAvatar from "./UserAvatar";
 import Logo from "../assets/logo.svg";
 import {
   FaChartBar,
@@ -22,6 +23,7 @@ import {
   FaSackDollar,
   FaBriefcaseMedical,
   FaTrophy,
+  FaClipboardCheck,
   FaComments,
   FaChevronLeft,
   FaChevronRight,
@@ -38,6 +40,7 @@ const PEOPLE_MANAGEMENT_ITEMS = [
   { name: "Plano de Formação", icon: FaGraduationCap },
   { name: "Mapa de Férias", icon: FaUmbrellaBeach },
   { name: "Livro de Ponto", icon: FaClock },
+  // { name: "Fecho Mensal", icon: FaClipboardCheck }, - painel próprio desativado, estado/ações passaram para /salarios
   { name: "Processamento Salários", icon: FaSackDollar },
   { name: "Medicina de Trabalho", icon: FaBriefcaseMedical },
   { name: "Prémios", icon: FaTrophy },
@@ -50,6 +53,7 @@ const PEOPLE_MANAGEMENT_PATH_PREFIXES = [
   "/salarios",
   "/plano-formacao",
   "/ferias",
+  // "/fecho-mensal", - painel próprio desativado, ver PEOPLE_MANAGEMENT_ITEMS
   "/medicina-trabalho",
   "/premios",
 ];
@@ -90,7 +94,6 @@ export default function Sidebar({ onSelectFile }) {
   // Prémios: GestorRH só consulta os seus próprios (ver canRead em premiosController) -
   // ao contrário das outras áreas de gestão de pessoas, nunca vê a lista de colaboradores aqui.
   const canManagePremios = isAdmin || isAdministrador || isGestorFinanceiro;
-  const initials = username ? username.slice(0, 2).toUpperCase() : "??";
   // Função do colaborador (campo "role", editado em Cadastro > Dados contratuais)  -
   // "user"/"User" é o valor por omissão de contas sem função preenchida (ver
   // verifyTokenAndGetUserInfo/createUser), por isso não é mostrado.
@@ -164,6 +167,8 @@ export default function Sidebar({ onSelectFile }) {
       navigate(canManagePremios ? "/premios" : `/premios/${uid}`);
     } else if (item.name === "Mapa de Férias") {
       navigate("/ferias");
+    // } else if (item.name === "Fecho Mensal") { - painel próprio desativado, ver PEOPLE_MANAGEMENT_ITEMS
+    //   navigate(canManageColaboradores ? "/fecho-mensal" : "/ponto");
     } else {
       toast.info("Funcionalidade em breve", { position: "top-right", autoClose: 2500 });
     }
@@ -382,9 +387,7 @@ export default function Sidebar({ onSelectFile }) {
             className={`flex items-center gap-2 px-2.5 py-2 rounded-md ${collapsed ? 'justify-center px-0' : ''}`}
             title={collapsed ? (funcao ? `${username} · ${funcao}` : username) : undefined}
           >
-            <div className="w-[30px] h-[30px] rounded-full bg-[#C8932F] flex items-center justify-center text-[11px] font-semibold text-white shrink-0">
-              {initials}
-            </div>
+            <UserAvatar nome={username} size={30} fontSize={11} />
             {!collapsed && (
               <div>
                 <div className="text-xs text-[#4A2E08] font-semibold">{username}</div>

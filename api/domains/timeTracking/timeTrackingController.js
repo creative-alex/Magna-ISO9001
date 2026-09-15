@@ -1,6 +1,8 @@
 const admin = require("firebase-admin");
 const { resolveTargetUid } = require("./helpers");
 const { computeAnnualOvertimeBalance } = require("./reportsController");
+const { isAdminOrHR, isAdministrador } = require("../../shared/middleware/auth");
+const { refreshFechoMensalSnapshotIfClosed } = require("../../shared/lib/monthLock");
 const db = admin.firestore();
 
 // Mesma regra de cálculo de horas de calcHours.js (frontend) e calcularHorasHelper
@@ -217,6 +219,16 @@ const updateUserTime = async (req, res) => {
     const { uid: userId, error: authError } = await resolveTargetUid(req);
     if (authError) return res.status(403).json({ error: authError });
 
+    // Um Colaborador comum não pode editar as suas próprias horas diretamente aqui  -
+    // tem de usar o pedido de alteração (requestTimeEdit), que fica pendente de
+    // aprovação de um GestorRH/Administrador/SuperAdmin. Só quem já tem esse nível
+    // de acesso é que continua a editar de imediato (colaboradores próprios ou de outros).
+    const isSelfEdit = userId === req.user.uid;
+    const actorPodeEditarDeImediato = isAdminOrHR(req.user.nivelAcesso) || isAdministrador(req.user.nivelAcesso);
+    if (isSelfEdit && !actorPodeEditarDeImediato) {
+      return res.status(403).json({ error: "Usa o pedido de alteração de horas  -  fica pendente de aprovação" });
+    }
+
     const dateParts = date.split("-");
     if (dateParts.length !== 2) {
       console.log("Erro: Formato de data inválido.", date);
@@ -261,6 +273,11 @@ const updateUserTime = async (req, res) => {
     const updateData = { timestamp: dataRegisto };
     updateData[campo] = valor;
     await registoRef.set(updateData, { merge: true });
+
+    // Edição só chega aqui quando quem a faz já é admin/RH/Administrador (ver
+    // actorPodeEditarDeImediato acima) - se o mês estiver fechado, é uma correção
+    // administrativa e o summarySnapshot do fecho mensal tem de refletir a mudança.
+    await refreshFechoMensalSnapshotIfClosed(userId, `${String(day).padStart(2, "0")}-${String(month).padStart(2, "0")}-${selectedYear}`, req.user.uid);
 
     return res.status(200).json({ message: "Horário atualizado com sucesso" });
   } catch (error) {
@@ -325,6 +342,14 @@ const deleteRegister = async (req, res) => {
 
     console.log("🔄 Executando batch delete...");
     await batch.commit();
+
+    // Rota exclusiva de SuperAdmin (ver requireAdmin em timeTrackingRoutes.js) - se o mês
+    // estiver fechado, é uma correção administrativa e o summarySnapshot tem de ser
+    // atualizado (ver api/shared/lib/monthLock.js). "date" pode vir sem ano (DD-MM), tal
+    // como formatDateForId já trata acima.
+    const [diaApagado, mesApagado, anoApagadoDoDate] = date.split("-");
+    const anoApagado = anoApagadoDoDate || year || new Date().getFullYear();
+    await refreshFechoMensalSnapshotIfClosed(uid, `${diaApagado.padStart(2, "0")}-${mesApagado.padStart(2, "0")}-${anoApagado}`, req.user.uid);
 
     console.log("✅ Registos apagados com sucesso.");
     return res.status(200).json({ message: "Registos apagados com sucesso" });

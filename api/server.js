@@ -17,6 +17,8 @@ const chatRoute = require("./domains/chat/chatRoutes");
 const medicinaTrabalhoRoute = require("./domains/medicinaTrabalho/medicinaTrabalhoRoutes");
 const premiosRoute = require("./domains/premios/premiosRoutes");
 const konamiWordleRoute = require("./domains/konamiWordle/konamiWordleRoutes");
+const fechoMensalRoute = require("./domains/fechoMensal/fechoMensalRoutes");
+const { startSchedulers } = require("./shared/services/scheduler");
 
 const app = express();
 app.use(express.json());
@@ -40,10 +42,12 @@ app.use("/chat", chatRoute);
 app.use("/medicina-trabalho", medicinaTrabalhoRoute);
 app.use("/premios", premiosRoute);
 app.use("/konami-wordle", konamiWordleRoute);
+app.use("/fecho-mensal", fechoMensalRoute);
 
 
 const server = http.createServer(app);
 attachChatWebSocket(server);
+startSchedulers();
 
 const PORT = process.env.PORT || 1080;
 server.listen(PORT, '0.0.0.0', () => console.log(`Servidor aberto na porta ${PORT}`));

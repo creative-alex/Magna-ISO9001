@@ -1,7 +1,7 @@
 const admin = require("firebase-admin");
 const { resolveTargetUid } = require("./helpers");
 const { getHolidaysDDMM } = require("./holidays");
-const { isBlocoAtivoEm } = require("../../shared/lib/absenceBlocks");
+const { isBlocoAtivoEm, labelBaixaOuLicenca } = require("../../shared/lib/absenceBlocks");
 const db = admin.firestore();
 
 // Função auxiliar para calcular horas (similar à do frontend)
@@ -551,7 +551,14 @@ const getYearlySummary = async (req, res) => {
 // de salários (dias trabalhados/faltas/férias/baixas deixam de ser inseridos à mão
 // e passam a vir do livro de ponto). Função pura, sem req/res e sem efeitos
 // secundários (não grava nada), ao contrário de processOvertimeDeduction.
-async function calculateMonthlyAttendanceSummary({ uid, year, month }) {
+//
+// "assumeWorkedFrom" (opcional, Date) é usado pelo fecho mensal (ver
+// api/domains/fechoMensal/fechoMensalController.js e api/shared/lib/monthLock.js):
+// a partir desse dia (inclusive) até ao fim do mês, um dia útil sem ausência válida já
+// registada é assumido como trabalhado em vez de ficar em branco/falta  -  é o que
+// permite fechar o mês antes do dia 25 sem esperar pelos dias que ainda faltam
+// decorrer. Sem este parâmetro o comportamento é exatamente o mesmo de sempre.
+async function calculateMonthlyAttendanceSummary({ uid, year, month, assumeWorkedFrom }) {
   const [userCreatedAt, sede, cadastroAusencias] = await Promise.all([
     getUserCreatedAt(uid),
     getUserSede(uid),
@@ -636,37 +643,75 @@ async function calculateMonthlyAttendanceSummary({ uid, year, month }) {
 
   const diasNoMes = new Date(year, month, 0).getDate();
   let diasFalta = 0;
+  let diasLicenca = 0;
+  const dias = [];
+
+  // Meia-noite do dia da confirmação (dia civil, não o instante exato)  -  esse dia e os
+  // seguintes ficam sujeitos à projeção "sem ausência válida = trabalho" (ver comentário
+  // na assinatura da função).
+  const assumeWorkedFromDay = assumeWorkedFrom
+    ? new Date(assumeWorkedFrom.getFullYear(), assumeWorkedFrom.getMonth(), assumeWorkedFrom.getDate())
+    : null;
 
   for (let dia = 1; dia <= diasNoMes; dia++) {
     const dataAtual = new Date(year, month - 1, dia);
     const diaSemana = dataAtual.getDay();
-    if (diaSemana < 1 || diaSemana > 5) continue; // só dias úteis
-
     const diaString = `${String(dia).padStart(2, "0")}-${String(month).padStart(2, "0")}`;
-    if (holidays.includes(diaString) || feriasDias.has(dia) || baixasDias.has(dia) || aniversarioDias.has(dia)) continue;
-
-    // Cedência temporária, licença/baixa médica (registada no Cadastro) ou contrato já
-    // não ativo (cessado/suspenso/reformado)  -  ver getUserCadastroAusencias acima.
     const diaIso = `${year}-${String(month).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
-    if (isDiaForaDeAtivo(cadastroAusencias, diaIso)) continue;
-    if (cadastroAusencias.cedencias.some(bloco => isBlocoAtivoEm(bloco, diaIso))) continue;
-    if (cadastroAusencias.licencasOuBaixas.some(bloco => isBlocoAtivoEm(bloco, diaIso))) continue;
+    const dataFormatada = `${String(dia).padStart(2, "0")}-${String(month).padStart(2, "0")}-${year}`;
 
-    const isAfterCreation = !userCreatedAt || dataAtual >= userCreatedAt;
-    if (!isAfterCreation) continue;
+    let status;
 
-    // Não contar falta em dias futuros (ou no próprio dia de hoje, ainda a decorrer)
-    const isPast = dataAtual < now && dataAtual.toDateString() !== now.toDateString();
-    if (!isPast) continue;
+    if (diaSemana < 1 || diaSemana > 5) {
+      status = "fim-de-semana";
+    } else if (holidays.includes(diaString)) {
+      status = "feriado";
+    } else if (feriasDias.has(dia)) {
+      status = "ferias";
+    } else if (baixasDias.has(dia)) {
+      status = "baixa";
+    } else if (aniversarioDias.has(dia)) {
+      status = "aniversario";
+    } else if (
+      // Cedência temporária, licença/baixa médica (registada no Cadastro) ou contrato já
+      // não ativo (cessado/suspenso/reformado)  -  ver getUserCadastroAusencias acima.
+      isDiaForaDeAtivo(cadastroAusencias, diaIso) ||
+      cadastroAusencias.cedencias.some(bloco => isBlocoAtivoEm(bloco, diaIso)) ||
+      cadastroAusencias.licencasOuBaixas.some(bloco => isBlocoAtivoEm(bloco, diaIso))
+    ) {
+      status = "inativo";
+      // Dos blocos do Cadastro, só as "Licença ..." (parental, luto, ...) contam para
+      // diasLicenca  -  baixa médica do Cadastro fica de fora (não é a mesma coisa que
+      // diasBaixaMedica, que vem só do livro de ponto) para não misturar as duas colunas
+      // no export de processamento de salários (ver salarioController.js).
+      const blocoLicenca = cadastroAusencias.licencasOuBaixas.find(bloco => isBlocoAtivoEm(bloco, diaIso));
+      if (blocoLicenca && labelBaixaOuLicenca(blocoLicenca.tipo) === "Licença") diasLicenca++;
+    } else if (userCreatedAt && dataAtual < userCreatedAt) {
+      // Antes da conta existir - nunca falta.
+      status = "inativo";
+    } else if (registoPorDia[dia]) {
+      status = "trabalho";
+    } else if (assumeWorkedFromDay && dataAtual >= assumeWorkedFromDay) {
+      // Mês fechado: dia da confirmação (inclusive) em diante, sem ausência válida
+      // registada - assumido como trabalhado para o processamento salarial.
+      status = "trabalho_previsto";
+      diasTrabalhados++;
+    } else if (dataAtual < now && dataAtual.toDateString() !== now.toDateString()) {
+      // Falta = já passou e não há registo nenhum nesse dia. Um registo incompleto (ex.:
+      // entrada sem saída, esqueceu-se de bater o ponto) não conta como falta  -  segue a
+      // mesma regra da tabela do livro de ponto (pontoTable.jsx), onde calcularHoras
+      // devolve total "-" nesse caso e por isso não entra no filtro de diasFalta.
+      status = "falta";
+      diasFalta++;
+    } else {
+      // Dia futuro fora da projeção (mês ainda não fechado) - nem falta nem trabalho.
+      status = "futuro";
+    }
 
-    // Falta = não há registo nenhum nesse dia. Um registo incompleto (ex.: entrada
-    // sem saída, esqueceu-se de bater o ponto) não conta como falta  -  segue a mesma
-    // regra da tabela do livro de ponto (pontoTable.jsx), onde calcularHoras devolve
-    // total "-" nesse caso e por isso não entra no filtro de diasFalta.
-    if (!registoPorDia[dia]) diasFalta++;
+    dias.push({ dia, data: dataFormatada, status });
   }
 
-  return { diasTrabalhados, diasFerias, diasBaixaMedica, diasAniversario, diasFalta };
+  return { diasTrabalhados, diasFerias, diasBaixaMedica, diasAniversario, diasFalta, diasLicenca, dias };
 }
 
 module.exports = {

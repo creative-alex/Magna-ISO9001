@@ -1,14 +1,19 @@
-import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import {
   FaXmark,
   FaChevronLeft,
   FaChevronRight,
   FaUmbrellaBeach,
+  FaSun,
+  FaVolleyball,
+  FaCakeCandles,
 } from "react-icons/fa6";
+import { GiPalmTree } from "react-icons/gi";
 import { apiFetch } from "../../../shared/utils/apiFetch";
 import { UserContext } from "../../../shared/context/userContext";
 import { NATIONAL_HOLIDAYS_DDMM, getMunicipalHolidayDDMM, getMoveableHolidays } from "../../../shared/utils/holidays";
+import { getInitials } from "../../../shared/utils/nomeCurto";
 
 const MONTH_NAMES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -63,13 +68,6 @@ function normalizeText(str) {
   return (str || "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 }
 
-function getInitials(nome) {
-  const parts = (nome || "").trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0][0].toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
 function buildVacationMap(employees) {
   const map = new Map();
   employees.forEach((emp) => {
@@ -86,6 +84,23 @@ function buildBirthdayMap(employees) {
   return map;
 }
 
+// Meses ("AAAA-MM") já confirmados no fecho mensal de cada colaborador (ver
+// api/domains/fechoMensal/) - a partir daí o próprio já não pode alterar férias
+// nesse mês (isMonthClosed, aplicado em toggleVacationDay/toggleBirthdayDay); um
+// admin/RH continua a poder, como correção.
+function buildClosedMonthsMap(employees) {
+  const map = new Map();
+  employees.forEach((emp) => {
+    map.set(emp.uid, new Set(emp.closedMonths || []));
+  });
+  return map;
+}
+
+// Padrão de riscas usado nas células de um mês já fechado - vem por cima da cor
+// normal do dia (férias/feriado/etc.), nunca a substitui, para o estado do dia
+// continuar visível por baixo do "cadeado" visual.
+const CLOSED_MONTH_PATTERN = "bg-[repeating-linear-gradient(45deg,rgba(75,85,99,0.22)_0px,rgba(75,85,99,0.22)_3px,transparent_3px,transparent_7px)]";
+
 export default function VacationTimeline({ year, onYearChange }) {
   const { uid, nivelAcesso } = useContext(UserContext);
   const isAdminOrHR = nivelAcesso === "SuperAdmin" || nivelAcesso === "GestorRH";
@@ -93,7 +108,12 @@ export default function VacationTimeline({ year, onYearChange }) {
   const [employees, setEmployees] = useState([]);
   const [vacationMap, setVacationMap] = useState(new Map());
   const [birthdayMap, setBirthdayMap] = useState(new Map());
+  const [closedMonthsMap, setClosedMonthsMap] = useState(new Map());
   const [loading, setLoading] = useState(true);
+  // Só o primeiro carregamento mostra a cena de praia a ecrã inteiro; recargas
+  // seguintes (trocar de ano, editar quota/transição) mantêm a tabela visível
+  // e mostram só a barra fina no cabeçalho (ver hasLoadedOnceRef mais abaixo).
+  const hasLoadedOnceRef = useRef(false);
   const [viewMode, setViewMode] = useState("timeline"); // "timeline" | "resumo"
   const [search, setSearch] = useState(""); // filtra por nome, função, entidade ou local (ver filteredEmployees)
   // Pesquisa própria da lista de colaboradores no calendário mensal de telemóvel
@@ -142,6 +162,8 @@ export default function VacationTimeline({ year, onYearChange }) {
       setEmployees(list);
       setVacationMap(buildVacationMap(list));
       setBirthdayMap(buildBirthdayMap(list));
+      setClosedMonthsMap(buildClosedMonthsMap(list));
+      hasLoadedOnceRef.current = true;
     } catch (err) {
       console.error("Erro ao carregar mapa de férias:", err);
       toast.error("Erro ao carregar o mapa de férias");
@@ -351,8 +373,72 @@ export default function VacationTimeline({ year, onYearChange }) {
     }
   };
 
-  if (loading) {
-    return <div className="p-10 text-center text-gray-500">A carregar mapa de férias...</div>;
+  if (loading && !hasLoadedOnceRef.current) {
+    return (
+      <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
+        {/* Cabeçalho igual ao real (não depende de dados), para a página não parecer
+            vazia enquanto o mapa carrega. */}
+        <div className="flex items-center gap-3 px-4 sm:px-6 py-3 sm:py-4 bg-white border-b border-gray-100">
+          <span className="w-10 h-10 rounded-xl bg-gold-light text-gold flex items-center justify-center shrink-0">
+            <FaUmbrellaBeach size={16} />
+          </span>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800 leading-tight">Mapa de Férias</h2>
+            <p className="text-xs text-gray-400 hidden sm:block">Consulta e gestão dos dias de férias da equipa</p>
+          </div>
+        </div>
+
+        <div className="flex-1 flex items-center justify-center px-3 sm:px-6 py-3 sm:py-5">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-10 py-8 flex flex-col items-center">
+            {/* Cenário de praia: sol a "respirar", palmeira a abanar, chapéu-de-sol a
+                flutuar, bola a rolar em loop, e o mar a mexer-se por baixo de tudo. */}
+            <div className="relative w-56 h-32 overflow-hidden">
+              <FaSun className="absolute top-0 right-8 text-warning text-3xl animate-vacationSunPulse" />
+
+              <GiPalmTree
+                className="absolute bottom-9 left-1 text-4xl text-success origin-bottom animate-vacationPalmSway"
+              />
+
+              <FaUmbrellaBeach
+                className="absolute bottom-9 left-1/2 -translate-x-1/2 text-5xl text-gold animate-vacationUmbrellaBob"
+              />
+
+              <FaVolleyball
+                className="absolute bottom-10 text-xl text-danger animate-vacationBallRoll"
+              />
+
+              {/* Linha da areia */}
+              <div className="absolute bottom-8 left-0 right-0 h-px bg-[#EADFC8]" />
+
+              {/* Mar: duas cópias da mesma onda lado a lado, deslizando em loop
+                  perfeito (a segunda metade repete a primeira). */}
+              <div className="absolute bottom-0 left-0 right-0 h-8 overflow-hidden rounded-b-lg">
+                <svg
+                  className="absolute inset-y-0 left-0 h-full animate-vacationWaveSlide"
+                  style={{ width: "200%" }}
+                  viewBox="0 0 200 20"
+                  preserveAspectRatio="none"
+                >
+                  <path
+                    d="M0 8 Q 12.5 0 25 8 T 50 8 T 75 8 T 100 8 T 125 8 T 150 8 T 175 8 T 200 8 V20 H0 Z"
+                    fill="#BFE0F2"
+                  />
+                </svg>
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-500 mt-2">
+              A carregar mapa de férias
+              <span className="inline-flex ml-0.5">
+                <span className="animate-bounce" style={{ animationDelay: "0ms" }}>.</span>
+                <span className="animate-bounce" style={{ animationDelay: "150ms" }}>.</span>
+                <span className="animate-bounce" style={{ animationDelay: "300ms" }}>.</span>
+              </span>
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Dados do colaborador escolhido na lista, para a vista mensal em telemóvel
@@ -361,6 +447,7 @@ export default function VacationTimeline({ year, onYearChange }) {
   const mobileEmployee = employeesByUid[selectedMobileUid];
   const mobileVacationSet = vacationMap.get(selectedMobileUid) || new Set();
   const mobileBirthdaySet = birthdayMap.get(selectedMobileUid) || new Set();
+  const mobileClosedMonths = closedMonthsMap.get(selectedMobileUid) || new Set();
   const mobileHolidaySet = mobileEmployee
     ? new Set([...nationalHolidaySet, getMunicipalHolidayDDMM(mobileEmployee.sede, year)])
     : nationalHolidaySet;
@@ -387,7 +474,15 @@ export default function VacationTimeline({ year, onYearChange }) {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 bg-white border-b border-gray-100">
+      <div className="relative flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 bg-white border-b border-gray-100">
+        {/* Recarga (trocar de ano, editar quota/transição): os dados anteriores
+            continuam visíveis, só esta barra fina sinaliza a atualização  -  ver
+            hasLoadedOnceRef e o ecrã de praia inteiro, usado só no 1º carregamento. */}
+        {loading && (
+          <div className="absolute bottom-0 left-0 right-0 h-[2px] overflow-hidden">
+            <div className="absolute inset-y-0 w-2/5 bg-gold rounded-full animate-vacationReloadBar" />
+          </div>
+        )}
         <div className="flex items-center gap-3">
           <span className="w-10 h-10 rounded-xl bg-gold-light text-gold flex items-center justify-center shrink-0">
             <FaUmbrellaBeach size={16} />
@@ -484,6 +579,7 @@ export default function VacationTimeline({ year, onYearChange }) {
             isSelf={selectedMobileUid === uid}
             vacationSet={mobileVacationSet}
             birthdaySet={mobileBirthdaySet}
+            closedMonths={mobileClosedMonths}
             holidaySet={mobileHolidaySet}
             editable={canEdit(selectedMobileUid)}
             saldo={mobileSaldo}
@@ -600,6 +696,7 @@ export default function VacationTimeline({ year, onYearChange }) {
               {filteredEmployees.map((emp) => {
                 const rowSet = vacationMap.get(emp.uid) || new Set();
                 const rowBirthdaySet = birthdayMap.get(emp.uid) || new Set();
+                const rowClosedMonths = closedMonthsMap.get(emp.uid) || new Set();
                 const editable = canEdit(emp.uid);
                 const isCurrentUser = emp.uid === uid;
                 // Feriado municipal da sede do colaborador, somado aos nacionais/móveis.
@@ -638,6 +735,7 @@ export default function VacationTimeline({ year, onYearChange }) {
                         const ddmm = `${pad2(day)}-${pad2(dayMonth + 1)}`;
                         const isHoliday = !isDispensa && rowHolidaySet.has(ddmm);
                         const isToday = dateObj.toDateString() === today.toDateString();
+                        const isClosedMonth = rowClosedMonths.has(`${dateObj.getFullYear()}-${pad2(dayMonth + 1)}`);
 
                         if (isDispensa) {
                           return (
@@ -659,7 +757,11 @@ export default function VacationTimeline({ year, onYearChange }) {
                         // ver handleDayMouseDown/acceptBirthdaySuggestion); um dia já marcado
                         // clica para desmarcar o que já lá está, seja férias ou aniversário.
                         const isMarkedInMode = isChecked || isBirthday;
-                        const canToggle = editable && (isMarkedInMode || !blockedReason);
+                        // O fecho mensal só impede o próprio dono da linha (mesma regra do
+                        // backend, isMonthClosed em toggleVacationDay/toggleBirthdayDay: um
+                        // admin/RH continua a poder alterar em nome de outro colaborador,
+                        // como correção  -  por isso só bloqueia quando isCurrentUser).
+                        const canToggle = editable && (isMarkedInMode || !blockedReason) && !(isCurrentUser && isClosedMonth);
                         const toggleHandler = isBirthday ? toggleBirthdayDay : toggleVacationDay;
 
                         const statusLabel = isChecked
@@ -667,18 +769,24 @@ export default function VacationTimeline({ year, onYearChange }) {
                           : isBirthday
                           ? "  -  🎂 Dia de aniversário"
                           : blockedLabel;
+                        const closedLabel = isClosedMonth
+                          ? isCurrentUser
+                            ? "  -  🔒 Mês fechado (não editável)"
+                            : "  -  🔒 Mês fechado (confirmado)"
+                          : "";
 
                         return (
                           <button
                             key={dateStr}
                             type="button"
-                            title={`${pad2(day)}/${pad2(dayMonth + 1)}/${dateObj.getFullYear()}${statusLabel}`}
+                            title={`${pad2(day)}/${pad2(dayMonth + 1)}/${dateObj.getFullYear()}${statusLabel}${closedLabel}`}
                             disabled={!canToggle}
                             onMouseDown={(e) => { e.preventDefault(); handleDayMouseDown(emp.uid, dateStr, isMarkedInMode, canToggle, toggleHandler, e); }}
                             onMouseEnter={() => handleDayMouseEnter(emp.uid, dateStr, isMarkedInMode, canToggle)}
                             className={[
                               "flex-1 h-full rounded-md transition-colors relative select-none",
                               isChecked ? "bg-gold" : isBirthday ? "bg-rose-400" : isHoliday ? "bg-warning/20" : isWeekend ? "bg-gray-300" : "bg-transparent",
+                              isClosedMonth ? CLOSED_MONTH_PATTERN : "",
                               canToggle && !isMarkedInMode ? "hover:bg-gold-mid/50 cursor-pointer" : "",
                               canToggle && isMarkedInMode ? "cursor-pointer hover:brightness-110" : "",
                               !canToggle ? "cursor-not-allowed" : "",
@@ -700,14 +808,17 @@ export default function VacationTimeline({ year, onYearChange }) {
 
       {birthdaySuggestion && (
         <div
-          className="fixed z-[2000] flex items-center gap-2 bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 text-sm"
+          className="fixed z-[2000] flex items-center gap-2.5 bg-white border border-rose-100 rounded-xl shadow-lg pl-3 pr-2 py-2 text-sm animate-fadeInUp"
           style={{ top: birthdaySuggestion.y + 14, left: birthdaySuggestion.x + 14 }}
         >
-          <span className="text-gray-600">🎂 Foi o aniversário?</span>
+          <span className="w-7 h-7 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
+            <FaCakeCandles size={13} />
+          </span>
+          <span className="text-gray-700 font-medium whitespace-nowrap">Foi o aniversário?</span>
           <button
             type="button"
             onClick={acceptBirthdaySuggestion}
-            className="text-rose-500 font-semibold hover:underline"
+            className="px-3 py-1 rounded-full bg-rose-400 text-white text-xs font-semibold cursor-pointer border-none transition-colors hover:bg-rose-500"
           >
             Marcar
           </button>
@@ -715,9 +826,9 @@ export default function VacationTimeline({ year, onYearChange }) {
             type="button"
             onClick={() => setBirthdaySuggestion(null)}
             title="Fechar"
-            className="text-gray-400 hover:text-gray-600"
+            className="w-6 h-6 flex items-center justify-center text-gray-300 hover:text-gray-500 hover:bg-gray-50 rounded-full transition-colors cursor-pointer border-none bg-transparent shrink-0"
           >
-            <FaXmark size={12} />
+            <FaXmark size={11} />
           </button>
         </div>
       )}
@@ -738,6 +849,7 @@ function MobileMonthCalendar({
   isSelf,
   vacationSet,
   birthdaySet,
+  closedMonths,
   holidaySet,
   editable,
   saldo,
@@ -802,13 +914,18 @@ function MobileMonthCalendar({
           const isToday = dateObj.toDateString() === today.toDateString();
           const isMarkedInMode = isChecked || isBirthday;
           const blockedReason = isHoliday ? "holiday" : isWeekend ? "weekend" : null;
-          const canToggle = editable && !isDispensa && (isMarkedInMode || !blockedReason);
+          const isClosedMonth = (closedMonths || new Set()).has(`${dateObj.getFullYear()}-${pad2(dayMonth + 1)}`);
+          // Mesma regra do desktop (ver canToggle na timeline): o fecho mensal só impede o
+          // próprio dono do calendário  -  um admin/RH a ver o mês de outro colega continua
+          // a poder alterar, como correção.
+          const canToggle = editable && !isDispensa && (isMarkedInMode || !blockedReason) && !(isSelf && isClosedMonth);
 
           return (
             <button
               key={dateStr}
               type="button"
               disabled={!canToggle}
+              title={isClosedMonth ? (isSelf ? "Mês fechado - não editável" : "Mês fechado (confirmado)") : undefined}
               onClick={(e) => onDayTap(dateStr, isMarkedInMode, isBirthday, e)}
               className={[
                 "aspect-square rounded-lg flex items-center justify-center text-sm relative select-none transition-colors",
@@ -818,6 +935,7 @@ function MobileMonthCalendar({
                 isBirthday && !isChecked ? "bg-rose-400 text-white font-semibold" : "",
                 !isMarkedInMode && !isDispensa && isHoliday ? "bg-warning/20" : "",
                 !isMarkedInMode && !isDispensa && !isHoliday && isWeekend ? "bg-gray-50" : "",
+                isClosedMonth ? CLOSED_MONTH_PATTERN : "",
                 isToday && !isMarkedInMode ? "ring-2 ring-inset ring-gold text-gold font-semibold" : "",
                 canToggle ? "cursor-pointer active:scale-95" : "cursor-not-allowed",
               ].join(" ")}
@@ -833,6 +951,7 @@ function MobileMonthCalendar({
         <LegendDot className="bg-rose-400" label="Aniversário" />
         <LegendDot className="bg-warning/40" label="Feriado" />
         <LegendDot className="ring-2 ring-inset ring-gold bg-white" label="Hoje" />
+        <LegendDot className={CLOSED_MONTH_PATTERN + " bg-gray-100"} label="Mês fechado" />
       </div>
     </div>
   );

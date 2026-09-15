@@ -1,7 +1,8 @@
 const admin = require("firebase-admin");
 const db = require("../../shared/db/firebase").db;
 const { calculateMonthlyAttendanceSummary } = require("../timeTracking/reportsController");
-const { isAdminOrHR, isAdministrador, isGestorFinanceiro, isSuperAdminOrGestorFinanceiro } = require("../../shared/middleware/auth");
+const { getHolidaysDDMM } = require("../timeTracking/holidays");
+const { isAdminOrHR, isAdministrador, isGestorFinanceiro, isSuperAdmin, isSuperAdminOrGestorFinanceiro } = require("../../shared/middleware/auth");
 const { sendMail, renderEmail } = require("../../shared/services/mailer");
 
 const bucket = admin.storage().bucket();
@@ -109,13 +110,18 @@ const getSalario = async (req, res) => {
       : null;
 
     // Dias trabalhados, faltas, férias e baixas médicas vêm sempre do livro de
-    // ponto (registo-ponto/{id}), nunca de dados inseridos manualmente.
+    // ponto (registo-ponto/{id}), nunca de dados inseridos manualmente  -  exceto quando o
+    // colaborador já confirmou o fecho mensal desse mês, caso em que se usa o
+    // summarySnapshot congelado na confirmação (ver api/domains/fechoMensal/), para uma
+    // correção posterior ao livro de ponto não alterar retroativamente um mês já fechado.
     const [anoStr, mesStr] = mes.split("-");
-    const attendance = await calculateMonthlyAttendanceSummary({
-      uid: id,
-      year: Number(anoStr),
-      month: Number(mesStr),
-    });
+    const fechoMensalDoc = await userDocRef.collection("fechoMensal").doc(mes).get();
+    const fechoMensal = fechoMensalDoc.exists ? fechoMensalDoc.data() : null;
+    const fechoConfirmado = fechoMensal?.confirmed === true;
+
+    const attendance = fechoConfirmado
+      ? fechoMensal.summarySnapshot
+      : await calculateMonthlyAttendanceSummary({ uid: id, year: Number(anoStr), month: Number(mesStr) });
 
     const valorSubsidioAlimentacaoPagar = valorSubsidioAlimentacao != null
       ? Math.round(attendance.diasTrabalhados * valorSubsidioAlimentacao * 100) / 100
@@ -135,6 +141,8 @@ const getSalario = async (req, res) => {
       dias_baixa_medica: attendance.diasBaixaMedica,
       dias_aniversario: attendance.diasAniversario,
       dias_falta: attendance.diasFalta,
+      dias_licenca: attendance.diasLicenca || 0,
+      fecho_confirmado: fechoConfirmado,
       recibo_path: mesData.recibo_path || null,
       form,
     });
@@ -290,4 +298,117 @@ const deleteRecibo = async (req, res) => {
   }
 };
 
-module.exports = { getSalario, saveSalario, uploadRecibo, deleteRecibo };
+// Dias úteis (segunda a sexta, sem feriados nacionais/móveis) de um mês  -  figura única
+// e global para o cabeçalho do export (ver exportFechoMensal), por isso não depende da
+// sede de nenhum colaborador em concreto: usa sede=null, que cai no feriado municipal por
+// omissão (Porto/Gaia), mesmo comportamento de quem não tem sede definida em todo o resto
+// do sistema (ver getMunicipalHolidayDDMM em holidays.js).
+function countDiasUteis(year, month) {
+  const holidays = getHolidaysDDMM(null, year);
+  const diasNoMes = new Date(year, month, 0).getDate();
+  let count = 0;
+  for (let dia = 1; dia <= diasNoMes; dia++) {
+    const diaSemana = new Date(year, month - 1, dia).getDay();
+    if (diaSemana === 0 || diaSemana === 6) continue;
+    const ddmm = `${String(dia).padStart(2, "0")}-${String(month).padStart(2, "0")}`;
+    if (holidays.includes(ddmm)) continue;
+    count++;
+  }
+  return count;
+}
+
+// Dados para o Excel de processamento de salários (ver ProcessamentoSalarios.jsx),
+// agrupados por entidade  -  só inclui colaboradores cujo fecho mensal desse mês já está
+// confirmado (ver api/domains/fechoMensal/), usando sempre o summarySnapshot congelado na
+// confirmação, nunca um recálculo ao vivo, tal como getSalario para um mês confirmado.
+const exportFechoMensal = async (req, res) => {
+  try {
+    if (!isAdminOrHR(req.user?.nivelAcesso) && !isGestorFinanceiro(req.user?.nivelAcesso)) {
+      return res.status(403).json({ error: "Acesso restrito a administradores e gestores de recursos humanos/financeiro" });
+    }
+
+    const { mes } = req.params;
+    if (!MES_REGEX.test(mes)) {
+      return res.status(400).json({ error: "Mês inválido (formato esperado AAAA-MM)" });
+    }
+    const [anoStr, mesStr] = mes.split("-");
+    const ano = Number(anoStr);
+    const mesNum = Number(mesStr);
+
+    // Nome de entidade tal como devolvido por getColaboradores/ColaboradoresGroupedList (o
+    // botão por entidade em ProcessamentoSalarios.jsx só conhece o nome, nunca o id do
+    // documento). Quando indicado, o export limita-se a essa entidade e garante que ela
+    // aparece na resposta mesmo sem nenhum colaborador confirmado ainda - sem isto, pedir o
+    // export de uma entidade só com fechos por confirmar devolvia uma lista vazia em vez do
+    // cabeçalho da entidade, impedindo até pré-visualizar/testar o botão.
+    const entidadeFiltro = typeof req.query.entidade === "string" && req.query.entidade ? req.query.entidade : null;
+
+    const [usersSnapshot, entidadesSnapshot] = await Promise.all([
+      db.collection("users").get(),
+      db.collection("entidades").get(),
+    ]);
+
+    const entidadesInfo = {};
+    entidadesSnapshot.forEach((doc) => {
+      const data = doc.data();
+      entidadesInfo[doc.id] = { nome: data.nome || doc.id, nif: data.nif || "" };
+    });
+
+    const entidadesMap = new Map();
+
+    if (entidadeFiltro) {
+      const entidadeInfoExistente = Object.values(entidadesInfo).find((info) => info.nome === entidadeFiltro);
+      entidadesMap.set(entidadeFiltro, { nome: entidadeFiltro, nif: entidadeInfoExistente?.nif || "", colaboradores: [] });
+    }
+
+    for (const userDoc of usersSnapshot.docs) {
+      const data = userDoc.data();
+      if (isSuperAdmin(data.nivelAcesso)) continue;
+      if (data.situacao_contratual && data.situacao_contratual !== "Ativo") continue;
+
+      const entidadeId = data.entidade ? data.entidade.replace("entidades/", "") : null;
+      const entidadeInfo = entidadeId ? entidadesInfo[entidadeId] : null;
+      const entidadeKey = entidadeInfo ? entidadeInfo.nome : "Sem entidade";
+
+      if (entidadeFiltro && entidadeKey !== entidadeFiltro) continue;
+
+      const fechoDoc = await userDoc.ref.collection("fechoMensal").doc(mes).get();
+      if (!fechoDoc.exists || fechoDoc.data().confirmed !== true) continue;
+
+      const snapshot = fechoDoc.data().summarySnapshot || {};
+      const salarioDoc = await userDoc.ref.collection("salarios").doc(mes).get();
+      const salarioData = salarioDoc.exists ? salarioDoc.data() : {};
+
+      if (!entidadesMap.has(entidadeKey)) {
+        entidadesMap.set(entidadeKey, { nome: entidadeKey, nif: entidadeInfo?.nif || "", colaboradores: [] });
+      }
+
+      const deslocacoesAtivas = !!salarioData.deslocacoes_ativas;
+      entidadesMap.get(entidadeKey).colaboradores.push({
+        nome: data.nome || userDoc.id,
+        diasTrabalhados: snapshot.diasTrabalhados ?? 0,
+        diasFerias: snapshot.diasFerias ?? 0,
+        diasBaixaMedica: snapshot.diasBaixaMedica ?? 0,
+        diasLicenca: snapshot.diasLicenca ?? 0,
+        deslocacoesAtivas,
+        deslocacoesKm: deslocacoesAtivas ? (Number(salarioData.deslocacoes_km) || 0) : 0,
+      });
+    }
+
+    const entidades = Array.from(entidadesMap.values())
+      .map((ent) => ({ ...ent, colaboradores: ent.colaboradores.sort((a, b) => a.nome.localeCompare(b.nome, "pt")) }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, "pt"));
+
+    return res.status(200).json({
+      mes,
+      mesLabel: getMesLabel(mes),
+      diasUteis: countDiasUteis(ano, mesNum),
+      entidades,
+    });
+  } catch (error) {
+    console.error("Erro ao gerar export de fecho mensal:", error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+module.exports = { getSalario, saveSalario, uploadRecibo, deleteRecibo, exportFechoMensal };

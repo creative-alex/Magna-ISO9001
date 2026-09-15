@@ -39,6 +39,9 @@ const UserDetails = ({ selectedUser }) => {
   const [totais, setTotais] = useState(null);
   const [totaisAnuais, setTotaisAnuais] = useState(null);
   const [feriasPendentes, setFeriasPendentes] = useState([]);
+  const [pendingTimeEdits, setPendingTimeEdits] = useState([]);
+  const [baixasPendentes, setBaixasPendentes] = useState([]);
+  const [fechoMensal, setFechoMensal] = useState(null);
   const [entidadesOptions, setEntidadesOptions] = useState([]);
   const navigate = useNavigate(); // Obtém a função navigate
   const location = useLocation();
@@ -133,6 +136,12 @@ const UserDetails = ({ selectedUser }) => {
         // Buscar férias pendentes
         await fetchFeriasPendentes();
 
+        // Buscar pedidos de alteração de horas pendentes
+        await fetchPendingTimeEdits();
+
+        // Buscar pedidos de baixa médica pendentes
+        await fetchBaixasPendentes();
+
         // Buscar totais anuais
         await fetchTotaisAnuais();
 
@@ -164,6 +173,70 @@ const UserDetails = ({ selectedUser }) => {
       setFeriasPendentes([]);
     }
   };
+
+  const fetchPendingTimeEdits = async () => {
+    try {
+      const response = await apiFetch(`/timetracking/pending-time-edits`, {
+        method: "POST",
+        body: JSON.stringify({ uid: userName }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setPendingTimeEdits(data.pendentes || []);
+      } else {
+        setPendingTimeEdits([]);
+      }
+    } catch (err) {
+      setPendingTimeEdits([]);
+    }
+  };
+
+  const fetchBaixasPendentes = async () => {
+    try {
+      const response = await apiFetch(`/timetracking/pending-medical-leaves`, {
+        method: "POST",
+        body: JSON.stringify({ uid: userName }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setBaixasPendentes(data.baixasPendentes || []);
+      } else {
+        setBaixasPendentes([]);
+      }
+    } catch (err) {
+      setBaixasPendentes([]);
+    }
+  };
+
+  const fetchFechoMensal = async () => {
+    if (!selectedMonth) {
+      setFechoMensal(null);
+      return;
+    }
+    try {
+      const mes = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
+      const response = await apiFetch(`/fecho-mensal/status`, {
+        method: "POST",
+        body: JSON.stringify({ uid: userName, mes }),
+      });
+
+      if (response.ok) {
+        setFechoMensal(await response.json());
+      } else {
+        setFechoMensal(null);
+      }
+    } catch (err) {
+      console.error("Erro ao buscar fecho mensal:", err);
+      setFechoMensal(null);
+    }
+  };
+
+  useEffect(() => {
+    fetchFechoMensal();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userName, selectedMonth, selectedYear]);
 
   const fetchTotaisAnuais = async () => {
     try {
@@ -265,6 +338,105 @@ const UserDetails = ({ selectedUser }) => {
     }
   };
 
+
+  const handleApproveTimeEdit = async (date) => {
+    try {
+      const response = await apiFetch(`/timetracking/approve-time-edit`, {
+        method: "POST",
+        body: JSON.stringify({ uid: userName, date }),
+      });
+
+      if (response.ok) {
+        await fetchPendingTimeEdits();
+        await fetchTotaisAnuais();
+      } else {
+        alert("Erro ao aprovar alteração de horas.");
+      }
+    } catch (err) {
+      console.error("Erro ao aprovar alteração de horas:", err);
+      alert("Erro ao aprovar alteração de horas.");
+    }
+  };
+
+  const handleRejectTimeEdit = async (date) => {
+    try {
+      const response = await apiFetch(`/timetracking/reject-time-edit`, {
+        method: "POST",
+        body: JSON.stringify({ uid: userName, date }),
+      });
+
+      if (response.ok) {
+        await fetchPendingTimeEdits();
+        alert("Pedido de alteração de horas rejeitado.");
+      } else {
+        alert("Erro ao rejeitar alteração de horas.");
+      }
+    } catch (err) {
+      console.error("Erro ao rejeitar alteração de horas:", err);
+      alert("Erro ao rejeitar alteração de horas.");
+    }
+  };
+
+  const handleApproveBaixa = async (pedido) => {
+    try {
+      const response = await apiFetch(`/timetracking/approve-medical-leave`, {
+        method: "POST",
+        body: JSON.stringify({ uid: userName, requestId: pedido.requestId, date: pedido.requestId ? undefined : pedido.dates[0] }),
+      });
+
+      if (response.ok) {
+        await fetchBaixasPendentes();
+        await fetchTotaisAnuais();
+      } else {
+        alert("Erro ao aprovar baixa médica.");
+      }
+    } catch (err) {
+      console.error("Erro ao aprovar baixa médica:", err);
+      alert("Erro ao aprovar baixa médica.");
+    }
+  };
+
+  const handleRejectBaixa = async (pedido) => {
+    try {
+      const response = await apiFetch(`/timetracking/reject-medical-leave`, {
+        method: "POST",
+        body: JSON.stringify({ uid: userName, requestId: pedido.requestId, date: pedido.requestId ? undefined : pedido.dates[0] }),
+      });
+
+      if (response.ok) {
+        await fetchBaixasPendentes();
+        await fetchTotaisAnuais();
+        alert("Pedido de baixa médica rejeitado.");
+      } else {
+        alert("Erro ao rejeitar baixa médica.");
+      }
+    } catch (err) {
+      console.error("Erro ao rejeitar baixa médica:", err);
+      alert("Erro ao rejeitar baixa médica.");
+    }
+  };
+
+  const handleConfirmFechoMensal = async () => {
+    if (!selectedMonth) return;
+    const mes = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
+    try {
+      const response = await apiFetch(`/fecho-mensal/confirm`, {
+        method: "POST",
+        body: JSON.stringify({ uid: userName, mes }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        await fetchFechoMensal();
+        await fetchTotaisAnuais();
+      } else {
+        alert(data.error || "Erro ao confirmar o fecho do mês.");
+      }
+    } catch (err) {
+      console.error("Erro ao confirmar fecho mensal:", err);
+      alert("Erro ao confirmar o fecho do mês.");
+    }
+  };
 
   const handleShowTimeLine = () => {
     setShowMonths(true);
@@ -387,8 +559,11 @@ const handleTotaisChange = (novosTotais) => {
 
 const handleDadosChange = (novosDados) => {
   setDados(novosDados); // Atualiza os dados no estado
-  // Recarregar férias pendentes quando os dados mudarem
+  // Recarregar férias, baixas médicas e pedidos de alteração de horas pendentes
+  // quando os dados mudarem
   fetchFeriasPendentes();
+  fetchPendingTimeEdits();
+  fetchBaixasPendentes();
 };
 
 // Normalizar entidade para URL (usar no breadcrumb)
@@ -590,10 +765,18 @@ const normalizedEntityUrl = userDetails?.entidade
                   selectedYear={selectedYear}
                   totais={totais}
                   feriasPendentes={feriasPendentes}
+                  pendingTimeEdits={pendingTimeEdits}
+                  baixasPendentes={baixasPendentes}
                   userName={userDetails?.nome}
                   dados={dados}
                   handleApproveVacation={handleApproveVacation}
                   handleRejectVacation={handleRejectVacation}
+                  handleApproveTimeEdit={handleApproveTimeEdit}
+                  handleRejectTimeEdit={handleRejectTimeEdit}
+                  handleApproveBaixa={handleApproveBaixa}
+                  handleRejectBaixa={handleRejectBaixa}
+                  fechoMensal={fechoMensal}
+                  handleConfirmFechoMensal={handleConfirmFechoMensal}
                 />
               </div>
             </div>

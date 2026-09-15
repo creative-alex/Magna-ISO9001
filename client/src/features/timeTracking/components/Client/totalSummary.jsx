@@ -1,11 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { FaStopwatch } from 'react-icons/fa6';
+import { FaStopwatch, FaChartColumn } from 'react-icons/fa6';
 import { calcularHoras, formatarMinutos } from '../../utils/calcHours';
 import { getHolidaysForSede } from '../../../../shared/utils/holidays';
 import { isBlocoAtivoEm, isDiaForaDeAtivo } from '../../../../shared/utils/absenceBlocks';
 import ManualOvertimeButton from './manualOvertime';
 import TimeTrackingTable from './pontoTable';
+import RequestTimeEditButton from './requestTimeEditButton';
+import MonthlyClosingButton from './monthlyClosingButton';
+import MedicalLeave from '../Shared/medicalLeave';
 import { apiFetch } from '../../../../shared/utils/apiFetch';
+
+const MONTH_NAMES_FULL = [
+  'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+  'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
+];
 
 const TotaisSummary = ({ username, month = new Date().getMonth() + 1 }) => {
   const [totais, setTotais] = useState({
@@ -311,17 +319,30 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1 }) => {
         {/* <p className="mb-2"><strong>🎂 Aniversário:</strong> {totais.diasAniversario}</p> */}
         <button
           onClick={handleOpenYearlyModal}
-          className="mt-4 underline cursor-pointer bg-transparent border-none text-sm font-medium text-gold"
+          className="mt-4 cursor-pointer bg-transparent border-none text-sm font-medium flex items-center justify-center gap-1.5 text-gold"
         >
-          📊 Ver resumo anual
+          <FaChartColumn />
+          Ver resumo anual
         </button>
         <button
           onClick={handleOpenOvertimeModal}
-          className="mt-2 underline cursor-pointer bg-transparent border-none text-sm font-medium flex items-center justify-center gap-1.5 text-gold"
+          className="mt-2 cursor-pointer bg-transparent border-none text-sm font-medium flex items-center justify-center gap-1.5 text-gold"
         >
           <FaStopwatch />
           Registar Horas Extra
         </button>
+        <RequestTimeEditButton
+          triggerClassName="mt-2 cursor-pointer bg-transparent border-none text-sm font-medium flex items-center justify-center gap-1.5 text-gold"
+        />
+        <MedicalLeave
+          username={username}
+          triggerClassName="mt-2 cursor-pointer bg-transparent border-none text-sm font-medium flex items-center justify-center gap-1.5 text-gold"
+        />
+        <MonthlyClosingButton
+          mes={`${new Date().getFullYear()}-${String(month).padStart(2, '0')}`}
+          mesLabel={`${MONTH_NAMES_FULL[month - 1]} de ${new Date().getFullYear()}`}
+          triggerClassName="mt-2 cursor-pointer bg-transparent border-none text-sm font-medium flex items-center justify-center gap-1.5 text-gold"
+        />
       </div>
 
       {showOvertimeModal && (

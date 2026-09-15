@@ -1,4 +1,4 @@
-import React, { useContext, useState, useRef, useEffect } from "react";
+import React, { useContext, useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { UserContext } from "../../../shared/context/userContext";
@@ -10,9 +10,13 @@ import {
   FaGraduationCap, FaCloudArrowUp, FaArrowUpRightFromSquare,
   FaCircleMinus, FaPencil, FaCheck, FaArrowLeft,
   FaUserGraduate, FaPlus, FaChevronDown, FaNotesMedical,
+  FaTriangleExclamation, FaPaperPlane,
 } from "react-icons/fa6";
 import { apiFetch } from "../../../shared/utils/apiFetch";
 import { getNomeCurto } from "../../../shared/utils/nomeCurto";
+import {
+  validarNIF, validarNISS, validarIBAN, validarCodigoPostal, validarTelefone, validarCartaoCidadao,
+} from "../../../shared/utils/validators";
 import {
   SITUACAO_CONJUGAL_OPTIONS, GRAU_PARENTESCO_OPTIONS, IRS_JOVEM_OPTIONS,
   TIPO_CONTRATO_OPTIONS, SITUACAO_CONTRATUAL_OPTIONS, DEPARTAMENTO_OPTIONS,
@@ -194,10 +198,114 @@ const ESTAGIO_FIELD_KEYS = ESTAGIO_SECTION.fields.filter(f => f.type !== "durati
 
 const ALL_FIELDS = SECTIONS.flatMap(s => s.fields);
 const FIELD_BY_KEY = Object.fromEntries(ALL_FIELDS.map(f => [f.key, f]));
+// Título da secção a que cada campo pertence - usado para reabrir automaticamente a
+// secção certa quando se tenta gravar com erros de validação lá dentro.
+const SECTION_BY_FIELD_KEY = Object.fromEntries(SECTIONS.flatMap(s => s.fields.map(f => [f.key, s.title])));
 const INITIAL_FORM = ALL_FIELDS.filter(f => !NON_STORED_TYPES.includes(f.type)).reduce((acc, f) => {
   acc[f.key] = f.type === "toggle" ? false : "";
   return acc;
 }, {});
+
+// Campos que contam para "perfil completo": todos os das secções não-restritas (o próprio
+// colaborador pode preenchê-los  -  excluem-se "Dados contratuais"/"Estágio", que são só de
+// RH), à exceção de "toggle" (um booleano está sempre "respondido", mesmo a false), "email"
+// (conta da plataforma, não é preenchido no cadastro) e dos tipos calculados/lista
+// (duration/tenure/blocks, já fora de ALL_FIELDS por NON_STORED_TYPES).
+const COMPLETENESS_FIELDS = SECTIONS
+  .filter(s => !s.restricted)
+  .flatMap(s => s.fields)
+  .filter(f => f.type !== "toggle" && f.key !== "email");
+
+// Campos em falta (respeitando "showIf"  -  um campo escondido pelas respostas atuais não
+// conta) de entre os COMPLETENESS_FIELDS, dado o form e os documentos já carregados.
+function getMissingFields(dataSource, docs) {
+  return COMPLETENESS_FIELDS.filter(f => {
+    if (f.showIf && !f.showIf(dataSource)) return false;
+    if (f.type === "file") return !docs[f.key];
+    const value = dataSource[f.key];
+    return value === undefined || value === null || value === "";
+  });
+}
+
+// Erros de validação por campo (chave -> mensagem), a partir do form/documentos atuais.
+// Só assinala um campo quando: (a) já tem um valor "aparentemente completo" (evita
+// mostrar "NIF inválido" enquanto o utilizador ainda está a escrever o 3º dígito) ou
+// (b) representa uma inconsistência lógica ativa entre campos relacionados (ex: ligou o
+// toggle "Dependentes com deficiência" mas não disse quantos). Campos simplesmente por
+// preencher não entram aqui - isso já é tratado à parte por getMissingFields.
+function getFieldErrors(form, docs) {
+  const errors = {};
+  const hoje = new Date().toISOString().slice(0, 10);
+
+  const nifDigitos = (form.nif || "").replace(/\D/g, "");
+  if (nifDigitos.length >= 9 && !validarNIF(form.nif)) errors.nif = "NIF inválido";
+
+  const nissDigitos = (form.n_seguranca_social || "").replace(/\D/g, "");
+  if (nissDigitos.length >= 11 && !validarNISS(form.n_seguranca_social)) errors.n_seguranca_social = "Nº de segurança social inválido";
+
+  const ccLimpo = (form.n_cartao_cidadao || "").replace(/\s/g, "");
+  if (ccLimpo.length >= 12 && !validarCartaoCidadao(form.n_cartao_cidadao)) errors.n_cartao_cidadao = "Nº de cartão de cidadão inválido";
+
+  if ((form.codigo_postal || "").length >= 8 && !validarCodigoPostal(form.codigo_postal)) errors.codigo_postal = "Formato esperado: 0000-000";
+
+  const telDigitos = (form.telefone || "").replace(/\D/g, "");
+  if (telDigitos.length >= 9 && !validarTelefone(form.telefone)) errors.telefone = "Contacto inválido";
+
+  const telEmergDigitos = (form.telefone_emergencia || "").replace(/\D/g, "");
+  if (telEmergDigitos.length >= 9 && !validarTelefone(form.telefone_emergencia)) errors.telefone_emergencia = "Contacto inválido";
+
+  const ibanLimpo = (form.IBAN || "").replace(/\s/g, "");
+  if (ibanLimpo.length >= 25 && !validarIBAN(form.IBAN)) errors.IBAN = "IBAN inválido";
+
+  if (form.data_nascimento && form.data_nascimento > hoje) errors.data_nascimento = "Data de nascimento no futuro";
+  if (form.validade_cc && form.data_nascimento && form.validade_cc < form.data_nascimento) errors.validade_cc = "Anterior à data de nascimento";
+
+  if (form.n_titulares !== "" && (!Number.isInteger(Number(form.n_titulares)) || Number(form.n_titulares) < 1)) errors.n_titulares = "Tem de ser um número inteiro ≥ 1";
+  if (form.n_dependentes !== "" && (!Number.isInteger(Number(form.n_dependentes)) || Number(form.n_dependentes) < 0)) errors.n_dependentes = "Tem de ser um número inteiro ≥ 0";
+
+  if (form.tem_dependentes_deficientes === true) {
+    const nDef = form.n_dependentes_deficientes;
+    if (nDef === "" || nDef === undefined || nDef === null) {
+      errors.n_dependentes_deficientes = "Obrigatório";
+    } else if (!Number.isInteger(Number(nDef)) || Number(nDef) < 1) {
+      errors.n_dependentes_deficientes = "Tem de ser um número inteiro ≥ 1";
+    } else if (Number(nDef) > Number(form.n_dependentes || 0)) {
+      errors.n_dependentes_deficientes = "Não pode exceder o nº de dependentes";
+    }
+  }
+
+  if (form.irs_jovem === true && !form.escalao_irs_jovem) errors.escalao_irs_jovem = "Obrigatório";
+  if (form.irs_jovem === true && !docs.digitalizacao_pedido_irs_jovem) errors.digitalizacao_pedido_irs_jovem = "Documento obrigatório";
+  if (form.ccp === true && !docs.digitalizacao_ccp) errors.digitalizacao_ccp = "Documento obrigatório";
+
+  if (form.situacao_contratual === SITUACAO_CESSADO && !form.motivo_cessacao) errors.motivo_cessacao = "Obrigatório";
+  if (form.tipo_contrato && form.tipo_contrato !== TIPO_CONTRATO_SEM_TERMO && !form.data_fim_contrato) errors.data_fim_contrato = "Obrigatório para este tipo de contrato";
+  if (form.data_fim_contrato && form.data_admissao && form.data_fim_contrato < form.data_admissao) errors.data_fim_contrato = "Anterior à data de admissão";
+
+  if (form.tipo_estagio === TIPO_ESTAGIO_PROFISSIONAL) {
+    if (!form.n_processo_estagio) errors.n_processo_estagio = "Obrigatório";
+    if (!form.id_processo_estagio) errors.id_processo_estagio = "Obrigatório";
+  }
+  if (form.data_fim_estagio && form.data_inicio_estagio && form.data_fim_estagio < form.data_inicio_estagio) errors.data_fim_estagio = "Anterior à data de início";
+
+  return errors;
+}
+
+// Erros de validação dos campos "blocks" (cedências temporárias, baixas médicas): por
+// chave do campo, um mapa de id de bloco -> mensagem (só a ordem das datas, por agora).
+function getBlockErrors(blockLists) {
+  const errors = {};
+  BLOCK_FIELDS.forEach(f => {
+    const porBloco = {};
+    (blockLists[f.key] || []).forEach(b => {
+      if (b.dataInicio && b.dataFim && b.dataFim < b.dataInicio) {
+        porBloco[b.id] = "Data de fim anterior à data de início";
+      }
+    });
+    if (Object.keys(porBloco).length > 0) errors[f.key] = porBloco;
+  });
+  return errors;
+}
 
 // Extensão do ficheiro original (com o ponto, ex: ".pdf")  -  "" se não tiver extensão.
 function extensaoFicheiro(filename) {
@@ -249,6 +357,13 @@ export default function Cadastro() {
   const nomeCurto = getNomeCurto(form.nome_completo) || targetLabel;
   const [uploading, setUploading] = useState({});
   const [viewing, setViewing] = useState({});
+  const [notifying, setNotifying] = useState(false);
+  // Só recalcula quando form/docRefs mudam  -  evita percorrer COMPLETENESS_FIELDS a cada render.
+  const missingFields = useMemo(() => (loading ? [] : getMissingFields(form, docRefs)), [loading, form, docRefs]);
+  const missingCount = missingFields.length;
+  // Erros de validação (formato/consistência)  -  só interessam em modo de edição.
+  const fieldErrors = useMemo(() => (editMode ? getFieldErrors(form, docRefs) : {}), [editMode, form, docRefs]);
+  const blockErrors = useMemo(() => (editMode ? getBlockErrors(blockLists) : {}), [editMode, blockLists]);
   const fileInputRefs = useRef({});
   // Só usado para revelar a caixa "Dados de estágio" antes de haver qualquer dado guardado
   // (ex: acabou de clicar "Adicionar dados de estágio"). Uma vez que existam dados, a caixa
@@ -347,6 +462,24 @@ export default function Cadastro() {
   };
 
   const handleSave = async () => {
+    if (Object.keys(fieldErrors).length > 0 || Object.keys(blockErrors).length > 0) {
+      // Reabre as secções/blocos com erros para o utilizador os poder ver e corrigir.
+      setCollapsedSections(prev => {
+        const next = { ...prev };
+        Object.keys(fieldErrors).forEach(key => { delete next[SECTION_BY_FIELD_KEY[key]]; });
+        Object.keys(blockErrors).forEach(key => { delete next[SECTION_BY_FIELD_KEY[key]]; });
+        return next;
+      });
+      setCollapsedBlocks(prev => {
+        const next = { ...prev };
+        Object.values(blockErrors).forEach(porBloco => {
+          Object.keys(porBloco).forEach(blockId => { delete next[blockId]; });
+        });
+        return next;
+      });
+      toast.error("Corrija os campos assinalados a vermelho antes de guardar", { position: "top-right" });
+      return;
+    }
     setSaving(true);
     try {
       const res = await apiFetch(`/cadastro/${targetKey}`, {
@@ -370,6 +503,24 @@ export default function Cadastro() {
       toast.error("Falha ao guardar a ficha de cadastro", { position: "top-right" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleNotifyIncomplete = async () => {
+    setNotifying(true);
+    try {
+      const res = await apiFetch(`/cadastro/${targetKey}/notify-incomplete`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Falha ao enviar notificação", { position: "top-right" });
+        return;
+      }
+      toast.success("Colaborador notificado por email", { position: "top-right", autoClose: 2500 });
+    } catch (e) {
+      console.error(e);
+      toast.error("Falha ao enviar notificação", { position: "top-right" });
+    } finally {
+      setNotifying(false);
     }
   };
 
@@ -509,12 +660,15 @@ export default function Cadastro() {
     return " - ";
   };
 
-  const renderField = (field, editable, dataSource = form) => {
+  const renderField = (field, editable, dataSource = form, errors = {}, blockErrs = {}) => {
     const { key, label, type, options, placeholder } = field;
     if (field.readOnly) editable = false;
     // "newRow" força o campo a começar numa linha nova mesmo que a linha anterior tenha um
     // número variável de campos (por causa de showIf)  -  ver os campos das secções em SECTIONS.
     const layoutStyle = field.newRow ? { minWidth: 0, gridColumnStart: 1 } : { minWidth: 0 };
+    const errorMsg = editable ? errors[key] : null;
+    const fieldInputStyle = errorMsg ? { ...inputStyle, borderColor: "#dc2626" } : inputStyle;
+    const errorText = errorMsg ? <div style={{ fontSize: 11, color: "#dc2626", marginTop: 4 }}>{errorMsg}</div> : null;
 
     if (type === "toggle") {
       const value = !!dataSource[key];
@@ -554,6 +708,7 @@ export default function Cadastro() {
 
     if (type === "blocks") {
       const blocks = blockLists[key] || [];
+      const errosDoBloco = blockErrs[key] || {};
       const fmtDate = v => {
         if (!v) return " - ";
         const [y, m, d] = v.split("-");
@@ -575,6 +730,7 @@ export default function Cadastro() {
               const summary = c.dataInicio || c.dataFim
                 ? `${fmtDate(c.dataInicio)} — ${fmtDate(c.dataFim)}${summaryExtra ? ` · ${summaryExtra}` : ""}`
                 : `Adicionar ${field.itemSingular}`;
+              const blocoErro = errosDoBloco[c.id];
               return (
                 <div key={c.id} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12, background: "#fafafa" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -645,7 +801,14 @@ export default function Cadastro() {
                         <div style={{ minWidth: 0 }}>
                           <span style={labelStyle}>{dataFimLabel}</span>
                           {editable ? (
-                            <input type="date" value={c.dataFim} onChange={e => handleChangeBlock(key, c.id, { dataFim: e.target.value })} style={inputStyle} />
+                            <>
+                              <input
+                                type="date" value={c.dataFim}
+                                onChange={e => handleChangeBlock(key, c.id, { dataFim: e.target.value })}
+                                style={blocoErro ? { ...inputStyle, borderColor: "#dc2626" } : inputStyle}
+                              />
+                              {blocoErro && <div style={{ fontSize: 11, color: "#dc2626", marginTop: 4 }}>{blocoErro}</div>}
+                            </>
                           ) : (
                             <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{fmtDate(c.dataFim)}</div>
                           )}
@@ -825,7 +988,7 @@ export default function Cadastro() {
             }}
             style={{
               display: "flex", alignItems: "center", gap: 12, padding: "10px 12px",
-              border: "1px solid #e5e7eb", borderRadius: 8,
+              border: `1px solid ${errorMsg ? "#dc2626" : "#e5e7eb"}`, borderRadius: 8,
               cursor: isUploading || isViewing ? "wait" : isActive ? "pointer" : "default",
               background: "#fafafa", transition: "background 0.12s",
             }}
@@ -843,6 +1006,7 @@ export default function Cadastro() {
                 : null}
             </div>
           </div>
+          {errorText}
         </div>
       );
     }
@@ -856,10 +1020,13 @@ export default function Cadastro() {
         <div key={key} style={layoutStyle}>
           <span style={labelStyle}>{label}</span>
           {editable ? (
-            <select value={currentValue} onChange={e => handleChange(key, e.target.value)} style={inputStyle}>
-              <option value="">Selecionar...</option>
-              {options.map(o => <option key={o} value={o}>{optionLabel(o)}</option>)}
-            </select>
+            <>
+              <select value={currentValue} onChange={e => handleChange(key, e.target.value)} style={fieldInputStyle}>
+                <option value="">Selecionar...</option>
+                {options.map(o => <option key={o} value={o}>{optionLabel(o)}</option>)}
+              </select>
+              {errorText}
+            </>
           ) : (
             <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{currentValue ? optionLabel(currentValue) : " - "}</div>
           )}
@@ -923,23 +1090,26 @@ export default function Cadastro() {
       <div key={key} style={layoutStyle}>
         <span style={labelStyle}>{label}</span>
         {editable ? (
-          listOptions ? (
-            <AutocompleteInput
-              value={dataSource[key]}
-              onChange={v => handleChange(key, v)}
-              options={listOptions}
-              placeholder={placeholder}
-              inputStyle={inputStyle}
-            />
-          ) : (
-            <input
-              type={type}
-              value={dataSource[key]}
-              placeholder={placeholder}
-              onChange={e => handleChange(key, e.target.value)}
-              style={inputStyle}
-            />
-          )
+          <>
+            {listOptions ? (
+              <AutocompleteInput
+                value={dataSource[key]}
+                onChange={v => handleChange(key, v)}
+                options={listOptions}
+                placeholder={placeholder}
+                inputStyle={fieldInputStyle}
+              />
+            ) : (
+              <input
+                type={type}
+                value={dataSource[key]}
+                placeholder={placeholder}
+                onChange={e => handleChange(key, e.target.value)}
+                style={fieldInputStyle}
+              />
+            )}
+            {errorText}
+          </>
         ) : (
           <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{renderValue(field, dataSource)}</div>
         )}
@@ -983,7 +1153,34 @@ export default function Cadastro() {
               <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 3 }}>
                 Dados pessoais, contratuais e documentação associados ao processo individual do colaborador.
               </div>
+              {!loading && missingCount > 0 && (
+                <div style={{
+                  display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8,
+                  padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600,
+                  background: "#FEF3C7", color: "#92400E",
+                }}>
+                  <FaTriangleExclamation style={{ fontSize: 10.5 }} />
+                  Cadastro incompleto  -  faltam {missingCount} {missingCount === 1 ? "campo" : "campos"}
+                </div>
+              )}
             </div>
+            {isViewingOther && canViewOther && !loading && missingCount > 0 && (
+              <button
+                disabled={notifying}
+                onClick={handleNotifyIncomplete}
+                title="Enviar email a avisar que o cadastro está incompleto"
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "8px 16px", fontSize: 13, fontWeight: 500, cursor: notifying ? "wait" : "pointer",
+                  border: "1px solid #e5e7eb", borderRadius: 7, background: "#fff",
+                  color: "#6b7280", transition: "all 0.15s", flexShrink: 0, opacity: notifying ? 0.6 : 1,
+                }}
+              >
+                {notifying
+                  ? "A enviar..."
+                  : <><FaPaperPlane style={{ fontSize: 12 }} /> Notificar cadastro incompleto</>}
+              </button>
+            )}
             <button
               disabled={saving}
               onClick={() => { if (editMode) handleSave(); else setEditMode(true); }}
@@ -1062,7 +1259,7 @@ export default function Cadastro() {
                 </div>
                 {!isCollapsed && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-4 p-[18px]">
-                    {visibleFields.map(f => renderField(f, sectionEditable, sectionData))}
+                    {visibleFields.map(f => renderField(f, sectionEditable, sectionData, fieldErrors, blockErrors))}
                   </div>
                 )}
               </div>

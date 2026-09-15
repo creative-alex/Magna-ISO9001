@@ -47,6 +47,21 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
       const baixas = data.baixas || [];
       const aniversario = data.aniversario || [];
 
+      // Pedidos de alteração de horas ainda pendentes de aprovação (ver
+      // requestTimeEditButton.jsx)  -  indexados por data completa "DD-MM-YYYY".
+      let ajustesPendentesPorDia = {};
+      try {
+        const ajustesResponse = await apiFetch(`/timetracking/pending-time-edits`, { method: "POST" });
+        if (ajustesResponse.ok) {
+          const ajustesData = await ajustesResponse.json();
+          ajustesPendentesPorDia = Object.fromEntries(
+            (ajustesData.pendentes || []).map((ajuste) => [ajuste.date, ajuste])
+          );
+        }
+      } catch (err) {
+        console.error("Erro ao buscar pedidos de alteração de horas pendentes:", err);
+      }
+
       const dadosProcessados = Array.from({ length: diasNoMes }, (_, i) => {
         const dia = `${String(i + 1).padStart(2, "0")}-${String(month).padStart(2, "0")}`;
         const diaCompleto = `${String(i + 1).padStart(2, "0")}-${String(month).padStart(2, "0")}-${year}`;
@@ -95,7 +110,8 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
           feriasPendente: isFerias,
           baixaPendente: isBaixa,
           compensated: isCompensado,
-          compensatedMinutes: minutosCompensados
+          compensatedMinutes: minutosCompensados,
+          edicaoPendente: ajustesPendentesPorDia[diaCompleto] || null
         };
       });
 
@@ -280,6 +296,11 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
         y={contextMenu.y}
         onClose={closeContextMenu}
         date={selectedDate}
+        dateCompleta={contextMenu.dayIndex != null ? dados[contextMenu.dayIndex]?.diaCompleto : null}
+        isDiaEditavel={contextMenu.dayIndex != null ? new Date(year, month - 1, contextMenu.dayIndex + 1) <= new Date(new Date().setHours(0, 0, 0, 0)) : false}
+        horaEntradaAtual={contextMenu.dayIndex != null ? dados[contextMenu.dayIndex]?.horaEntrada : null}
+        horaSaidaAtual={contextMenu.dayIndex != null ? dados[contextMenu.dayIndex]?.horaSaida : null}
+        onTimeEditRequested={fetchData}
         username={username}
         month={month}
         onOvertimeRegistered={fetchData}

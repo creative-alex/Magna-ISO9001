@@ -3,8 +3,12 @@ import { FaStopwatch } from 'react-icons/fa6';
 import VacationButton from '../Shared/vacationButton';
 import MedicalLeave from '../Shared/medicalLeave';
 import ManualOvertimeButton from './manualOvertime';
+import RequestTimeEditButton from './requestTimeEditButton';
 
-const ContextMenu = ({ visible, x, y, onClose, date, username, month, isAdmin = false, onOvertimeRegistered }) => {
+const ContextMenu = ({
+  visible, x, y, onClose, date, username, month, isAdmin = false, onOvertimeRegistered,
+  isDiaEditavel = false, dateCompleta, horaEntradaAtual, horaSaidaAtual, onTimeEditRequested,
+}) => {
   const [activeSubMenu, setActiveSubMenu] = useState(null);
   const [showOvertimeModal, setShowOvertimeModal] = useState(false);
 
@@ -87,6 +91,16 @@ const ContextMenu = ({ visible, x, y, onClose, date, username, month, isAdmin = 
       <div className="cursor-pointer select-none transition-colors hover:bg-gray-100 [&_button]:w-full [&_button]:py-2.5 [&_button]:px-4 [&_button]:flex [&_button]:items-center [&_button]:gap-2 [&_button]:text-sm [&_button]:text-gray-800 [&_button]:text-left [&_button]:bg-transparent [&_button]:border-none [&_button]:cursor-pointer">
         <MedicalLeave username={username} date={date} onSuccess={onClose} />
       </div>
+      {isDiaEditavel && (
+        <div className="cursor-pointer select-none transition-colors hover:bg-gray-100 [&_button]:w-full [&_button]:py-2.5 [&_button]:px-4 [&_button]:flex [&_button]:items-center [&_button]:gap-2 [&_button]:text-sm [&_button]:text-gray-800 [&_button]:text-left [&_button]:bg-transparent [&_button]:border-none [&_button]:cursor-pointer">
+          <RequestTimeEditButton
+            date={dateCompleta}
+            horaEntradaAtual={horaEntradaAtual}
+            horaSaidaAtual={horaSaidaAtual}
+            onSuccess={() => { onClose(); if (onTimeEditRequested) onTimeEditRequested(); }}
+          />
+        </div>
+      )}
     </div>
   );
 };

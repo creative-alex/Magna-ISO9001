@@ -1,4 +1,5 @@
 import React, { useContext, useState } from 'react';
+import { FaUmbrellaBeach } from 'react-icons/fa6';
 import { UserContext } from '../../../../shared/context/userContext';
 import { toast } from 'react-toastify';
 import { apiFetch } from '../../../../shared/utils/apiFetch';
@@ -47,8 +48,8 @@ const VacationButton = ({ username, date, onSuccess }) => {
   };
 
   return (
-    <button onClick={handleRequest} disabled={loading}>
-      {loading ? 'A processar...' : '🏖️ Marcar Férias'}
+    <button onClick={handleRequest} disabled={loading} className="flex items-center gap-2">
+      {loading ? 'A processar...' : (<><FaUmbrellaBeach className="text-[#C8932F]" /> Marcar Férias</>)}
     </button>
   );
 };

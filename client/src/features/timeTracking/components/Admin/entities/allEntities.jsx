@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { FaBuilding, FaChevronRight, FaGear, FaMagnifyingGlass } from "react-icons/fa6";
 import Entity from "./Entity";
+import UserListRow from "./UserListRow";
 import { apiFetch } from "../../../../../shared/utils/apiFetch";
 
 const GOLD = "#C8932F";
@@ -182,35 +183,9 @@ const AllEntities = () => {
                       {searchTerm ? "Nenhum colaborador corresponde à pesquisa." : "Nenhum colaborador nesta entidade."}
                     </div>
                   ) : (
-                    users.map((u, i) => {
-                      const initials = u.nome ? u.nome.slice(0, 2).toUpperCase() : "??";
-                      return (
-                        <div
-                          key={u.uid}
-                          onClick={() => openUser(u)}
-                          style={{
-                            display: "flex", alignItems: "center", gap: 14, padding: "14px 20px 14px 44px", cursor: "pointer",
-                            borderBottom: i === users.length - 1 ? "none" : "1px solid #f3f4f6",
-                            transition: "background 0.12s",
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.background = "#fafafa"}
-                          onMouseLeave={e => e.currentTarget.style.background = ""}
-                        >
-                          <div style={{
-                            width: 32, height: 32, borderRadius: "50%", background: GOLD, flexShrink: 0,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: 12, fontWeight: 700, color: "#fff",
-                          }}>
-                            {initials}
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13.5, fontWeight: 600, color: "#111827" }}>{u.nome}</div>
-                            <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 1 }}>{u.email}</div>
-                          </div>
-                          <FaChevronRight style={{ fontSize: 11, color: "#d1d5db", flexShrink: 0 }} />
-                        </div>
-                      );
-                    })
+                    users.map((u, i) => (
+                      <UserListRow key={u.uid} user={u} onClick={openUser} isLast={i === users.length - 1} indent />
+                    ))
                   )
                 )}
               </div>

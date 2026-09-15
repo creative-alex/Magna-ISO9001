@@ -3,24 +3,16 @@ const path = require("path");
 const nodemailer = require("nodemailer");
 const handlebars = require("handlebars");
 
-// Contas de no-reply usadas pelo nodemailer, por ordem de tentativa: se o envio falhar
-// numa conta (ex: limite de envio do Gmail atingido), tenta a seguinte antes de desistir.
-const ACCOUNTS = [
-  { user: process.env.NODEEMAIL, pass: process.env.NODEPASSWORD },
-  { user: process.env.NODEEMAIL2, pass: process.env.NODEPASSWORD2 },
-  { user: process.env.NODEEMAIL3, pass: process.env.NODEPASSWORD3 },
-].filter(account => account.user && account.pass);
+// Conta de no-reply usada pelo nodemailer (SMTP mail.comenius.pt).
+const NODEEMAIL = process.env.NODEEMAIL;
+const NODEPASSWORD = process.env.NODEPASSWORD;
 
-const transporters = new Map();
-function getTransporter(account) {
-  if (!transporters.has(account.user)) {
-    transporters.set(account.user, nodemailer.createTransport({
-      service: "gmail",
-      auth: { user: account.user, pass: account.pass },
-    }));
-  }
-  return transporters.get(account.user);
-}
+const transporter = nodemailer.createTransport({
+  host: "mail.comenius.pt",
+  port: 465,
+  secure: true, // true porque é a porta 465 (SSL)
+  auth: { user: NODEEMAIL, pass: NODEPASSWORD },
+});
 
 const TEMPLATES_DIR = path.join(__dirname, "emailTemplates");
 const compiledTemplates = new Map();
@@ -69,30 +61,20 @@ async function sendMail({ to, subject, html, entidade }) {
     console.error("Sem destinatário  -  email não enviado:", subject);
     return;
   }
-  if (ACCOUNTS.length === 0) {
+  if (!NODEEMAIL || !NODEPASSWORD) {
     console.error("Nenhuma conta de no-reply configurada (NODEEMAIL/NODEPASSWORD)  -  email não enviado:", subject);
     return;
   }
 
   const logoAttachment = getLogoAttachment(entidade);
 
-  let lastError = null;
-  for (const account of ACCOUNTS) {
-    try {
-      await getTransporter(account).sendMail({
-        from: `"MAGNA ISO9001" <${account.user}>`,
-        to,
-        subject,
-        html,
-        attachments: [logoAttachment],
-      });
-      return;
-    } catch (error) {
-      lastError = error;
-      console.error(`Falha ao enviar email via ${account.user}, a tentar próxima conta:`, error.message);
-    }
-  }
-  throw lastError;
+  await transporter.sendMail({
+    from: `"MAGNA ISO9001" <${NODEEMAIL}>`,
+    to,
+    subject,
+    html,
+    attachments: [logoAttachment],
+  });
 }
 
 module.exports = { sendMail, renderEmail, LOGO_CID };
