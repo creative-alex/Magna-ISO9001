@@ -45,63 +45,49 @@ function getMonthName(month) {
   return months[month - 1];
 }
 
-// Função auxiliar para buscar a data de criação do colaborador
-async function getUserCreatedAt(uid) {
-  try {
-    const userDoc = await db.collection('users').doc(uid).get();
+// getUserCreatedAt/getUserSede/getUserCadastroAusencias liam cada uma, de forma
+// independente, o mesmo documento users/{uid}  -  3 leituras redundantes sempre que um
+// chamador precisava das 3. Os dois chamadores (getUserRecords e
+// calculateMonthlyAttendanceSummary, mais abaixo) agora leem esse documento uma única
+// vez e passam userData às funções puras abaixo; só getUserCadastroAusencias continua
+// assíncrona, por causa das subcoleções cedencias/baixasMedicas que lhe são próprias.
 
-    if (userDoc.exists) {
-      const userData = userDoc.data();
-      const createdAt = userData.createdAt;
+// Data de criação do colaborador, a partir de um users/{uid} já lido.
+function extractUserCreatedAt(userData) {
+  const createdAt = userData?.createdAt;
+  if (!createdAt) return null;
 
-      if (!createdAt) {
-        return null;
-      }
-
-      // Verificar se é um Timestamp do Firestore
-      if (createdAt && typeof createdAt.toDate === 'function') {
-        return createdAt.toDate();
-      }
-
-      // Verificar se é uma string ISO
-      if (typeof createdAt === 'string') {
-        const dateFromString = new Date(createdAt);
-        if (!isNaN(dateFromString.getTime())) {
-          return dateFromString;
-        }
-      }
-
-      return null;
-    }
-
-    return null;
-  } catch (error) {
-    console.error("Erro ao buscar data de criação do colaborador:", error);
-    return null;
+  // Verificar se é um Timestamp do Firestore
+  if (typeof createdAt.toDate === 'function') {
+    return createdAt.toDate();
   }
+
+  // Verificar se é uma string ISO
+  if (typeof createdAt === 'string') {
+    const dateFromString = new Date(createdAt);
+    if (!isNaN(dateFromString.getTime())) {
+      return dateFromString;
+    }
+  }
+
+  return null;
 }
 
 // Sede do colaborador (users/{uid}.sede)  -  usada para saber que feriado
-// municipal aplicar no cálculo de faltas (ver ./holidays.js).
-async function getUserSede(uid) {
-  try {
-    const userDoc = await db.collection('users').doc(uid).get();
-    return userDoc.exists ? (userDoc.data().sede || null) : null;
-  } catch (error) {
-    console.error("Erro ao buscar sede do colaborador:", error);
-    return null;
-  }
+// municipal aplicar no cálculo de faltas (ver ./holidays.js), a partir de um
+// users/{uid} já lido.
+function extractUserSede(userData) {
+  return userData?.sede || null;
 }
 
 // Situação contratual e ausências geridas no módulo de Cadastro (situacao_contratual/
-// data_fim_contrato no próprio documento do colaborador, e as subcoleções
-// users/{uid}/cedencias e users/{uid}/baixasMedicas  -  ver cadastroController.js).
-// Distintas das coleções Ferias/BaixasMedicas do livro de ponto acima, e até agora nunca
-// cruzadas com o cálculo de faltas (ver isDiaForaDeAtivo, usado em
-// calculateMonthlyAttendanceSummary).
-async function getUserCadastroAusencias(uid) {
-  const userDoc = await db.collection("users").doc(uid).get();
-  const userData = userDoc.exists ? userDoc.data() : {};
+// data_fim_contrato no próprio documento do colaborador, já lido pelo chamador, e as
+// subcoleções users/{uid}/cedencias e users/{uid}/baixasMedicas  -  ver
+// cadastroController.js). Distintas das coleções Ferias/BaixasMedicas do livro de ponto
+// acima, e até agora nunca cruzadas com o cálculo de faltas (ver isDiaForaDeAtivo, usado
+// em calculateMonthlyAttendanceSummary).
+async function getUserCadastroAusencias(uid, userData) {
+  const data = userData || {};
 
   const [cedenciasSnap, licencasSnap] = await Promise.all([
     db.collection("users").doc(uid).collection("cedencias").get(),
@@ -109,8 +95,8 @@ async function getUserCadastroAusencias(uid) {
   ]);
 
   return {
-    situacaoContratual: userData.situacao_contratual || "Ativo",
-    dataFimContrato: userData.data_fim_contrato || null,
+    situacaoContratual: data.situacao_contratual || "Ativo",
+    dataFimContrato: data.data_fim_contrato || null,
     cedencias: cedenciasSnap.docs.map(doc => doc.data()),
     licencasOuBaixas: licencasSnap.docs.map(doc => doc.data()),
   };
@@ -154,16 +140,17 @@ async function computeAnnualOvertimeBalance(uid, year) {
     compensatedMinutes += data.horas_compensatorias || 0;
   });
 
+  // Filtrado por "year" (todos os documentos já têm este campo) em vez de ler a
+  // coleção inteira e filtrar aqui pelo ano embutido em "date".
   const manualOvertimeSnapshot = await db
     .collection("registo-ponto")
     .doc(uid)
     .collection("HorasExtraManual")
+    .where("year", "==", year)
     .get();
 
   manualOvertimeSnapshot.forEach(doc => {
-    const data = doc.data();
-    const docYear = parseInt((data.date || "").split("-")[2]);
-    if (docYear === year) grossMinutes += data.totalMinutes || 0;
+    grossMinutes += doc.data().totalMinutes || 0;
   });
 
   return { grossMinutes, compensatedMinutes, netMinutes: grossMinutes - compensatedMinutes };
@@ -290,13 +277,17 @@ const getUserRecords = async (req, res) => {
       );
     }
 
+    // users/{userId} lido uma única vez e partilhado pelas 3 leituras abaixo (ver nota em
+    // extractUserCreatedAt/extractUserSede/getUserCadastroAusencias).
+    const userDocForSummary = await db.collection('users').doc(userId).get();
+    const userDataForSummary = userDocForSummary.exists ? userDocForSummary.data() : null;
     // Data de criação do colaborador, para o frontend não contar faltas antes da conta existir
-    const userCreatedAt = await getUserCreatedAt(userId);
+    const userCreatedAt = extractUserCreatedAt(userDataForSummary);
     // Sede do colaborador, para o frontend saber que feriado municipal aplicar
-    const sede = await getUserSede(userId);
+    const sede = extractUserSede(userDataForSummary);
     // Situação contratual, cedências e licenças/baixas do Cadastro, para o frontend não
     // marcar esses dias como falta (ver isDiaForaDeAtivo/getUserCadastroAusencias acima).
-    const cadastroAusencias = await getUserCadastroAusencias(userId);
+    const cadastroAusencias = await getUserCadastroAusencias(userId, userDataForSummary);
 
     const registos = snapshot.docs.map((doc) => {
       const data = doc.data();
@@ -425,19 +416,18 @@ const getOvertimeSummary = async (req, res) => {
       .doc(userId)
       .collection("HorasExtraManual");
 
-    // Sem campo "timestamp" nesta subcoleção  -  filtra-se pelo ano embutido em
-    // "date" (formato DD-MM-YYYY), tal como o resto dos endpoints já fazem.
-    const manualOvertimeSnapshot = await manualOvertimeRef.get();
+    // Sem campo "timestamp" nesta subcoleção  -  filtra-se pelo campo "year" (todos os
+    // documentos já o têm, ver backfill/escrita em registerManualOvertime) em vez de
+    // ler a coleção inteira e filtrar aqui pelo ano embutido em "date".
+    const manualOvertimeSnapshot = await manualOvertimeRef.where("year", "==", currentYear).get();
 
     let totalManualOvertimeMinutes = 0;
 
     manualOvertimeSnapshot.forEach(doc => {
       const data = doc.data();
-      // Extrair mês e ano da data no formato DD-MM-YYYY
+      // Extrair mês da data no formato DD-MM-YYYY (o ano já vem filtrado pela query acima)
       const dateParts = data.date.split('-');
       const month = parseInt(dateParts[1]);
-      const docYear = parseInt(dateParts[2]);
-      if (docYear !== currentYear) return;
       const monthKey = `${String(month).padStart(2, "0")}`;
 
       if (!monthlyData[monthKey]) {
@@ -559,11 +549,13 @@ const getYearlySummary = async (req, res) => {
 // permite fechar o mês antes do dia 25 sem esperar pelos dias que ainda faltam
 // decorrer. Sem este parâmetro o comportamento é exatamente o mesmo de sempre.
 async function calculateMonthlyAttendanceSummary({ uid, year, month, assumeWorkedFrom }) {
-  const [userCreatedAt, sede, cadastroAusencias] = await Promise.all([
-    getUserCreatedAt(uid),
-    getUserSede(uid),
-    getUserCadastroAusencias(uid),
-  ]);
+  // users/{uid} lido uma única vez e partilhado pelas 3 leituras abaixo, em vez de cada
+  // uma reler o mesmo documento de forma independente (ver nota acima).
+  const userDoc = await db.collection('users').doc(uid).get();
+  const userData = userDoc.exists ? userDoc.data() : null;
+  const userCreatedAt = extractUserCreatedAt(userData);
+  const sede = extractUserSede(userData);
+  const cadastroAusencias = await getUserCadastroAusencias(uid, userData);
   const now = new Date();
 
   const firstDay = new Date(year, month - 1, 1);
@@ -596,10 +588,14 @@ async function calculateMonthlyAttendanceSummary({ uid, year, month, assumeWorke
   const feriasRef = db.collection("registo-ponto").doc(uid).collection("Ferias");
   const baixasRef = db.collection("registo-ponto").doc(uid).collection("BaixasMedicas");
   const aniversarioRef = db.collection("registo-ponto").doc(uid).collection("DiasAniversario");
+  // Filtradas por "year" (todos os documentos destas 3 coleções já têm este campo -
+  // ver backfill e escrita em createVacation/createMedicalLeave/toggleVacationDay/
+  // toggleBirthdayDay) em vez de ler o histórico completo do colaborador e filtrar
+  // aqui em memória só pelo mês pedido.
   const [feriasSnapshot, baixasSnapshot, aniversarioSnapshot] = await Promise.all([
-    feriasRef.get(),
-    baixasRef.get(),
-    aniversarioRef.get(),
+    feriasRef.where("year", "==", year).get(),
+    baixasRef.where("year", "==", year).get(),
+    aniversarioRef.where("year", "==", year).get(),
   ]);
 
   let diasFerias = 0;

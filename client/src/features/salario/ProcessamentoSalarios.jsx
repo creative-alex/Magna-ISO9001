@@ -6,7 +6,7 @@ import Sidebar from "../../shared/components/Sidebar";
 import Topbar from "../../shared/components/Topbar";
 import ColaboradoresGroupedList from "../../shared/components/ColaboradoresGroupedList";
 import ExportFechoMensalButton from "./ExportFechoMensalButton";
-import { FaPencil, FaCheck, FaSliders, FaChevronDown } from "react-icons/fa6";
+import { FaPencil, FaCheck, FaSliders, FaChevronDown, FaTriangleExclamation, FaXmark } from "react-icons/fa6";
 import { apiFetch } from "../../shared/utils/apiFetch";
 
 const GOLD = "#C8932F";
@@ -220,6 +220,70 @@ function FechoMensalRowBadge({ status, onSendReminder, sending }) {
   );
 }
 
+// Confirmação explícita antes do fecho universal (ver Interface no pedido original) - ação
+// global e potencialmente irreversível para os colaboradores, por isso não basta o próprio
+// botão vermelho: tem de haver um segundo passo deliberado antes de chamar a API.
+function TerminarVencimentoModal({ onConfirm, onCancel, loading }) {
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[2000] p-5"
+      onClick={() => !loading && onCancel()}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl max-w-[420px] w-full relative"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={loading}
+          className="absolute top-4 right-4 !w-8 !h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors cursor-pointer border-none bg-transparent disabled:cursor-not-allowed"
+        >
+          <FaXmark size={16} />
+        </button>
+
+        <div className="flex items-center gap-3 px-6 pt-6 pb-4 pr-14 border-b border-gray-100">
+          <span className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+            <FaTriangleExclamation size={16} />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-base font-bold text-gray-900 leading-tight">Terminar vencimento</h2>
+          </div>
+        </div>
+
+        <div className="px-6 pt-5 pb-6">
+          <p className="text-sm font-semibold text-gray-900 leading-relaxed mb-3">
+            Ação global — fecha o mês para todos os colaboradores que ainda não o tenham confirmado.
+          </p>
+          <p className="text-sm text-gray-700 leading-relaxed mb-6">
+            Ao executar esta ação, o mês será fechado para <strong>todos os colaboradores que permanecem com o fecho pendente</strong>.
+            Os dias normais de trabalho que não tenham qualquer registo ou ausência válida serão considerados <strong className="text-red-600">falta</strong>.
+          </p>
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={loading}
+              className="flex-1 py-2.5 px-4 border border-gray-200 rounded-full bg-white text-gray-600 text-sm font-medium cursor-pointer transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={loading}
+              className="flex-1 py-2.5 px-4 border-none rounded-full bg-red-600 text-white text-sm font-semibold cursor-pointer transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+            >
+              {loading ? "A fechar..." : "Sim, terminar"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ProcessamentoSalarios() {
   const navigate = useNavigate();
   const { uid, nivelAcesso } = useContext(UserContext);
@@ -231,6 +295,11 @@ export default function ProcessamentoSalarios() {
   // Fecho mensal (estado + exportação) só faz sentido para quem processa vencimentos a
   // nível global - Administrador continua de fora, tal como nos Parâmetros de salário.
   const canSeeFechoMensal = isAdmin || isHR || isGestorFinanceiro;
+  // "Terminar vencimento" (fecho universal, ver terminarVencimento em
+  // fechoMensalController.js): SuperAdmin vê sempre; GestorRH/GestorFinanceiro só a partir
+  // do dia 25 (mesmo prazo do fecho normal) - backend aceita os três (ver
+  // requireAdminOrHRorFinanceiro), esta restrição de dia é só de interface.
+  const canTerminarVencimento = isAdmin || ((isHR || isGestorFinanceiro) && new Date().getDate() >= 25);
 
   useEffect(() => {
     // Esta página (parâmetros + lista de colaboradores) é só para admin/RH/
@@ -248,6 +317,8 @@ export default function ProcessamentoSalarios() {
 
   const [fechoStatusList, setFechoStatusList] = useState([]);
   const [sendingUid, setSendingUid] = useState(null);
+  const [closingUniversal, setClosingUniversal] = useState(false);
+  const [showTerminarModal, setShowTerminarModal] = useState(false);
 
   const fetchFechoStatus = useCallback(async () => {
     if (!canSeeFechoMensal) return;
@@ -313,6 +384,29 @@ export default function ProcessamentoSalarios() {
     }
   };
 
+  const confirmTerminarVencimento = async () => {
+    setClosingUniversal(true);
+    try {
+      const response = await apiFetch("/fecho-mensal/terminar-vencimento", {
+        method: "POST",
+        body: JSON.stringify({ mes: mesAtual }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        toast.success(`Mês fechado para ${data.fechados} colaborador(es)`);
+        await fetchFechoStatus();
+        setShowTerminarModal(false);
+      } else {
+        toast.error(data.error || "Erro ao terminar o vencimento");
+      }
+    } catch (err) {
+      console.error("Erro ao terminar o vencimento:", err);
+      toast.error("Erro ao terminar o vencimento");
+    } finally {
+      setClosingUniversal(false);
+    }
+  };
+
   const handleSelectFile = (filePath) => {
     const formattedPath = filePath.replace(/\s/g, "-").replace(/\//g, "__");
     navigate(`/file/${formattedPath}`, { state: { originalFilename: filePath } });
@@ -341,7 +435,26 @@ export default function ProcessamentoSalarios() {
           title="Colaboradores"
           subtitle="Agrupados por entidade. Seleciona um colaborador para consultar ou preencher os dados de processamento salarial do mês."
           onSelect={(c) => navigate(`/salarios/${c.id}`, { state: { nome: c.nome, email: c.email } })}
-          renderHeaderExtra={canSeeFechoMensal ? () => <ExportFechoMensalButton /> : undefined}
+          renderHeaderExtra={
+            canSeeFechoMensal
+              ? () => (
+                  <div className="flex items-center gap-2">
+                    <ExportFechoMensalButton />
+                    {canTerminarVencimento && (
+                      <button
+                        type="button"
+                        onClick={() => setShowTerminarModal(true)}
+                        disabled={closingUniversal}
+                        title="Ação global: fecha o mês para todos os colaboradores que ainda não confirmaram - dias normais sem registo ficam como falta"
+                        className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg border-0 cursor-pointer transition-colors bg-red-600 text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                      >
+                        {closingUniversal ? "A fechar..." : "Terminar vencimento"}
+                      </button>
+                    )}
+                  </div>
+                )
+              : undefined
+          }
           renderGroupExtra={
             canSeeFechoMensal
               ? (entidade) => <ExportFechoMensalButton entidade={entidade} compact closed={entidadeClosedMap.get(entidade)} />
@@ -360,6 +473,14 @@ export default function ProcessamentoSalarios() {
           }
         />
       </div>
+
+      {showTerminarModal && (
+        <TerminarVencimentoModal
+          onConfirm={confirmTerminarVencimento}
+          onCancel={() => setShowTerminarModal(false)}
+          loading={closingUniversal}
+        />
+      )}
     </div>
   );
 }

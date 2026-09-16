@@ -43,12 +43,16 @@ const UserDetails = ({ selectedUser }) => {
   const [baixasPendentes, setBaixasPendentes] = useState([]);
   const [fechoMensal, setFechoMensal] = useState(null);
   const [entidadesOptions, setEntidadesOptions] = useState([]);
+  // Entidades adicionais (para além de "Entidade" acima) que este colaborador, quando
+  // Administrador, também gere - só um SuperAdmin pode atribuir isto (ver
+  // entidadesGeridasPor no backend).
+  const [entidadesGeridasSelecionadas, setEntidadesGeridasSelecionadas] = useState([]);
   const navigate = useNavigate(); // Obtém a função navigate
   const location = useLocation();
   const { uid: uidParam } = useParams();
   const [dados, setDados] = useState([]);
-  const { username, uid: actorUid, nivelAcesso: actorNivelAcesso } = useContext(UserContext);
-  // Um Administrador só gere colaboradores da sua própria entidade e nunca pode
+  const { username, uid: actorUid, nivelAcesso: actorNivelAcesso, entidadesGeridasNomes } = useContext(UserContext);
+  // Um Administrador só gere colaboradores das entidades que administra e nunca pode
   // atribuir/manter um nível de acesso igual ou superior ao seu; um GestorRH pode
   // atribuir Administrador mas nunca GestorRH/GestorFinanceiro/SuperAdmin, que
   // continuam exclusivos do SuperAdmin  -  o backend também impõe isto
@@ -56,6 +60,10 @@ const UserDetails = ({ selectedUser }) => {
   // coerente com o que é aceite.
   const isAdministrador = actorNivelAcesso === "Administrador";
   const isSuperAdmin = actorNivelAcesso === "SuperAdmin";
+  // Caso raro de um Administrador que gere mais do que uma entidade: em vez de
+  // bloquear o campo "Entidade", deixa mover o colaborador entre as que gere (ver
+  // entidadesGeridasPor no backend).
+  const isMultiEntidadeAdministrador = isAdministrador && (entidadesGeridasNomes?.length || 0) > 1;
 
   const handleSelectFile = (filePath) => {
     const formattedPath = filePath.replace(/\s/g, '-').replace(/\//g, '__');
@@ -87,9 +95,14 @@ const UserDetails = ({ selectedUser }) => {
   }, [selectedUser]);
 
   // Lista de entidades para o autocomplete do campo "Entidade"  -  só é preciso para
-  // quem pode mesmo editá-la (Administrador tem o campo sempre desativado).
+  // quem pode mesmo editá-la (um Administrador de uma só entidade tem o campo sempre
+  // desativado); um Administrador de mais do que uma usa antes as suas próprias
+  // (entidadesGeridasNomes), nunca a lista completa.
   useEffect(() => {
-    if (isAdministrador) return;
+    if (isAdministrador) {
+      if (isMultiEntidadeAdministrador) setEntidadesOptions(entidadesGeridasNomes);
+      return;
+    }
     (async () => {
       try {
         const res = await apiFetch("/entities/showEntities", { method: "POST" });
@@ -100,7 +113,7 @@ const UserDetails = ({ selectedUser }) => {
         console.error("Erro ao buscar entidades:", err);
       }
     })();
-  }, [isAdministrador]);
+  }, [isAdministrador, isMultiEntidadeAdministrador, entidadesGeridasNomes]);
 
   useEffect(() => {
 
@@ -308,8 +321,11 @@ const UserDetails = ({ selectedUser }) => {
       });
 
       if (response.ok) {
+        // Só recarrega a lista de pendentes - "Totais anuais" (yearly-summary +
+        // overtime-summary) é caro de recalcular (percorre o ano inteiro) só para
+        // refletir 1 dia aprovado; fica atualizado no próximo carregamento completo
+        // da página (troca de ano/colaborador), tal como aceite na auditoria de leituras.
         await fetchFeriasPendentes(); // Recarregar a lista
-        await fetchTotaisAnuais(); // Recalcular totais anuais
       } else {
       }
     } catch (err) {
@@ -326,8 +342,8 @@ const UserDetails = ({ selectedUser }) => {
       });
 
       if (response.ok) {
+        // Ver nota em handleApproveVacation sobre não recalcular totais anuais aqui.
         await fetchFeriasPendentes();
-        await fetchTotaisAnuais();
         alert("Férias rejeitadas com sucesso!");
       } else {
         alert("Erro ao rejeitar férias.");
@@ -347,8 +363,8 @@ const UserDetails = ({ selectedUser }) => {
       });
 
       if (response.ok) {
+        // Ver nota em handleApproveVacation sobre não recalcular totais anuais aqui.
         await fetchPendingTimeEdits();
-        await fetchTotaisAnuais();
       } else {
         alert("Erro ao aprovar alteração de horas.");
       }
@@ -385,8 +401,8 @@ const UserDetails = ({ selectedUser }) => {
       });
 
       if (response.ok) {
+        // Ver nota em handleApproveVacation sobre não recalcular totais anuais aqui.
         await fetchBaixasPendentes();
-        await fetchTotaisAnuais();
       } else {
         alert("Erro ao aprovar baixa médica.");
       }
@@ -404,8 +420,8 @@ const UserDetails = ({ selectedUser }) => {
       });
 
       if (response.ok) {
+        // Ver nota em handleApproveVacation sobre não recalcular totais anuais aqui.
         await fetchBaixasPendentes();
-        await fetchTotaisAnuais();
         alert("Pedido de baixa médica rejeitado.");
       } else {
         alert("Erro ao rejeitar baixa médica.");
@@ -476,12 +492,20 @@ const UserDetails = ({ selectedUser }) => {
   };
 
   const handleEditClick = () => {
+    setEntidadesGeridasSelecionadas(userDetails?.entidadesGeridasNomes || []);
     setIsEditing(true);
   };
 
   const handleCancelClick = () => {
     setIsEditing(false);
     setEditedData(userDetails);
+    setEntidadesGeridasSelecionadas(userDetails?.entidadesGeridasNomes || []);
+  };
+
+  const toggleEntidadeGerida = (nome) => {
+    setEntidadesGeridasSelecionadas((prev) => (
+      prev.includes(nome) ? prev.filter((n) => n !== nome) : [...prev, nome]
+    ));
   };
 
   const handleInputChange = (e) => {
@@ -519,10 +543,19 @@ const UserDetails = ({ selectedUser }) => {
 
       console.log("✅ Dados sanitizados que serão enviados:", sanitizedData);
 
+      delete sanitizedData.entidadesGeridasNomes;
+
       const dataToSend = {
         ...sanitizedData,
         uid: userDetails?.uid || localStorage.getItem("selectedUserUID"),
       };
+
+      // "entidadesGeridas" só é enviado quando é mesmo suposto ser alterado (SuperAdmin a
+      // editar um Administrador) - o backend recusa este campo vindo de quem não é
+      // SuperAdmin, e não faz sentido para quem não é Administrador.
+      if (isSuperAdmin && editedData?.nivelAcesso === "Administrador") {
+        dataToSend.entidadesGeridas = entidadesGeridasSelecionadas;
+      }
 
 
       const response = await apiFetch(`/timetracking/updateUserDetails`, {
@@ -641,8 +674,8 @@ const normalizedEntityUrl = userDetails?.entidade
                             value={editedData?.entidade || ""}
                             onChange={(v) => setEditedData({ ...editedData, entidade: v })}
                             options={entidadesOptions}
-                            inputStyle={{ ...inputStyle, ...(isAdministrador ? { cursor: "not-allowed", opacity: 0.7 } : {}) }}
-                            disabled={isAdministrador}
+                            inputStyle={{ ...inputStyle, ...((isAdministrador && !isMultiEntidadeAdministrador) ? { cursor: "not-allowed", opacity: 0.7 } : {}) }}
+                            disabled={isAdministrador && !isMultiEntidadeAdministrador}
                           />
                         </div>
                         <div>
@@ -675,6 +708,29 @@ const normalizedEntityUrl = userDetails?.entidade
                             </select>
                           )}
                         </div>
+                        {isSuperAdmin && editedData?.nivelAcesso === "Administrador" && (
+                          <div>
+                            <span style={labelStyle}>Entidades adicionais que também gere</span>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 160, overflowY: "auto", border: "1px solid #e5e7eb", borderRadius: 6, padding: 10, background: "#fafafa" }}>
+                              {entidadesOptions.filter((nome) => nome !== editedData?.entidade).length === 0 && (
+                                <span style={{ fontSize: 12, color: "#9ca3af" }}>Não há outras entidades registadas.</span>
+                              )}
+                              {entidadesOptions.filter((nome) => nome !== editedData?.entidade).map((nome) => (
+                                <label key={nome} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, color: "#374151", cursor: "pointer" }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={entidadesGeridasSelecionadas.includes(nome)}
+                                    onChange={() => toggleEntidadeGerida(nome)}
+                                  />
+                                  {nome}
+                                </label>
+                              ))}
+                            </div>
+                            <span style={{ fontSize: 10.5, color: "#9ca3af", marginTop: 4, display: "block" }}>
+                              Além da entidade principal acima, este Administrador também vê e gere os colaboradores destas entidades.
+                            </span>
+                          </div>
+                        )}
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4, paddingTop: 14, borderTop: "1px solid #f3f4f6" }}>
                           <div style={{ display: "flex", gap: 8 }}>
                             <button style={btnSolid} onClick={handleSubmitClick}>Submeter</button>

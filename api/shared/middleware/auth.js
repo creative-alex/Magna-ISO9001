@@ -14,9 +14,16 @@ async function requireAuth(req, res, next) {
 
     let userDoc = await db.collection("users").doc(decodedToken.uid).get();
     let userData = {};
+    // true só quando o documento existe mesmo em users/{uid} (não no caso raro do
+    // fallback por email abaixo, dados legados com outro ID de documento) - controllers
+    // de autoconsulta usam isto para saber se podem reaproveitar userData em vez de
+    // fazer o seu próprio users/{id}.get(), sem arriscar divergir do que esse get()
+    // devolveria (ver requireAuth/req.userData mais abaixo).
+    let userDocExists = false;
 
     if (userDoc.exists) {
       userData = userDoc.data();
+      userDocExists = true;
     } else {
       const querySnapshot = await db.collection("users").where("email", "==", decodedToken.email).get();
       if (!querySnapshot.empty) {
@@ -36,7 +43,18 @@ async function requireAuth(req, res, next) {
       // limitar o que um "Administrador" (nível intermédio, ver isAdministrador) pode
       // ver/gerir aos colaboradores da sua própria entidade.
       entidade: userData.entidade || null,
+      // Caso raro de um Administrador que gere mais do que uma entidade: refs
+      // "entidades/<id>" adicionais, para além de "entidade" acima  -  ver
+      // entidadesGeridasPor/entidadeNoAmbito.
+      entidadesGeridas: userData.entidadesGeridas || null,
     };
+
+    // Dados brutos do próprio documento já lido acima (users/{uid}) - endpoints de
+    // autoconsulta (cadastro/salário/formação/prémios/medicina/favoritos) reaproveitam
+    // isto em vez de reler o mesmo documento, quando o pedido é sobre o próprio
+    // utilizador e req.userDocExists é true (ver nota acima).
+    req.userData = userData;
+    req.userDocExists = userDocExists;
 
     next();
   } catch (error) {
@@ -64,6 +82,28 @@ function isGestorRH(nivelAcesso) {
 // (contrato, salário, plano de formação) nem acesso fora da sua entidade.
 function isAdministrador(nivelAcesso) {
   return (nivelAcesso || "").toLowerCase() === "administrador";
+}
+
+// Todas as entidades (refs "entidades/<id>") geridas por um Administrador: a sua
+// "entidade" principal mais qualquer entidade adicional em "entidadesGeridas" - caso
+// raro de um Administrador responsável por mais do que uma entidade. Aceita tanto
+// req.user como um userData de Firestore (mesmo formato dos dois campos).
+function entidadesGeridasPor(user) {
+  const geridas = new Set();
+  if (user?.entidade) geridas.add(user.entidade);
+  if (Array.isArray(user?.entidadesGeridas)) {
+    user.entidadesGeridas.forEach((ref) => { if (ref) geridas.add(ref); });
+  }
+  return [...geridas];
+}
+
+// Verifica se a entidade de um colaborador-alvo está dentro do âmbito de gestão de um
+// Administrador. Usar em vez de comparar "=== req.user.entidade" diretamente, para
+// suportar o caso de um Administrador com mais do que uma entidade (ver
+// entidadesGeridasPor); quem chama continua responsável por confirmar isAdministrador
+// primeiro, já que esta função por si só nada diz sobre o nível de acesso.
+function entidadeNoAmbito(user, targetEntidade) {
+  return !!targetEntidade && entidadesGeridasPor(user).includes(targetEntidade);
 }
 
 // Usado nos sítios (cadastro/salário/formação) onde o Administrador só deve poder
@@ -129,6 +169,8 @@ module.exports = {
   isAdminOrHR,
   isGestorRH,
   isAdministrador,
+  entidadesGeridasPor,
+  entidadeNoAmbito,
   isAdminOrHRorAdministrador,
   isGestorFinanceiro,
   isSuperAdminOrGestorFinanceiro,

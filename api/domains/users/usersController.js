@@ -1,6 +1,6 @@
 const admin = require("firebase-admin");
 const db = require("../../shared/db/firebase").db;
-const { isSuperAdmin: hasSuperAdminAccess, isAdministrador } = require("../../shared/middleware/auth");
+const { isSuperAdmin: hasSuperAdminAccess, isAdministrador, entidadesGeridasPor } = require("../../shared/middleware/auth");
 const { isBlocoAtivoEm, labelBaixaOuLicenca } = require("../../shared/lib/absenceBlocks");
 
 // Únicos valores válidos para o nível de acesso (controla permissões). Distinto
@@ -56,18 +56,26 @@ const verifyTokenAndGetUserInfo = async (req, res) => {
     const isSuperAdmin = hasSuperAdminAccess(userData.nivelAcesso);
     console.log('📍 Role do usuário:', userData.role || 'user');
 
-    // Nome legível da entidade  -  só é preciso resolver quando o utilizador é
-    // Administrador (usado no frontend para bloquear o campo "Entidade" ao criar/editar
-    // colaboradores, para não deixar sair da sua própria entidade).
+    // Nomes legíveis das entidades geridas  -  só é preciso resolver quando o utilizador é
+    // Administrador (usado no frontend para bloquear/restringir o campo "Entidade" ao
+    // criar/editar colaboradores, para não deixar sair das entidades que gere). Normalmente
+    // uma só ("entidadeNome"), mas um Administrador pode gerir mais do que uma (ver
+    // entidadesGeridasPor) - "entidadesGeridasNomes" traz todas.
     let entidadeNome = null;
-    if (isAdministrador(userData.nivelAcesso) && typeof userData.entidade === 'string') {
-      const entidadeId = userData.entidade.replace('entidades/', '');
-      try {
-        const entidadeDoc = await db.collection('entidades').doc(entidadeId).get();
-        entidadeNome = entidadeDoc.exists ? (entidadeDoc.data().nome || null) : null;
-      } catch (err) {
-        console.error('⚠️ Erro ao buscar nome da entidade:', err);
-      }
+    let entidadesGeridasNomes = [];
+    if (isAdministrador(userData.nivelAcesso)) {
+      const geridas = entidadesGeridasPor(userData);
+      entidadesGeridasNomes = await Promise.all(geridas.map(async (ref) => {
+        const entidadeId = ref.replace('entidades/', '');
+        try {
+          const entidadeDoc = await db.collection('entidades').doc(entidadeId).get();
+          return entidadeDoc.exists ? (entidadeDoc.data().nome || entidadeId) : entidadeId;
+        } catch (err) {
+          console.error('⚠️ Erro ao buscar nome da entidade:', err);
+          return entidadeId;
+        }
+      }));
+      entidadeNome = entidadesGeridasNomes[0] || null;
     }
 
     const responseData = {
@@ -81,6 +89,7 @@ const verifyTokenAndGetUserInfo = async (req, res) => {
       isFirstLogin: isSuperAdmin ? false : (userData.isFirstLogin ?? true),
       entidade: userData.entidade || null,
       entidadeNome,
+      entidadesGeridasNomes,
     };
 
     console.log('✅ Retornando dados do usuário:', JSON.stringify(responseData, null, 2));
@@ -245,13 +254,70 @@ const getAllUsers = async (req, res) => {
   }
 };
 
+// Situação contratual não-ativa é sempre a informação mais relevante (ver
+// getColaboradores/getColaboradoresStatusHoje) - ignora baixas/cedências/férias nesse
+// caso. Caso contrário, procura uma baixa/cedência ativa hoje nas listas já agrupadas
+// por colaborador (ver collectionGroup em getEstadoHojeParaColaboradores), e só then
+// faz a única leitura que continua por colaborador (Ferias de hoje, ver nota aí).
+async function resolveEstadoHoje(db, { id, situacao_contratual }, { baixasPorUid, cedenciasPorUid, todayIso, todayBr }) {
+  if (situacao_contratual && situacao_contratual !== "Ativo") {
+    return situacao_contratual;
+  }
+
+  const baixaAtiva = (baixasPorUid.get(id) || []).find(b => isBlocoAtivoEm(b, todayIso));
+  if (baixaAtiva) return labelBaixaOuLicenca(baixaAtiva.tipo);
+
+  const cedenciaAtiva = (cedenciasPorUid.get(id) || []).some(b => isBlocoAtivoEm(b, todayIso));
+  if (cedenciaAtiva) return "Cedência temporária";
+
+  // Só esta continua 1 leitura por colaborador: precisa de where("date","==",hoje) e
+  // um collectionGroup com esse filtro exigiria um índice que ainda não existe no
+  // projeto (confirmado - falha com FAILED_PRECONDITION); ao contrário de
+  // baixasMedicas/cedencias acima, que um collectionGroup sem filtro já resolve bem.
+  const feriasSnap = await db.collection('registo-ponto').doc(id).collection('Ferias').where('date', '==', todayBr).get();
+  const emFerias = feriasSnap.docs.some(d => {
+    const data = d.data();
+    return data.Approved === true || data.Approved === 'true' || data.Approved === 1;
+  });
+  if (emFerias) return "Férias";
+
+  return "Ativo";
+}
+
+// baixasMedicas/cedencias (módulo de Cadastro) de TODOS os colaboradores, lidas de
+// uma só vez via collectionGroup (funciona sem índice novo para uma leitura sem
+// where - confirmado) e agrupadas por uid, em vez de 1 leitura de cada subcoleção por
+// colaborador (era o N+1 de getColaboradoresStatusHoje: 2×M leituras extra).
+async function fetchBaixasECedenciasPorUid(db) {
+  const [baixasSnap, cedenciasSnap] = await Promise.all([
+    db.collectionGroup('baixasMedicas').get(),
+    db.collectionGroup('cedencias').get(),
+  ]);
+  const groupByUid = (snap) => {
+    const map = new Map();
+    snap.forEach(doc => {
+      const uid = doc.ref.parent.parent.id;
+      if (!map.has(uid)) map.set(uid, []);
+      map.get(uid).push(doc.data());
+    });
+    return map;
+  };
+  return { baixasPorUid: groupByUid(baixasSnap), cedenciasPorUid: groupByUid(cedenciasSnap) };
+}
+
 const getColaboradores = async (req, res) => {
   try {
     const db = admin.firestore();
-    const [snapshot, entidadesSnapshot] = await Promise.all([
-      db.collection('users').get(),
-      db.collection('entidades').get(),
-    ]);
+    // Opcional: inclui o estado "hoje" de cada colaborador na mesma resposta (ver
+    // getColaboradoresStatusHoje) - evita que o frontend tenha de pedir a coleção
+    // "users" inteira uma segunda vez só para calcular isto (ver
+    // ColaboradoresGroupedList.jsx).
+    const comEstadoHoje = req.query?.comEstadoHoje === 'true';
+
+    const reads = [db.collection('users').get(), db.collection('entidades').get()];
+    const [snapshot, entidadesSnapshot, baixasECedencias] = await Promise.all(
+      comEstadoHoje ? [...reads, fetchBaixasECedenciasPorUid(db)] : reads
+    );
 
     if (snapshot.empty) {
       return res.json([]);
@@ -262,17 +328,18 @@ const getColaboradores = async (req, res) => {
       entidadeNomes[doc.id] = doc.data().nome || doc.id;
     });
 
-    // Administrador só vê os colaboradores da sua própria entidade; SuperAdmin/GestorRH
-    // (os únicos outros níveis que chegam aqui, ver requireCanViewColaboradores) veem todos.
+    // Administrador só vê os colaboradores das entidades que gere (normalmente uma só);
+    // SuperAdmin/GestorRH (os únicos outros níveis que chegam aqui, ver
+    // requireCanViewColaboradores) veem todos.
     const actorNivelAcesso = req.user?.nivelAcesso;
     const scopeToOwnEntidade = isAdministrador(actorNivelAcesso);
-    const actorEntidade = req.user?.entidade || null;
+    const actorEntidades = scopeToOwnEntidade ? entidadesGeridasPor(req.user) : null;
 
     const colaboradores = [];
     snapshot.forEach(doc => {
       const data = doc.data();
       if (hasSuperAdminAccess(data.nivelAcesso)) return;
-      if (scopeToOwnEntidade && data.entidade !== actorEntidade) return;
+      if (scopeToOwnEntidade && !actorEntidades.includes(data.entidade)) return;
 
       const entidadeId = data.entidade ? data.entidade.replace('entidades/', '') : null;
       colaboradores.push({
@@ -281,10 +348,26 @@ const getColaboradores = async (req, res) => {
         email: data.email || 'Email não disponível',
         role: data.role || 'user',
         entidade: entidadeId ? (entidadeNomes[entidadeId] || entidadeId) : null,
+        situacao_contratual: data.situacao_contratual || 'Ativo',
       });
     });
 
-    res.json(colaboradores);
+    if (!comEstadoHoje) {
+      return res.json(colaboradores);
+    }
+
+    const hoje = new Date();
+    const ctx = {
+      ...baixasECedencias,
+      todayIso: hoje.toISOString().slice(0, 10),
+      todayBr: `${String(hoje.getDate()).padStart(2, "0")}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${hoje.getFullYear()}`,
+    };
+    const colaboradoresComEstado = await Promise.all(colaboradores.map(async (c) => ({
+      ...c,
+      estadoHoje: await resolveEstadoHoje(db, c, ctx),
+    })));
+
+    res.json(colaboradoresComEstado);
   } catch (error) {
     console.error("Erro ao buscar colaboradores:", error);
     res.status(500).json({ error: "Erro interno do servidor", details: error.message });
@@ -294,56 +377,41 @@ const getColaboradores = async (req, res) => {
 // Estado "hoje" de cada colaborador, para a lista de /colaboradores  -  por ordem de
 // prioridade: situação contratual não-ativa (cessado/suspenso/reformado) > baixa/licença
 // a decorrer > cedência temporária a decorrer > férias aprovadas para hoje > ativo.
+// Mantido como endpoint próprio por compatibilidade; o ecrã de Colaboradores usa antes
+// GET /users/getColaboradores?comEstadoHoje=true (mesmo cálculo, sem repetir a leitura
+// da coleção "users").
 const getColaboradoresStatusHoje = async (req, res) => {
   try {
     const db = admin.firestore();
-    const hoje = new Date();
-    const todayIso = hoje.toISOString().slice(0, 10);
-    const todayBr = `${String(hoje.getDate()).padStart(2, "0")}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${hoje.getFullYear()}`;
 
-    const usersSnapshot = await db.collection('users').get();
+    const [usersSnapshot, baixasECedencias] = await Promise.all([
+      db.collection('users').get(),
+      fetchBaixasECedenciasPorUid(db),
+    ]);
 
     // Mesmo âmbito de visibilidade que getColaboradores (ver requireCanViewColaboradores).
     const actorNivelAcesso = req.user?.nivelAcesso;
     const scopeToOwnEntidade = isAdministrador(actorNivelAcesso);
-    const actorEntidade = req.user?.entidade || null;
+    const actorEntidades = scopeToOwnEntidade ? entidadesGeridasPor(req.user) : null;
 
     const alvo = [];
     usersSnapshot.forEach(doc => {
       const data = doc.data();
       if (hasSuperAdminAccess(data.nivelAcesso)) return;
-      if (scopeToOwnEntidade && data.entidade !== actorEntidade) return;
+      if (scopeToOwnEntidade && !actorEntidades.includes(data.entidade)) return;
       alvo.push({ id: doc.id, situacao_contratual: data.situacao_contratual || null });
     });
 
-    const estados = await Promise.all(alvo.map(async ({ id, situacao_contratual }) => {
-      // Situação contratual diferente de "Ativo" (Cessado, Suspenso, Reformado) é sempre
-      // a informação mais relevante  -  ignora baixas/cedências/férias nesse caso.
-      if (situacao_contratual && situacao_contratual !== "Ativo") {
-        return { id, estado: situacao_contratual };
-      }
-
-      const userRef = db.collection('users').doc(id);
-      const [baixasSnap, cedenciasSnap, feriasSnap] = await Promise.all([
-        userRef.collection('baixasMedicas').get(),
-        userRef.collection('cedencias').get(),
-        db.collection('registo-ponto').doc(id).collection('Ferias').where('date', '==', todayBr).get(),
-      ]);
-
-      const baixaAtiva = baixasSnap.docs.map(d => d.data()).find(b => isBlocoAtivoEm(b, todayIso));
-      if (baixaAtiva) return { id, estado: labelBaixaOuLicenca(baixaAtiva.tipo) };
-
-      const cedenciaAtiva = cedenciasSnap.docs.some(d => isBlocoAtivoEm(d.data(), todayIso));
-      if (cedenciaAtiva) return { id, estado: "Cedência temporária" };
-
-      const emFerias = feriasSnap.docs.some(d => {
-        const data = d.data();
-        return data.Approved === true || data.Approved === 'true' || data.Approved === 1;
-      });
-      if (emFerias) return { id, estado: "Férias" };
-
-      return { id, estado: "Ativo" };
-    }));
+    const hoje = new Date();
+    const ctx = {
+      ...baixasECedencias,
+      todayIso: hoje.toISOString().slice(0, 10),
+      todayBr: `${String(hoje.getDate()).padStart(2, "0")}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${hoje.getFullYear()}`,
+    };
+    const estados = await Promise.all(alvo.map(async ({ id, situacao_contratual }) => ({
+      id,
+      estado: await resolveEstadoHoje(db, { id, situacao_contratual }, ctx),
+    })));
 
     res.json(estados);
   } catch (error) {
@@ -449,6 +517,13 @@ const getFavorites = async (req, res) => {
     if (username !== req.user.nome) {
       return res.status(403).json({ error: 'Não podes ver os favoritos de outro utilizador' });
     }
+    // Este endpoint só devolve os favoritos do próprio utilizador (ver verificação
+    // acima), documento que o middleware (requireAuth) já leu - reaproveita-lo em vez
+    // de repetir a mesma pesquisa por "nome". No caso raro em que esse documento não
+    // exista em users/{uid} (ver req.userDocExists), mantém a pesquisa original.
+    if (req.userDocExists) {
+      return res.json(req.userData.favorites || []);
+    }
     const snapshot = await db.collection('users').where('nome', '==', username).get();
     if (snapshot.empty) return res.json([]);
     const userData = snapshot.docs[0].data();
@@ -469,11 +544,17 @@ const updateFavorite = async (req, res) => {
       return res.status(403).json({ error: 'Não podes alterar os favoritos de outro utilizador' });
     }
 
-    const snapshot = await db.collection('users').where('nome', '==', username).get();
-    if (snapshot.empty) return res.status(404).json({ error: 'Utilizador não encontrado' });
-
-    const userDocRef = snapshot.docs[0].ref;
-    const favorites = snapshot.docs[0].data().favorites || [];
+    let userDocRef;
+    let favorites;
+    if (req.userDocExists) {
+      userDocRef = db.collection('users').doc(req.user.uid);
+      favorites = req.userData.favorites || [];
+    } else {
+      const snapshot = await db.collection('users').where('nome', '==', username).get();
+      if (snapshot.empty) return res.status(404).json({ error: 'Utilizador não encontrado' });
+      userDocRef = snapshot.docs[0].ref;
+      favorites = snapshot.docs[0].data().favorites || [];
+    }
 
     let updatedFavorites;
     if (action === 'add') {

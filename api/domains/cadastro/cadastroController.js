@@ -1,6 +1,6 @@
 const admin = require("firebase-admin");
 const db = require("../../shared/db/firebase").db;
-const { isAdminOrHR, isAdministrador } = require("../../shared/middleware/auth");
+const { isAdminOrHR, isAdministrador, entidadeNoAmbito } = require("../../shared/middleware/auth");
 const { sendMail, renderEmail } = require("../../shared/services/mailer");
 const {
   validarNIF, validarNISS, validarCodigoPostal, validarTelefone, validarCartaoCidadao, validarIBAN,
@@ -14,7 +14,7 @@ function canAccess(req, id) {
 // sua própria entidade (nunca de outra); um colaborador comum só vê o seu próprio
 // cadastro. Nunca dá direito de escrita  -  isso continua só em canAccess/canEditRestricted.
 function canRead(req, id, targetEntidade) {
-  return canAccess(req, id) || (isAdministrador(req.user?.nivelAcesso) && !!targetEntidade && targetEntidade === req.user?.entidade);
+  return canAccess(req, id) || (isAdministrador(req.user?.nivelAcesso) && entidadeNoAmbito(req.user, targetEntidade));
 }
 
 function canEditRestricted(req) {
@@ -101,12 +101,20 @@ const getCadastro = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const userDoc = await db.collection("users").doc(id).get();
-    if (!userDoc.exists) {
-      return res.status(404).json({ error: "Colaborador não encontrado" });
+    // Quando o pedido é sobre o próprio utilizador, o middleware (requireAuth) já leu
+    // este mesmo documento - reaproveita-lo em vez de o reler (ver req.userDocExists).
+    const userDocRef = db.collection("users").doc(id);
+    let data;
+    if (req.user?.uid === id && req.userDocExists) {
+      data = req.userData;
+    } else {
+      const userDoc = await userDocRef.get();
+      if (!userDoc.exists) {
+        return res.status(404).json({ error: "Colaborador não encontrado" });
+      }
+      data = userDoc.data();
     }
 
-    const data = userDoc.data();
     if (!canRead(req, id, data.entidade)) {
       return res.status(403).json({ error: "Sem permissão para consultar este cadastro" });
     }
@@ -117,14 +125,14 @@ const getCadastro = async (req, res) => {
     });
 
     // Documentos digitalizados  -  um documento por chave (ex: "digitalizacao_cc") em users/{id}/docs/{docKey}.
-    const docsSnap = await userDoc.ref.collection("docs").get();
+    const docsSnap = await userDocRef.collection("docs").get();
     const docs = {};
     docsSnap.forEach(doc => { docs[doc.id] = doc.data(); });
 
     // Cedências temporárias / baixas médicas  -  cada uma numa subcoleção própria (ver BLOCK_COLLECTIONS).
     const blocks = {};
     await Promise.all(BLOCK_COLLECTIONS.map(async ({ collection, requestKey }) => {
-      const snap = await userDoc.ref.collection(collection).get();
+      const snap = await userDocRef.collection(collection).get();
       blocks[requestKey] = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }));
 
@@ -174,8 +182,10 @@ const saveCadastro = async (req, res) => {
     }
 
     const userDocRef = db.collection("users").doc(id);
-    const userDoc = await userDocRef.get();
-    if (!userDoc.exists) {
+    // Idem getCadastro: reaproveita a existência já confirmada pelo middleware quando
+    // o pedido é sobre o próprio utilizador, em vez de reler o mesmo documento.
+    const userExists = (req.user?.uid === id && req.userDocExists) || (await userDocRef.get()).exists;
+    if (!userExists) {
       return res.status(404).json({ error: "Colaborador não encontrado" });
     }
 
@@ -260,12 +270,17 @@ const notifyPerfilIncompleto = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const userDoc = await db.collection("users").doc(id).get();
-    if (!userDoc.exists) {
-      return res.status(404).json({ error: "Colaborador não encontrado" });
+    let userData;
+    if (req.user?.uid === id && req.userDocExists) {
+      userData = req.userData;
+    } else {
+      const userDoc = await db.collection("users").doc(id).get();
+      if (!userDoc.exists) {
+        return res.status(404).json({ error: "Colaborador não encontrado" });
+      }
+      userData = userDoc.data();
     }
 
-    const userData = userDoc.data();
     if (!canRead(req, id, userData.entidade)) {
       return res.status(403).json({ error: "Sem permissão para notificar este colaborador" });
     }

@@ -1,13 +1,13 @@
 const admin = require("firebase-admin");
 const db = require("../../shared/db/firebase").db;
-const { isAdministrador, isSuperAdminOrGestorFinanceiro } = require("../../shared/middleware/auth");
+const { isAdministrador, isSuperAdminOrGestorFinanceiro, entidadeNoAmbito } = require("../../shared/middleware/auth");
 
 // Leitura: SuperAdmin/Gestor Financeiro vê qualquer colaborador; Administrador vê os
 // colaboradores da sua própria entidade; GestorRH e o próprio colaborador só podem
 // consultar os seus próprios prémios (nunca de outro colaborador), nunca editar.
 function canRead(req, id, targetEntidade) {
   return isSuperAdminOrGestorFinanceiro(req.user?.nivelAcesso) || req.user?.uid === id
-    || (isAdministrador(req.user?.nivelAcesso) && !!targetEntidade && targetEntidade === req.user?.entidade);
+    || (isAdministrador(req.user?.nivelAcesso) && entidadeNoAmbito(req.user, targetEntidade));
 }
 
 // Edição (criar/atualizar/apagar prémio): exclusiva de SuperAdmin e Gestor Financeiro
@@ -64,12 +64,18 @@ const getPremios = async (req, res) => {
     const { id } = req.params;
 
     const userDocRef = db.collection("users").doc(id);
-    const userDoc = await userDocRef.get();
-    if (!userDoc.exists) {
-      return res.status(404).json({ error: "Colaborador não encontrado" });
+    let userEntidade;
+    if (req.user?.uid === id && req.userDocExists) {
+      userEntidade = req.userData.entidade;
+    } else {
+      const userDoc = await userDocRef.get();
+      if (!userDoc.exists) {
+        return res.status(404).json({ error: "Colaborador não encontrado" });
+      }
+      userEntidade = userDoc.data().entidade;
     }
 
-    if (!canRead(req, id, userDoc.data().entidade)) {
+    if (!canRead(req, id, userEntidade)) {
       return res.status(403).json({ error: "Sem permissão para consultar os prémios deste colaborador" });
     }
 

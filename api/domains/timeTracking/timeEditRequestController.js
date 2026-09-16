@@ -146,18 +146,18 @@ const getPendingTimeEdits = async (req, res) => {
     const { uid: userId, error: authError } = await resolveTargetUid(req);
     if (authError) return res.status(403).json({ error: authError });
 
-    const snapshot = await db.collection("registo-ponto").doc(userId).collection("AjustesPendentes").get();
+    const snapshot = await db.collection("registo-ponto").doc(userId).collection("AjustesPendentes")
+      .where("Approved", "==", false)
+      .get();
     const pendentes = [];
     snapshot.forEach((doc) => {
       const data = doc.data();
-      if (data.Approved === false) {
-        pendentes.push({
-          date: data.date,
-          horaEntrada: data.horaEntrada,
-          horaSaida: data.horaSaida,
-          justificativa: data.justificativa,
-        });
-      }
+      pendentes.push({
+        date: data.date,
+        horaEntrada: data.horaEntrada,
+        horaSaida: data.horaSaida,
+        justificativa: data.justificativa,
+      });
     });
 
     return res.status(200).json({ pendentes });

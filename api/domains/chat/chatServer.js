@@ -61,11 +61,12 @@ async function persistMensagem(colaboradorId, colaboradorNome, autor, texto) {
   const conversaRef = db.collection("conversas").doc(colaboradorId);
   const mensagemRef = conversaRef.collection("mensagens").doc();
   const criadoEm = admin.firestore.FieldValue.serverTimestamp();
+  const autorTipo = autor.isGestor ? "gestor" : "colaborador";
 
   await mensagemRef.set({
     autorId: autor.uid,
     autorNome: autor.nome,
-    autorTipo: autor.isGestor ? "gestor" : "colaborador",
+    autorTipo,
     texto,
     criadoEm,
   });
@@ -79,15 +80,18 @@ async function persistMensagem(colaboradorId, colaboradorNome, autor, texto) {
     unreadForColaborador: autor.isGestor ? true : false,
   }, { merge: true });
 
-  const mensagemDoc = await mensagemRef.get();
-  const data = mensagemDoc.data();
+  // Tudo o que é devolvido já está em memória desde o .set() acima - reler o documento
+  // só para o devolver era uma leitura desperdiçada por cada mensagem enviada. O único
+  // campo que não temos localmente é o valor resolvido de "criadoEm" (é um sentinel de
+  // servidor até ser lido); usar o instante atual do servidor é equivalente para efeitos
+  // de exibição/ordenação no chat.
   return {
-    id: mensagemDoc.id,
-    autorId: data.autorId,
-    autorNome: data.autorNome,
-    autorTipo: data.autorTipo,
-    texto: data.texto,
-    criadoEm: data.criadoEm ? data.criadoEm.toDate().toISOString() : new Date().toISOString(),
+    id: mensagemRef.id,
+    autorId: autor.uid,
+    autorNome: autor.nome,
+    autorTipo,
+    texto,
+    criadoEm: new Date().toISOString(),
   };
 }
 

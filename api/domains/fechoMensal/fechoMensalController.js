@@ -1,7 +1,7 @@
 const admin = require("firebase-admin");
 const db = admin.firestore();
 const { resolveTargetUid } = require("../timeTracking/helpers");
-const { isSuperAdmin, isAdministrador } = require("../../shared/middleware/auth");
+const { isSuperAdmin, isAdministrador, entidadesGeridasPor, entidadeNoAmbito } = require("../../shared/middleware/auth");
 const { calculateMonthlyAttendanceSummary } = require("../timeTracking/reportsController");
 const { sendMail, renderEmail } = require("../../shared/services/mailer");
 
@@ -44,18 +44,21 @@ function resumoDoSnapshot(summary) {
   };
 }
 
-// Colaboradores ativos (exclui SuperAdmin e quem já não está "Ativo" - Cessado/Suspenso/
-// Reformado), tal como getColaboradoresStatusHoje em usersController.js. Sem
-// "scopeToEntidade" devolve todos - usado pelo agendador (sendMonthlyClosingReminders/
-// sweepUnconfirmedMonths), que não tem um "req" de um admin específico.
-async function getActiveColaboradores({ scopeToEntidade } = {}) {
+// Colaboradores ativos (exclui SuperAdmin, Administrador - "manda chuva" de entidade, sem
+// livro de ponto/férias próprios, tal como em getVacationMap - e quem já não está "Ativo"
+// - Cessado/Suspenso/Reformado), tal como getColaboradoresStatusHoje em usersController.js.
+// Sem "scopeToEntidades" devolve todos - usado pelo agendador (sendMonthlyClosingReminders/
+// sendSecondMonthlyClosingReminders/sweepUnconfirmedMonths), que não tem um "req" de um
+// admin específico.
+async function getActiveColaboradores({ scopeToEntidades } = {}) {
   const snapshot = await db.collection("users").get();
   const colaboradores = [];
   snapshot.forEach(doc => {
     const data = doc.data();
     if (isSuperAdmin(data.nivelAcesso)) return;
+    if (isAdministrador(data.nivelAcesso)) return;
     if (data.situacao_contratual && data.situacao_contratual !== "Ativo") return;
-    if (scopeToEntidade && data.entidade !== scopeToEntidade) return;
+    if (scopeToEntidades && !scopeToEntidades.includes(data.entidade)) return;
     colaboradores.push({ id: doc.id, nome: data.nome || doc.id, email: data.email || null, entidade: data.entidade || null });
   });
   return colaboradores;
@@ -171,11 +174,11 @@ const listFechoMensalStatus = async (req, res) => {
       return res.status(400).json({ error: "Mês inválido (formato esperado AAAA-MM)" });
     }
 
-    // Mesmo âmbito de visibilidade que getColaboradoresStatusHoje: Administrador só vê a
-    // própria entidade, SuperAdmin/GestorRH/GestorFinanceiro veem todos.
-    const scopeToEntidade = isAdministrador(req.user?.nivelAcesso) ? req.user?.entidade : null;
+    // Mesmo âmbito de visibilidade que getColaboradoresStatusHoje: Administrador só vê as
+    // entidades que gere (normalmente uma só), SuperAdmin/GestorRH/GestorFinanceiro veem todos.
+    const scopeToEntidades = isAdministrador(req.user?.nivelAcesso) ? entidadesGeridasPor(req.user) : null;
     const [colaboradores, entidadesSnapshot] = await Promise.all([
-      getActiveColaboradores({ scopeToEntidade }),
+      getActiveColaboradores({ scopeToEntidades }),
       db.collection("entidades").get(),
     ]);
 
@@ -313,7 +316,7 @@ const sendReminderToUser = async (req, res) => {
     }
     const userData = userDoc.data();
 
-    if (isAdministrador(req.user?.nivelAcesso) && userData.entidade !== req.user?.entidade) {
+    if (isAdministrador(req.user?.nivelAcesso) && !entidadeNoAmbito(req.user, userData.entidade)) {
       return res.status(403).json({ error: "Acesso restrito a colaboradores da sua entidade" });
     }
 
@@ -355,6 +358,70 @@ async function sweepUnconfirmedMonths() {
   }
   return sinalizados;
 }
+
+// Fecho universal (botão "Terminar vencimento", RH/Admin, disponível a partir do dia 25) -
+// força o fecho do mês para TODOS os colaboradores que ainda não o tenham confirmado, de
+// uma só vez. Reutiliza a mesma getActiveColaboradores/calculateMonthlyAttendanceSummary/
+// resumoDoSnapshot já usadas em todo este ficheiro - nenhuma leitura nova é introduzida
+// além do já necessário para calcular a assiduidade de quem falta fechar.
+//
+// Diferença crucial em relação a confirmFechoMensal (confirmação do próprio colaborador):
+// aqui NÃO se passa "assumeWorkedFrom", por isso calculateMonthlyAttendanceSummary usa a
+// sua classificação normal (ver reportsController.js) em vez da projeção "dia da
+// confirmação em diante = trabalho": dia com registo → trabalho, férias/baixa/aniversário
+// → essa categoria, dia útil já passado sem registo → falta, fim de semana/feriado → fora
+// da contagem. Ou seja, ao contrário do fecho normal, o fecho universal NUNCA presume que
+// os dias restantes foram trabalhados.
+//
+// Idempotente: cada colaborador só é processado se o seu fechoMensal/{mes} ainda não tiver
+// confirmed:true (mesma condição já usada em sendReminderEmailToColaborador/
+// sweepUnconfirmedMonths) - voltar a executar no mesmo mês só afeta quem continuar por
+// fechar, nunca reprocessa quem já está fechado (nem por confirmação própria, nem por uma
+// corrida anterior deste fecho universal).
+async function forceCloseUnconfirmedMonths(mes, actorUid) {
+  const [ano, mesNum] = mes.split("-").map(Number);
+  const colaboradores = await getActiveColaboradores();
+
+  let fechados = 0;
+  for (const colaborador of colaboradores) {
+    try {
+      const fechoRef = db.collection("users").doc(colaborador.id).collection("fechoMensal").doc(mes);
+      const fechoDoc = await fechoRef.get();
+      if (fechoDoc.exists && fechoDoc.data().confirmed === true) continue;
+
+      const summary = await calculateMonthlyAttendanceSummary({ uid: colaborador.id, year: ano, month: mesNum });
+
+      await fechoRef.set({
+        mes,
+        confirmed: true,
+        confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+        confirmedBy: actorUid,
+        summarySnapshot: resumoDoSnapshot(summary),
+        flaggedUnconfirmedAt: admin.firestore.FieldValue.delete(),
+      }, { merge: true });
+      fechados++;
+    } catch (error) {
+      console.error(`Erro ao forçar o fecho do mês para ${colaborador.id}:`, error);
+    }
+  }
+  return fechados;
+}
+
+// Handler do botão "Terminar vencimento" (ver rota /terminar-vencimento, requireAdminOrHR).
+const terminarVencimento = async (req, res) => {
+  try {
+    const { mes } = req.body;
+    if (!MES_REGEX.test(mes || "")) {
+      return res.status(400).json({ error: "Mês inválido (formato esperado AAAA-MM)" });
+    }
+
+    const fechados = await forceCloseUnconfirmedMonths(mes, req.user.uid);
+    return res.status(200).json({ message: "Fecho universal do mês processado com sucesso", fechados });
+  } catch (error) {
+    console.error("Erro ao processar o fecho universal do mês:", error);
+    return res.status(500).json({ error: error.message });
+  }
+};
 
 // Disparo manual (SuperAdmin) das funções acima - úteis para QA (não dá para esperar pelo
 // dia 20/24/25 em produção) e como rede de segurança se o cron falhar.
@@ -399,4 +466,5 @@ module.exports = {
   triggerSecondReminders,
   triggerSweep,
   sendReminderToUser,
+  terminarVencimento,
 };

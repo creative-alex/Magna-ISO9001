@@ -1,51 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { apiFetch } from '../../../../shared/utils/apiFetch';
 
 
-const LeaveButton = ({ username, fontSize = '1.5vw', buttonHeight = '5vh', onSuccess }) => {
-  const [hasEntry, setHasEntry] = useState(false);
-  const [hasLeave, setHasLeave] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const checkStatus = async () => {
-      if (!username) return;
-      
-
-      
-      try {
-        const [entryRes, leaveRes] = await Promise.all([
-          apiFetch(`/timetracking/checkEntry`, { method: 'POST' }),
-          apiFetch(`/timetracking/checkLeave`, { method: 'POST' }),
-        ]);
-
-        if (entryRes.ok) {
-          const entryData = await entryRes.json();
-          setHasEntry(entryData.hasEntry || false);
-        }
-
-        if (leaveRes.ok) {
-          const leaveData = await leaveRes.json();
-          setHasLeave(leaveData.hasLeave || false);
-        }
-      } catch (error) {
-        console.error('Erro ao verificar status:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkStatus();
-  }, [username]);
-
+// hasEntry/hasLeave/loading vêm do pai (RegistosPage), partilhados com EntryButton -
+// ver nota em entryRegisterButton.jsx (era /checkEntry + /checkLeave só para este
+// botão, mais /checkEntry outra vez no botão de entrada; agora é 1 leitura só,
+// reaproveitada pelos dois).
+const LeaveButton = ({ hasEntry, hasLeave, loading, fontSize = '1.5vw', buttonHeight = '5vh', onSuccess }) => {
   const isDisabled = !hasEntry || hasLeave;
 
   const handleClick = async () => {
     const now = new Date();
     const formattedTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    const currentDate = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
 
     try {
       // Tentar registar online primeiro
@@ -55,7 +23,6 @@ const LeaveButton = ({ username, fontSize = '1.5vw', buttonHeight = '5vh', onSuc
       });
 
       if (response.ok) {
-        setHasLeave(true);
         toast.success(`✓ Saída registada às ${formattedTime}`, {
           position: 'top-right',
           autoClose: 3000

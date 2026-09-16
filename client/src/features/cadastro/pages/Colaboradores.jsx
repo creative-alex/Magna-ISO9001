@@ -38,6 +38,7 @@ export default function Colaboradores() {
           subtitle="Agrupados por entidade. Seleciona um colaborador para consultar ou preencher a respetiva ficha de cadastro."
           onSelect={(c) => navigate(`/cadastro/${c.id}`, { state: { nome: c.nome, email: c.email } })}
           showStatusHoje
+          includeInactive
         />
       </div>
     </div>

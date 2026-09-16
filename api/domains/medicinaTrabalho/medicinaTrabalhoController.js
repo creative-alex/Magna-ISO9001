@@ -1,6 +1,6 @@
 const admin = require("firebase-admin");
 const db = require("../../shared/db/firebase").db;
-const { isAdminOrHR, isAdministrador } = require("../../shared/middleware/auth");
+const { isAdminOrHR, isAdministrador, entidadeNoAmbito } = require("../../shared/middleware/auth");
 
 const bucket = admin.storage().bucket();
 
@@ -8,7 +8,7 @@ const bucket = admin.storage().bucket();
 // sua própria entidade; o próprio colaborador só pode consultar, nunca gerir os exames.
 function canRead(req, id, targetEntidade) {
   return isAdminOrHR(req.user?.nivelAcesso) || req.user?.uid === id
-    || (isAdministrador(req.user?.nivelAcesso) && !!targetEntidade && targetEntidade === req.user?.entidade);
+    || (isAdministrador(req.user?.nivelAcesso) && entidadeNoAmbito(req.user, targetEntidade));
 }
 
 function canManage(req) {
@@ -25,12 +25,18 @@ const getMedicinaTrabalho = async (req, res) => {
     const { id } = req.params;
 
     const userDocRef = db.collection("users").doc(id);
-    const userDoc = await userDocRef.get();
-    if (!userDoc.exists) {
-      return res.status(404).json({ error: "Colaborador não encontrado" });
+    let userEntidade;
+    if (req.user?.uid === id && req.userDocExists) {
+      userEntidade = req.userData.entidade;
+    } else {
+      const userDoc = await userDocRef.get();
+      if (!userDoc.exists) {
+        return res.status(404).json({ error: "Colaborador não encontrado" });
+      }
+      userEntidade = userDoc.data().entidade;
     }
 
-    if (!canRead(req, id, userDoc.data().entidade)) {
+    if (!canRead(req, id, userEntidade)) {
       return res.status(403).json({ error: "Sem permissão para consultar a medicina do trabalho deste colaborador" });
     }
 

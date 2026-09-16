@@ -16,6 +16,7 @@ export const UserProvider = ({ children }) => {
   const [nivelAcesso, setNivelAcesso] = useState(null);
   const [entidade, setEntidade] = useState(null);
   const [entidadeNome, setEntidadeNome] = useState(null);
+  const [entidadesGeridasNomes, setEntidadesGeridasNomes] = useState([]);
 
   // Função para verificar e validar o token do utilizador
   const validateUserToken = async (user) => {
@@ -49,6 +50,7 @@ export const UserProvider = ({ children }) => {
         setNivelAcesso(userData.nivelAcesso);
         setEntidade(userData.entidade);
         setEntidadeNome(userData.entidadeNome);
+        setEntidadesGeridasNomes(Array.isArray(userData.entidadesGeridasNomes) ? userData.entidadesGeridasNomes : []);
         setIsAuthenticated(true);
         return true;
       } else {
@@ -72,6 +74,7 @@ export const UserProvider = ({ children }) => {
     setNivelAcesso(null);
     setEntidade(null);
     setEntidadeNome(null);
+    setEntidadesGeridasNomes([]);
     setIsAuthenticated(false);
   };
 
@@ -123,6 +126,8 @@ export const UserProvider = ({ children }) => {
     setEntidade,
     entidadeNome,
     setEntidadeNome,
+    entidadesGeridasNomes,
+    setEntidadesGeridasNomes,
     isAuthenticated,
     setIsAuthenticated,
     isLoading,

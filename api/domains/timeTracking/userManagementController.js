@@ -1,7 +1,7 @@
 const admin = require("firebase-admin");
 const { normalizeUserId } = require("./helpers");
 const { normalizeEntityId } = require("../../shared/lib/normalizeEntityId");
-const { isSuperAdmin, isAdminOrHR, isGestorRH, isAdministrador, isGestorFinanceiro } = require("../../shared/middleware/auth");
+const { isSuperAdmin, isAdminOrHR, isGestorRH, isAdministrador, isGestorFinanceiro, entidadesGeridasPor, entidadeNoAmbito } = require("../../shared/middleware/auth");
 const db = admin.firestore();
 
 // Únicos valores válidos para o nível de acesso (controla permissões). Distinto
@@ -23,15 +23,47 @@ function normalizeNivelAcessoForActor(actorNivelAcesso, requestedNivelAcesso) {
   return requested;
 }
 
+// Nomes legíveis das entidades adicionais (para além de "entidade") que um
+// Administrador também gere (ver entidadesGeridasPor) - usado em userDetails/
+// updateUserDetails para pré-preencher/devolver o formulário de atribuição, que só um
+// SuperAdmin pode submeter.
+async function resolveEntidadesGeridasNomes(refs) {
+  if (!Array.isArray(refs) || !refs.length) return [];
+  const nomes = await Promise.all(refs.map(async (ref) => {
+    const entidadeId = typeof ref === "string" ? ref.replace("entidades/", "") : null;
+    if (!entidadeId) return null;
+    try {
+      const entidadeDoc = await db.collection("entidades").doc(entidadeId).get();
+      return entidadeDoc.exists ? (entidadeDoc.data().nome || entidadeId) : entidadeId;
+    } catch (err) {
+      console.error("⚠️ Erro ao buscar entidade:", err);
+      return entidadeId;
+    }
+  }));
+  return nomes.filter(Boolean);
+}
+
 const createUser = async (req, res) => {
   try {
     const { nome, email, role, nivelAcesso, temporaryPassword } = req.body;
     const actorIsAdministrador = isAdministrador(req.user?.nivelAcesso);
-    // Administrador só pode criar colaboradores dentro da sua própria entidade  -  ignora
-    // qualquer "entidade" enviada no corpo e usa sempre a do próprio Administrador.
-    const entidade = actorIsAdministrador
-      ? (req.user?.entidade || "").replace("entidades/", "")
-      : req.body.entidade;
+    // Administrador só pode criar colaboradores dentro de uma entidade que gere. No caso
+    // comum (uma só entidade) ignora qualquer "entidade" enviada no corpo e usa sempre a
+    // sua; um Administrador de mais do que uma entidade (ver entidadesGeridasPor) tem de
+    // indicar qual das suas é a do novo colaborador.
+    const actorEntidades = actorIsAdministrador ? entidadesGeridasPor(req.user) : null;
+    let entidade;
+    if (actorIsAdministrador && actorEntidades.length > 1) {
+      const requestedRef = req.body.entidade ? `entidades/${normalizeEntityId(req.body.entidade)}` : null;
+      if (!requestedRef || !actorEntidades.includes(requestedRef)) {
+        return res.status(400).json({ error: "Indique uma das entidades que administra para este colaborador" });
+      }
+      entidade = req.body.entidade;
+    } else if (actorIsAdministrador) {
+      entidade = (req.user?.entidade || "").replace("entidades/", "");
+    } else {
+      entidade = req.body.entidade;
+    }
 
     // Validação básica
     if (!nome || !email || !entidade || !temporaryPassword) {
@@ -117,7 +149,7 @@ const userDetails = async (req, res) => {
 
     const userData = userDoc.data();
 
-    if (isAdministrador(req.user?.nivelAcesso) && userData.entidade !== req.user?.entidade) {
+    if (isAdministrador(req.user?.nivelAcesso) && !entidadeNoAmbito(req.user, userData.entidade)) {
       return res.status(403).json({ error: "Acesso restrito a colaboradores da sua entidade" });
     }
 
@@ -140,6 +172,8 @@ const userDetails = async (req, res) => {
       }
     }
 
+    const entidadesGeridasNomes = await resolveEntidadesGeridasNomes(userData.entidadesGeridas);
+
     const userDetails = {
       uid,
       email: userData.email || "N/A",
@@ -147,6 +181,7 @@ const userDetails = async (req, res) => {
       nome: userData.nome || "N/A",
       role: userData.role || "N/A",
       nivelAcesso: normalizeNivelAcesso(userData.nivelAcesso),
+      entidadesGeridasNomes,
     };
 
     res.json(userDetails);
@@ -166,7 +201,7 @@ const getUsersByEntity = async (req, res) => {
 
     const entidadeId = normalizeEntityId(entidadeNome);
 
-    if (isAdministrador(req.user?.nivelAcesso) && `entidades/${entidadeId}` !== req.user?.entidade) {
+    if (isAdministrador(req.user?.nivelAcesso) && !entidadeNoAmbito(req.user, `entidades/${entidadeId}`)) {
       return res.status(403).json({ error: "Acesso restrito à sua entidade" });
     }
 
@@ -203,7 +238,7 @@ const updateUserDetails = async (req, res) => {
       return res.status(404).json({ error: "user não encontrado." });
     }
 
-    if (actorIsAdministrador && userDoc.data().entidade !== req.user?.entidade) {
+    if (actorIsAdministrador && !entidadeNoAmbito(req.user, userDoc.data().entidade)) {
       return res.status(403).json({ error: "Acesso restrito a colaboradores da sua entidade" });
     }
     // Um Administrador nunca pode editar um GestorRH/GestorFinanceiro/SuperAdmin que por
@@ -212,11 +247,23 @@ const updateUserDetails = async (req, res) => {
       return res.status(403).json({ error: "Acesso restrito a colaboradores da sua entidade" });
     }
 
-    // Administrador nunca pode mudar a entidade de um colaborador  -  mantém sempre a
-    // própria, para não conseguir "tirar" ninguém da entidade que gere.
-    const entidade = actorIsAdministrador
-      ? (req.user?.entidade || "").replace("entidades/", "")
-      : req.body.entidade;
+    // Administrador nunca pode mandar um colaborador para uma entidade que não gere. No
+    // caso comum (uma só entidade) mantém sempre a sua, para não conseguir "tirar"
+    // ninguém dela; um Administrador de mais do que uma entidade (ver
+    // entidadesGeridasPor) pode mover o colaborador entre as que gere, mas nunca para fora.
+    const actorEntidades = actorIsAdministrador ? entidadesGeridasPor(req.user) : null;
+    let entidade;
+    if (actorIsAdministrador && actorEntidades.length > 1) {
+      const requestedRef = req.body.entidade ? `entidades/${normalizeEntityId(req.body.entidade)}` : null;
+      if (!requestedRef || !actorEntidades.includes(requestedRef)) {
+        return res.status(400).json({ error: "Só pode atribuir uma das entidades que administra" });
+      }
+      entidade = req.body.entidade;
+    } else if (actorIsAdministrador) {
+      entidade = (req.user?.entidade || "").replace("entidades/", "");
+    } else {
+      entidade = req.body.entidade;
+    }
 
     if (!uid || !nome || !entidade || !role) {
       return res.status(400).json({ error: "Todos os campos são obrigatórios." });
@@ -240,10 +287,31 @@ const updateUserDetails = async (req, res) => {
       updatedData.nivelAcesso = normalizeNivelAcessoForActor(req.user?.nivelAcesso, nivelAcesso);
     }
 
+    // "entidadesGeridas" (entidades adicionais que um Administrador também gere, ver
+    // entidadesGeridasPor) é um campo de permissões, não um dado normal do colaborador -
+    // só um SuperAdmin pode defini-lo, nunca o próprio Administrador nem um GestorRH.
+    // Quando ausente do pedido, não é tocado (mantém o que já lá estava).
+    if (req.body.entidadesGeridas !== undefined) {
+      if (!isSuperAdmin(req.user?.nivelAcesso)) {
+        return res.status(403).json({ error: "Só um SuperAdmin pode definir as entidades geridas por um Administrador." });
+      }
+      if (!Array.isArray(req.body.entidadesGeridas)) {
+        return res.status(400).json({ error: "entidadesGeridas deve ser uma lista de entidades." });
+      }
+      updatedData.entidadesGeridas = req.body.entidadesGeridas
+        .filter((nome) => typeof nome === "string" && nome.trim())
+        .map((nome) => `entidades/${normalizeEntityId(nome)}`);
+    }
+
     await userDocRef.update(updatedData);
 
     const entidadeDoc = await db.collection("entidades").doc(entidadeId).get();
     const entidadeNome = entidadeDoc.exists ? (entidadeDoc.data().nome || "Desconhecida") : "Desconhecida";
+    // Devolve sempre o estado atual (já refletindo esta atualização, se "entidadesGeridas"
+    // fez parte dela), para o formulário nunca ficar com uma versão desatualizada.
+    const entidadesGeridasNomes = await resolveEntidadesGeridasNomes(
+      updatedData.entidadesGeridas ?? userDoc.data().entidadesGeridas
+    );
 
     return res.status(200).json({
       message: "colaborador atualizado com sucesso.",
@@ -252,6 +320,7 @@ const updateUserDetails = async (req, res) => {
       role,
       nivelAcesso: updatedData.nivelAcesso ?? normalizeNivelAcesso(userDoc.data().nivelAcesso),
       entidade: entidadeNome,
+      entidadesGeridasNomes,
     });
   } catch (error) {
     console.error("🚨 Erro ao atualizar colaborador:", error);
@@ -277,7 +346,7 @@ const deleteUser = async (req, res) => {
     }
 
     if (isAdministrador(req.user?.nivelAcesso)) {
-      if (userDoc.data().entidade !== req.user?.entidade) {
+      if (!entidadeNoAmbito(req.user, userDoc.data().entidade)) {
         return res.status(403).json({ error: "Acesso restrito a colaboradores da sua entidade" });
       }
       if (isAdminOrHR(userDoc.data().nivelAcesso) || isGestorFinanceiro(userDoc.data().nivelAcesso)) {

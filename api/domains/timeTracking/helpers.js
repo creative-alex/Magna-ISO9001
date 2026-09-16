@@ -1,5 +1,5 @@
 const admin = require("firebase-admin");
-const { isAdminOrHR, isAdministrador } = require("../../shared/middleware/auth");
+const { isAdminOrHR, isAdministrador, entidadeNoAmbito } = require("../../shared/middleware/auth");
 const db = admin.firestore();
 
 // Função helper para normalizar IDs de colaboradors
@@ -29,7 +29,7 @@ const resolveTargetUid = async (req) => {
 
   if (isAdministrador(req.user.nivelAcesso)) {
     const targetDoc = await db.collection("users").doc(targetUid).get();
-    if (targetDoc.exists && targetDoc.data().entidade === req.user.entidade) {
+    if (targetDoc.exists && entidadeNoAmbito(req.user, targetDoc.data().entidade)) {
       return { uid: targetUid, error: null };
     }
     return { uid: null, error: "Acesso restrito a colaboradores da sua entidade" };

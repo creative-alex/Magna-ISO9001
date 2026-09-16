@@ -216,6 +216,7 @@ export default function KonamiWordle() {
 
   const bufferRef = useRef([]);
   const hintRequestRef = useRef(0);
+  const wordsSyncedRef = useRef(false);
   const target = entry.word;
 
   const toggleTimerEnabled = () => {
@@ -273,9 +274,15 @@ export default function KonamiWordle() {
     return () => clearInterval(id);
   }, [open, status, entry]);
 
-  // Sincroniza com a lista partilhada no servidor (Firestore), para que
-  // colegas na mesma rede joguem com as mesmas palavras/dicas.
-  useEffect(() => {
+  // Sincroniza com a lista partilhada no servidor (Firestore), para que colegas na
+  // mesma rede joguem com as mesmas palavras/dicas. A esmagadora maioria das visitas ao
+  // Dashboard nunca desbloqueia este easter egg, por isso só sincroniza quando o código
+  // Konami é mesmo detetado (ver useEffect abaixo), em vez de em todo o carregamento do
+  // Dashboard; wordsSyncedRef garante que só acontece uma vez por sessão de página,
+  // tal como antes (o efeito original só corria uma vez, no mount).
+  const syncWordListFromServer = useCallback(() => {
+    if (wordsSyncedRef.current) return;
+    wordsSyncedRef.current = true;
     apiFetch("/konami-wordle/words")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
@@ -326,12 +333,13 @@ export default function KonamiWordle() {
         bufferRef.current.every((k, i) => k === KONAMI_CODE[i]);
       if (matches) {
         bufferRef.current = [];
+        syncWordListFromServer();
         startNewGame();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [startNewGame]);
+  }, [startNewGame, syncWordListFromServer]);
 
   const submitGuess = useCallback(() => {
     if (currentGuess.length !== target.length) {

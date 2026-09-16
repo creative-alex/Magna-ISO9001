@@ -5,13 +5,25 @@ import ContextMenu from './contextMenu';
 import ManualOvertimeModal from './ManualOvertimeModal';
 import { apiFetch } from '../../../../shared/utils/apiFetch';
 
-const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year = new Date().getFullYear(), className = '', onCompensated }) => {
+// calendarData/calendarLoading (opcionais): quando vêm do pai (RegistosPage.jsx), esta
+// tabela não faz o seu próprio POST /timetracking/calendar - antes disso, e a
+// totalSummary.jsx pediam os mesmos dados (mesmo username/mês/ano) de forma
+// independente, duplicando a leitura mais cara da página inteira. Quando
+// calendarData é null (ex: dentro do modal de "resumo anual", onde cada mês
+// expandido é um mês/ano arbitrário e diferente do da página principal), a tabela
+// continua a fazer o seu próprio pedido, tal como sempre fez.
+const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year = new Date().getFullYear(), className = '', onDataChanged, reloadTick = 0, calendarData, calendarLoading = false }) => {
   const [dados, setDados] = useState([]);
   const [loading, setLoading] = useState(true);
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, dayIndex: null });
   const [selectedDate, setSelectedDate] = useState(null);
   const [tooltip, setTooltip] = useState({ visible: false, x: 0, y: 0, content: '' });
   const [overtimeModal, setOvertimeModal] = useState({ show: false, entries: [], date: '' });
+
+  // hasExternalData tem de ser "a prop foi passada" (mesmo que ainda null a carregar),
+  // não "já tem dados" - senão, durante o carregamento inicial (calendarData ainda
+  // null no pai), esta tabela cairia por engano no modo de auto-busca (Modo B).
+  const hasExternalData = calendarData !== undefined;
 
   // Função para extrair apenas a hora no formato HH:MM
   const extractTime = (timeString) => {
@@ -24,43 +36,33 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
     return timeString;
   };
 
-  const fetchData = useCallback(async () => {
-    if (!username) return;
-
+  // Pedidos de alteração de horas ainda pendentes de aprovação (ver
+  // requestTimeEditButton.jsx)  -  indexados por data completa "DD-MM-YYYY". Nunca é
+  // partilhado com a totalSummary.jsx (só esta tabela usa isto), por isso continua
+  // a ser um pedido próprio em ambos os modos.
+  const fetchPendingEdits = useCallback(async () => {
+    if (!username) return {};
     try {
-      setLoading(true);
-
-      const response = await apiFetch(`/timetracking/calendar`, {
-        method: "POST",
-        body: JSON.stringify({ month, year }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erro HTTP: ${response.status}`);
+      const ajustesResponse = await apiFetch(`/timetracking/pending-time-edits`, { method: "POST" });
+      if (ajustesResponse.ok) {
+        const ajustesData = await ajustesResponse.json();
+        return Object.fromEntries(
+          (ajustesData.pendentes || []).map((ajuste) => [ajuste.date, ajuste])
+        );
       }
+    } catch (err) {
+      console.error("Erro ao buscar pedidos de alteração de horas pendentes:", err);
+    }
+    return {};
+  }, [username]);
 
-      const data = await response.json();
+  const processCalendarData = useCallback((data, ajustesPendentesPorDia) => {
       const diasNoMes = new Date(year, month, 0).getDate();
       const registos = data.registos || [];
       const manualOvertimeData = data.manualOvertime || [];
       const ferias = data.ferias || [];
       const baixas = data.baixas || [];
       const aniversario = data.aniversario || [];
-
-      // Pedidos de alteração de horas ainda pendentes de aprovação (ver
-      // requestTimeEditButton.jsx)  -  indexados por data completa "DD-MM-YYYY".
-      let ajustesPendentesPorDia = {};
-      try {
-        const ajustesResponse = await apiFetch(`/timetracking/pending-time-edits`, { method: "POST" });
-        if (ajustesResponse.ok) {
-          const ajustesData = await ajustesResponse.json();
-          ajustesPendentesPorDia = Object.fromEntries(
-            (ajustesData.pendentes || []).map((ajuste) => [ajuste.date, ajuste])
-          );
-        }
-      } catch (err) {
-        console.error("Erro ao buscar pedidos de alteração de horas pendentes:", err);
-      }
 
       const dadosProcessados = Array.from({ length: diasNoMes }, (_, i) => {
         const dia = `${String(i + 1).padStart(2, "0")}-${String(month).padStart(2, "0")}`;
@@ -116,16 +118,65 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
       });
 
       setDados(dadosProcessados);
+  }, [month, year]);
+
+  // Modo A: dados vêm do pai (calendarData != null) - só falta juntar os pedidos
+  // pendentes (que continuam a ser só desta tabela) e processar.
+  useEffect(() => {
+    if (!hasExternalData) return;
+    if (calendarLoading || !calendarData) { setLoading(true); return; }
+    let cancelled = false;
+    setLoading(true);
+    fetchPendingEdits().then((ajustes) => {
+      if (cancelled) return;
+      processCalendarData(calendarData, ajustes);
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [hasExternalData, calendarData, calendarLoading, fetchPendingEdits, processCalendarData]);
+
+  // Modo B: sem dados do pai (ex: dentro do modal de resumo anual, um mês/ano
+  // arbitrário por linha expandida) - comportamento de sempre, pedido próprio.
+  const fetchOwnData = useCallback(async () => {
+    if (!username) return;
+    setLoading(true);
+    try {
+      const response = await apiFetch(`/timetracking/calendar`, {
+        method: "POST",
+        body: JSON.stringify({ month, year }),
+      });
+      if (!response.ok) {
+        throw new Error(`Erro HTTP: ${response.status}`);
+      }
+      const data = await response.json();
+      const ajustes = await fetchPendingEdits();
+      processCalendarData(data, ajustes);
     } catch (error) {
       console.error("Erro ao buscar dados:", error);
     } finally {
       setLoading(false);
     }
-  }, [username, month, year]);
+  // reloadTick força um novo fetchOwnData quando o pai sinaliza que algo mudou (ex:
+  // entrada/saída registada) - antes disso era feito remontando este componente
+  // inteiro (key={refreshKey}), o que também reiniciava contextMenu/tooltip/modal de
+  // horas extras sem necessidade.
+  }, [username, month, year, reloadTick, fetchPendingEdits, processCalendarData]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (hasExternalData) return;
+    fetchOwnData();
+  }, [hasExternalData, fetchOwnData]);
+
+  // Pede ao pai para recarregar (modo A) ou recarrega diretamente (modo B) - usado
+  // depois de ações desta tabela que mudam os dados (compensar dia curto, pedir
+  // alteração de horas, registar horas extra manuais).
+  const refreshData = useCallback(() => {
+    if (hasExternalData) {
+      if (onDataChanged) onDataChanged();
+    } else {
+      fetchOwnData();
+    }
+  }, [hasExternalData, onDataChanged, fetchOwnData]);
 
   const handleContextMenu = (e, dayIndex) => {
     e.preventDefault();
@@ -174,12 +225,11 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
 
   const handleOvertimeUpdate = () => {
     closeOvertimeModal();
-    fetchData();
+    refreshData();
   };
 
   const handleCompensated = () => {
-    fetchData();
-    if (onCompensated) onCompensated();
+    refreshData();
   };
 
 
@@ -300,10 +350,10 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
         isDiaEditavel={contextMenu.dayIndex != null ? new Date(year, month - 1, contextMenu.dayIndex + 1) <= new Date(new Date().setHours(0, 0, 0, 0)) : false}
         horaEntradaAtual={contextMenu.dayIndex != null ? dados[contextMenu.dayIndex]?.horaEntrada : null}
         horaSaidaAtual={contextMenu.dayIndex != null ? dados[contextMenu.dayIndex]?.horaSaida : null}
-        onTimeEditRequested={fetchData}
+        onTimeEditRequested={refreshData}
         username={username}
         month={month}
-        onOvertimeRegistered={fetchData}
+        onOvertimeRegistered={refreshData}
       />
       <ManualOvertimeModal
         show={overtimeModal.show}

@@ -11,11 +11,15 @@ import AutocompleteInput from '../../../shared/components/AutocompleteInput';
 import { FUNCAO } from '../../../shared/utils/formOptions';
 
 const Register = () => {
-    const { nivelAcesso: actorNivelAcesso, entidadeNome: actorEntidadeNome } = useContext(UserContext);
-    // Um Administrador só pode criar colaboradores dentro da sua própria entidade e
+    const { nivelAcesso: actorNivelAcesso, entidadeNome: actorEntidadeNome, entidadesGeridasNomes } = useContext(UserContext);
+    // Um Administrador só pode criar colaboradores dentro de uma entidade que gere e
     // nunca pode atribuir um nível de acesso igual ou superior ao seu  -  o backend
     // também impõe isto, mas mantemos o formulário coerente com o que vai ser aceite.
     const isAdministrador = actorNivelAcesso === 'Administrador';
+    // Caso raro de um Administrador que gere mais do que uma entidade: em vez de
+    // bloquear o campo numa só, deixa escolher entre as que gere (ver
+    // entidadesGeridasPor no backend).
+    const isMultiEntidadeAdministrador = isAdministrador && entidadesGeridasNomes.length > 1;
     // SuperAdmin escolhe qualquer nível de acesso; GestorRH só pode criar Colaborador
     // ou Administrador (nunca GestorRH/GestorFinanceiro/SuperAdmin, esses continuam
     // exclusivos do SuperAdmin)  -  o backend também impõe isto (normalizeNivelAcessoForActor).
@@ -52,11 +56,15 @@ const Register = () => {
         })();
     }, []);
 
-    // Inclui sempre a própria entidade do Administrador nas sugestões, mesmo que por
-    // algum motivo não venha na lista carregada do backend (ver <select> antigo).
-    const entidadeOptions = isAdministrador && actorEntidadeNome && !entidades.includes(actorEntidadeNome)
-        ? [actorEntidadeNome, ...entidades]
-        : entidades;
+    // Um Administrador de mais do que uma entidade só pode escolher entre as que
+    // gere; um Administrador comum (uma só entidade) continua a ver a sua própria
+    // sempre incluída nas sugestões, mesmo que por algum motivo não venha na lista
+    // carregada do backend (ver <select> antigo).
+    const entidadeOptions = isMultiEntidadeAdministrador
+        ? entidadesGeridasNomes
+        : (isAdministrador && actorEntidadeNome && !entidades.includes(actorEntidadeNome)
+            ? [actorEntidadeNome, ...entidades]
+            : entidades);
 
     const handleSubmit = async (event) => {
         event.preventDefault();
@@ -263,11 +271,15 @@ const Register = () => {
                                         onChange={setEntidade}
                                         options={entidadeOptions}
                                         placeholder={entidadesLoading ? 'A carregar entidades...' : 'Escreve ou seleciona uma entidade'}
-                                        disabled={isAdministrador || entidadesLoading}
+                                        disabled={(isAdministrador && !isMultiEntidadeAdministrador) || entidadesLoading}
                                         required
                                     />
                                     {isAdministrador && (
-                                        <span className="text-[12px] text-gray-400">Como Administrador, só podes criar colaboradores na tua própria entidade.</span>
+                                        <span className="text-[12px] text-gray-400">
+                                            {isMultiEntidadeAdministrador
+                                                ? 'Escolhe a entidade (uma das que administras) para este colaborador.'
+                                                : 'Como Administrador, só podes criar colaboradores na tua própria entidade.'}
+                                        </span>
                                     )}
                                 </div>
 

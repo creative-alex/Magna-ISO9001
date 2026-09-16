@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { FaStopwatch, FaChartColumn } from 'react-icons/fa6';
 import { calcularHoras, formatarMinutos } from '../../utils/calcHours';
 import { getHolidaysForSede } from '../../../../shared/utils/holidays';
@@ -15,7 +15,12 @@ const MONTH_NAMES_FULL = [
   'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
 ];
 
-const TotaisSummary = ({ username, month = new Date().getMonth() + 1 }) => {
+// calendarData/calendarLoading (opcionais): quando vêm do pai (RegistosPage.jsx), os
+// "Totais" do mês não fazem o seu próprio POST /timetracking/calendar - antes disso,
+// esta e a pontoTable.jsx pediam os mesmos dados (mesmo username/mês/ano) de forma
+// independente, duplicando a leitura mais cara da página. O saldo anual de horas
+// extra (2º useEffect) e o resumo anual/modal continuam à parte, sem alteração.
+const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick = 0, calendarData, calendarLoading = false }) => {
   const [totais, setTotais] = useState({
     totalHoras: "0h 0m",
     totalExtras: "0h 0m",
@@ -45,24 +50,8 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1 }) => {
     return timeString;
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!username) return;
-      
-      try {
-        setLoading(true);
+  const processMonthData = useCallback((data) => {
         const currentYear = new Date().getFullYear();
-        
-        const response = await apiFetch(`/timetracking/calendar`, {
-          method: "POST",
-          body: JSON.stringify({ month, year: currentYear }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Erro HTTP: ${response.status}`);
-        }
-
-        const data = await response.json();
         const registos = data.registos || [];
         const ferias = data.ferias || [];
         const baixas = data.baixas || [];
@@ -149,15 +138,57 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1 }) => {
           diasFerias: ferias.filter(f => f.approved).length,
           diasAniversario: aniversario.filter(a => a.approved).length,
         });
+  }, [month]);
+
+  // hasExternalData tem de ser "a prop foi passada" (mesmo que ainda null a
+  // carregar), não "já tem dados" - ver nota igual em pontoTable.jsx.
+  const hasExternalData = calendarData !== undefined;
+
+  // Modo A: dados vêm do pai - não faz o seu próprio pedido.
+  useEffect(() => {
+    if (!hasExternalData) return;
+    if (calendarLoading || !calendarData) { setLoading(true); return; }
+    setLoading(true);
+    try {
+      processMonthData(calendarData);
+    } catch (error) {
+      console.error("Erro ao processar totais:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [hasExternalData, calendarData, calendarLoading, processMonthData]);
+
+  // Modo B: sem dados do pai - pedido próprio (mantido por robustez/consistência com
+  // pontoTable.jsx, embora hoje este componente só seja usado com calendarData vindo
+  // de RegistosPage.jsx).
+  useEffect(() => {
+    if (hasExternalData) return;
+    if (!username) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        const currentYear = new Date().getFullYear();
+        const response = await apiFetch(`/timetracking/calendar`, {
+          method: "POST",
+          body: JSON.stringify({ month, year: currentYear }),
+        });
+        if (!response.ok) throw new Error(`Erro HTTP: ${response.status}`);
+        const data = await response.json();
+        if (cancelled) return;
+        processMonthData(data);
       } catch (error) {
         console.error("Erro ao buscar totais:", error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
-    };
-
-    fetchData();
-  }, [username, month]);
+    })();
+    return () => { cancelled = true; };
+  // reloadTick sinaliza o pai (RegistosPage) que algo mudou (ex: entrada/saída
+  // registada) - antes isto era feito remontando este componente inteiro
+  // (key={refreshKey}), que também fechava o modal de resumo anual/horas extras
+  // se estivesse aberto.
+  }, [hasExternalData, username, month, reloadTick, processMonthData]);
 
   // Saldo anual de horas extra: bruto acumulado (meses nunca reduzidos por faltas)
   // menos o que já foi usado para compensar dias curtos  -  cálculo único e
@@ -179,7 +210,7 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1 }) => {
         setAccumulatedCompensated(data.totalCompensatedMinutes ?? 0);
       })
       .catch((err) => console.error("Erro ao buscar saldo anual de horas extra:", err));
-  }, [username]);
+  }, [username, reloadTick]);
 
   const fetchYearlyData = async () => {
     if (!username) return;

@@ -1,6 +1,6 @@
 const admin = require("firebase-admin");
 const db = require("../../shared/db/firebase").db;
-const { isAdminOrHR, isAdministrador } = require("../../shared/middleware/auth");
+const { isAdminOrHR, isAdministrador, entidadeNoAmbito } = require("../../shared/middleware/auth");
 
 const bucket = admin.storage().bucket();
 
@@ -11,7 +11,7 @@ const ANO_REGEX = /^\d{4}$/;
 // formação, nunca editar nem gerir certificados.
 function canRead(req, id, targetEntidade) {
   return isAdminOrHR(req.user?.nivelAcesso) || req.user?.uid === id
-    || (isAdministrador(req.user?.nivelAcesso) && !!targetEntidade && targetEntidade === req.user?.entidade);
+    || (isAdministrador(req.user?.nivelAcesso) && entidadeNoAmbito(req.user, targetEntidade));
 }
 
 function canManage(req) {
@@ -53,12 +53,18 @@ const getFormacao = async (req, res) => {
     }
 
     const userDocRef = db.collection("users").doc(id);
-    const userDoc = await userDocRef.get();
-    if (!userDoc.exists) {
-      return res.status(404).json({ error: "Colaborador não encontrado" });
+    let userEntidade;
+    if (req.user?.uid === id && req.userDocExists) {
+      userEntidade = req.userData.entidade;
+    } else {
+      const userDoc = await userDocRef.get();
+      if (!userDoc.exists) {
+        return res.status(404).json({ error: "Colaborador não encontrado" });
+      }
+      userEntidade = userDoc.data().entidade;
     }
 
-    if (!canRead(req, id, userDoc.data().entidade)) {
+    if (!canRead(req, id, userEntidade)) {
       return res.status(403).json({ error: "Sem permissão para consultar este plano de formação" });
     }
 
@@ -143,10 +149,15 @@ const criarAcaoConcluida = async (req, res) => {
       return res.status(400).json({ error: "Indica a data de conclusão (formato AAAA-MM-DD)" });
     }
 
+    // Esta ação é sempre sobre o próprio utilizador (ver verificação acima), por isso o
+    // middleware (requireAuth) já leu este documento - só é preciso reler se, por algum
+    // motivo raro, esse documento não existisse em users/{uid} (ver req.userDocExists).
     const userDocRef = db.collection("users").doc(id);
-    const userDoc = await userDocRef.get();
-    if (!userDoc.exists) {
-      return res.status(404).json({ error: "Colaborador não encontrado" });
+    if (!req.userDocExists) {
+      const userDoc = await userDocRef.get();
+      if (!userDoc.exists) {
+        return res.status(404).json({ error: "Colaborador não encontrado" });
+      }
     }
 
     const acaoRef = userDocRef.collection("formacao").doc(ano).collection("acoes").doc();

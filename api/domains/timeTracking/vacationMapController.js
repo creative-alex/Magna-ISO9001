@@ -126,12 +126,19 @@ const getVacationMap = async (req, res) => {
       const uid = userDoc.id;
       const entidadeId = data.entidade ? data.entidade.replace("entidades/", "") : null;
 
+      // fechoMensal: os IDs de documento são sempre "YYYY-MM" (ver mesFromDataCompleta em
+      // monthLock.js), por isso um range por documentId() dá o ano pedido sem precisar de
+      // nenhum campo/índice novo - em vez de ler a subcoleção inteira (todos os meses
+      // desde sempre) e filtrar aqui em memória.
       const [feriasSnapshot, aniversarioSnapshot, quotaOverrideDoc, diasTransitadosDoc, fechoMensalSnapshot] = await Promise.all([
         db.collection("registo-ponto").doc(uid).collection("Ferias").where("year", "==", currentYear).get(),
         db.collection("registo-ponto").doc(uid).collection("DiasAniversario").where("year", "==", currentYear).get(),
         userDoc.ref.collection("quotaOverrides").doc(String(currentYear)).get(),
         userDoc.ref.collection("diasTransitados").doc(String(currentYear)).get(),
-        userDoc.ref.collection("fechoMensal").get(),
+        userDoc.ref.collection("fechoMensal")
+          .where(admin.firestore.FieldPath.documentId(), ">=", `${currentYear}-01`)
+          .where(admin.firestore.FieldPath.documentId(), "<=", `${currentYear}-12`)
+          .get(),
       ]);
 
       // Meses já confirmados (ver api/domains/fechoMensal/) deste ano  -  usado pelo mapa
@@ -140,8 +147,8 @@ const getVacationMap = async (req, res) => {
       const closedMonths = [];
       fechoMensalSnapshot.forEach((doc) => {
         const fechoData = doc.data();
-        if (fechoData.confirmed === true && typeof fechoData.mes === "string" && fechoData.mes.startsWith(`${currentYear}-`)) {
-          closedMonths.push(fechoData.mes);
+        if (fechoData.confirmed === true) {
+          closedMonths.push(fechoData.mes || doc.id);
         }
       });
 

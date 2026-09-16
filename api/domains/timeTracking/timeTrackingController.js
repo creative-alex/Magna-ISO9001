@@ -440,6 +440,7 @@ const registerManualOvertime = async (req, res) => {
       startHour: startHour,
       endHour: endHour,
       date: formattedDate,
+      year: parseInt(yyyy, 10),
       hours: hoursNum,
       minutes: minutesNum,
       totalMinutes: totalMinutes,
@@ -460,7 +461,7 @@ const registerManualOvertime = async (req, res) => {
 
 const getManualOvertimeForMonth = async (req, res) => {
   try {
-    const { month } = req.body;
+    const { month, year } = req.body;
 
     if (!month) {
       console.log("Erro: Campos obrigatórios ausentes.");
@@ -468,12 +469,16 @@ const getManualOvertimeForMonth = async (req, res) => {
     }
 
     const userId = req.user.uid;
+    const targetYear = year || new Date().getFullYear();
 
     const userDocRef = db.collection("registo-ponto").doc(userId);
 
-    // Buscar todas as horas extras manuais para o mês
+    // Buscar as horas extras manuais do ano pedido (filtradas em vez de ler a coleção
+    // inteira) - corrige também um bug latente: sem o filtro de ano, o mesmo mês em
+    // anos diferentes era somado junto (só se comparava o mês, nunca o ano).
     const manualOvertimeSnapshot = await userDocRef
       .collection("HorasExtraManual")
+      .where("year", "==", targetYear)
       .get();
 
     const manualOvertimeByDay = {};
@@ -578,6 +583,9 @@ const updateManualOvertime = async (req, res) => {
       startHour: hourStart,
       endHour: hourEnd,
       date: formattedDate,
+      // Recalculado a partir da data (em vez de deixar o valor antigo) para o campo
+      // "year" nunca ficar dessincronizado do "date" se a edição mudar de ano.
+      year: parseInt(formattedDate.split("-")[2], 10),
       hours: hoursNum,
       minutes: minutesNum,
       totalMinutes: totalMinutes,

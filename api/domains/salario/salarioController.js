@@ -2,7 +2,7 @@ const admin = require("firebase-admin");
 const db = require("../../shared/db/firebase").db;
 const { calculateMonthlyAttendanceSummary } = require("../timeTracking/reportsController");
 const { getHolidaysDDMM } = require("../timeTracking/holidays");
-const { isAdminOrHR, isAdministrador, isGestorFinanceiro, isSuperAdmin, isSuperAdminOrGestorFinanceiro } = require("../../shared/middleware/auth");
+const { isAdminOrHR, isAdministrador, isGestorFinanceiro, isSuperAdmin, isSuperAdminOrGestorFinanceiro, entidadeNoAmbito } = require("../../shared/middleware/auth");
 const { sendMail, renderEmail } = require("../../shared/services/mailer");
 
 const bucket = admin.storage().bucket();
@@ -19,7 +19,7 @@ function canAccess(req) {
 // seus próprios dados (nunca editar nem enviar recibos - isso continua restrito a canAccess).
 function canRead(req, id, targetEntidade) {
   return isAdminOrHR(req.user?.nivelAcesso) || isGestorFinanceiro(req.user?.nivelAcesso) || req.user?.uid === id
-    || (isAdministrador(req.user?.nivelAcesso) && !!targetEntidade && targetEntidade === req.user?.entidade);
+    || (isAdministrador(req.user?.nivelAcesso) && entidadeNoAmbito(req.user, targetEntidade));
 }
 
 const MES_REGEX = /^\d{4}-\d{2}$/;
@@ -55,12 +55,19 @@ const getSalario = async (req, res) => {
     }
 
     const userDocRef = db.collection("users").doc(id);
-    const userDoc = await userDocRef.get();
-    if (!userDoc.exists) {
-      return res.status(404).json({ error: "Colaborador não encontrado" });
+    // Quando o pedido é sobre o próprio utilizador, reaproveita o documento que o
+    // middleware (requireAuth) já leu, em vez de o reler.
+    let userData;
+    if (req.user?.uid === id && req.userDocExists) {
+      userData = req.userData;
+    } else {
+      const userDoc = await userDocRef.get();
+      if (!userDoc.exists) {
+        return res.status(404).json({ error: "Colaborador não encontrado" });
+      }
+      userData = userDoc.data();
     }
 
-    const userData = userDoc.data();
     if (!canRead(req, id, userData.entidade)) {
       return res.status(403).json({ error: "Sem permissão para consultar estes dados salariais" });
     }
@@ -115,13 +122,25 @@ const getSalario = async (req, res) => {
     // summarySnapshot congelado na confirmação (ver api/domains/fechoMensal/), para uma
     // correção posterior ao livro de ponto não alterar retroativamente um mês já fechado.
     const [anoStr, mesStr] = mes.split("-");
-    const fechoMensalDoc = await userDocRef.collection("fechoMensal").doc(mes).get();
-    const fechoMensal = fechoMensalDoc.exists ? fechoMensalDoc.data() : null;
-    const fechoConfirmado = fechoMensal?.confirmed === true;
-
-    const attendance = fechoConfirmado
-      ? fechoMensal.summarySnapshot
-      : await calculateMonthlyAttendanceSummary({ uid: id, year: Number(anoStr), month: Number(mesStr) });
+    let attendance;
+    let fechoConfirmado;
+    if (isAdministrador(userData.nivelAcesso)) {
+      // Administrador não participa no fluxo de fecho mensal (não recebe os emails nem
+      // aparece em getActiveColaboradores, ver fechoMensalController.js) - o mês conta
+      // sempre como fechado e totalmente trabalhado para efeitos de vencimento.
+      attendance = {
+        diasTrabalhados: countDiasUteis(Number(anoStr), Number(mesStr)),
+        diasFerias: 0, diasBaixaMedica: 0, diasAniversario: 0, diasFalta: 0, diasLicenca: 0,
+      };
+      fechoConfirmado = true;
+    } else {
+      const fechoMensalDoc = await userDocRef.collection("fechoMensal").doc(mes).get();
+      const fechoMensal = fechoMensalDoc.exists ? fechoMensalDoc.data() : null;
+      fechoConfirmado = fechoMensal?.confirmed === true;
+      attendance = fechoConfirmado
+        ? fechoMensal.summarySnapshot
+        : await calculateMonthlyAttendanceSummary({ uid: id, year: Number(anoStr), month: Number(mesStr) });
+    }
 
     const valorSubsidioAlimentacaoPagar = valorSubsidioAlimentacao != null
       ? Math.round(attendance.diasTrabalhados * valorSubsidioAlimentacao * 100) / 100
@@ -169,12 +188,18 @@ const saveSalario = async (req, res) => {
     }
 
     const userDocRef = db.collection("users").doc(id);
-    const userDoc = await userDocRef.get();
-    if (!userDoc.exists) {
-      return res.status(404).json({ error: "Colaborador não encontrado" });
+    let userData;
+    if (req.user?.uid === id && req.userDocExists) {
+      userData = req.userData;
+    } else {
+      const userDoc = await userDocRef.get();
+      if (!userDoc.exists) {
+        return res.status(404).json({ error: "Colaborador não encontrado" });
+      }
+      userData = userDoc.data();
     }
 
-    const effectiveEscalao = escalao_vencimento || userDoc.data().escalao_vencimento || "";
+    const effectiveEscalao = escalao_vencimento || userData.escalao_vencimento || "";
     const userUpdate = {};
     if (escalao_vencimento) userUpdate.escalao_vencimento = escalao_vencimento;
     if (effectiveEscalao === "II" && tem_isencao_horario !== undefined) {
@@ -219,11 +244,16 @@ const uploadRecibo = async (req, res) => {
     }
 
     const userDocRef = db.collection("users").doc(id);
-    const userDoc = await userDocRef.get();
-    if (!userDoc.exists) {
-      return res.status(404).json({ error: "Colaborador não encontrado" });
+    let userData;
+    if (req.user?.uid === id && req.userDocExists) {
+      userData = req.userData;
+    } else {
+      const userDoc = await userDocRef.get();
+      if (!userDoc.exists) {
+        return res.status(404).json({ error: "Colaborador não encontrado" });
+      }
+      userData = userDoc.data();
     }
-    const userData = userDoc.data();
 
     const ano = mes.split("-")[0];
     const filePath = `RecibosVencimento/${id}/${ano}/${mes}.pdf`;
@@ -372,10 +402,17 @@ const exportFechoMensal = async (req, res) => {
 
       if (entidadeFiltro && entidadeKey !== entidadeFiltro) continue;
 
-      const fechoDoc = await userDoc.ref.collection("fechoMensal").doc(mes).get();
-      if (!fechoDoc.exists || fechoDoc.data().confirmed !== true) continue;
+      let snapshot;
+      if (isAdministrador(data.nivelAcesso)) {
+        // Ver getSalario: Administrador não participa no fluxo de fecho mensal, conta
+        // sempre como fechado e totalmente trabalhado, nunca fica de fora do export.
+        snapshot = { diasTrabalhados: countDiasUteis(ano, mesNum), diasFerias: 0, diasBaixaMedica: 0, diasLicenca: 0 };
+      } else {
+        const fechoDoc = await userDoc.ref.collection("fechoMensal").doc(mes).get();
+        if (!fechoDoc.exists || fechoDoc.data().confirmed !== true) continue;
+        snapshot = fechoDoc.data().summarySnapshot || {};
+      }
 
-      const snapshot = fechoDoc.data().summarySnapshot || {};
       const salarioDoc = await userDoc.ref.collection("salarios").doc(mes).get();
       const salarioData = salarioDoc.exists ? salarioDoc.data() : {};
 

@@ -63,6 +63,7 @@ const createVacation = async (req, res) => {
 
     await userDocRef.collection("Ferias").doc(registoId).set({
       date: dataCompleta,
+      year: parseInt(selectedYear, 10),
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
       Approved
     });
@@ -210,6 +211,7 @@ const createMedicalLeave = async (req, res) => {
       const registoId = `registo_${pad2(day)}${pad2(month)}${y}`;
       batch.set(userDocRef.collection("BaixasMedicas").doc(registoId), {
         date: dataCompletas[index],
+        year: y,
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
         Approved,
         pdfPath,
@@ -382,34 +384,21 @@ const getPendingVacations = async (req, res) => {
       .doc(uid)
       .collection("Ferias");
 
-    const feriasSnapshot = await feriasRef.get();
+    // Filtrado por ano e por Approved==false diretamente na query (todos os
+    // documentos já têm "year" - ver backfill) em vez de ler a coleção inteira do
+    // colaborador e filtrar aqui em memória.
+    const feriasSnapshot = await feriasRef
+      .where("year", "==", currentYear)
+      .where("Approved", "==", false)
+      .get();
     const feriasPendentes = [];
 
     feriasSnapshot.forEach(doc => {
       const data = doc.data();
-
-      // Verificar se é do ano correto
-      const dateStr = data.date;
-      let docYear;
-
-      if (dateStr && dateStr.includes('-')) {
-        const parts = dateStr.split('-');
-        if (parts.length === 3) {
-          // Formato DD-MM-YYYY ou YYYY-MM-DD
-          if (parts[0].length === 4) {
-            docYear = parseInt(parts[0]);
-          } else {
-            docYear = parseInt(parts[2]);
-          }
-        }
-      }
-
-      if (data.Approved === false && (!docYear || docYear === currentYear)) {
-        feriasPendentes.push({
-          date: data.date,
-          approved: data.Approved
-        });
-      }
+      feriasPendentes.push({
+        date: data.date,
+        approved: data.Approved
+      });
     });
 
     return res.status(200).json({
@@ -439,11 +428,13 @@ const getAllUsersVacations = async (req, res) => {
       const uid = userDoc.id;
       const nome = userDoc.data().nome || uid;
 
-      // Buscar férias no registo-ponto
+      // Buscar férias no registo-ponto, já filtradas por ano (todos os documentos já
+      // têm "year" - ver backfill) em vez de ler o histórico completo do colaborador.
       const feriasSnapshot = await db
         .collection("registo-ponto")
         .doc(uid)
         .collection("Ferias")
+        .where("year", "==", currentYear)
         .get();
 
       if (feriasSnapshot.size > 0) {
@@ -457,27 +448,13 @@ const getAllUsersVacations = async (req, res) => {
         const isApproved = data.Approved === true || data.Approved === 'true' || data.Approved === 1;
 
         if (data.date && isApproved) {
-          const parts = data.date.split('-');
-          let docYear;
-
-          if (parts.length === 3) {
-            docYear = parseInt(parts[2]);
-          } else if (parts.length === 2) {
-            docYear = currentYear;
-          } else {
-            console.log(`    [Skip] Formato inválido: ${data.date}`);
-            return;
-          }
-
-          if (docYear === currentYear) {
-            allVacations.push({
-              uid,
-              nome,
-              date: data.date,
-              timestamp: data.timestamp,
-              approved: true
-            });
-          }
+          allVacations.push({
+            uid,
+            nome,
+            date: data.date,
+            timestamp: data.timestamp,
+            approved: true
+          });
         }
       });
     }

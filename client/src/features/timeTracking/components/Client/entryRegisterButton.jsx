@@ -1,42 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { apiFetch } from '../../../../shared/utils/apiFetch';
 
 
-const EntryButton = ({ username, fontSize = '1.5vw', buttonHeight = '5vh', onSuccess }) => {
-  const [hasEntry, setHasEntry] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const checkEntryStatus = async () => {
-      if (!username) return;
-      
-
-      
-      try {
-        const response = await apiFetch(`/timetracking/checkEntry`, {
-          method: 'POST',
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setHasEntry(data.hasEntry || false);
-        }
-      } catch (error) {
-        console.error('Erro ao verificar entrada:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkEntryStatus();
-  }, [username]);
-
+// hasEntry/loading vêm do pai (RegistosPage), que lê /checkTimeTracking uma única vez
+// e partilha o resultado com ExitButton - antes cada botão lia o seu próprio estado
+// (este fazia /checkEntry, o de saída fazia /checkEntry + /checkLeave), 3 leituras
+// onde 1 chamada a /checkTimeTracking já dá toda a informação.
+const EntryButton = ({ hasEntry, loading, fontSize = '1.5vw', buttonHeight = '5vh', onSuccess }) => {
   const handleClick = async () => {
     const now = new Date();
     const formattedTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    const currentDate = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
 
     try {
       // Tentar registar online primeiro
@@ -46,7 +21,6 @@ const EntryButton = ({ username, fontSize = '1.5vw', buttonHeight = '5vh', onSuc
       });
 
       if (response.ok) {
-        setHasEntry(true);
         toast.success(`✓ Entrada registada às ${formattedTime}`, {
           position: 'top-right',
           autoClose: 3000

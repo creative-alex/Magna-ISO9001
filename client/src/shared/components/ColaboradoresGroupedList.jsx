@@ -1,10 +1,17 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { FaIdCard, FaMagnifyingGlass, FaChevronRight, FaBuilding } from "react-icons/fa6";
+import { FaIdCard, FaMagnifyingGlass, FaChevronRight, FaBuilding, FaUserSlash } from "react-icons/fa6";
 import { apiFetch } from "../utils/apiFetch";
 import UserAvatar from "./UserAvatar";
 
 const GOLD = "#C8932F";
 const SEM_ENTIDADE = "Sem entidade";
+const INATIVOS_KEY = "__inativos__";
+// Situações contratuais que tiram o colaborador do quadro ativo (ver
+// SITUACAO_CONTRATUAL_OPTIONS em formOptions.js) - sem sentido em processamento
+// de salários, prémios, medicina do trabalho ou plano de formação, por isso
+// ficam sempre de fora dos grupos por entidade; só a página de cadastro
+// (includeInactive) os mostra, agrupados à parte.
+const INACTIVE_STATUSES = ["Cessado", "Suspenso", "Reformado"];
 
 // Cores do badge de estado "hoje" (ver getColaboradoresStatusHoje no usersController) -
 // qualquer estado não mapeado aqui (ex: um texto de situação contratual inesperado) cai
@@ -21,7 +28,7 @@ const STATUS_STYLES = {
 };
 const STATUS_STYLE_DEFAULT = { bg: "#F3F4F6", color: "#374151" };
 
-export default function ColaboradoresGroupedList({ title, subtitle, onSelect, showStatusHoje = false, renderGroupExtra, renderMemberExtra, renderHeaderExtra }) {
+export default function ColaboradoresGroupedList({ title, subtitle, onSelect, showStatusHoje = false, includeInactive = false, renderGroupExtra, renderMemberExtra, renderHeaderExtra }) {
   const [colaboradores, setColaboradores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -31,27 +38,23 @@ export default function ColaboradoresGroupedList({ title, subtitle, onSelect, sh
   useEffect(() => {
     (async () => {
       try {
-        const res = await apiFetch("/users/getColaboradores");
-        if (res.ok) setColaboradores(await res.json());
+        // Quando é preciso mostrar o estado "hoje", pede-o já incluído nesta mesma
+        // chamada (comEstadoHoje=true) em vez de fazer um 2º pedido a
+        // /getColaboradoresStatusHoje, que voltaria a ler a coleção "users" inteira
+        // outra vez para essencialmente os mesmos colaboradores.
+        const url = showStatusHoje ? "/users/getColaboradores?comEstadoHoje=true" : "/users/getColaboradores";
+        const res = await apiFetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          setColaboradores(data);
+          if (showStatusHoje) {
+            setStatusHoje(Object.fromEntries((data || []).map(c => [c.id, c.estadoHoje])));
+          }
+        }
       } catch (e) {
         console.error(e);
       } finally {
         setLoading(false);
-      }
-    })();
-  }, []);
-
-  useEffect(() => {
-    if (!showStatusHoje) return;
-    (async () => {
-      try {
-        const res = await apiFetch("/users/getColaboradoresStatusHoje");
-        if (res.ok) {
-          const data = await res.json();
-          setStatusHoje(Object.fromEntries((data || []).map(e => [e.id, e.estado])));
-        }
-      } catch (e) {
-        console.error(e);
       }
     })();
   }, [showStatusHoje]);
@@ -65,16 +68,23 @@ export default function ColaboradoresGroupedList({ title, subtitle, onSelect, sh
 
   const groups = useMemo(() => {
     const byEntidade = {};
+    const inativos = [];
     filtered.forEach(c => {
+      if (INACTIVE_STATUSES.includes(c.situacao_contratual)) {
+        if (includeInactive) inativos.push(c);
+        return;
+      }
       const key = c.entidade || SEM_ENTIDADE;
       (byEntidade[key] = byEntidade[key] || []).push(c);
     });
-    return Object.entries(byEntidade).sort(([a], [b]) => {
+    const entries = Object.entries(byEntidade).sort(([a], [b]) => {
       if (a === SEM_ENTIDADE) return 1;
       if (b === SEM_ENTIDADE) return -1;
       return a.localeCompare(b);
     });
-  }, [filtered]);
+    if (inativos.length > 0) entries.push([INATIVOS_KEY, inativos]);
+    return entries;
+  }, [filtered, includeInactive]);
 
   const renderColaborador = (c, isLast) => {
     return (
@@ -150,6 +160,7 @@ export default function ColaboradoresGroupedList({ title, subtitle, onSelect, sh
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {groups.map(([entidade, membros]) => {
             const isCollapsed = !!collapsed[entidade];
+            const isInativos = entidade === INATIVOS_KEY;
             return (
               <div key={entidade} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
                 <div
@@ -159,9 +170,11 @@ export default function ColaboradoresGroupedList({ title, subtitle, onSelect, sh
                     background: "#fafafa", borderBottom: isCollapsed ? "none" : "1px solid #f3f4f6",
                   }}
                 >
-                  <FaBuilding style={{ fontSize: 13, color: GOLD, flexShrink: 0 }} />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "#111827", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entidade}</span>
-                  {renderGroupExtra && renderGroupExtra(entidade, membros)}
+                  {isInativos
+                    ? <FaUserSlash style={{ fontSize: 13, color: "#9ca3af", flexShrink: 0 }} />
+                    : <FaBuilding style={{ fontSize: 13, color: GOLD, flexShrink: 0 }} />}
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#111827", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{isInativos ? "Inativos" : entidade}</span>
+                  {!isInativos && renderGroupExtra && renderGroupExtra(entidade, membros)}
                   <span style={{ fontSize: 11, color: "#9ca3af" }}>{membros.length}</span>
                   <FaChevronRight style={{
                     fontSize: 11, color: "#9ca3af", flexShrink: 0,
