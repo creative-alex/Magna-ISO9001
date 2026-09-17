@@ -209,14 +209,16 @@ const INITIAL_FORM = ALL_FIELDS.filter(f => !NON_STORED_TYPES.includes(f.type)).
 // Campos que contam para "perfil completo": todos os das secções não-restritas (o próprio
 // colaborador pode preenchê-los  -  excluem-se "Dados contratuais"/"Estágio", que são só de
 // RH), à exceção de "toggle" (um booleano está sempre "respondido", mesmo a false), "email"
-// (conta da plataforma, não é preenchido no cadastro) e "duration"/"tenure"/"blocks" (não
+// (conta da plataforma, não é preenchido no cadastro), "duration"/"tenure"/"blocks" (não
 // vivem no "form" - "blocks" em particular, como "Registos" de baixas médicas, não ter
-// nenhum registo é um estado válido, não um campo por preencher).
+// nenhum registo é um estado válido, não um campo por preencher) e dos campos em
+// COMPLETENESS_EXCLUDED_KEYS (não são obrigatórios apesar de estarem numa secção não-restrita).
 const COMPLETENESS_EXCLUDED_TYPES = ["duration", "tenure", "blocks"];
+const COMPLETENESS_EXCLUDED_KEYS = ["email", "ficha_dgert_atualizada"];
 const COMPLETENESS_FIELDS = SECTIONS
   .filter(s => !s.restricted)
   .flatMap(s => s.fields)
-  .filter(f => f.type !== "toggle" && f.key !== "email" && !COMPLETENESS_EXCLUDED_TYPES.includes(f.type));
+  .filter(f => f.type !== "toggle" && !COMPLETENESS_EXCLUDED_KEYS.includes(f.key) && !COMPLETENESS_EXCLUDED_TYPES.includes(f.type));
 
 // Campos em falta (respeitando "showIf"  -  um campo escondido pelas respostas atuais não
 // conta) de entre os COMPLETENESS_FIELDS, dado o form e os documentos já carregados.
