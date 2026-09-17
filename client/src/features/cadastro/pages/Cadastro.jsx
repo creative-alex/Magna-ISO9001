@@ -214,7 +214,7 @@ const INITIAL_FORM = ALL_FIELDS.filter(f => !NON_STORED_TYPES.includes(f.type)).
 // nenhum registo é um estado válido, não um campo por preencher) e dos campos em
 // COMPLETENESS_EXCLUDED_KEYS (não são obrigatórios apesar de estarem numa secção não-restrita).
 const COMPLETENESS_EXCLUDED_TYPES = ["duration", "tenure", "blocks"];
-const COMPLETENESS_EXCLUDED_KEYS = ["email", "ficha_dgert_atualizada"];
+const COMPLETENESS_EXCLUDED_KEYS = ["email", "ficha_dgert_atualizada", "digitalizacao_pedido_irs_jovem"];
 const COMPLETENESS_FIELDS = SECTIONS
   .filter(s => !s.restricted)
   .flatMap(s => s.fields)
@@ -284,7 +284,6 @@ function getFieldErrors(form, docs) {
   // Estas condições "obrigatório se X" são política a incentivar, não dados errados - fichas
   // já guardadas antes desta validação existir não podem ficar presas por causa delas.
   if (form.irs_jovem === true && !form.escalao_irs_jovem) set("escalao_irs_jovem", "Obrigatório", false);
-  if (form.irs_jovem === true && !docs.digitalizacao_pedido_irs_jovem) set("digitalizacao_pedido_irs_jovem", "Documento obrigatório", false);
   if (form.ccp === true && !docs.digitalizacao_ccp) set("digitalizacao_ccp", "Documento obrigatório", false);
 
   if (form.situacao_contratual === SITUACAO_CESSADO && !form.motivo_cessacao) set("motivo_cessacao", "Obrigatório", false);
