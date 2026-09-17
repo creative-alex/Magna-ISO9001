@@ -149,15 +149,19 @@ const getCadastro = async (req, res) => {
 // mesmos problemas (ver getFieldErrors/getBlockErrors em Cadastro.jsx), mas a API não
 // deve confiar apenas nisso. Só valida formato/consistência de campos preenchidos - um
 // campo em branco não é aqui rejeitado (isso é tratado à parte, como "cadastro incompleto").
+// Tal como no frontend, só rejeita um formato quando o valor já "parece completo" (mesmo
+// nº de carateres do formato esperado) - fichas antigas com um valor mais curto do que o
+// exigido hoje (nunca validado até agora) não podem ficar impedidas de gravar por causa
+// de um campo que a pessoa nem está a editar.
 function validarCadastroForm(form) {
   const erros = [];
-  if (form.nif && !validarNIF(form.nif)) erros.push("NIF inválido");
-  if (form.n_seguranca_social && !validarNISS(form.n_seguranca_social)) erros.push("Nº de segurança social inválido");
-  if (form.n_cartao_cidadao && !validarCartaoCidadao(form.n_cartao_cidadao)) erros.push("Nº de cartão de cidadão inválido");
-  if (form.codigo_postal && !validarCodigoPostal(form.codigo_postal)) erros.push("Código postal inválido");
-  if (form.telefone && !validarTelefone(form.telefone)) erros.push("Contacto inválido");
-  if (form.telefone_emergencia && !validarTelefone(form.telefone_emergencia)) erros.push("Contacto de emergência inválido");
-  if (form.IBAN && !validarIBAN(form.IBAN)) erros.push("IBAN inválido");
+  if ((form.nif || "").replace(/\D/g, "").length >= 9 && !validarNIF(form.nif)) erros.push("NIF inválido");
+  if ((form.n_seguranca_social || "").replace(/\D/g, "").length >= 11 && !validarNISS(form.n_seguranca_social)) erros.push("Nº de segurança social inválido");
+  if ((form.n_cartao_cidadao || "").replace(/\s/g, "").length >= 12 && !validarCartaoCidadao(form.n_cartao_cidadao)) erros.push("Nº de cartão de cidadão inválido");
+  if ((form.codigo_postal || "").length >= 8 && !validarCodigoPostal(form.codigo_postal)) erros.push("Código postal inválido");
+  if ((form.telefone || "").replace(/\D/g, "").length >= 9 && !validarTelefone(form.telefone)) erros.push("Contacto inválido");
+  if ((form.telefone_emergencia || "").replace(/\D/g, "").length >= 9 && !validarTelefone(form.telefone_emergencia)) erros.push("Contacto de emergência inválido");
+  if ((form.IBAN || "").replace(/\s/g, "").length >= 25 && !validarIBAN(form.IBAN)) erros.push("IBAN inválido");
   if (form.data_nascimento && form.validade_cc && form.validade_cc < form.data_nascimento) erros.push("Validade do CC anterior à data de nascimento");
   if (form.data_admissao && form.data_fim_contrato && form.data_fim_contrato < form.data_admissao) erros.push("Data de fim de contrato anterior à data de admissão");
   if (form.data_inicio_estagio && form.data_fim_estagio && form.data_fim_estagio < form.data_inicio_estagio) erros.push("Data de fim de estágio anterior à data de início");

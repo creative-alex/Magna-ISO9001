@@ -209,12 +209,14 @@ const INITIAL_FORM = ALL_FIELDS.filter(f => !NON_STORED_TYPES.includes(f.type)).
 // Campos que contam para "perfil completo": todos os das secções não-restritas (o próprio
 // colaborador pode preenchê-los  -  excluem-se "Dados contratuais"/"Estágio", que são só de
 // RH), à exceção de "toggle" (um booleano está sempre "respondido", mesmo a false), "email"
-// (conta da plataforma, não é preenchido no cadastro) e dos tipos calculados/lista
-// (duration/tenure/blocks, já fora de ALL_FIELDS por NON_STORED_TYPES).
+// (conta da plataforma, não é preenchido no cadastro) e "duration"/"tenure"/"blocks" (não
+// vivem no "form" - "blocks" em particular, como "Registos" de baixas médicas, não ter
+// nenhum registo é um estado válido, não um campo por preencher).
+const COMPLETENESS_EXCLUDED_TYPES = ["duration", "tenure", "blocks"];
 const COMPLETENESS_FIELDS = SECTIONS
   .filter(s => !s.restricted)
   .flatMap(s => s.fields)
-  .filter(f => f.type !== "toggle" && f.key !== "email");
+  .filter(f => f.type !== "toggle" && f.key !== "email" && !COMPLETENESS_EXCLUDED_TYPES.includes(f.type));
 
 // Campos em falta (respeitando "showIf"  -  um campo escondido pelas respostas atuais não
 // conta) de entre os COMPLETENESS_FIELDS, dado o form e os documentos já carregados.
@@ -227,84 +229,104 @@ function getMissingFields(dataSource, docs) {
   });
 }
 
-// Erros de validação por campo (chave -> mensagem), a partir do form/documentos atuais.
-// Só assinala um campo quando: (a) já tem um valor "aparentemente completo" (evita
-// mostrar "NIF inválido" enquanto o utilizador ainda está a escrever o 3º dígito) ou
-// (b) representa uma inconsistência lógica ativa entre campos relacionados (ex: ligou o
-// toggle "Dependentes com deficiência" mas não disse quantos). Campos simplesmente por
-// preencher não entram aqui - isso já é tratado à parte por getMissingFields.
+// Erros de validação por campo (chave -> { message, blocking }), a partir do form/documentos
+// atuais. "blocking: true" impede o "Guardar" (dado ativamente errado: formato inválido,
+// datas invertidas, números que não batem certo); "blocking: false" é só um aviso visual
+// (campo que a política atual pede mas que fichas antigas podem legitimamente não ter -
+// nunca trava quem só está a editar outra coisa na mesma ficha). Um campo simplesmente por
+// preencher (sem essa inconsistência) não entra aqui - isso já é tratado à parte por
+// getMissingFields. Só assinala formato quando o valor já está "aparentemente completo"
+// (evita mostrar "NIF inválido" enquanto o utilizador ainda está a escrever o 3º dígito).
 function getFieldErrors(form, docs) {
   const errors = {};
   const hoje = new Date().toISOString().slice(0, 10);
+  const set = (key, message, blocking) => { errors[key] = { message, blocking }; };
 
   const nifDigitos = (form.nif || "").replace(/\D/g, "");
-  if (nifDigitos.length >= 9 && !validarNIF(form.nif)) errors.nif = "NIF inválido";
+  if (nifDigitos.length >= 9 && !validarNIF(form.nif)) set("nif", "NIF inválido", true);
 
   const nissDigitos = (form.n_seguranca_social || "").replace(/\D/g, "");
-  if (nissDigitos.length >= 11 && !validarNISS(form.n_seguranca_social)) errors.n_seguranca_social = "Nº de segurança social inválido";
+  if (nissDigitos.length >= 11 && !validarNISS(form.n_seguranca_social)) set("n_seguranca_social", "Nº de segurança social inválido", true);
 
   const ccLimpo = (form.n_cartao_cidadao || "").replace(/\s/g, "");
-  if (ccLimpo.length >= 12 && !validarCartaoCidadao(form.n_cartao_cidadao)) errors.n_cartao_cidadao = "Nº de cartão de cidadão inválido";
+  if (ccLimpo.length >= 12 && !validarCartaoCidadao(form.n_cartao_cidadao)) set("n_cartao_cidadao", "Nº de cartão de cidadão inválido", true);
 
-  if ((form.codigo_postal || "").length >= 8 && !validarCodigoPostal(form.codigo_postal)) errors.codigo_postal = "Formato esperado: 0000-000";
+  if ((form.codigo_postal || "").length >= 8 && !validarCodigoPostal(form.codigo_postal)) set("codigo_postal", "Formato esperado: 0000-000", true);
 
   const telDigitos = (form.telefone || "").replace(/\D/g, "");
-  if (telDigitos.length >= 9 && !validarTelefone(form.telefone)) errors.telefone = "Contacto inválido";
+  if (telDigitos.length >= 9 && !validarTelefone(form.telefone)) set("telefone", "Contacto inválido", true);
 
   const telEmergDigitos = (form.telefone_emergencia || "").replace(/\D/g, "");
-  if (telEmergDigitos.length >= 9 && !validarTelefone(form.telefone_emergencia)) errors.telefone_emergencia = "Contacto inválido";
+  if (telEmergDigitos.length >= 9 && !validarTelefone(form.telefone_emergencia)) set("telefone_emergencia", "Contacto inválido", true);
 
   const ibanLimpo = (form.IBAN || "").replace(/\s/g, "");
-  if (ibanLimpo.length >= 25 && !validarIBAN(form.IBAN)) errors.IBAN = "IBAN inválido";
+  if (ibanLimpo.length >= 25 && !validarIBAN(form.IBAN)) set("IBAN", "IBAN inválido", true);
 
-  if (form.data_nascimento && form.data_nascimento > hoje) errors.data_nascimento = "Data de nascimento no futuro";
-  if (form.validade_cc && form.data_nascimento && form.validade_cc < form.data_nascimento) errors.validade_cc = "Anterior à data de nascimento";
+  if (form.data_nascimento && form.data_nascimento > hoje) set("data_nascimento", "Data de nascimento no futuro", true);
+  if (form.validade_cc && form.data_nascimento && form.validade_cc < form.data_nascimento) set("validade_cc", "Anterior à data de nascimento", true);
 
-  if (form.n_titulares !== "" && (!Number.isInteger(Number(form.n_titulares)) || Number(form.n_titulares) < 1)) errors.n_titulares = "Tem de ser um número inteiro ≥ 1";
-  if (form.n_dependentes !== "" && (!Number.isInteger(Number(form.n_dependentes)) || Number(form.n_dependentes) < 0)) errors.n_dependentes = "Tem de ser um número inteiro ≥ 0";
+  if (form.n_titulares !== "" && (!Number.isInteger(Number(form.n_titulares)) || Number(form.n_titulares) < 1)) set("n_titulares", "Tem de ser um número inteiro ≥ 1", true);
+  if (form.n_dependentes !== "" && (!Number.isInteger(Number(form.n_dependentes)) || Number(form.n_dependentes) < 0)) set("n_dependentes", "Tem de ser um número inteiro ≥ 0", true);
 
   if (form.tem_dependentes_deficientes === true) {
     const nDef = form.n_dependentes_deficientes;
     if (nDef === "" || nDef === undefined || nDef === null) {
-      errors.n_dependentes_deficientes = "Obrigatório";
+      set("n_dependentes_deficientes", "Obrigatório", false);
     } else if (!Number.isInteger(Number(nDef)) || Number(nDef) < 1) {
-      errors.n_dependentes_deficientes = "Tem de ser um número inteiro ≥ 1";
+      set("n_dependentes_deficientes", "Tem de ser um número inteiro ≥ 1", true);
     } else if (Number(nDef) > Number(form.n_dependentes || 0)) {
-      errors.n_dependentes_deficientes = "Não pode exceder o nº de dependentes";
+      set("n_dependentes_deficientes", "Não pode exceder o nº de dependentes", true);
     }
   }
 
-  if (form.irs_jovem === true && !form.escalao_irs_jovem) errors.escalao_irs_jovem = "Obrigatório";
-  if (form.irs_jovem === true && !docs.digitalizacao_pedido_irs_jovem) errors.digitalizacao_pedido_irs_jovem = "Documento obrigatório";
-  if (form.ccp === true && !docs.digitalizacao_ccp) errors.digitalizacao_ccp = "Documento obrigatório";
+  // Estas condições "obrigatório se X" são política a incentivar, não dados errados - fichas
+  // já guardadas antes desta validação existir não podem ficar presas por causa delas.
+  if (form.irs_jovem === true && !form.escalao_irs_jovem) set("escalao_irs_jovem", "Obrigatório", false);
+  if (form.irs_jovem === true && !docs.digitalizacao_pedido_irs_jovem) set("digitalizacao_pedido_irs_jovem", "Documento obrigatório", false);
+  if (form.ccp === true && !docs.digitalizacao_ccp) set("digitalizacao_ccp", "Documento obrigatório", false);
 
-  if (form.situacao_contratual === SITUACAO_CESSADO && !form.motivo_cessacao) errors.motivo_cessacao = "Obrigatório";
-  if (form.tipo_contrato && form.tipo_contrato !== TIPO_CONTRATO_SEM_TERMO && !form.data_fim_contrato) errors.data_fim_contrato = "Obrigatório para este tipo de contrato";
-  if (form.data_fim_contrato && form.data_admissao && form.data_fim_contrato < form.data_admissao) errors.data_fim_contrato = "Anterior à data de admissão";
+  if (form.situacao_contratual === SITUACAO_CESSADO && !form.motivo_cessacao) set("motivo_cessacao", "Obrigatório", false);
+  if (form.tipo_contrato && form.tipo_contrato !== TIPO_CONTRATO_SEM_TERMO && !form.data_fim_contrato) set("data_fim_contrato", "Obrigatório para este tipo de contrato", false);
+  if (form.data_fim_contrato && form.data_admissao && form.data_fim_contrato < form.data_admissao) set("data_fim_contrato", "Anterior à data de admissão", true);
 
   if (form.tipo_estagio === TIPO_ESTAGIO_PROFISSIONAL) {
-    if (!form.n_processo_estagio) errors.n_processo_estagio = "Obrigatório";
-    if (!form.id_processo_estagio) errors.id_processo_estagio = "Obrigatório";
+    if (!form.n_processo_estagio) set("n_processo_estagio", "Obrigatório", false);
+    if (!form.id_processo_estagio) set("id_processo_estagio", "Obrigatório", false);
   }
-  if (form.data_fim_estagio && form.data_inicio_estagio && form.data_fim_estagio < form.data_inicio_estagio) errors.data_fim_estagio = "Anterior à data de início";
+  if (form.data_fim_estagio && form.data_inicio_estagio && form.data_fim_estagio < form.data_inicio_estagio) set("data_fim_estagio", "Anterior à data de início", true);
 
   return errors;
 }
 
 // Erros de validação dos campos "blocks" (cedências temporárias, baixas médicas): por
-// chave do campo, um mapa de id de bloco -> mensagem (só a ordem das datas, por agora).
+// chave do campo, um mapa de id de bloco -> { message, blocking } (só a ordem das datas,
+// por agora - ver getFieldErrors para o que significa "blocking").
 function getBlockErrors(blockLists) {
   const errors = {};
   BLOCK_FIELDS.forEach(f => {
     const porBloco = {};
     (blockLists[f.key] || []).forEach(b => {
       if (b.dataInicio && b.dataFim && b.dataFim < b.dataInicio) {
-        porBloco[b.id] = "Data de fim anterior à data de início";
+        porBloco[b.id] = { message: "Data de fim anterior à data de início", blocking: true };
       }
     });
     if (Object.keys(porBloco).length > 0) errors[f.key] = porBloco;
   });
   return errors;
+}
+
+// Erros bloqueantes ({key: {message, blocking}} ou {key: {blocoId: {message, blocking}}})
+// -> lista de mensagens a mostrar ao utilizador (rótulo do campo, quando existir).
+function listarErrosBloqueantes(fieldErrors, blockErrors) {
+  const labels = [];
+  Object.entries(fieldErrors).forEach(([key, err]) => {
+    if (err.blocking) labels.push(FIELD_BY_KEY[key]?.label || key);
+  });
+  Object.entries(blockErrors).forEach(([key, porBloco]) => {
+    const temBloqueante = Object.values(porBloco).some(e => e.blocking);
+    if (temBloqueante) labels.push(FIELD_BY_KEY[key]?.label || key);
+  });
+  return labels;
 }
 
 // Extensão do ficheiro original (com o ponto, ex: ".pdf")  -  "" se não tiver extensão.
@@ -462,22 +484,25 @@ export default function Cadastro() {
   };
 
   const handleSave = async () => {
-    if (Object.keys(fieldErrors).length > 0 || Object.keys(blockErrors).length > 0) {
-      // Reabre as secções/blocos com erros para o utilizador os poder ver e corrigir.
+    const camposBloqueantes = listarErrosBloqueantes(fieldErrors, blockErrors);
+    if (camposBloqueantes.length > 0) {
+      // Reabre as secções/blocos com erros bloqueantes para o utilizador os poder ver e corrigir.
       setCollapsedSections(prev => {
         const next = { ...prev };
-        Object.keys(fieldErrors).forEach(key => { delete next[SECTION_BY_FIELD_KEY[key]]; });
-        Object.keys(blockErrors).forEach(key => { delete next[SECTION_BY_FIELD_KEY[key]]; });
+        Object.entries(fieldErrors).forEach(([key, err]) => { if (err.blocking) delete next[SECTION_BY_FIELD_KEY[key]]; });
+        Object.entries(blockErrors).forEach(([key, porBloco]) => {
+          if (Object.values(porBloco).some(e => e.blocking)) delete next[SECTION_BY_FIELD_KEY[key]];
+        });
         return next;
       });
       setCollapsedBlocks(prev => {
         const next = { ...prev };
         Object.values(blockErrors).forEach(porBloco => {
-          Object.keys(porBloco).forEach(blockId => { delete next[blockId]; });
+          Object.entries(porBloco).forEach(([blockId, err]) => { if (err.blocking) delete next[blockId]; });
         });
         return next;
       });
-      toast.error("Corrija os campos assinalados a vermelho antes de guardar", { position: "top-right" });
+      toast.error(`Corrija antes de guardar: ${camposBloqueantes.join(", ")}`, { position: "top-right" });
       return;
     }
     setSaving(true);
@@ -639,9 +664,13 @@ export default function Cadastro() {
     }
   };
 
+  // "borderWidth/borderStyle/borderColor" em vez do atalho "border"  -  assim
+  // fieldInputStyle pode substituir só o "borderColor" (campo com erro) sem misturar
+  // propriedade abreviada com a sua versão longa no mesmo objeto de estilo (o React
+  // avisa disso entre re-renders, ex: ao remover o erro ao corrigir o campo).
   const inputStyle = {
     width: "100%", fontSize: 13, color: "#111827", fontWeight: 500,
-    border: "1px solid #e5e7eb", borderRadius: 6, padding: "7px 9px",
+    borderWidth: 1, borderStyle: "solid", borderColor: "#e5e7eb", borderRadius: 6, padding: "7px 9px",
     outline: "none", background: editMode ? "#fafafa" : "#fff",
     boxSizing: "border-box",
   };
@@ -666,7 +695,7 @@ export default function Cadastro() {
     // "newRow" força o campo a começar numa linha nova mesmo que a linha anterior tenha um
     // número variável de campos (por causa de showIf)  -  ver os campos das secções em SECTIONS.
     const layoutStyle = field.newRow ? { minWidth: 0, gridColumnStart: 1 } : { minWidth: 0 };
-    const errorMsg = editable ? errors[key] : null;
+    const errorMsg = editable ? errors[key]?.message : null;
     const fieldInputStyle = errorMsg ? { ...inputStyle, borderColor: "#dc2626" } : inputStyle;
     const errorText = errorMsg ? <div style={{ fontSize: 11, color: "#dc2626", marginTop: 4 }}>{errorMsg}</div> : null;
 
@@ -730,7 +759,7 @@ export default function Cadastro() {
               const summary = c.dataInicio || c.dataFim
                 ? `${fmtDate(c.dataInicio)} — ${fmtDate(c.dataFim)}${summaryExtra ? ` · ${summaryExtra}` : ""}`
                 : `Adicionar ${field.itemSingular}`;
-              const blocoErro = errosDoBloco[c.id];
+              const blocoErro = errosDoBloco[c.id]?.message;
               return (
                 <div key={c.id} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12, background: "#fafafa" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1153,16 +1182,26 @@ export default function Cadastro() {
               <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 3 }}>
                 Dados pessoais, contratuais e documentação associados ao processo individual do colaborador.
               </div>
-              {!loading && missingCount > 0 && (
-                <div style={{
-                  display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8,
-                  padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600,
-                  background: "#FEF3C7", color: "#92400E",
-                }}>
-                  <FaTriangleExclamation style={{ fontSize: 10.5 }} />
-                  Cadastro incompleto  -  faltam {missingCount} {missingCount === 1 ? "campo" : "campos"}
-                </div>
-              )}
+              {!loading && missingCount > 0 && (() => {
+                const nomesFaltam = missingFields.map(f => f.label);
+                const LIMITE = 6;
+                const resumo = nomesFaltam.length > LIMITE
+                  ? `${nomesFaltam.slice(0, LIMITE).join(", ")} e mais ${nomesFaltam.length - LIMITE}`
+                  : nomesFaltam.join(", ");
+                return (
+                  <div
+                    title={nomesFaltam.join(", ")}
+                    style={{
+                      display: "inline-flex", alignItems: "flex-start", gap: 6, marginTop: 8, maxWidth: "100%",
+                      padding: "3px 10px", borderRadius: 12, fontSize: 11, fontWeight: 600,
+                      background: "#FEF3C7", color: "#92400E",
+                    }}
+                  >
+                    <FaTriangleExclamation style={{ fontSize: 10.5, marginTop: 2, flexShrink: 0 }} />
+                    <span>Cadastro incompleto  -  falta: {resumo}</span>
+                  </div>
+                );
+              })()}
             </div>
             {isViewingOther && canViewOther && !loading && missingCount > 0 && (
               <button
