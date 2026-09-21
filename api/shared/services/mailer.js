@@ -3,12 +3,13 @@ const path = require("path");
 const nodemailer = require("nodemailer");
 const handlebars = require("handlebars");
 
-// Conta de no-reply usada pelo nodemailer (SMTP mail.comenius.pt).
+// Conta de no-reply usada pelo nodemailer (SMTP do Google Workspace, comenius.pt migrou
+// de mail.comenius.pt/cPanel para lá - NODEPASSWORD é uma App Password da conta).
 const NODEEMAIL = process.env.NODEEMAIL;
 const NODEPASSWORD = process.env.NODEPASSWORD;
 
 const transporter = nodemailer.createTransport({
-  host: "mail.comenius.pt",
+  host: "smtp.gmail.com",
   port: 465,
   secure: true, // true porque é a porta 465 (SSL)
   auth: { user: NODEEMAIL, pass: NODEPASSWORD },

@@ -349,6 +349,10 @@ const getColaboradores = async (req, res) => {
         role: data.role || 'user',
         entidade: entidadeId ? (entidadeNomes[entidadeId] || entidadeId) : null,
         situacao_contratual: data.situacao_contratual || 'Ativo',
+        nivelAcesso: normalizeNivelAcesso(data.nivelAcesso),
+        // Só o booleano (nunca o NIF em si) - usado pelo botão "Notificar sem NIF" por
+        // entidade em ColaboradoresGroupedList (ver notifyEntidadeSemNif em cadastroController.js).
+        temNif: !!(data.nif || '').trim(),
       });
     });
 

@@ -1,8 +1,8 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { FaBuilding } from "react-icons/fa6";
 import { apiFetch } from "../../../../../shared/utils/apiFetch";
-import { UserContext } from "../../../../../shared/context/userContext";
+import { usePermissions } from "../../../../../shared/hooks/usePermissions";
 
 const GOLD = "#C8932F";
 
@@ -33,10 +33,10 @@ const btnSolid = { padding: "7px 18px", fontSize: 12, fontWeight: 500, borderRad
 const btnGhost = { padding: "7px 18px", fontSize: 12, fontWeight: 500, borderRadius: 999, border: "1px solid #e5e7eb", color: "#6b7280", background: "transparent", cursor: "pointer" };
 
 const Entity = () => {
-  const { nivelAcesso } = useContext(UserContext);
+  const { isAdministrador } = usePermissions();
   // Editar/apagar a entidade (nome, NIF, morada) é sobre o registo da entidade em
   // si, não sobre os colaboradores  -  fica fora do que um Administrador gere.
-  const canManageEntity = nivelAcesso !== "Administrador";
+  const canManageEntity = !isAdministrador;
   const params = useParams();
   const entityParam = params.entityName || params.id_entidade;
   const formattedEntityName = decodeURIComponent(entityParam || "").replace(/%20/g, "-"); // Substitui "%20" por "-"

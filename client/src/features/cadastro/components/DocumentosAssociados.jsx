@@ -1,16 +1,15 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { UserContext } from '../../../shared/context/userContext';
+import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../../../shared/utils/apiFetch';
+import { usePermissions } from '../../../shared/hooks/usePermissions';
 
-const DocumentosAssociados = ({ 
-  currentValue, 
-  onChange, 
+const DocumentosAssociados = ({
+  currentValue,
+  onChange,
   originalFilename,
   isEditable = true, // Nova prop para controlar editabilidade
   canEdit = true // Nova prop para controlar se pode editar (permissões)
 }) => {
-  const { nivelAcesso } = useContext(UserContext);
-  const isSuperAdmin = nivelAcesso === 'SuperAdmin';
+  const { isSuperAdmin } = usePermissions();
   const [documentosDisponiveis, setDocumentosDisponiveis] = useState([]);
   const [documentosSelecionados, setDocumentosSelecionados] = useState([]);
   const [showModal, setShowModal] = useState(false);

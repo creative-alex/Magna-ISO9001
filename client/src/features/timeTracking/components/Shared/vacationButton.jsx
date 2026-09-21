@@ -1,17 +1,18 @@
-import React, { useContext, useState } from 'react';
+import React, { useState } from 'react';
 import { FaUmbrellaBeach } from 'react-icons/fa6';
-import { UserContext } from '../../../../shared/context/userContext';
 import { toast } from 'react-toastify';
 import { apiFetch } from '../../../../shared/utils/apiFetch';
+import { usePermissions } from '../../../../shared/hooks/usePermissions';
 
 const VacationButton = ({ username, date, onSuccess }) => {
-  const { nivelAcesso } = useContext(UserContext);
   const [loading, setLoading] = useState(false);
   // Tem de espelhar exatamente quem o backend deixa marcar férias por outro colaborador
   // (resolveTargetUid)  -  SuperAdmin/GestorRH sem restrições, Administrador também (o
   // backend confirma que é da sua própria entidade). Caso contrário o pedido sai sem
-  // "uid" e acaba registado (pendente) na conta de quem clicou.
-  const isAdmin = nivelAcesso === "SuperAdmin" || nivelAcesso === "GestorRH" || nivelAcesso === "Administrador";
+  // "uid" e acaba registado (pendente) na conta de quem clicou. Nome explícito (em vez
+  // de um "isAdmin" ambíguo): isto NÃO é "só SuperAdmin", é o mesmo conjunto alargado
+  // que auth.js chama isAdminOrHRorAdministrador.
+  const { isAdminOrHRorAdministrador } = usePermissions();
 
   const handleRequest = async () => {
     if (!date) {
@@ -26,12 +27,12 @@ const VacationButton = ({ username, date, onSuccess }) => {
       // férias por outro colaborador passa o "uid" desse colaborador.
       const response = await apiFetch(`/timetracking/vacation`, {
         method: "POST",
-        body: JSON.stringify(isAdmin ? { uid: username, date } : { date }),
+        body: JSON.stringify(isAdminOrHRorAdministrador ? { uid: username, date } : { date }),
       });
-      
+
       if (response.ok) {
-        const message = isAdmin 
-          ? "Férias registadas com sucesso!" 
+        const message = isAdminOrHRorAdministrador
+          ? "Férias registadas com sucesso!"
           : "Pedido de férias enviado! Aguarda aprovação.";
         toast.success(message);
         if (onSuccess) onSuccess();

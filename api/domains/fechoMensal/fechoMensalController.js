@@ -143,6 +143,16 @@ const confirmFechoMensal = async (req, res) => {
       if (new Date() > deadline) {
         return res.status(403).json({ error: "Prazo de confirmação expirado para este mês. Contacte o RH/Administração." });
       }
+
+      // O colaborador não pode fechar o próprio mês sem ter o NIF associado ao cadastro
+      // (users/{uid}.nif, preenchido em Cadastro.jsx - ver CADASTRO_FIELD_KEYS em
+      // cadastroController.js, necessário para o processamento de vencimentos). Um
+      // admin/RH/Administrador a confirmar em nome de alguém (fora deste "if") continua a
+      // poder, como correção administrativa - só o self-service fica bloqueado.
+      const userDoc = await db.collection("users").doc(userId).get();
+      if (!(userDoc.data()?.nif || "").trim()) {
+        return res.status(403).json({ error: "Não é possível confirmar o fecho do mês sem ter o NIF associado ao seu cadastro. Atualize o seu cadastro ou contacte o RH." });
+      }
     }
 
     const confirmedAtDate = new Date();
@@ -241,7 +251,7 @@ async function sendReminderEmailToColaborador(colaborador, mes, variant) {
 
 const REMINDER_VARIANT = {
   template: "fecho-mensal",
-  subject: (mesLabel) => `Fecho do mês — ${mesLabel}`,
+  subject: (mesLabel) => `Fecho do mês - ${mesLabel}`,
   sentAtField: "reminderSentAt",
 };
 // Segundo aviso (dia 24, um dia antes do prazo) - só quem ainda não confirmou continua a

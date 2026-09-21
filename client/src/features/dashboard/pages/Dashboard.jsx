@@ -13,12 +13,13 @@ import { FaFile, FaCheck, FaStar, FaRegStar } from "react-icons/fa6";
 import AIAssistant from "../../aiAssistant/components/AIAssistant";
 import KonamiWordle from "../components/KonamiWordle";
 import { apiFetch } from "../../../shared/utils/apiFetch";
+import { usePermissions } from "../../../shared/hooks/usePermissions";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { username, nivelAcesso } = useContext(UserContext);
+  const { username } = useContext(UserContext);
   const { favorites, toggleFavorite, isFavorite } = useContext(FavoritesContext);
-  const isAdmin = nivelAcesso === "SuperAdmin";
+  const { isSuperAdmin } = usePermissions();
   const gold = "#C8932F";
 
   const [processOwners, setProcessOwners] = useState({});
@@ -38,18 +39,18 @@ export default function Dashboard() {
       .then(r => r.json()).then(setProcessOwners).catch(() => {});
     // "/users/getAllUsers" é restrito a SuperAdmin (ver requireAdmin em userRoutes.js) -
     // só vale a pena chamar para quem tem acesso, senão é sempre um 403.
-    if (isAdmin) {
+    if (isSuperAdmin) {
       apiFetch(`/users/getAllUsers`)
         .then(r => r.json()).then(data => setTotalUsers(Array.isArray(data) ? data.length : data.users?.length ?? null)).catch(() => {});
     }
-  }, [isAdmin]);
+  }, [isSuperAdmin]);
 
   const handleSelectFile = (filePath) => {
     const formattedPath = filePath.replace(/\s/g, '-').replace(/\//g, '__');
     const processName = filePath.split('/')[0];
     const ownerStr = processOwners[processName];
-    const canEdit = isAdmin || (ownerStr && ownerStr.split(',').map(n => n.trim()).includes(username));
-    navigate(`/file/${formattedPath}`, { state: { originalFilename: filePath, canEdit, isSuperAdmin: isAdmin } });
+    const canEdit = isSuperAdmin || (ownerStr && ownerStr.split(',').map(n => n.trim()).includes(username));
+    navigate(`/file/${formattedPath}`, { state: { originalFilename: filePath, canEdit, isSuperAdmin } });
   };
 
   const totalProcessos = Object.keys(processOwners).length;
@@ -145,7 +146,7 @@ export default function Dashboard() {
                 ) : processos.map((p, i) => {
                   const isExpanded = expandedProcess === p.nome;
                   const files = isExpanded ? getFilesForProcess(p.nome) : [];
-                  const canManage = isAdmin || p.dono.split(',').map(n => n.trim()).includes(username);
+                  const canManage = isSuperAdmin || p.dono.split(',').map(n => n.trim()).includes(username);
                   return (
                     <div key={i} style={{ borderBottom: i < processos.length - 1 ? "1px solid #f9fafb" : "none" }}>
                       <div onClick={() => setExpandedProcess(isExpanded ? null : p.nome)}
@@ -157,7 +158,7 @@ export default function Dashboard() {
                         </span>
                         <span style={{ fontSize: 11, color: "#9ca3af", flexShrink: 0 }}>{p.dono}</span>
                         {canManage && <CreateTableButton folderName={p.nome} currentPath={[]} size={ICON_SIZE} className={createBtnClass} />}
-                        {isAdmin && <DeleteButton file={{ name: p.nome }} currentPath={[]} onDelete={reloadFileTree} isFolder size={ICON_SIZE} className={deleteBtnClass} />}
+                        {isSuperAdmin && <DeleteButton file={{ name: p.nome }} currentPath={[]} onDelete={reloadFileTree} isFolder size={ICON_SIZE} className={deleteBtnClass} />}
                         <span style={{ color: "#d1d5db", fontSize: 12, transition: "transform 0.2s", transform: isExpanded ? "rotate(90deg)" : "none" }}>›</span>
                       </div>
                       {isExpanded && (
@@ -246,7 +247,7 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-      <AIAssistant fileTree={filteredTree} searchTerm={searchTerm} username={username} isAdmin={isAdmin} isSuperAdmin={isAdmin} processOwners={processOwners} onSuggestion={() => {}} />
+      <AIAssistant fileTree={filteredTree} searchTerm={searchTerm} username={username} isAdmin={isSuperAdmin} isSuperAdmin={isSuperAdmin} processOwners={processOwners} onSuggestion={() => {}} />
       <KonamiWordle />
     </div>
   );

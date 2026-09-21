@@ -1,11 +1,11 @@
-import React, { useContext, useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaClipboardCheck } from "react-icons/fa6";
 import { toast } from "react-toastify";
 import Sidebar from "../../../shared/components/Sidebar";
 import Topbar from "../../../shared/components/Topbar";
 import { apiFetch } from "../../../shared/utils/apiFetch";
-import { UserContext } from "../../../shared/context/userContext";
+import { usePermissions } from "../../../shared/hooks/usePermissions";
 
 const MONTH_NAMES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -17,8 +17,7 @@ const MONTH_NAMES = [
 // userStats.jsx, que só mostra um colaborador de cada vez.
 export default function FechoMensalAdmin() {
   const navigate = useNavigate();
-  const { nivelAcesso } = useContext(UserContext);
-  const isSuperAdmin = nivelAcesso === "SuperAdmin";
+  const { isSuperAdmin } = usePermissions();
 
   const now = new Date();
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());

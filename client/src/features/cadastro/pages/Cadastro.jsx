@@ -13,6 +13,7 @@ import {
   FaTriangleExclamation, FaPaperPlane,
 } from "react-icons/fa6";
 import { apiFetch } from "../../../shared/utils/apiFetch";
+import { usePermissions } from "../../../shared/hooks/usePermissions";
 import { getNomeCurto } from "../../../shared/utils/nomeCurto";
 import {
   validarNIF, validarNISS, validarIBAN, validarCodigoPostal, validarTelefone, validarCartaoCidadao,
@@ -350,18 +351,27 @@ export default function Cadastro() {
   const navigate = useNavigate();
   const { id } = useParams();
   const location = useLocation();
-  const { username, uid, nivelAcesso, setUsername } = useContext(UserContext);
-  const isAdmin = nivelAcesso === "SuperAdmin";
-  const isHR = nivelAcesso === "GestorRH";
-  const isAdministrador = nivelAcesso === "Administrador";
-  const canEditRestricted = isAdmin || isHR;
-  // Administrador só pode consultar o cadastro de outro colaborador  (o backend confirma
-  // que é da sua entidade); nunca ganha canEditRestricted, por isso continua sem poder
-  // editar os campos de "Contrato de trabalho"/"Estágio".
-  const canViewOther = isAdmin || isHR || isAdministrador;
+  const { username, uid, setUsername } = useContext(UserContext);
+  const { isSuperAdmin, isGestorRH, isAdministrador, isGestorFinanceiro, canViewCadastro, canEditCadastro, canEditCadastroRestrito } = usePermissions();
   const isViewingOther = !!id;
   const targetKey = id || uid;
   const targetLabel = isViewingOther ? (location.state?.nome || id) : username;
+  // Nome da entidade do colaborador-alvo (devolvido por GET /cadastro/:id, ver
+  // fetchCadastro) - só é preciso para decidir, para um Administrador, se o alvo está
+  // dentro do seu âmbito de gestão (ver isEntidadeInScope em usePermissions.js).
+  // Continua null até a ficha carregar; para o próprio utilizador isso não afeta nada
+  // (canView/canEdit são sempre true sobre si próprio, ver canViewCadastro/canEditCadastro),
+  // só atrasa a decisão fina quando isViewingOther && isAdministrador.
+  const [targetEntidadeNome, setTargetEntidadeNome] = useState(null);
+  // Verificação grosseira (só por nível de acesso, sem ainda saber a entidade do alvo)
+  // usada só para decidir se vale a pena tentar carregar a ficha de outro colaborador -
+  // quem não passa nem esta verificação nunca teria acesso a mais ninguém, seja qual for
+  // a entidade. A decisão fina (com âmbito de entidade) é canView/canEdit abaixo; o
+  // backend continua a validar sempre as duas, isto é só para poupar um pedido inútil.
+  const canAttemptViewOther = isSuperAdmin || isGestorRH || isGestorFinanceiro || isAdministrador;
+  const canView = canViewCadastro(targetKey, targetEntidadeNome);
+  const canEdit = canEditCadastro(targetKey, targetEntidadeNome);
+  const canEditRestricted = canEditCadastroRestrito(targetEntidadeNome);
 
   const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -397,11 +407,11 @@ export default function Cadastro() {
   const [colaboradoresOptions, setColaboradoresOptions] = useState([]);
 
   useEffect(() => {
-    if (isViewingOther && !canViewOther) {
+    if (isViewingOther && !canAttemptViewOther) {
       navigate("/cadastro", { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isViewingOther, canViewOther]);
+  }, [isViewingOther, canAttemptViewOther]);
 
   useEffect(() => {
     setEstagioAdding(false);
@@ -449,6 +459,7 @@ export default function Cadastro() {
       const data = await res.json();
       setForm({ ...INITIAL_FORM, ...(data.form || {}), email: data.email || "" });
       setDocRefs(data.docs || {});
+      setTargetEntidadeNome(data.entidade || null);
       const novosBlockLists = BLOCK_FIELDS.reduce((acc, f) => { acc[f.key] = data[f.apiKey] || []; return acc; }, {});
       setBlockLists(novosBlockLists);
       // Blocos já com data de início preenchida (ou seja, já existiam antes desta consulta)
@@ -1204,7 +1215,7 @@ export default function Cadastro() {
                 );
               })()}
             </div>
-            {isViewingOther && canViewOther && !loading && missingCount > 0 && (
+            {isViewingOther && canView && !loading && missingCount > 0 && (
               <button
                 disabled={notifying}
                 onClick={handleNotifyIncomplete}
@@ -1221,22 +1232,28 @@ export default function Cadastro() {
                   : <><FaPaperPlane style={{ fontSize: 12 }} /> Notificar cadastro incompleto</>}
               </button>
             )}
-            <button
-              disabled={saving}
-              onClick={() => { if (editMode) handleSave(); else setEditMode(true); }}
-              style={{
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "8px 16px", fontSize: 13, fontWeight: 500, cursor: saving ? "wait" : "pointer",
-                border: `1px solid ${editMode ? "#22c55e" : GOLD}`,
-                borderRadius: 7, background: "#fff",
-                color: editMode ? "#22c55e" : GOLD,
-                transition: "all 0.15s", flexShrink: 0, opacity: saving ? 0.6 : 1,
-              }}
-            >
-              {saving
-                ? "A guardar..."
-                : editMode ? <><FaCheck style={{ fontSize: 12 }} /> Guardar</> : <><FaPencil style={{ fontSize: 12 }} /> Editar</>}
-            </button>
+            {/* !loading: para um Administrador, canEdit só fica definitivo depois de
+                targetEntidadeNome carregar (ver fetchCadastro) - evita mostrar o botão e
+                escondê-lo logo a seguir. O backend (canWrite) continua a ser sempre a
+                validação final, isto só decide se o botão aparece. */}
+            {!loading && canEdit && (
+              <button
+                disabled={saving}
+                onClick={() => { if (editMode) handleSave(); else setEditMode(true); }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "8px 16px", fontSize: 13, fontWeight: 500, cursor: saving ? "wait" : "pointer",
+                  border: `1px solid ${editMode ? "#22c55e" : GOLD}`,
+                  borderRadius: 7, background: "#fff",
+                  color: editMode ? "#22c55e" : GOLD,
+                  transition: "all 0.15s", flexShrink: 0, opacity: saving ? 0.6 : 1,
+                }}
+              >
+                {saving
+                  ? "A guardar..."
+                  : editMode ? <><FaCheck style={{ fontSize: 12 }} /> Guardar</> : <><FaPencil style={{ fontSize: 12 }} /> Editar</>}
+              </button>
+            )}
           </div>
 
           {loading && (

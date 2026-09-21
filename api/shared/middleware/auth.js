@@ -37,8 +37,8 @@ async function requireAuth(req, res, next) {
       nome: userData.nome || decodedToken.name || null,
       // "role" é só o cargo/título mostrado (texto livre, ex: "Gestora RH / Coordenadora
       // Pedagógica")  -  NUNCA usar para decidir permissões, usar sempre nivelAcesso.
-      role: userData.role || "user",
-      nivelAcesso: userData.nivelAcesso || "Colaborador",
+      role: userData.role,
+      nivelAcesso: userData.nivelAcesso,
       // Referência "entidades/<id>" da entidade a que o utilizador pertence. Usada para
       // limitar o que um "Administrador" (nível intermédio, ver isAdministrador) pode
       // ver/gerir aos colaboradores da sua própria entidade.
@@ -76,10 +76,11 @@ function isGestorRH(nivelAcesso) {
   return (nivelAcesso || "").toLowerCase() === "gestorrh";
 }
 
-// Nível intermédio entre "Colaborador" e "GestorRH": vê os dados de cadastro/salário/
-// formação dos colaboradores da sua própria entidade (nunca de outras) e pode gerir
-// (criar/editar/apagar) as respetivas contas, mas sem os direitos de edição de RH
-// (contrato, salário, plano de formação) nem acesso fora da sua entidade.
+// Nível intermédio entre "Colaborador" e "GestorRH": vê e edita o cadastro (incluindo
+// os campos de contrato/estágio, ver canEditRestricted em cadastroController.js) dos
+// colaboradores da sua própria entidade (nunca de outras) e pode gerir (criar/editar/
+// apagar) as respetivas contas, mas sem os direitos de edição de RH em salário/plano de
+// formação nem acesso fora da sua entidade.
 function isAdministrador(nivelAcesso) {
   return (nivelAcesso || "").toLowerCase() === "administrador";
 }

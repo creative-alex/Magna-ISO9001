@@ -6,8 +6,10 @@ import Sidebar from "../../shared/components/Sidebar";
 import Topbar from "../../shared/components/Topbar";
 import ColaboradoresGroupedList from "../../shared/components/ColaboradoresGroupedList";
 import ExportFechoMensalButton from "./ExportFechoMensalButton";
+import ImportarRecibosButton from "./ImportarRecibosButton";
 import { FaPencil, FaCheck, FaSliders, FaChevronDown, FaTriangleExclamation, FaXmark } from "react-icons/fa6";
 import { apiFetch } from "../../shared/utils/apiFetch";
+import { usePermissions } from "../../shared/hooks/usePermissions";
 
 const GOLD = "#C8932F";
 
@@ -286,20 +288,20 @@ function TerminarVencimentoModal({ onConfirm, onCancel, loading }) {
 
 export default function ProcessamentoSalarios() {
   const navigate = useNavigate();
-  const { uid, nivelAcesso } = useContext(UserContext);
-  const isAdmin = nivelAcesso === "SuperAdmin";
-  const isHR = nivelAcesso === "GestorRH";
-  const isAdministrador = nivelAcesso === "Administrador";
-  const isGestorFinanceiro = nivelAcesso === "GestorFinanceiro";
-  const canView = isAdmin || isHR || isAdministrador || isGestorFinanceiro;
+  const { uid } = useContext(UserContext);
+  const { isSuperAdmin, isGestorRH, isGestorFinanceiro, canViewColaboradores, canViewPayroll, canEditPayroll } = usePermissions();
+  const canView = canViewColaboradores;
   // Fecho mensal (estado + exportação) só faz sentido para quem processa vencimentos a
   // nível global - Administrador continua de fora, tal como nos Parâmetros de salário.
-  const canSeeFechoMensal = isAdmin || isHR || isGestorFinanceiro;
+  const canSeeFechoMensal = canViewPayroll;
   // "Terminar vencimento" (fecho universal, ver terminarVencimento em
   // fechoMensalController.js): SuperAdmin vê sempre; GestorRH/GestorFinanceiro só a partir
   // do dia 25 (mesmo prazo do fecho normal) - backend aceita os três (ver
   // requireAdminOrHRorFinanceiro), esta restrição de dia é só de interface.
-  const canTerminarVencimento = isAdmin || ((isHR || isGestorFinanceiro) && new Date().getDate() >= 25);
+  const canTerminarVencimento = isSuperAdmin || ((isGestorRH || isGestorFinanceiro) && new Date().getDate() >= 25);
+  // Importação de recibos em lote: mesma restrição do upload manual (ver canAccess em
+  // salarioController.js/uploadRecibo) - GestorRH mantém consulta mas não pode importar.
+  const canImportarRecibos = canEditPayroll;
 
   useEffect(() => {
     // Esta página (parâmetros + lista de colaboradores) é só para admin/RH/
@@ -427,7 +429,7 @@ export default function ProcessamentoSalarios() {
             Financeiro  -  separação de funções entre RH e Financeiro. */}
         {canSeeFechoMensal && (
           <div className="px-4 sm:px-6 pt-4 sm:pt-6" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            <ParametrosSalario canEdit={isAdmin || isGestorFinanceiro} />
+            <ParametrosSalario canEdit={canEditPayroll} />
           </div>
         )}
 
@@ -439,6 +441,7 @@ export default function ProcessamentoSalarios() {
             canSeeFechoMensal
               ? () => (
                   <div className="flex items-center gap-2">
+                    {canImportarRecibos && <ImportarRecibosButton />}
                     <ExportFechoMensalButton />
                     {canTerminarVencimento && (
                       <button

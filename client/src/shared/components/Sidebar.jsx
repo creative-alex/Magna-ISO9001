@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { UserContext } from "../context/userContext";
 import { FavoritesContext } from "../context/favoritesContext";
+import { usePermissions } from "../hooks/usePermissions";
 import UserAvatar from "./UserAvatar";
 import Logo from "../assets/logo.svg";
 import {
@@ -80,20 +81,18 @@ const normalizeEntitySlug = (nome) => (nome || "").toLowerCase()
 export default function Sidebar({ onSelectFile }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { username, nivelAcesso, uid, entidadeNome, userRole } = useContext(UserContext);
+  const { username, uid, entidadeNome, userRole } = useContext(UserContext);
   const { favorites, toggleFavorite } = useContext(FavoritesContext);
-  const isAdmin = nivelAcesso === "SuperAdmin";
-  const isHR = nivelAcesso === "GestorRH";
-  const isAdministrador = nivelAcesso === "Administrador";
-  const isGestorFinanceiro = nivelAcesso === "GestorFinanceiro";
-  const canManageColaboradores = isAdmin || isHR || isAdministrador;
-  // Gestor Financeiro só entra na vista de lista em Processamento de Salários e
-  // Prémios (as duas áreas que gere)  -  nunca em Cadastro/Plano de Formação/
-  // Medicina de Trabalho, que continuam fora do seu âmbito.
-  const canManageFinanceiro = canManageColaboradores || isGestorFinanceiro;
+  const { isSuperAdmin, isAdminOrHR, canManageUsers, canViewColaboradores, canViewPremiosList } = usePermissions();
+  // Plano de Formação/Medicina de Trabalho: mesmo âmbito de gestão de contas
+  // (requireAdminOrEntidadeAdmin) - nunca o Gestor Financeiro, que fica fora destas duas áreas.
+  const canManageColaboradores = canManageUsers;
+  // Cadastro/Processamento Salários: Gestor Financeiro também entra na vista de lista
+  // (as duas áreas que gere) - mesmo âmbito de requireCanViewColaboradores no backend.
+  const canManageFinanceiro = canViewColaboradores;
   // Prémios: GestorRH só consulta os seus próprios (ver canRead em premiosController) -
   // ao contrário das outras áreas de gestão de pessoas, nunca vê a lista de colaboradores aqui.
-  const canManagePremios = isAdmin || isAdministrador || isGestorFinanceiro;
+  const canManagePremios = canViewPremiosList;
   // Função do colaborador (campo "role", editado em Cadastro > Dados contratuais)  -
   // "user"/"User" é o valor por omissão de contas sem função preenchida (ver
   // verifyTokenAndGetUserInfo/createUser), por isso não é mostrado.
@@ -156,7 +155,11 @@ export default function Sidebar({ onSelectFile }) {
     if (item.name === "Livro de Ponto") {
       navigate("/ponto");
     } else if (item.name === "Cadastro") {
-      navigate(canManageColaboradores ? "/colaboradores" : "/cadastro");
+      // canManageFinanceiro (não canManageColaboradores): um GestorFinanceiro também
+      // pode consultar o Cadastro de outros colaboradores (ver canViewCadastro em
+      // usePermissions.js), por isso precisa de chegar à lista tal como já acontecia
+      // em Processamento Salários/Prémios.
+      navigate(canManageFinanceiro ? "/colaboradores" : "/cadastro");
     } else if (item.name === "Processamento Salários") {
       navigate(canManageFinanceiro ? "/salarios" : `/salarios/${uid}`);
     } else if (item.name === "Plano de Formação") {
@@ -345,7 +348,7 @@ export default function Sidebar({ onSelectFile }) {
             é sobre documentação ISO e não tem nada a ver com colaboradores, por isso
             continua exclusivo do SuperAdmin); Administrador só as ações que se aplicam
             à sua própria entidade. */}
-        {(isAdmin || isHR || isAdministrador) && (
+        {canManageUsers && (
           <>
             {sectionLabel("Administração")}
             <div
@@ -355,7 +358,7 @@ export default function Sidebar({ onSelectFile }) {
             >
               <FaUser style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> {!collapsed && "Novo Utilizador"}
             </div>
-            {(isAdmin || isHR) && (
+            {isAdminOrHR && (
               <div
                 className={navItemBaseClass}
                 onClick={() => navigate('/ponto/nova-entidade')}
@@ -364,14 +367,14 @@ export default function Sidebar({ onSelectFile }) {
                 <FaBuilding style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> {!collapsed && "Nova Entidade"}
               </div>
             )}
-            {isAdmin && (
+            {isSuperAdmin && (
               <div className={navItemBaseClass} onClick={() => navigate('/novo-processo')} title={collapsed ? "Novo Processo" : undefined}>
                 <FaClipboardList style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> {!collapsed && "Novo Processo"}
               </div>
             )}
             <div
               className={navItemBaseClass}
-              onClick={() => navigate((isAdmin || isHR) ? '/ponto/entidades' : `/ponto/entidades/${normalizeEntitySlug(entidadeNome)}`)}
+              onClick={() => navigate(isAdminOrHR ? '/ponto/entidades' : `/ponto/entidades/${normalizeEntitySlug(entidadeNome)}`)}
               title={collapsed ? "Gerir Livro de Ponto" : undefined}
             >
               <FaClock style={{ fontSize: 16, color: "var(--gold)", flexShrink: 0 }} /> {!collapsed && "Gerir Livro de Ponto"}

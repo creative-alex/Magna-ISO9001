@@ -12,6 +12,7 @@ import {
 import { GiPalmTree } from "react-icons/gi";
 import { apiFetch } from "../../../shared/utils/apiFetch";
 import { UserContext } from "../../../shared/context/userContext";
+import { usePermissions } from "../../../shared/hooks/usePermissions";
 import { NATIONAL_HOLIDAYS_DDMM, getMunicipalHolidayDDMM, getMoveableHolidays } from "../../../shared/utils/holidays";
 import { getInitials } from "../../../shared/utils/nomeCurto";
 
@@ -102,8 +103,8 @@ function buildClosedMonthsMap(employees) {
 const CLOSED_MONTH_PATTERN = "bg-[repeating-linear-gradient(45deg,rgba(75,85,99,0.22)_0px,rgba(75,85,99,0.22)_3px,transparent_3px,transparent_7px)]";
 
 export default function VacationTimeline({ year, onYearChange }) {
-  const { uid, nivelAcesso } = useContext(UserContext);
-  const isAdminOrHR = nivelAcesso === "SuperAdmin" || nivelAcesso === "GestorRH";
+  const { uid } = useContext(UserContext);
+  const { isAdminOrHR } = usePermissions();
 
   const [employees, setEmployees] = useState([]);
   const [vacationMap, setVacationMap] = useState(new Map());

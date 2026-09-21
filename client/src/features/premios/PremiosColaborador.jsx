@@ -6,6 +6,7 @@ import Sidebar from "../../shared/components/Sidebar";
 import Topbar from "../../shared/components/Topbar";
 import { FaTrophy, FaPencil, FaCheck, FaArrowLeft, FaTrash, FaPlus } from "react-icons/fa6";
 import { apiFetch } from "../../shared/utils/apiFetch";
+import { usePermissions } from "../../shared/hooks/usePermissions";
 import { getNomeCurto } from "../../shared/utils/nomeCurto";
 
 const GOLD = "#C8932F";
@@ -40,16 +41,14 @@ export default function PremiosColaborador() {
   const navigate = useNavigate();
   const { id } = useParams();
   const location = useLocation();
-  const { uid, nivelAcesso, username } = useContext(UserContext);
-  const isAdmin = nivelAcesso === "SuperAdmin";
-  const isAdministrador = nivelAcesso === "Administrador";
-  const isGestorFinanceiro = nivelAcesso === "GestorFinanceiro";
+  const { uid, username } = useContext(UserContext);
+  const { isAdministrador, isSuperAdminOrGestorFinanceiro } = usePermissions();
   // Edição exclusiva de SuperAdmin/Gestor Financeiro. GestorRH não entra em canViewList:
   // só consulta os seus próprios prémios (via isSelf), nunca os de outro colaborador
   // (ver canRead em premiosController)  -  ao contrário de Cadastro/Formação/Medicina
   // de Trabalho, onde GestorRH continua a gerir toda a gente.
-  const canManage = isAdmin || isGestorFinanceiro;
-  const canViewList = isAdmin || isGestorFinanceiro;
+  const canManage = isSuperAdminOrGestorFinanceiro;
+  const canViewList = isSuperAdminOrGestorFinanceiro;
   const isSelf = uid === id;
   // Administrador só tem acesso de leitura (o backend confirma que o colaborador é da
   // sua entidade); nunca ganha canManage, por isso os botões de edição continuam ocultos.

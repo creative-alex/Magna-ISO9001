@@ -1,36 +1,60 @@
 const admin = require("firebase-admin");
 const db = require("../../shared/db/firebase").db;
-const { isAdminOrHR, isAdministrador, entidadeNoAmbito } = require("../../shared/middleware/auth");
+const { isAdminOrHR, isAdministrador, isGestorFinanceiro, entidadeNoAmbito } = require("../../shared/middleware/auth");
 const { sendMail, renderEmail } = require("../../shared/services/mailer");
 const {
   validarNIF, validarNISS, validarCodigoPostal, validarTelefone, validarCartaoCidadao, validarIBAN,
 } = require("../../shared/utils/validators");
 
-function canAccess(req, id) {
-  return req.user?.uid === id || isAdminOrHR(req.user?.nivelAcesso);
+// Um Administrador só vê/edita colaboradores das entidades que administra (nunca de
+// outra) - mesmo critério (entidadeNoAmbito) usado para ler e para escrever, só muda o
+// que cada operação decide fazer com esse resultado.
+function isAdminInScope(req, targetEntidade) {
+  return isAdministrador(req.user?.nivelAcesso) && entidadeNoAmbito(req.user, targetEntidade);
 }
 
-// Leitura: admin/RH vê qualquer colaborador; Administrador vê os colaboradores da
-// sua própria entidade (nunca de outra); um colaborador comum só vê o seu próprio
-// cadastro. Nunca dá direito de escrita  -  isso continua só em canAccess/canEditRestricted.
+// Leitura: admin/RH vê qualquer colaborador; GestorFinanceiro também vê qualquer
+// colaborador (precisa de consultar o cadastro para o processamento de salários), mas
+// nunca ganha direito de escrita sobre o de outra pessoa (ver canWrite); Administrador
+// vê os colaboradores das entidades que administra; um colaborador comum só vê o seu
+// próprio cadastro.
 function canRead(req, id, targetEntidade) {
-  return canAccess(req, id) || (isAdministrador(req.user?.nivelAcesso) && entidadeNoAmbito(req.user, targetEntidade));
+  return req.user?.uid === id
+    || isAdminOrHR(req.user?.nivelAcesso)
+    || isGestorFinanceiro(req.user?.nivelAcesso)
+    || isAdminInScope(req, targetEntidade);
 }
 
-function canEditRestricted(req) {
-  return isAdminOrHR(req.user?.nivelAcesso);
+// Escrita (campos não-restritos): admin/RH sem restrições; Administrador só dentro do
+// seu âmbito de entidade; GestorFinanceiro NUNCA edita o cadastro de outro colaborador
+// (só o seu próprio, coberto pelo "uid === id" abaixo) - separação deliberada entre ver
+// e editar para este nível.
+function canWrite(req, id, targetEntidade) {
+  return req.user?.uid === id
+    || isAdminOrHR(req.user?.nivelAcesso)
+    || isAdminInScope(req, targetEntidade);
 }
 
-// Campos de "Contrato de trabalho" e "Estágio": só GestorRH/SuperAdmin pode alterá-los,
-// mesmo que o próprio colaborador tenha acesso de escrita ao resto do seu cadastro.
+// Campos de "Contrato de trabalho"/"Estágio" e as subcoleções de cedências/baixas
+// médicas: GestorRH/SuperAdmin sem restrições; Administrador só dentro do seu âmbito de
+// entidade (mesmo critério de canWrite, incluindo agora estes campos antes reservados a
+// RH) - sem atalho por "é o próprio": um Colaborador ou GestorFinanceiro continuam sem
+// poder editar isto na sua própria ficha, exatamente como já acontecia antes.
+function canEditRestricted(req, targetEntidade) {
+  return isAdminOrHR(req.user?.nivelAcesso) || isAdminInScope(req, targetEntidade);
+}
+
+// Campos de "Contrato de trabalho" e "Estágio": só quem passa canEditRestricted pode
+// alterá-los, mesmo que o próprio colaborador tenha acesso de escrita ao resto do seu cadastro.
 const RESTRICTED_FORM_KEYS = [
   "tipo_contrato", "role", "departamento", "situacao_contratual", "motivo_cessacao", "data_admissao", "data_fim_contrato",
   "tipo_estagio", "n_processo_estagio", "id_processo_estagio", "entidade_medida",
   "data_inicio_estagio", "data_fim_estagio", "area_funcao", "habilitacoes_estagio",
   "entidade_estagio", "orientador", "observacao_estagio",
 ];
-// "sede" também só é editável por GestorRH/SuperAdmin, mas é um simples campo do colaborador
-// (usado pelo livro de ponto/mapa de férias para saber que feriados regionais aplicar).
+// "sede" também só é editável por quem passa canEditRestricted, mas é um simples campo
+// do colaborador (usado pelo livro de ponto/mapa de férias para saber que feriados
+// regionais aplicar).
 const RESTRICTED_KEYS = [...RESTRICTED_FORM_KEYS, "sede"];
 const RESTRICTED_DOC_KEYS = [
   "digitalizacao_contrato",
@@ -40,14 +64,21 @@ const RESTRICTED_DOC_KEYS = [
 
 // Cedências temporárias e baixas médicas: cada uma é uma lista de blocos independentes
 // (data início/fim + PDF), por isso vivem em subcoleções (um documento por bloco) em vez
-// de um campo no documento do user  -  só GestorRH/SuperAdmin pode alterá-las (ver
-// canEditRestricted). "collection" é o nome da subcoleção em users/{id}/{collection}/{blocoId};
+// de um campo no documento do user  -  só quem passa canEditRestricted (GestorRH/
+// SuperAdmin, ou um Administrador dentro do seu âmbito de entidade) pode alterá-las.
+// "collection" é o nome da subcoleção em users/{id}/{collection}/{blocoId};
 // "requestKey" é a chave correspondente no corpo do pedido (ver saveCadastro) e na resposta
 // de getCadastro.
 const BLOCK_COLLECTIONS = [
   { collection: "cedencias", requestKey: "cedencias" },
   { collection: "baixasMedicas", requestKey: "baixasMedicas" },
 ];
+
+// Situações contratuais que tiram o colaborador do quadro ativo - mesmo critério de
+// ColaboradoresGroupedList.jsx (só colaboradores ativos aparecem agrupados por entidade,
+// os restantes ficam à parte em "Inativos"), usado para não notificar quem já não está
+// nesta entidade.
+const INACTIVE_STATUSES = ["Cessado", "Suspenso", "Reformado"];
 
 // Substitui o conteúdo de uma subcoleção de "blocos" pelos itens recebidos (cada um
 // identificado pelo seu próprio id de documento)  -  cria/atualiza os que vieram no
@@ -136,9 +167,20 @@ const getCadastro = async (req, res) => {
       blocks[requestKey] = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }));
 
+    // Nome da entidade do colaborador-alvo (não é um campo de cadastro, não entra em
+    // CADASTRO_FIELD_KEYS) - o frontend usa-o só para decidir se mostra o botão de
+    // editar a um Administrador (ver isEntidadeInScope/canEditCadastro em
+    // usePermissions.js); a autorização real de escrita é sempre revalidada aqui no
+    // servidor (canWrite/canEditRestricted), nunca decidida só por esse botão aparecer.
+    let entidadeNome = null;
+    if (data.entidade) {
+      const entidadeDoc = await db.collection("entidades").doc(data.entidade.replace("entidades/", "")).get();
+      entidadeNome = entidadeDoc.exists ? (entidadeDoc.data().nome || null) : null;
+    }
+
     // "email" não é um campo de cadastro (não entra em CADASTRO_FIELD_KEYS)  -  é o
     // email da conta, devolvido à parte só para consulta no ecrã de cadastro.
-    res.json({ form, docs, ...blocks, email: data.email || null });
+    res.json({ form, docs, ...blocks, email: data.email || null, entidade: entidadeNome });
   } catch (error) {
     console.error("Erro ao buscar cadastro:", error);
     res.status(500).json({ error: "Erro interno do servidor" });
@@ -171,7 +213,24 @@ function validarCadastroForm(form) {
 const saveCadastro = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!canAccess(req, id)) {
+
+    const userDocRef = db.collection("users").doc(id);
+    // Precisa da entidade do colaborador-alvo antes de decidir a permissão (âmbito do
+    // Administrador, ver canWrite) - idem getCadastro, reaproveita a existência já
+    // confirmada pelo middleware quando o pedido é sobre o próprio utilizador, em vez
+    // de reler o mesmo documento.
+    let targetData;
+    if (req.user?.uid === id && req.userDocExists) {
+      targetData = req.userData;
+    } else {
+      const userDoc = await userDocRef.get();
+      if (!userDoc.exists) {
+        return res.status(404).json({ error: "Colaborador não encontrado" });
+      }
+      targetData = userDoc.data();
+    }
+
+    if (!canWrite(req, id, targetData.entidade)) {
       return res.status(403).json({ error: "Sem permissão para editar este cadastro" });
     }
 
@@ -185,15 +244,7 @@ const saveCadastro = async (req, res) => {
       return res.status(400).json({ error: erros.join("; ") });
     }
 
-    const userDocRef = db.collection("users").doc(id);
-    // Idem getCadastro: reaproveita a existência já confirmada pelo middleware quando
-    // o pedido é sobre o próprio utilizador, em vez de reler o mesmo documento.
-    const userExists = (req.user?.uid === id && req.userDocExists) || (await userDocRef.get()).exists;
-    if (!userExists) {
-      return res.status(404).json({ error: "Colaborador não encontrado" });
-    }
-
-    const privileged = canEditRestricted(req);
+    const privileged = canEditRestricted(req, targetData.entidade);
 
     if (privileged) {
       const errosBlocos = [];
@@ -307,4 +358,52 @@ const notifyPerfilIncompleto = async (req, res) => {
   }
 };
 
-module.exports = { getCadastro, saveCadastro, notifyPerfilIncompleto };
+// Notifica de uma só vez todos os colaboradores ativos de uma entidade que ainda não têm
+// NIF registado - mesmo aviso de notifyPerfilIncompleto, mas disparado a partir do botão
+// junto ao nome da entidade em ColaboradoresGroupedList (ver Colaboradores.jsx) em vez de
+// perfil a perfil. "entidade" vem pelo nome (tal como devolvido por getColaboradores/
+// ColaboradoresGroupedList, que só conhece o nome, nunca o id do documento - mesmo padrão
+// de GET /salario/export/:mes).
+const notifyEntidadeSemNif = async (req, res) => {
+  try {
+    const entidadeNome = typeof req.body?.entidade === "string" ? req.body.entidade.trim() : "";
+    if (!entidadeNome) {
+      return res.status(400).json({ error: "Entidade não especificada" });
+    }
+
+    const entidadesSnap = await db.collection("entidades").get();
+    const entidadeDoc = entidadesSnap.docs.find(doc => (doc.data().nome || doc.id) === entidadeNome);
+    if (!entidadeDoc) {
+      return res.status(404).json({ error: "Entidade não encontrada" });
+    }
+    const entidadeRef = `entidades/${entidadeDoc.id}`;
+
+    if (!isAdminOrHR(req.user?.nivelAcesso) && !isAdminInScope(req, entidadeRef)) {
+      return res.status(403).json({ error: "Sem permissão para notificar colaboradores desta entidade" });
+    }
+
+    const usersSnap = await db.collection("users").where("entidade", "==", entidadeRef).get();
+    const alvos = usersSnap.docs
+      .map(doc => doc.data())
+      // Administradores não contam para este aviso - o "cadastro incompleto" é dirigido
+      // aos colaboradores da entidade, não a quem a gere.
+      .filter(data => !isAdministrador(data.nivelAcesso)
+        && !INACTIVE_STATUSES.includes(data.situacao_contratual)
+        && !(data.nif || "").trim()
+        && data.email);
+
+    await Promise.all(alvos.map(data => sendMail({
+      to: data.email,
+      subject: "O seu cadastro na MAGNA ISO 9001 está incompleto",
+      html: renderEmail("perfil-incompleto", { nome: data.nome || "", eyebrow: "Cadastro incompleto" }),
+      entidade: entidadeRef,
+    })));
+
+    res.json({ message: `Notificação enviada a ${alvos.length} colaborador(es) sem NIF`, count: alvos.length });
+  } catch (error) {
+    console.error("Erro ao notificar colaboradores sem NIF:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+};
+
+module.exports = { getCadastro, saveCadastro, notifyPerfilIncompleto, notifyEntidadeSemNif };

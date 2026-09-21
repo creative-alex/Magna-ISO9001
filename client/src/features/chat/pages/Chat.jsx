@@ -5,12 +5,13 @@ import Sidebar from "../../../shared/components/Sidebar";
 import Topbar from "../../../shared/components/Topbar";
 import ConversasList from "../components/ConversasList";
 import ChatWindow from "../components/ChatWindow";
+import { usePermissions } from "../../../shared/hooks/usePermissions";
 
 export default function Chat() {
   const navigate = useNavigate();
   const { colaboradorId: colaboradorIdParam } = useParams();
-  const { uid, username, nivelAcesso } = useContext(UserContext);
-  const isGestor = nivelAcesso === "SuperAdmin" || nivelAcesso === "GestorRH";
+  const { uid, username } = useContext(UserContext);
+  const { isAdminOrHR: isGestor } = usePermissions();
   const [liveUpdate, setLiveUpdate] = useState(null);
   const [selectedNome, setSelectedNome] = useState(null);
 

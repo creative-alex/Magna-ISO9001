@@ -9,6 +9,7 @@ import {
   FaCircleCheck, FaClock, FaChevronDown, FaChevronUp,
 } from "react-icons/fa6";
 import { apiFetch } from "../../shared/utils/apiFetch";
+import { usePermissions } from "../../shared/hooks/usePermissions";
 import { getNomeCurto } from "../../shared/utils/nomeCurto";
 
 const GOLD = "#C8932F";
@@ -54,11 +55,8 @@ export default function FormacaoColaborador() {
   const navigate = useNavigate();
   const { id } = useParams();
   const location = useLocation();
-  const { uid, nivelAcesso, username } = useContext(UserContext);
-  const isAdmin = nivelAcesso === "SuperAdmin";
-  const isHR = nivelAcesso === "GestorRH";
-  const isAdministrador = nivelAcesso === "Administrador";
-  const canManage = isAdmin || isHR;
+  const { uid, username } = useContext(UserContext);
+  const { isAdministrador, canManageFormacao: canManage } = usePermissions();
   const isSelf = uid === id;
   // Administrador só tem acesso de leitura (o backend confirma que o colaborador é da
   // sua entidade); nunca ganha canManage, por isso os botões de edição continuam ocultos.

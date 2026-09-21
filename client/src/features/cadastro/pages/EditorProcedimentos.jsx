@@ -10,6 +10,7 @@ import LoadingPage from "../../../shared/components/Loading";
 import Sidebar from "../../../shared/components/Sidebar";
 import Topbar from "../../../shared/components/Topbar";
 import { apiFetch } from "../../../shared/utils/apiFetch";
+import { usePermissions } from "../../../shared/hooks/usePermissions";
 
 // Definição dos dois templates
 const tabelas = [
@@ -130,7 +131,8 @@ export default function TablePageUnified() {
   const [isLoading, setIsLoading] = useState(true);
   
   // Context do usuário para verificar permissões
-  const { username, nivelAcesso } = useContext(UserContext);
+  const { username } = useContext(UserContext);
+  const { isSuperAdmin: isSuperAdminFromContext } = usePermissions();
 
   const originalFilename =
     location?.state?.originalFilename
@@ -287,12 +289,11 @@ const isUserOwner = (donoProcessoString, username) => {
 };
 
 // Fallback: verificar permissões localmente se não vier do state
-const isAdmin = nivelAcesso === "SuperAdmin";
-const canEditFallback = isAdmin || isUserOwner(donoProcesso, username);
+const canEditFallback = isSuperAdminFromContext || isUserOwner(donoProcesso, username);
 
 // Usar o valor do state se disponível, senão usar fallback
 const canEdit = canEditFromState !== undefined ? canEditFromState : canEditFallback;
-const isSuperAdmin = isSuperAdminFromState !== undefined ? isSuperAdminFromState : isAdmin;
+const isSuperAdmin = isSuperAdminFromState !== undefined ? isSuperAdminFromState : isSuperAdminFromContext;
 
 // Carregar funcionários do backend
 useEffect(() => {
@@ -1450,7 +1451,7 @@ useEffect(() => {
         fileTree={[]}
         searchTerm=""
         username={username}
-        isAdmin={isAdmin}
+        isAdmin={isSuperAdmin}
         isSuperAdmin={isSuperAdmin}
         processOwners={{}}
         onSuggestion={() => {}}

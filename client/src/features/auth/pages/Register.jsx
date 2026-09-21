@@ -9,22 +9,21 @@ import { apiFetch } from '../../../shared/utils/apiFetch';
 import { UserContext } from '../../../shared/context/userContext';
 import AutocompleteInput from '../../../shared/components/AutocompleteInput';
 import { FUNCAO } from '../../../shared/utils/formOptions';
+import { usePermissions } from '../../../shared/hooks/usePermissions';
 
 const Register = () => {
-    const { nivelAcesso: actorNivelAcesso, entidadeNome: actorEntidadeNome, entidadesGeridasNomes } = useContext(UserContext);
+    const { entidadeNome: actorEntidadeNome, entidadesGeridasNomes } = useContext(UserContext);
     // Um Administrador só pode criar colaboradores dentro de uma entidade que gere e
     // nunca pode atribuir um nível de acesso igual ou superior ao seu  -  o backend
     // também impõe isto, mas mantemos o formulário coerente com o que vai ser aceite.
-    const isAdministrador = actorNivelAcesso === 'Administrador';
+    // SuperAdmin escolhe qualquer nível de acesso; GestorRH só pode criar Colaborador
+    // ou Administrador (nunca GestorRH/GestorFinanceiro/SuperAdmin, esses continuam
+    // exclusivos do SuperAdmin)  -  o backend também impõe isto (normalizeNivelAcessoForActor).
+    const { isAdministrador, isSuperAdmin, isGestorRH: isHR } = usePermissions();
     // Caso raro de um Administrador que gere mais do que uma entidade: em vez de
     // bloquear o campo numa só, deixa escolher entre as que gere (ver
     // entidadesGeridasPor no backend).
     const isMultiEntidadeAdministrador = isAdministrador && entidadesGeridasNomes.length > 1;
-    // SuperAdmin escolhe qualquer nível de acesso; GestorRH só pode criar Colaborador
-    // ou Administrador (nunca GestorRH/GestorFinanceiro/SuperAdmin, esses continuam
-    // exclusivos do SuperAdmin)  -  o backend também impõe isto (normalizeNivelAcessoForActor).
-    const isSuperAdmin = actorNivelAcesso === 'SuperAdmin';
-    const isHR = actorNivelAcesso === 'GestorRH';
 
     const [nome, setNome] = useState('');
     const [email, setEmail] = useState('');
@@ -250,9 +249,13 @@ const Register = () => {
                                             required
                                         >
                                             <option value="Colaborador">Colaborador</option>
-                                            <option value="Administrador">Administrador</option>
+                                            {/* GestorRH pode atribuir GestorFinanceiro (área diferente da sua) mas nunca
+                                                Administrador (só o SuperAdmin promove a esse nível) - ver
+                                                normalizeNivelAcessoForActor em userManagementController.js. */}
+                                            {isHR && <option value="GestorFinanceiro">Gestor(a) Financeiro</option>}
                                             {isSuperAdmin && (
                                                 <>
+                                                    <option value="Administrador">Administrador</option>
                                                     <option value="GestorRH">Gestor(a) de Recursos Humanos</option>
                                                     <option value="GestorFinanceiro">Gestor(a) Financeiro</option>
                                                     <option value="SuperAdmin">SuperAdmin</option>

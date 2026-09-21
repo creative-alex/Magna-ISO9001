@@ -12,6 +12,7 @@ const STATUS_LABELS = {
   feriado: 'Feriado',
   'fim-de-semana': 'Fim de semana',
   falta: 'Falta',
+  incompleto: 'Registo incompleto',
   inativo: '-',
   futuro: '-',
 };

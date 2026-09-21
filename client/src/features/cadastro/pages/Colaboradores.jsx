@@ -1,17 +1,17 @@
-import React, { useContext, useEffect } from "react";
+import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { UserContext } from "../../../shared/context/userContext";
 import Sidebar from "../../../shared/components/Sidebar";
 import Topbar from "../../../shared/components/Topbar";
 import ColaboradoresGroupedList from "../../../shared/components/ColaboradoresGroupedList";
+import NotifySemNifButton from "../components/NotifySemNifButton";
+import { usePermissions } from "../../../shared/hooks/usePermissions";
 
 export default function Colaboradores() {
   const navigate = useNavigate();
-  const { nivelAcesso } = useContext(UserContext);
-  const isAdmin = nivelAcesso === "SuperAdmin";
-  const isHR = nivelAcesso === "GestorRH";
-  const isAdministrador = nivelAcesso === "Administrador";
-  const canView = isAdmin || isHR || isAdministrador;
+  // Mesmo âmbito de requireCanViewColaboradores no backend (GET /users/getColaboradores) -
+  // um GestorFinanceiro também precisa de chegar aqui para poder consultar o Cadastro de
+  // outros colaboradores (ver canViewCadastro em usePermissions.js), mesmo sem poder editá-lo.
+  const { canViewColaboradores: canView, canManageUsers } = usePermissions();
 
   useEffect(() => {
     if (!canView) {
@@ -39,6 +39,17 @@ export default function Colaboradores() {
           onSelect={(c) => navigate(`/cadastro/${c.id}`, { state: { nome: c.nome, email: c.email } })}
           showStatusHoje
           includeInactive
+          renderGroupExtra={
+            canManageUsers
+              ? (entidade, membros) => {
+                  // Administradores não contam - o aviso é dirigido aos colaboradores da
+                  // entidade, não a quem a gere (mesmo critério do backend, ver
+                  // notifyEntidadeSemNif em cadastroController.js).
+                  const semNif = membros.filter((m) => !m.temNif && m.nivelAcesso !== "Administrador").length;
+                  return semNif > 0 ? <NotifySemNifButton entidade={entidade} count={semNif} /> : null;
+                }
+              : undefined
+          }
         />
       </div>
     </div>

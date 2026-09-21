@@ -4,14 +4,12 @@ import { UserContext } from "../../shared/context/userContext";
 import Sidebar from "../../shared/components/Sidebar";
 import Topbar from "../../shared/components/Topbar";
 import ColaboradoresGroupedList from "../../shared/components/ColaboradoresGroupedList";
+import { usePermissions } from "../../shared/hooks/usePermissions";
 
 export default function PlanoFormacao() {
   const navigate = useNavigate();
-  const { uid, nivelAcesso } = useContext(UserContext);
-  const isAdmin = nivelAcesso === "SuperAdmin";
-  const isHR = nivelAcesso === "GestorRH";
-  const isAdministrador = nivelAcesso === "Administrador";
-  const canView = isAdmin || isHR || isAdministrador;
+  const { uid } = useContext(UserContext);
+  const { canManageUsers: canView } = usePermissions();
 
   useEffect(() => {
     // Esta página (lista de colaboradores) é só para admin/RH/Administrador; um

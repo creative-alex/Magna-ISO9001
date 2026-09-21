@@ -14,11 +14,17 @@ function normalizeNivelAcesso(nivelAcesso) {
 
 // Um Administrador só gere colaboradores da sua própria entidade e nunca pode
 // promover ninguém (incluindo a si próprio) a um nível igual ou superior ao seu
-// (GestorRH/GestorFinanceiro/SuperAdmin)  -  isso continua exclusivo do SuperAdmin.
-// Um SuperAdmin continua sem restrições.
+// (GestorRH/GestorFinanceiro/SuperAdmin)  -  isso continua exclusivo do SuperAdmin. Um
+// GestorRH pode atribuir GestorFinanceiro (área diferente da sua, não é uma promoção a
+// par/acima) mas nunca Administrador/GestorRH/SuperAdmin. Um SuperAdmin continua sem restrições.
 function normalizeNivelAcessoForActor(actorNivelAcesso, requestedNivelAcesso) {
   const requested = normalizeNivelAcesso(requestedNivelAcesso);
   if (isSuperAdmin(actorNivelAcesso)) return requested;
+  if (isGestorRH(actorNivelAcesso)) {
+    if (requested === "GestorFinanceiro") return requested;
+    if (requested === "Administrador" || requested === "GestorRH" || requested === "SuperAdmin") return "Colaborador";
+    return requested;
+  }
   if (requested === "GestorRH" || requested === "GestorFinanceiro" || requested === "SuperAdmin") return "Colaborador";
   return requested;
 }
@@ -276,13 +282,16 @@ const updateUserDetails = async (req, res) => {
     // nome muda  -  os dados em "registo-ponto/{uid}" continuam válidos sem
     // precisar de nenhuma migração.
     const updatedData = { entidade: entidadeRef, nome, role, updatedAt: new Date() };
-    // Ninguém pode alterar o seu próprio nível de acesso, nem o de outro GestorRH
-    // (exceto SuperAdmin)  -  GestorRH é um nível de pares entre si, e um
+    // Ninguém pode alterar o seu próprio nível de acesso, nem o de outro GestorRH ou de
+    // um Administrador (exceto SuperAdmin)  -  GestorRH nunca pode promover/despromover
+    // um Administrador (só o SuperAdmin o faz), e é um nível de pares entre si; um
     // GestorRH/Administrador consegue chegar a qualquer ficha em /ponto/user-details
     // (requireAdminOrEntidadeAdmin não distingue "editar outro" de "editar-se a si
     // próprio"), por isso este bloqueio tem de ficar aqui e não só no formulário.
     const isSelfEdit = uid === req.user?.uid;
-    const nivelAcessoBloqueado = !isSuperAdmin(req.user?.nivelAcesso) && (isSelfEdit || isGestorRH(userDoc.data().nivelAcesso));
+    const targetNivelAcesso = userDoc.data().nivelAcesso;
+    const nivelAcessoBloqueado = !isSuperAdmin(req.user?.nivelAcesso)
+      && (isSelfEdit || isGestorRH(targetNivelAcesso) || isAdministrador(targetNivelAcesso));
     if (nivelAcesso !== undefined && !nivelAcessoBloqueado) {
       updatedData.nivelAcesso = normalizeNivelAcessoForActor(req.user?.nivelAcesso, nivelAcesso);
     }

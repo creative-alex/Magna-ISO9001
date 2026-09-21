@@ -10,6 +10,7 @@ import TableHours from '../components/Admin/clients/pontoTable';
 import UserStats from '../components/Admin/clients/userStats';
 import AutocompleteInput from '../../../shared/components/AutocompleteInput';
 import { FUNCAO } from '../../../shared/utils/formOptions';
+import { usePermissions } from '../../../shared/hooks/usePermissions';
 
 const GOLD = "#C8932F";
 
@@ -51,15 +52,14 @@ const UserDetails = ({ selectedUser }) => {
   const location = useLocation();
   const { uid: uidParam } = useParams();
   const [dados, setDados] = useState([]);
-  const { username, uid: actorUid, nivelAcesso: actorNivelAcesso, entidadesGeridasNomes } = useContext(UserContext);
+  const { username, uid: actorUid, entidadesGeridasNomes } = useContext(UserContext);
   // Um Administrador só gere colaboradores das entidades que administra e nunca pode
   // atribuir/manter um nível de acesso igual ou superior ao seu; um GestorRH pode
-  // atribuir Administrador mas nunca GestorRH/GestorFinanceiro/SuperAdmin, que
-  // continuam exclusivos do SuperAdmin  -  o backend também impõe isto
+  // atribuir GestorFinanceiro (área diferente da sua) mas nunca Administrador/GestorRH/
+  // SuperAdmin, que continuam exclusivos do SuperAdmin  -  o backend também impõe isto
   // (updateUserDetails/normalizeNivelAcessoForActor), mas o formulário fica
   // coerente com o que é aceite.
-  const isAdministrador = actorNivelAcesso === "Administrador";
-  const isSuperAdmin = actorNivelAcesso === "SuperAdmin";
+  const { isAdministrador, isSuperAdmin, isGestorRH } = usePermissions();
   // Caso raro de um Administrador que gere mais do que uma entidade: em vez de
   // bloquear o campo "Entidade", deixa mover o colaborador entre as que gere (ver
   // entidadesGeridasPor no backend).
@@ -78,12 +78,14 @@ const UserDetails = ({ selectedUser }) => {
   // Pega o uid do parâmetro da rota, depois do selectedUser, depois do localStorage (legado)
   const userName = uidParam || selectedUser?.uid || localStorage.getItem("selectedUserUID");
 
-  // Ninguém pode alterar o seu próprio nível de acesso, nem o de outro GestorRH
-  // (exceto SuperAdmin)  -  o backend já recusa em silêncio (updateUserDetails), aqui
-  // só se evita mostrar um campo editável que na prática não tem efeito.
+  // Ninguém pode alterar o seu próprio nível de acesso, nem o de outro GestorRH ou de
+  // um Administrador (exceto SuperAdmin)  -  o backend já recusa em silêncio
+  // (updateUserDetails), aqui só se evita mostrar um campo editável que na prática não
+  // tem efeito.
   const isEditingSelf = !!actorUid && actorUid === userName;
   const targetIsGestorRH = userDetails?.nivelAcesso === "GestorRH";
-  const nivelAcessoBloqueado = !isSuperAdmin && (isEditingSelf || targetIsGestorRH);
+  const targetIsAdministrador = userDetails?.nivelAcesso === "Administrador";
+  const nivelAcessoBloqueado = !isSuperAdmin && (isEditingSelf || targetIsGestorRH || targetIsAdministrador);
 
   // Guarda o uid no localStorage quando selectedUser mudar
   useEffect(() => {
@@ -695,13 +697,19 @@ const normalizedEntityUrl = userDetails?.entidade
                               <span style={{ display: "block", fontSize: 10.5, color: "#9ca3af", fontWeight: 400, marginTop: 2 }}>
                                 {isEditingSelf
                                   ? "Não podes alterar o teu próprio nível de acesso."
-                                  : "Só um SuperAdmin pode alterar o nível de acesso de outro Gestor(a) de RH."}
+                                  : targetIsAdministrador
+                                    ? "Só um SuperAdmin pode alterar o nível de acesso de um Administrador."
+                                    : "Só um SuperAdmin pode alterar o nível de acesso de outro Gestor(a) de RH."}
                               </span>
                             </div>
                           ) : (
                             <select name="nivelAcesso" style={selectStyle} value={editedData?.nivelAcesso || "Colaborador"} onChange={handleInputChange}>
                               <option value="Colaborador">Colaborador</option>
-                              {!isAdministrador && <option value="Administrador">Administrador</option>}
+                              {/* GestorRH pode atribuir GestorFinanceiro (área diferente da sua) mas nunca
+                                  Administrador (só o SuperAdmin promove a esse nível) - ver
+                                  normalizeNivelAcessoForActor em userManagementController.js. */}
+                              {isSuperAdmin && <option value="Administrador">Administrador</option>}
+                              {isGestorRH && <option value="GestorFinanceiro">Gestor(a) Financeiro</option>}
                               {isSuperAdmin && <option value="GestorRH">Gestor(a) de Recursos Humanos</option>}
                               {isSuperAdmin && <option value="GestorFinanceiro">Gestor(a) Financeiro</option>}
                               {isSuperAdmin && <option value="SuperAdmin">SuperAdmin</option>}

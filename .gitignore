@@ -14,3 +14,6 @@ api/shared/db/serviceAccountKey.json
 # Output da migração do Livro de Ponto (contém emails e passwords temporárias)
 api/scripts/migration-output/
 
+# Grafo de contexto gerado pelo Madar (graphify-ts)
+out/
+

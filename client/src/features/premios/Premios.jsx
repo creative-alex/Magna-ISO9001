@@ -4,14 +4,12 @@ import { UserContext } from "../../shared/context/userContext";
 import Sidebar from "../../shared/components/Sidebar";
 import Topbar from "../../shared/components/Topbar";
 import ColaboradoresGroupedList from "../../shared/components/ColaboradoresGroupedList";
+import { usePermissions } from "../../shared/hooks/usePermissions";
 
 export default function Premios() {
   const navigate = useNavigate();
-  const { uid, nivelAcesso } = useContext(UserContext);
-  const isAdmin = nivelAcesso === "SuperAdmin";
-  const isAdministrador = nivelAcesso === "Administrador";
-  const isGestorFinanceiro = nivelAcesso === "GestorFinanceiro";
-  const canView = isAdmin || isAdministrador || isGestorFinanceiro;
+  const { uid } = useContext(UserContext);
+  const { canViewPremiosList: canView } = usePermissions();
 
   useEffect(() => {
     // Esta página (lista de colaboradores) é só para admin/Administrador/Gestor

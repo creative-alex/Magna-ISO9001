@@ -1,9 +1,9 @@
-import React, { useContext, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { FaNotesMedical, FaXmark, FaCalendarDay, FaCircleInfo, FaFilePdf } from 'react-icons/fa6';
-import { UserContext } from '../../../../shared/context/userContext';
 import { toast } from 'react-toastify';
 import { apiFetch } from '../../../../shared/utils/apiFetch';
+import { usePermissions } from '../../../../shared/hooks/usePermissions';
 
 // "DD-MM" ou "DD-MM-YYYY" -> "YYYY-MM-DD" (valor de um <input type="date">).
 function ddmmParaIso(ddmm, anoPorOmissao) {
@@ -72,7 +72,6 @@ function formatarDataCurta(d) {
 // (ao contrário de um pedido de férias de um único dia, aqui pode fazer sentido
 // ajustar o início mesmo depois de clicar num dia errado).
 const MedicalLeave = ({ username, date, onSuccess, triggerClassName, triggerLabel }) => {
-  const { nivelAcesso } = useContext(UserContext);
   const [showModal, setShowModal] = useState(false);
   const [diaInicio, setDiaInicio] = useState('');
   const [diasUteis, setDiasUteis] = useState('1');
@@ -83,7 +82,7 @@ const MedicalLeave = ({ username, date, onSuccess, triggerClassName, triggerLabe
   // colaborador (resolveTargetUid)  -  SuperAdmin/GestorRH sem restrições, Administrador
   // também (o backend confirma que é da sua própria entidade). Caso contrário o pedido
   // sai sem "uid" e acaba registado (pendente) na conta de quem clicou.
-  const isAdmin = nivelAcesso === "SuperAdmin" || nivelAcesso === "GestorRH" || nivelAcesso === "Administrador";
+  const { isAdminOrHRorAdministrador } = usePermissions();
 
   const openModal = (e) => {
     if (e) e.stopPropagation();
@@ -151,7 +150,7 @@ const MedicalLeave = ({ username, date, onSuccess, triggerClassName, triggerLabe
 
       const response = await apiFetch('/timetracking/medicalLeave', {
         method: 'POST',
-        body: JSON.stringify(isAdmin
+        body: JSON.stringify(isAdminOrHRorAdministrador
           ? { uid: username, startDate: isoParaBr(diaInicio), businessDays: dias, pdfPath }
           : { startDate: isoParaBr(diaInicio), businessDays: dias, pdfPath }),
       });
@@ -163,7 +162,7 @@ const MedicalLeave = ({ username, date, onSuccess, triggerClassName, triggerLabe
         return;
       }
 
-      toast.success(data.message || (isAdmin ? 'Baixa médica registada com sucesso!' : 'Pedido de baixa médica enviado! Aguarda aprovação.'));
+      toast.success(data.message || (isAdminOrHRorAdministrador ? 'Baixa médica registada com sucesso!' : 'Pedido de baixa médica enviado! Aguarda aprovação.'));
       setShowModal(false);
       if (onSuccess) onSuccess();
     } catch (err) {
@@ -205,7 +204,7 @@ const MedicalLeave = ({ username, date, onSuccess, triggerClassName, triggerLabe
           <div className="flex items-start gap-2 bg-[#C8932F]/10 text-[#8a6a22] text-xs leading-relaxed rounded-lg px-3 py-2.5 mb-5">
             <FaCircleInfo className="mt-0.5 shrink-0" size={13} />
             <span>
-              {isAdmin
+              {isAdminOrHRorAdministrador
                 ? 'Fica registada de imediato. Não é possível marcar baixa em fins de semana ou feriados  -  esses dias são sempre saltados automaticamente.'
                 : 'Fica pendente de aprovação de um Gestor(a) de RH ou Administrador. Não é possível marcar baixa em fins de semana ou feriados  -  esses dias são sempre saltados automaticamente.'}
             </span>

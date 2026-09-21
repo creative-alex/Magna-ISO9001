@@ -227,12 +227,6 @@ const Login = ({ onLoginSuccess }) => {
                         </button>
                     </form>
                 </div>
-
-                <img
-                    src={LoginFooter}
-                    alt=""
-                    className="w-auto h-auto max-w-[700px] max-h-[240px] object-contain mx-auto mt-6 shrink-0 max-sm:max-w-[85%] max-sm:max-h-[110px] max-sm:mt-6"
-                />
             </div>
         </div>
     );

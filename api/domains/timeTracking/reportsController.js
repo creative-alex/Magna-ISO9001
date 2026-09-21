@@ -685,8 +685,22 @@ async function calculateMonthlyAttendanceSummary({ uid, year, month, assumeWorke
     } else if (userCreatedAt && dataAtual < userCreatedAt) {
       // Antes da conta existir - nunca falta.
       status = "inativo";
-    } else if (registoPorDia[dia]) {
+    } else if (registoPorDia[dia] && registoPorDia[dia].horaEntrada && registoPorDia[dia].horaSaida) {
       status = "trabalho";
+    } else if (registoPorDia[dia] && registoPorDia[dia].horaEntrada) {
+      // Tem pelo menos a entrada batida, mesmo sem saída - hoje ainda a decorrer, ou um
+      // dia já passado em que só faltou bater a saída. Em qualquer dos casos sabe-se que
+      // esteve presente, por isso conta como trabalhado (diasTrabalhados++, ao contrário
+      // do ramo "incompleto" abaixo) em vez de ficar por classificar.
+      status = "trabalho";
+      diasTrabalhados++;
+    } else if (registoPorDia[dia]) {
+      // Tem registo do dia mas nem a entrada está preenchida (raro) - não há confirmação
+      // de presença nesse dia, por isso não conta como trabalhado nem como falta, mas
+      // também não deve aparecer com o estado "trabalho" no detalhe diário (ver
+      // STATUS_LABELS em monthlyClosingButton.jsx), senão a contagem mostrada (dias com
+      // estado "trabalho") deixa de bater certo com o total diasTrabalhados devolvido acima.
+      status = "incompleto";
     } else if (assumeWorkedFromDay && dataAtual >= assumeWorkedFromDay) {
       // Mês fechado: dia da confirmação (inclusive) em diante, sem ausência válida
       // registada - assumido como trabalhado para o processamento salarial.

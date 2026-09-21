@@ -448,4 +448,4 @@ const exportFechoMensal = async (req, res) => {
   }
 };
 
-module.exports = { getSalario, saveSalario, uploadRecibo, deleteRecibo, exportFechoMensal };
+module.exports = { getSalario, saveSalario, uploadRecibo, deleteRecibo, exportFechoMensal, getMesLabel, MES_REGEX };
