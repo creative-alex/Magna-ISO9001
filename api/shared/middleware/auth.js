@@ -47,6 +47,10 @@ async function requireAuth(req, res, next) {
       // "entidades/<id>" adicionais, para além de "entidade" acima  -  ver
       // entidadesGeridasPor/entidadeNoAmbito.
       entidadesGeridas: userData.entidadesGeridas || null,
+      // Função de Gestor(a) de Qualidade  -  dimensão independente de nivelAcesso (ver
+      // isGestorQualidade/requireGestorQualidade). Uma pessoa acumula esta função com
+      // qualquer nivelAcesso, sem que uma interfira na outra.
+      gestorQualidade: userData.gestorQualidade === true,
     };
 
     // Dados brutos do próprio documento já lido acima (users/{uid}) - endpoints de
@@ -126,6 +130,13 @@ function isSuperAdminOrGestorFinanceiro(nivelAcesso) {
   return isSuperAdmin(nivelAcesso) || isGestorFinanceiro(nivelAcesso);
 }
 
+// Gestor(a) de Qualidade: booleano independente de nivelAcesso (ver req.user.gestorQualidade
+// em requireAuth) - uma pessoa mantém as permissões do seu nivelAcesso e ganha,
+// adicionalmente, as de Qualidade (Não Conformidades). Nunca inferir isto de nivelAcesso.
+function isGestorQualidade(user) {
+  return user?.gestorQualidade === true;
+}
+
 function requireAdmin(req, res, next) {
   if (!isSuperAdmin(req.user?.nivelAcesso)) {
     return res.status(403).json({ error: "Acesso restrito a administradores" });
@@ -160,12 +171,25 @@ function requireCanViewColaboradores(req, res, next) {
   next();
 }
 
+// Ações de Qualidade (catalogar NC, atribuir/alterar responsável, verificar eficácia,
+// fechar NC): quem tem gestorQualidade=true, seja qual for o seu nivelAcesso, ou um
+// SuperAdmin - o SuperAdmin continua a ser sempre a autoridade máxima do sistema e tem de
+// conseguir intervir em qualquer NC mesmo sem a função de Qualidade atribuída (ex: a
+// Gestora de Qualidade está ausente e uma NC tem de ser destravada).
+function requireGestorQualidade(req, res, next) {
+  if (!isGestorQualidade(req.user) && !isSuperAdmin(req.user?.nivelAcesso)) {
+    return res.status(403).json({ error: "Acesso restrito a Gestores(as) de Qualidade" });
+  }
+  next();
+}
+
 module.exports = {
   requireAuth,
   requireAdmin,
   requireAdminOrHR,
   requireAdminOrEntidadeAdmin,
   requireCanViewColaboradores,
+  requireGestorQualidade,
   isSuperAdmin,
   isAdminOrHR,
   isGestorRH,
@@ -175,4 +199,5 @@ module.exports = {
   isAdminOrHRorAdministrador,
   isGestorFinanceiro,
   isSuperAdminOrGestorFinanceiro,
+  isGestorQualidade,
 };

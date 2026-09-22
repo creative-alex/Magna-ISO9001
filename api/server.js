@@ -18,6 +18,8 @@ const medicinaTrabalhoRoute = require("./domains/medicinaTrabalho/medicinaTrabal
 const premiosRoute = require("./domains/premios/premiosRoutes");
 const konamiWordleRoute = require("./domains/konamiWordle/konamiWordleRoutes");
 const fechoMensalRoute = require("./domains/fechoMensal/fechoMensalRoutes");
+const naoConformidadeRoute = require("./domains/naoConformidade/naoConformidadeRoutes");
+const deslocacoesRoute = require("./domains/deslocacoes/deslocacoesRoutes");
 const { startSchedulers } = require("./shared/services/scheduler");
 
 const app = express();
@@ -43,6 +45,8 @@ app.use("/medicina-trabalho", medicinaTrabalhoRoute);
 app.use("/premios", premiosRoute);
 app.use("/konami-wordle", konamiWordleRoute);
 app.use("/fecho-mensal", fechoMensalRoute);
+app.use("/nao-conformidades", naoConformidadeRoute);
+app.use("/deslocacoes", deslocacoesRoute);
 
 
 const server = http.createServer(app);

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   verifyTokenAndGetUserInfo, getAllUsers, getColaboradores, getColaboradoresStatusHoje,
-  createUser, getFavorites, updateFavorite, updateFirstLogin,
+  createUser, getFavorites, updateFavorite, updateFirstLogin, getUserDirectory,
 } = require('./usersController');
 const { requireAuth, requireAdmin, requireCanViewColaboradores } = require('../../shared/middleware/auth');
 
@@ -11,6 +11,9 @@ router.post("/verifyTokenAndGetUserInfo", verifyTokenAndGetUserInfo);
 router.get("/getAllUsers", requireAuth, requireAdmin, getAllUsers);
 router.get("/getColaboradores", requireAuth, requireCanViewColaboradores, getColaboradores);
 router.get("/getColaboradoresStatusHoje", requireAuth, requireCanViewColaboradores, getColaboradoresStatusHoje);
+// Diretório mínimo (uid+nome) para escolher "pessoas envolvidas" numa Não Conformidade -
+// aberto a qualquer utilizador autenticado, ver getUserDirectory.
+router.get("/directory", requireAuth, getUserDirectory);
 router.post("/createUser", requireAuth, requireAdmin, createUser);
 router.get("/favorites/:username", requireAuth, getFavorites);
 router.post("/favorites", requireAuth, updateFavorite);

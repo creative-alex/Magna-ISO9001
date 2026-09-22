@@ -17,6 +17,9 @@ export const UserProvider = ({ children }) => {
   const [entidade, setEntidade] = useState(null);
   const [entidadeNome, setEntidadeNome] = useState(null);
   const [entidadesGeridasNomes, setEntidadesGeridasNomes] = useState([]);
+  // Função de Gestor(a) de Qualidade  -  dimensão independente de nivelAcesso (ver
+  // usePermissions.js/isGestorQualidade). Nunca usada para inferir nivelAcesso nem vice-versa.
+  const [gestorQualidade, setGestorQualidade] = useState(false);
 
   // Função para verificar e validar o token do utilizador
   const validateUserToken = async (user) => {
@@ -51,6 +54,7 @@ export const UserProvider = ({ children }) => {
         setEntidade(userData.entidade);
         setEntidadeNome(userData.entidadeNome);
         setEntidadesGeridasNomes(Array.isArray(userData.entidadesGeridasNomes) ? userData.entidadesGeridasNomes : []);
+        setGestorQualidade(userData.gestorQualidade === true);
         setIsAuthenticated(true);
         return true;
       } else {
@@ -75,6 +79,7 @@ export const UserProvider = ({ children }) => {
     setEntidade(null);
     setEntidadeNome(null);
     setEntidadesGeridasNomes([]);
+    setGestorQualidade(false);
     setIsAuthenticated(false);
   };
 
@@ -128,6 +133,8 @@ export const UserProvider = ({ children }) => {
     setEntidadeNome,
     entidadesGeridasNomes,
     setEntidadesGeridasNomes,
+    gestorQualidade,
+    setGestorQualidade,
     isAuthenticated,
     setIsAuthenticated,
     isLoading,

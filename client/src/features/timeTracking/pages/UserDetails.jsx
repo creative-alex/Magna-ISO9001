@@ -42,6 +42,7 @@ const UserDetails = ({ selectedUser }) => {
   const [feriasPendentes, setFeriasPendentes] = useState([]);
   const [pendingTimeEdits, setPendingTimeEdits] = useState([]);
   const [baixasPendentes, setBaixasPendentes] = useState([]);
+  const [deslocacoesPendentes, setDeslocacoesPendentes] = useState([]);
   const [fechoMensal, setFechoMensal] = useState(null);
   const [entidadesOptions, setEntidadesOptions] = useState([]);
   // Entidades adicionais (para além de "Entidade" acima) que este colaborador, quando
@@ -157,6 +158,9 @@ const UserDetails = ({ selectedUser }) => {
         // Buscar pedidos de baixa médica pendentes
         await fetchBaixasPendentes();
 
+        // Buscar deslocações pendentes
+        await fetchDeslocacoesPendentes();
+
         // Buscar totais anuais
         await fetchTotaisAnuais();
 
@@ -222,6 +226,24 @@ const UserDetails = ({ selectedUser }) => {
       }
     } catch (err) {
       setBaixasPendentes([]);
+    }
+  };
+
+  const fetchDeslocacoesPendentes = async () => {
+    try {
+      const response = await apiFetch(`/deslocacoes/pending`, {
+        method: "POST",
+        body: JSON.stringify({ uid: userName }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setDeslocacoesPendentes(data.pendentes || []);
+      } else {
+        setDeslocacoesPendentes([]);
+      }
+    } catch (err) {
+      setDeslocacoesPendentes([]);
     }
   };
 
@@ -431,6 +453,44 @@ const UserDetails = ({ selectedUser }) => {
     } catch (err) {
       console.error("Erro ao rejeitar baixa médica:", err);
       alert("Erro ao rejeitar baixa médica.");
+    }
+  };
+
+  const handleApproveDeslocacao = async (deslocacao) => {
+    try {
+      const response = await apiFetch(`/deslocacoes/approve`, {
+        method: "POST",
+        body: JSON.stringify({ uid: userName, id: deslocacao.id }),
+      });
+
+      if (response.ok) {
+        // Ver nota em handleApproveVacation sobre não recalcular totais anuais aqui.
+        await fetchDeslocacoesPendentes();
+      } else {
+        alert("Erro ao aprovar deslocação.");
+      }
+    } catch (err) {
+      console.error("Erro ao aprovar deslocação:", err);
+      alert("Erro ao aprovar deslocação.");
+    }
+  };
+
+  const handleRejectDeslocacao = async (deslocacao) => {
+    try {
+      const response = await apiFetch(`/deslocacoes/reject`, {
+        method: "POST",
+        body: JSON.stringify({ uid: userName, id: deslocacao.id }),
+      });
+
+      if (response.ok) {
+        await fetchDeslocacoesPendentes();
+        alert("Deslocação rejeitada com sucesso.");
+      } else {
+        alert("Erro ao rejeitar deslocação.");
+      }
+    } catch (err) {
+      console.error("Erro ao rejeitar deslocação:", err);
+      alert("Erro ao rejeitar deslocação.");
     }
   };
 
@@ -716,6 +776,26 @@ const normalizedEntityUrl = userDetails?.entidade
                             </select>
                           )}
                         </div>
+                        <div>
+                          <span style={labelStyle}>Gestor(a) de Qualidade</span>
+                          {isSuperAdmin ? (
+                            <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, color: "#374151", cursor: "pointer", marginTop: 2 }}>
+                              <input
+                                type="checkbox"
+                                checked={editedData?.gestorQualidade === true}
+                                onChange={(e) => setEditedData({ ...editedData, gestorQualidade: e.target.checked })}
+                              />
+                              É Gestor(a) de Qualidade (acumula com o nível de acesso acima, dá acesso a todas as Não Conformidades)
+                            </label>
+                          ) : (
+                            <div style={{ ...valueStyle, ...inputStyle, cursor: "not-allowed", opacity: 0.7 }}>
+                              {editedData?.gestorQualidade ? "Sim" : "Não"}
+                              <span style={{ display: "block", fontSize: 10.5, color: "#9ca3af", fontWeight: 400, marginTop: 2 }}>
+                                Só um SuperAdmin pode atribuir/remover esta função.
+                              </span>
+                            </div>
+                          )}
+                        </div>
                         {isSuperAdmin && editedData?.nivelAcesso === "Administrador" && (
                           <div>
                             <span style={labelStyle}>Entidades adicionais que também gere</span>
@@ -768,6 +848,10 @@ const normalizedEntityUrl = userDetails?.entidade
                         <div>
                           <span style={labelStyle}>Nível de acesso</span>
                           <div style={valueStyle}>{userDetails.nivelAcesso || "Colaborador"}</div>
+                        </div>
+                        <div>
+                          <span style={labelStyle}>Gestor(a) de Qualidade</span>
+                          <div style={valueStyle}>{userDetails.gestorQualidade ? "Sim" : "Não"}</div>
                         </div>
                       </div>
                     )}
@@ -831,6 +915,7 @@ const normalizedEntityUrl = userDetails?.entidade
                   feriasPendentes={feriasPendentes}
                   pendingTimeEdits={pendingTimeEdits}
                   baixasPendentes={baixasPendentes}
+                  deslocacoesPendentes={deslocacoesPendentes}
                   userName={userDetails?.nome}
                   dados={dados}
                   handleApproveVacation={handleApproveVacation}
@@ -839,6 +924,8 @@ const normalizedEntityUrl = userDetails?.entidade
                   handleRejectTimeEdit={handleRejectTimeEdit}
                   handleApproveBaixa={handleApproveBaixa}
                   handleRejectBaixa={handleRejectBaixa}
+                  handleApproveDeslocacao={handleApproveDeslocacao}
+                  handleRejectDeslocacao={handleRejectDeslocacao}
                   fechoMensal={fechoMensal}
                   handleConfirmFechoMensal={handleConfirmFechoMensal}
                 />

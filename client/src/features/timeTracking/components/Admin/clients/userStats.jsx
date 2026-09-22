@@ -11,6 +11,7 @@ const AnnualStats = ({
   feriasPendentes,
   pendingTimeEdits,
   baixasPendentes,
+  deslocacoesPendentes,
   userName,
   dados,
   handleApproveVacation,
@@ -19,6 +20,8 @@ const AnnualStats = ({
   handleRejectTimeEdit,
   handleApproveBaixa,
   handleRejectBaixa,
+  handleApproveDeslocacao,
+  handleRejectDeslocacao,
   fechoMensal,
   handleConfirmFechoMensal
 }) => {
@@ -179,6 +182,43 @@ const AnnualStats = ({
                   {ajuste.horaSaida && <>Saída: <strong>{ajuste.horaSaida}</strong></>}
                 </span>
                 <span className="text-[11.5px] text-gray-500 italic">{ajuste.justificativa}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {deslocacoesPendentes?.length > 0 && (
+        <div className="px-[18px] py-4 border-t border-gray-100">
+          <h3 className="text-[11px] uppercase tracking-wider text-[#C8932F] font-semibold mb-3">Deslocações Pendentes</h3>
+          <ul className="flex flex-col gap-2">
+            {deslocacoesPendentes.map((deslocacao) => (
+              <li key={deslocacao.id} className="flex flex-col gap-1.5 p-2.5 bg-[#FAF3E6] rounded-lg">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[12.5px] font-semibold text-gray-700">{formatDate(deslocacao.data)}</span>
+                  <div className="flex gap-1.5">
+                    <button
+                      className="bg-green-600 text-white border-0 px-2.5 py-1 rounded-full text-xs cursor-pointer transition-colors duration-200 hover:bg-green-700"
+                      onClick={() => handleApproveDeslocacao(deslocacao)}
+                    >
+                      Aprovar
+                    </button>
+                    <button
+                      className="bg-red-600 text-white border-0 px-2.5 py-1 rounded-full text-xs cursor-pointer transition-colors duration-200 hover:bg-red-700"
+                      onClick={() => handleRejectDeslocacao(deslocacao)}
+                    >
+                      Negar
+                    </button>
+                  </div>
+                </div>
+                <span className="text-[11.5px] text-gray-700">
+                  {deslocacao.origem} → {deslocacao.destino}{deslocacao.idaEVolta ? ' → ' + deslocacao.origem : ''} · {deslocacao.km} km
+                  {deslocacao.idaEVolta ? ' (ida e volta)' : ''}
+                  {deslocacao.valor != null ? ` · ${deslocacao.valor.toFixed(2)} €` : ''}
+                </span>
+                <span className="text-[11.5px] text-gray-500 italic">
+                  Motivo: {deslocacao.motivo}
+                </span>
               </li>
             ))}
           </ul>

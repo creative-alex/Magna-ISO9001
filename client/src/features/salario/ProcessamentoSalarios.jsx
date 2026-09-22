@@ -222,6 +222,18 @@ function FechoMensalRowBadge({ status, onSendReminder, sending }) {
   );
 }
 
+// Aviso de deslocações por validar (ver api/domains/deslocacoes/) - a contagem vem de
+// /deslocacoes/pending-uids; a aprovação em si é feita em /salarios/:id
+// (SalarioColaborador.jsx), junto ao resto do processamento salarial.
+function KmPendenteBadge({ count }) {
+  if (!count) return null;
+  return (
+    <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 6, background: "#FEF3C7", color: "#92400E", whiteSpace: "nowrap" }}>
+      Quilómetros por validar{count > 1 ? ` (${count})` : ""}
+    </span>
+  );
+}
+
 // Confirmação explícita antes do fecho universal (ver Interface no pedido original) - ação
 // global e potencialmente irreversível para os colaboradores, por isso não basta o próprio
 // botão vermelho: tem de haver um segundo passo deliberado antes de chamar a API.
@@ -342,6 +354,29 @@ export default function ProcessamentoSalarios() {
   useEffect(() => {
     fetchFechoStatus();
   }, [fetchFechoStatus]);
+
+  const [pendingKmByUid, setPendingKmByUid] = useState({});
+
+  // Mesma visibilidade de canSeeFechoMensal (canViewPayroll = isAdminOrHR ||
+  // isGestorFinanceiro) - é exatamente a permissão validada dentro do controller para
+  // este endpoint (ver getUidsComDeslocacoesPendentes).
+  const fetchPendingKm = useCallback(async () => {
+    if (!canSeeFechoMensal) return;
+    try {
+      const response = await apiFetch("/deslocacoes/pending-uids", { method: "POST" });
+      if (response.ok) {
+        const data = await response.json();
+        setPendingKmByUid(data.contagemPorUid || {});
+      }
+    } catch (err) {
+      console.error("Erro ao carregar deslocações pendentes:", err);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canSeeFechoMensal]);
+
+  useEffect(() => {
+    fetchPendingKm();
+  }, [fetchPendingKm]);
 
   const fechoStatusByUid = useMemo(
     () => new Map(fechoStatusList.map((s) => [s.uid, s])),
@@ -466,11 +501,14 @@ export default function ProcessamentoSalarios() {
           renderMemberExtra={
             canSeeFechoMensal
               ? (c) => (
-                  <FechoMensalRowBadge
-                    status={fechoStatusByUid.get(c.id)}
-                    onSendReminder={() => handleSendReminder(c.id)}
-                    sending={sendingUid === c.id}
-                  />
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <KmPendenteBadge count={pendingKmByUid[c.id]} />
+                    <FechoMensalRowBadge
+                      status={fechoStatusByUid.get(c.id)}
+                      onSendReminder={() => handleSendReminder(c.id)}
+                      sending={sendingUid === c.id}
+                    />
+                  </div>
                 )
               : undefined
           }

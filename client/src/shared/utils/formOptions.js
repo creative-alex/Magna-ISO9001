@@ -83,7 +83,6 @@ export const FUNCAO = [
   "Gestor(a) de Comunicação Marketing",
   "Gestor(a) de Informática",
   "Gestor(a) de Centro Qualifica",
-  "Gestor(a) de Qualidade",
   "Economista",
   "Psicóloga / TORVC - Técnico de Orientação, Reconhecimento e Validação de Competências",
   "Coordenador(a) Pedagógico(a)",

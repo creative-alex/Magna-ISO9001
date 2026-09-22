@@ -38,6 +38,26 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [showOvertimeModal, setShowOvertimeModal] = useState(false);
   const [expandedMonth, setExpandedMonth] = useState(null);
+  const [mesFechado, setMesFechado] = useState(false);
+  const mesAtual = `${new Date().getFullYear()}-${String(month).padStart(2, '0')}`;
+
+  // "Pedir Baixa Médica" (tal como "Fecho Mensal" logo abaixo) desaparece quando o
+  // próprio já confirmou o fecho deste mês - o backend já recusa o pedido nesse caso
+  // (ver isMonthClosed em createMedicalLeave), isto só evita mostrar um botão que iria
+  // falhar. Não se aplica a MedicalLeave usado em nome de outro colaborador (Admin/
+  // pontoTable.jsx, contextMenu.jsx) - aí continua sempre visível, como correção.
+  useEffect(() => {
+    if (!username) return;
+    let cancelled = false;
+    apiFetch('/fecho-mensal/status', {
+      method: 'POST',
+      body: JSON.stringify({ mes: mesAtual }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (!cancelled) setMesFechado(!!data?.confirmed); })
+      .catch(() => { if (!cancelled) setMesFechado(false); });
+    return () => { cancelled = true; };
+  }, [username, mesAtual]);
 
   // Função para extrair apenas a hora no formato HH:MM
   const extractTime = (timeString) => {
@@ -365,12 +385,14 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick
         <RequestTimeEditButton
           triggerClassName="mt-2 cursor-pointer bg-transparent border-none text-sm font-medium flex items-center justify-center gap-1.5 text-gold"
         />
-        <MedicalLeave
-          username={username}
-          triggerClassName="mt-2 cursor-pointer bg-transparent border-none text-sm font-medium flex items-center justify-center gap-1.5 text-gold"
-        />
+        {!mesFechado && (
+          <MedicalLeave
+            username={username}
+            triggerClassName="mt-2 cursor-pointer bg-transparent border-none text-sm font-medium flex items-center justify-center gap-1.5 text-gold"
+          />
+        )}
         <MonthlyClosingButton
-          mes={`${new Date().getFullYear()}-${String(month).padStart(2, '0')}`}
+          mes={mesAtual}
           mesLabel={`${MONTH_NAMES_FULL[month - 1]} de ${new Date().getFullYear()}`}
           triggerClassName="mt-2 cursor-pointer bg-transparent border-none text-sm font-medium flex items-center justify-center gap-1.5 text-gold"
         />

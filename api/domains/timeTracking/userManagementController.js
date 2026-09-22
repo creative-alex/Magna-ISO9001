@@ -188,6 +188,9 @@ const userDetails = async (req, res) => {
       role: userData.role || "N/A",
       nivelAcesso: normalizeNivelAcesso(userData.nivelAcesso),
       entidadesGeridasNomes,
+      // Função de Gestor(a) de Qualidade  -  independente de nivelAcesso (ver
+      // isGestorQualidade em auth.js).
+      gestorQualidade: userData.gestorQualidade === true,
     };
 
     res.json(userDetails);
@@ -312,6 +315,18 @@ const updateUserDetails = async (req, res) => {
         .map((nome) => `entidades/${normalizeEntityId(nome)}`);
     }
 
+    // "gestorQualidade" é uma função transversal (dá acesso a todas as Não Conformidades
+    // da organização, independentemente de entidade/nivelAcesso) - mesma sensibilidade de
+    // "entidadesGeridas" acima, por isso só um SuperAdmin pode alterá-la. Ao contrário de
+    // "entidadesGeridas" (só enviado pelo formulário nos casos em que faz sentido), o
+    // formulário de edição envia sempre o valor atual deste campo; por isso, quando quem
+    // pede não é SuperAdmin, ignora-se o valor em vez de rejeitar o pedido inteiro (mesmo
+    // padrão de "nivelAcessoBloqueado" acima: os outros campos continuam a poder ser
+    // gravados).
+    if (req.body.gestorQualidade !== undefined && isSuperAdmin(req.user?.nivelAcesso)) {
+      updatedData.gestorQualidade = req.body.gestorQualidade === true;
+    }
+
     await userDocRef.update(updatedData);
 
     const entidadeDoc = await db.collection("entidades").doc(entidadeId).get();
@@ -330,6 +345,7 @@ const updateUserDetails = async (req, res) => {
       nivelAcesso: updatedData.nivelAcesso ?? normalizeNivelAcesso(userDoc.data().nivelAcesso),
       entidade: entidadeNome,
       entidadesGeridasNomes,
+      gestorQualidade: updatedData.gestorQualidade ?? (userDoc.data().gestorQualidade === true),
     });
   } catch (error) {
     console.error("🚨 Erro ao atualizar colaborador:", error);

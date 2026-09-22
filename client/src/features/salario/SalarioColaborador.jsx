@@ -16,16 +16,11 @@ const GOLD = "#C8932F";
 
 const ESCALAO_OPTIONS = ["I", "II", "III", "IV"];
 
-const DESLOCACOES_FIELDS = [
-  { key: "deslocacoes_ativas", label: "Tem deslocações este mês", type: "toggle" },
-  { key: "deslocacoes_km", label: "Quilómetros", type: "number", conditionalOn: "deslocacoes_ativas" },
-];
-
 const SUBSIDIO_FIELDS = [
   { key: "cartao_coverflex", label: "Tem cartão coverflex", type: "toggle" },
 ];
 
-const ALL_MONTHLY_FIELDS = [...DESLOCACOES_FIELDS, ...SUBSIDIO_FIELDS];
+const ALL_MONTHLY_FIELDS = [...SUBSIDIO_FIELDS];
 const INITIAL_FORM = ALL_MONTHLY_FIELDS.reduce((acc, f) => {
   acc[f.key] = f.type === "toggle" ? false : "";
   return acc;
@@ -47,7 +42,12 @@ export default function SalarioColaborador() {
   const { id } = useParams();
   const location = useLocation();
   const { uid, username } = useContext(UserContext);
-  const { isAdministrador, canViewPayroll, canEditPayroll } = usePermissions();
+  const { isAdministrador, isAdminOrHR, canViewPayroll, canEditPayroll } = usePermissions();
+  // Aprovação de deslocações (ver api/domains/deslocacoes/): mesmo âmbito de
+  // requireAdminOrHR no backend - SuperAdmin/GestorRH, independentemente de canManage
+  // (GestorFinanceiro edita o resto do salário mas não aprova deslocações, e GestorRH
+  // aprova mesmo sem poder editar o resto).
+  const canApproveDeslocacoes = isAdminOrHR;
   // Edição exclusiva de SuperAdmin/Gestor Financeiro  -  GestorRH mantém consulta
   // (ver canViewList/canView) mas já não pode editar dados salariais.
   const canManage = canEditPayroll;
@@ -73,6 +73,7 @@ export default function SalarioColaborador() {
   const [valorSubsidioAlimentacao, setValorSubsidioAlimentacao] = useState(null);
   const [valorSubsidioAlimentacaoPagar, setValorSubsidioAlimentacaoPagar] = useState(null);
   const [valorKmDeslocacao, setValorKmDeslocacao] = useState(null);
+  const [deslocacoesKm, setDeslocacoesKm] = useState(null);
   const [valorDeslocacoes, setValorDeslocacoes] = useState(null);
   const [diasTrabalhados, setDiasTrabalhados] = useState(null);
   const [diasFerias, setDiasFerias] = useState(null);
@@ -84,6 +85,8 @@ export default function SalarioColaborador() {
   const [uploadingRecibo, setUploadingRecibo] = useState(false);
   const [viewingRecibo, setViewingRecibo] = useState(false);
   const [removingRecibo, setRemovingRecibo] = useState(false);
+  const [deslocacoesPendentes, setDeslocacoesPendentes] = useState([]);
+  const [processingDeslocacaoId, setProcessingDeslocacaoId] = useState(null);
   const isencaoDependePessoa = escalaoVencimento === "II";
 
   useEffect(() => {
@@ -106,6 +109,7 @@ export default function SalarioColaborador() {
         setValorSubsidioAlimentacao(data.valor_subsidio_alimentacao);
         setValorSubsidioAlimentacaoPagar(data.valor_subsidio_alimentacao_pagar);
         setValorKmDeslocacao(data.valor_km_deslocacao);
+        setDeslocacoesKm(data.deslocacoes_km);
         setValorDeslocacoes(data.valor_deslocacoes);
         setDiasTrabalhados(data.dias_trabalhados);
         setDiasFerias(data.dias_ferias);
@@ -130,6 +134,75 @@ export default function SalarioColaborador() {
     fetchSalario();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, mes]);
+
+  // Todas as deslocações pendentes do colaborador (sem filtrar por mês, mesma convenção
+  // de getPendingVacations/getPendingTimeEdits) - a lista pode ter viagens de meses
+  // diferentes do que está selecionado acima.
+  const fetchDeslocacoesPendentes = useCallback(async () => {
+    if (!canApproveDeslocacoes) return;
+    try {
+      const res = await apiFetch("/deslocacoes/pending", {
+        method: "POST",
+        body: JSON.stringify({ uid: id }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDeslocacoesPendentes(data.pendentes || []);
+      } else {
+        setDeslocacoesPendentes([]);
+      }
+    } catch (e) {
+      console.error(e);
+      setDeslocacoesPendentes([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, canApproveDeslocacoes]);
+
+  useEffect(() => {
+    fetchDeslocacoesPendentes();
+  }, [fetchDeslocacoesPendentes]);
+
+  const handleApproveDeslocacao = async (deslocacao) => {
+    setProcessingDeslocacaoId(deslocacao.id);
+    try {
+      const res = await apiFetch("/deslocacoes/approve", {
+        method: "POST",
+        body: JSON.stringify({ uid: id, id: deslocacao.id }),
+      });
+      if (res.ok) {
+        await Promise.all([fetchDeslocacoesPendentes(), fetchSalario()]);
+        toast.success("Deslocação aprovada", { position: "top-right", autoClose: 2000 });
+      } else {
+        toast.error("Falha ao aprovar a deslocação", { position: "top-right" });
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Falha ao aprovar a deslocação", { position: "top-right" });
+    } finally {
+      setProcessingDeslocacaoId(null);
+    }
+  };
+
+  const handleRejectDeslocacao = async (deslocacao) => {
+    setProcessingDeslocacaoId(deslocacao.id);
+    try {
+      const res = await apiFetch("/deslocacoes/reject", {
+        method: "POST",
+        body: JSON.stringify({ uid: id, id: deslocacao.id }),
+      });
+      if (res.ok) {
+        await Promise.all([fetchDeslocacoesPendentes(), fetchSalario()]);
+        toast.success("Deslocação rejeitada", { position: "top-right", autoClose: 2000 });
+      } else {
+        toast.error("Falha ao rejeitar a deslocação", { position: "top-right" });
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Falha ao rejeitar a deslocação", { position: "top-right" });
+    } finally {
+      setProcessingDeslocacaoId(null);
+    }
+  };
 
   const handleChange = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
 
@@ -470,13 +543,73 @@ export default function SalarioColaborador() {
                     {valorKmDeslocacao != null ? `${valorKmDeslocacao} €/km` : "Valor por km não definido"}
                   </span>
                 </div>
+                {/* Calculado a partir das deslocações aprovadas no Fecho Mensal (ver
+                    api/domains/deslocacoes/) - deixou de ser editável aqui. */}
                 <div className="grid grid-cols-1 sm:grid-cols-3" style={{ padding: 18, gap: "16px 20px" }}>
-                  {DESLOCACOES_FIELDS.filter(f => !f.conditionalOn || form[f.conditionalOn] === true).map(renderField)}
+                  <div>
+                    <span style={labelStyle}>Quilómetros aprovados</span>
+                    <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{deslocacoesKm ?? " - "}</div>
+                  </div>
                   <div>
                     <span style={labelStyle}>Valor a receber (€)</span>
                     <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{valorDeslocacoes ?? " - "}</div>
                   </div>
                 </div>
+
+                {/* Aprovação pela GestorRH (ou SuperAdmin) - mesmo âmbito de requireAdminOrHR
+                    no backend, independente de canManage (GestorFinanceiro não aprova). Sem
+                    filtro por mês: mostra pendentes de qualquer mês, tal como
+                    getPendingVacations/getPendingTimeEdits. */}
+                {canApproveDeslocacoes && deslocacoesPendentes.length > 0 && (
+                  <div style={{ borderTop: "1px solid #f3f4f6", padding: 18 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: GOLD, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 10 }}>
+                      Deslocações Pendentes
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {deslocacoesPendentes.map((d) => (
+                        <div key={d.id} style={{ background: "#FAF3E6", borderRadius: 8, padding: 10, display: "flex", flexDirection: "column", gap: 4 }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                            <span style={{ fontSize: 12.5, fontWeight: 600, color: "#374151" }}>{d.data}</span>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <button
+                                type="button"
+                                disabled={processingDeslocacaoId === d.id}
+                                onClick={() => handleApproveDeslocacao(d)}
+                                style={{
+                                  padding: "4px 12px", fontSize: 11, fontWeight: 600, cursor: processingDeslocacaoId === d.id ? "wait" : "pointer",
+                                  borderRadius: 6, border: `1px solid ${GOLD}`, background: GOLD, color: "#fff",
+                                  opacity: processingDeslocacaoId === d.id ? 0.6 : 1,
+                                }}
+                              >
+                                Aprovar
+                              </button>
+                              <button
+                                type="button"
+                                disabled={processingDeslocacaoId === d.id}
+                                onClick={() => handleRejectDeslocacao(d)}
+                                style={{
+                                  padding: "4px 12px", fontSize: 11, fontWeight: 600, cursor: processingDeslocacaoId === d.id ? "wait" : "pointer",
+                                  borderRadius: 6, border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280",
+                                  opacity: processingDeslocacaoId === d.id ? 0.6 : 1,
+                                }}
+                              >
+                                Negar
+                              </button>
+                            </div>
+                          </div>
+                          <span style={{ fontSize: 11.5, color: "#374151" }}>
+                            Trajétoria: &nbsp; 
+                             {d.origem} → {d.destino}{d.idaEVolta ? ` → ${d.origem}` : ""} · {d.km} km{d.idaEVolta ? " (ida e volta)" : ""}
+                             {d.valor != null ? ` · ${d.valor.toFixed(2)} €` : ""}
+                          </span>
+                          <span style={{ fontSize: 11.5, color: "#6b7280", fontStyle: "italic" }}>
+                            Motivo de Deslocação: {d.motivo}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Ajustes do mês  -  vem sempre do livro de ponto, não é editável aqui */}

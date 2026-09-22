@@ -90,6 +90,9 @@ const verifyTokenAndGetUserInfo = async (req, res) => {
       entidade: userData.entidade || null,
       entidadeNome,
       entidadesGeridasNomes,
+      // Função de Gestor(a) de Qualidade  -  independente de nivelAcesso (ver
+      // isGestorQualidade em auth.js). Sempre boolean, nunca undefined.
+      gestorQualidade: userData.gestorQualidade === true,
     };
 
     console.log('✅ Retornando dados do usuário:', JSON.stringify(responseData, null, 2));
@@ -580,7 +583,28 @@ const updateFavorite = async (req, res) => {
   }
 };
 
+// Diretório mínimo de utilizadores (uid + nome), aberto a qualquer utilizador autenticado
+// - usado para escolher "pessoas envolvidas" numa Não Conformidade (qualquer colaborador
+// pode reportar uma NC e identificar quem esteve envolvido, não só quem já tem acesso a
+// getColaboradores). Devolve só o mínimo necessário para um seletor (sem email/entidade/
+// nivelAcesso), e exclui SuperAdmins tal como getAllUsers.
+const getUserDirectory = async (req, res) => {
+  try {
+    const snapshot = await db.collection('users').get();
+    const directory = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (hasSuperAdminAccess(data.nivelAcesso)) return;
+      directory.push({ uid: doc.id, nome: data.nome || data.email || doc.id });
+    });
+    res.json(directory);
+  } catch (error) {
+    console.error('Erro ao buscar diretório de utilizadores:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+};
+
 module.exports = {
   verifyTokenAndGetUserInfo, createUser, getAllUsers, getColaboradores, getColaboradoresStatusHoje,
-  getFavorites, updateFavorite, updateFirstLogin
+  getFavorites, updateFavorite, updateFirstLogin, getUserDirectory,
 };

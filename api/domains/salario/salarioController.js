@@ -35,13 +35,15 @@ function getMesLabel(mes) {
 
 // Campos mensais  -  cada mês é o seu próprio documento em users/{id}/salarios/{mes}.
 // Nota: o valor do subsídio de alimentação e o valor/km de deslocações são iguais
-// para todos e vêm de parametrosSalario  -  aqui só se guarda se a pessoa tem
-// deslocações este mês e quantos km, não o valor em euros.
+// para todos e vêm de parametrosSalario.
 // Baixas, licenças, faltas, férias e dias trabalhados NÃO entram aqui: vêm sempre
 // calculados a partir do livro de ponto em getSalario (ver calculateMonthlyAttendanceSummary),
 // nunca são inseridos manualmente nem persistidos neste documento.
+// "deslocacoes_ativas"/"deslocacoes_km" deixaram de ser editáveis aqui: passam a ser
+// calculados a partir das viagens aprovadas em users/{id}/deslocacoes (ver
+// api/domains/deslocacoes/) - getSalario/exportFechoMensal só caem para estes dois campos
+// como valor histórico de meses anteriores a essa funcionalidade.
 const SALARIO_MES_FIELD_KEYS = [
-  "deslocacoes_ativas", "deslocacoes_km",
   "cartao_coverflex",
   "emissao_envio_recibos",
 ];
@@ -110,9 +112,23 @@ const getSalario = async (req, res) => {
       }
     }
 
-    const deslocacoesAtivas = !!form.deslocacoes_ativas;
-    const deslocacoesKm = Number(form.deslocacoes_km) || 0;
-    const valorDeslocacoes = deslocacoesAtivas && valorKmDeslocacao != null
+    // Deslocações: soma das viagens aprovadas em users/{id}/deslocacoes deste mês (ver
+    // api/domains/deslocacoes/), substituindo o antigo campo manual deslocacoes_km/
+    // deslocacoes_ativas. Só cai para o valor manual antigo quando não existir NENHUM
+    // documento em "deslocacoes" para este mês (meses anteriores a esta funcionalidade) -
+    // nunca zera silenciosamente um valor já processado/pago.
+    const deslocacoesSnapshot = await userDocRef.collection("deslocacoes").where("mes", "==", mes).get();
+    let deslocacoesKm;
+    if (deslocacoesSnapshot.empty) {
+      deslocacoesKm = mesData.deslocacoes_ativas ? (Number(mesData.deslocacoes_km) || 0) : 0;
+    } else {
+      deslocacoesKm = 0;
+      deslocacoesSnapshot.forEach(doc => {
+        const d = doc.data();
+        if (d.Approved === true) deslocacoesKm += Number(d.km) || 0;
+      });
+    }
+    const valorDeslocacoes = deslocacoesKm > 0 && valorKmDeslocacao != null
       ? Math.round(deslocacoesKm * valorKmDeslocacao * 100) / 100
       : null;
 
@@ -154,6 +170,7 @@ const getSalario = async (req, res) => {
       valor_subsidio_alimentacao: valorSubsidioAlimentacao,
       valor_subsidio_alimentacao_pagar: valorSubsidioAlimentacaoPagar,
       valor_km_deslocacao: valorKmDeslocacao,
+      deslocacoes_km: deslocacoesKm,
       valor_deslocacoes: valorDeslocacoes,
       dias_trabalhados: attendance.diasTrabalhados,
       dias_ferias: attendance.diasFerias,
@@ -420,15 +437,28 @@ const exportFechoMensal = async (req, res) => {
         entidadesMap.set(entidadeKey, { nome: entidadeKey, nif: entidadeInfo?.nif || "", colaboradores: [] });
       }
 
-      const deslocacoesAtivas = !!salarioData.deslocacoes_ativas;
+      // Mesma soma das viagens aprovadas usada em getSalario, com o mesmo fallback para o
+      // valor manual antigo em meses sem nenhum documento em "deslocacoes".
+      const deslocacoesSnapshot = await userDoc.ref.collection("deslocacoes").where("mes", "==", mes).get();
+      let deslocacoesKm;
+      if (deslocacoesSnapshot.empty) {
+        deslocacoesKm = salarioData.deslocacoes_ativas ? (Number(salarioData.deslocacoes_km) || 0) : 0;
+      } else {
+        deslocacoesKm = 0;
+        deslocacoesSnapshot.forEach(doc => {
+          const d = doc.data();
+          if (d.Approved === true) deslocacoesKm += Number(d.km) || 0;
+        });
+      }
+
       entidadesMap.get(entidadeKey).colaboradores.push({
         nome: data.nome || userDoc.id,
         diasTrabalhados: snapshot.diasTrabalhados ?? 0,
         diasFerias: snapshot.diasFerias ?? 0,
         diasBaixaMedica: snapshot.diasBaixaMedica ?? 0,
         diasLicenca: snapshot.diasLicenca ?? 0,
-        deslocacoesAtivas,
-        deslocacoesKm: deslocacoesAtivas ? (Number(salarioData.deslocacoes_km) || 0) : 0,
+        deslocacoesAtivas: deslocacoesKm > 0,
+        deslocacoesKm,
       });
     }
 

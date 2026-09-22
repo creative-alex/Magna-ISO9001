@@ -15,5 +15,5 @@ export const API_CONFIG = {
 // Other constants can be added here
 export const APP_CONSTANTS = {
   MIN_PASSWORD_LENGTH: 6,
-  MAX_UPLOAD_SIZE: 10 * 1024 * 1024, 
+  MAX_UPLOAD_SIZE: 4 * 1024 * 1024,
 };

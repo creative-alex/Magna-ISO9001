@@ -1,8 +1,12 @@
-import React, { useState, useContext } from "react";
+import React, { useContext, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { UserContext } from "../../shared/context/userContext";
 import Sidebar from "../../shared/components/Sidebar";
 import Topbar from "../../shared/components/Topbar";
+import { apiFetch } from "../../shared/utils/apiFetch";
+import { APP_CONSTANTS } from "../../shared/utils/constants";
+import EnvolvidosPicker from "./components/EnvolvidosPicker";
+import { GRAVIDADES } from "./estados";
 import { toast } from "react-toastify";
 
 const GOLD = "#C8932F";
@@ -36,25 +40,7 @@ const DEPARTAMENTOS = [
   "Gestão do Sistema - Qualidade",
 ];
 
-const GRAVIDADES = ["Pouco grave", "Grave", "Muito grave"];
-
 const gravityColor = { "Pouco grave": "#22c55e", "Grave": "#f59e0b", "Muito grave": "#ef4444" };
-
-function buildSteps(form) {
-  const base = [
-    { key: "origem", label: "Origem da ocorrência", required: true },
-    { key: "gravidade", label: "Gravidade da ocorrência", required: true },
-    { key: "departamentos", label: "Departamentos / Funções envolvidos", required: true },
-    { key: "descricao", label: "Descrição da ocorrência", required: true },
-    { key: "correcaoRealizada", label: "Foi realizada alguma correção?", required: true },
-  ];
-  if (form.correcaoRealizada === "Sim") {
-    base.push({ key: "descricaoCorrecao", label: "Descrição das correções efetuadas", required: true });
-  }
-  base.push({ key: "registadoPor", label: "Ocorrência registada por", required: true });
-  base.push({ key: "__summary__", label: "Confirmar e enviar", required: false });
-  return base;
-}
 
 const initialForm = {
   origem: "",
@@ -65,17 +51,13 @@ const initialForm = {
   descricao: "",
   correcaoRealizada: "",
   descricaoCorrecao: "",
-  registadoPor: "",
 };
 
 function RadioOption({ label, checked, onChange, color }) {
   return (
     <label
       className="flex items-start gap-3 cursor-pointer p-3 rounded-lg border-2 transition-all duration-150"
-      style={{
-        borderColor: checked ? GOLD : "#e5e7eb",
-        background: checked ? GOLD_LIGHT : "#fff",
-      }}
+      style={{ borderColor: checked ? GOLD : "#e5e7eb", background: checked ? GOLD_LIGHT : "#fff" }}
       onClick={onChange}
     >
       <span
@@ -95,10 +77,7 @@ function CheckOption({ label, checked, onChange }) {
   return (
     <label
       className="flex items-start gap-3 cursor-pointer p-3 rounded-lg border-2 transition-all duration-150"
-      style={{
-        borderColor: checked ? GOLD : "#e5e7eb",
-        background: checked ? GOLD_LIGHT : "#fff",
-      }}
+      style={{ borderColor: checked ? GOLD : "#e5e7eb", background: checked ? GOLD_LIGHT : "#fff" }}
       onClick={onChange}
     >
       <span
@@ -116,111 +95,53 @@ function CheckOption({ label, checked, onChange }) {
   );
 }
 
-function StepProgress({ steps, current, maxStep, onJump }) {
+function Section({ title, subtitle, required, error, sectionRef, children }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3 mb-6">
-      <div className="flex items-center gap-1">
-        {steps.map((s, i) => {
-          const isLast = i === steps.length - 1;
-          const done = i < current;
-          const active = i === current;
-          const visited = i <= maxStep;
-          const clickable = visited && i !== current;
-          return (
-            <React.Fragment key={s.key}>
-              <button
-                type="button"
-                disabled={!clickable}
-                onClick={() => onJump(i)}
-                title={visited ? s.label : undefined}
-                className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold transition-all duration-200 focus:outline-none"
-                style={{
-                  background: done ? GOLD : active ? "#fff" : visited ? "#fff" : "#f3f4f6",
-                  border: `2px solid ${visited || active ? GOLD : "#e5e7eb"}`,
-                  color: done ? "#fff" : active ? GOLD : visited ? GOLD : "#9ca3af",
-                  cursor: clickable ? "pointer" : "default",
-                  boxShadow: active ? `0 0 0 3px ${GOLD_LIGHT}` : "none",
-                }}
-              >
-                {i + 1}
-              </button>
-              {!isLast && (
-                <div
-                  className="flex-1 h-0.5 min-w-[6px] rounded transition-all duration-300"
-                  style={{ background: done ? GOLD : "#e5e7eb" }}
-                />
-              )}
-            </React.Fragment>
-          );
-        })}
+    <div ref={sectionRef} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-5 scroll-mt-6">
+      <div className="px-6 pt-5 pb-1">
+        <div className="flex items-center gap-2 mb-1">
+          <h2 className="text-base font-semibold text-gray-800">{title}</h2>
+          {required && <span className="text-xs text-red-500">* obrigatório</span>}
+        </div>
+        {subtitle && <p className="text-xs text-gray-500 mb-3">{subtitle}</p>}
       </div>
-
-      <div className="mt-2 text-center text-xs text-gray-500">
-        <span className="font-semibold" style={{ color: GOLD }}>{steps[current]?.label}</span>
-        {current < steps.length - 1 && (
-          <span className="text-gray-400">  -  passo {current + 1} de {steps.length - 1}</span>
+      <div className="px-6 pb-6">
+        {children}
+        {error && (
+          <div className="mt-3 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2 border border-red-200">{error}</div>
         )}
       </div>
-
-      {maxStep > 0 && (
-        <p className="text-center text-xs text-gray-400 mt-1">
-          Clique em qualquer número visitado para saltar diretamente para esse passo
-        </p>
-      )}
     </div>
   );
 }
 
-function SummaryRow({ label, value, onEdit }) {
-  return (
-    <div className="py-3 border-b border-gray-100 last:border-0 flex items-start justify-between gap-3">
-      <div className="flex-1 min-w-0">
-        <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: GOLD }}>
-          {label}
-        </div>
-        <div className="text-sm text-gray-800 whitespace-pre-wrap break-words">
-          {Array.isArray(value)
-            ? value.length > 0
-              ? value.map((v, i) => <div key={i}>• {v}</div>)
-              : <span className="italic text-gray-400">Nenhum selecionado</span>
-            : value || <span className="italic text-gray-400">Não respondido</span>}
-        </div>
-      </div>
-      {onEdit && (
-        <button
-          type="button"
-          onClick={onEdit}
-          className="flex-shrink-0 text-xs px-2 py-1 rounded-md border transition-all duration-150 font-medium"
-          style={{ borderColor: GOLD, color: GOLD, background: "#fff" }}
-          title="Editar esta resposta"
-        >
-          Editar
-        </button>
-      )}
-    </div>
-  );
-}
+const MAX_ANEXOS_MB = Math.round(APP_CONSTANTS.MAX_UPLOAD_SIZE / (1024 * 1024));
 
 export default function RegistoNaoConformidade() {
   const navigate = useNavigate();
-  const { userEmail } = useContext(UserContext);
+  const { userEmail, username } = useContext(UserContext);
   const [form, setForm] = useState(initialForm);
-  const [step, setStep] = useState(0);
-  const [maxStep, setMaxStep] = useState(0);
+  const [envolvidos, setEnvolvidos] = useState([]);
+  const [anexos, setAnexos] = useState([]);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState({});
 
-  const steps = buildSteps(form);
-  const currentStepKey = steps[step]?.key;
-  const isSummary = currentStepKey === "__summary__";
+  const refs = {
+    origem: useRef(null),
+    gravidade: useRef(null),
+    departamentos: useRef(null),
+    descricao: useRef(null),
+    correcaoRealizada: useRef(null),
+    registadoPor: useRef(null),
+  };
 
-  const update = (field, value) => setForm(f => ({ ...f, [field]: value }));
+  const update = (field, value) => setForm((f) => ({ ...f, [field]: value }));
 
   const toggleDep = (dep) => {
-    setForm(f => ({
+    setForm((f) => ({
       ...f,
       departamentos: f.departamentos.includes(dep)
-        ? f.departamentos.filter(d => d !== dep)
+        ? f.departamentos.filter((d) => d !== dep)
         : [...f.departamentos, dep],
     }));
   };
@@ -237,63 +158,58 @@ export default function RegistoNaoConformidade() {
   };
 
   const validate = () => {
-    setError("");
-    switch (currentStepKey) {
-      case "origem":
-        if (!form.origem) return "Por favor selecione a origem da ocorrência.";
-        if (form.origem === "__outra__" && !form.origemOutra.trim()) return "Por favor descreva a origem.";
-        break;
-      case "gravidade":
-        if (!form.gravidade) return "Por favor classifique a gravidade.";
-        break;
-      case "departamentos":
-        if (form.departamentos.length === 0 && !form.departamentosOutra.trim())
-          return "Por favor selecione pelo menos um departamento ou função.";
-        break;
-      case "descricao":
-        if (!form.descricao.trim()) return "Por favor descreva a ocorrência.";
-        break;
-      case "correcaoRealizada":
-        if (!form.correcaoRealizada) return "Por favor indique se foi realizada alguma correção.";
-        break;
-      case "descricaoCorrecao":
-        if (!form.descricaoCorrecao.trim()) return "Por favor descreva as correções efetuadas.";
-        break;
-      case "registadoPor":
-        if (!form.registadoPor.trim()) return "Por favor indique o seu nome completo.";
-        break;
-      default:
-        break;
+    const next = {};
+    if (!form.origem) next.origem = "Por favor selecione a origem da ocorrência.";
+    else if (form.origem === "__outra__" && !form.origemOutra.trim()) next.origem = "Por favor descreva a origem.";
+
+    if (!form.gravidade) next.gravidade = "Por favor classifique a gravidade.";
+
+    if (form.departamentos.length === 0 && !form.departamentosOutra.trim()) {
+      next.departamentos = "Por favor selecione pelo menos um departamento ou função.";
     }
-    return null;
+
+    if (!form.descricao.trim()) next.descricao = "Por favor descreva a ocorrência.";
+
+    if (!form.correcaoRealizada) next.correcaoRealizada = "Por favor indique se foi realizada alguma correção.";
+    else if (form.correcaoRealizada === "Sim" && !form.descricaoCorrecao.trim()) {
+      next.correcaoRealizada = "Por favor descreva as correções efetuadas.";
+    }
+
+    if (!username) next.registadoPor = "Não foi possível identificar a pessoa autenticada. Recarregue a página.";
+
+    return next;
   };
 
-  const stepIndexFor = (key) => steps.findIndex(s => s.key === key);
-
-  const handleNext = () => {
-    const err = validate();
-    if (err) { setError(err); return; }
-    setError("");
-    setStep(s => {
-      const next = s + 1;
-      setMaxStep(m => Math.max(m, next));
-      return next;
-    });
+  const handleFilesSelected = (e) => {
+    const novos = Array.from(e.target.files || []);
+    e.target.value = "";
+    const validos = [];
+    for (const file of novos) {
+      if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+        toast.error(`"${file.name}" não é um PDF.`);
+        continue;
+      }
+      if (file.size > APP_CONSTANTS.MAX_UPLOAD_SIZE) {
+        toast.error(`"${file.name}" excede o limite de ${MAX_ANEXOS_MB}MB.`);
+        continue;
+      }
+      validos.push(file);
+    }
+    setAnexos((prev) => [...prev, ...validos]);
   };
 
-  const handleBack = () => {
-    setError("");
-    setStep(s => s - 1);
-  };
-
-  const handleJump = (i) => {
-    setError("");
-    setStep(i);
-  };
+  const removeAnexo = (idx) => setAnexos((prev) => prev.filter((_, i) => i !== idx));
 
   const handleSubmit = async () => {
+    const validation = validate();
+    setErrors(validation);
+    const firstErrorKey = Object.keys(validation)[0];
+    if (firstErrorKey) {
+      refs[firstErrorKey]?.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
     setSubmitting(true);
-    setError("");
     try {
       const payload = {
         origem: getOrigemFinal(),
@@ -302,213 +218,37 @@ export default function RegistoNaoConformidade() {
         descricao: form.descricao,
         correcaoRealizada: form.correcaoRealizada,
         descricaoCorrecao: form.correcaoRealizada === "Sim" ? form.descricaoCorrecao : null,
-        registadoPor: form.registadoPor,
-        emailUtilizador: userEmail,
-        dataRegisto: new Date().toISOString(),
+        registadoPor: username,
+        envolvidos,
       };
 
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/nao-conformidades`, {
+      const res = await apiFetch("/nao-conformidades", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Erro ${res.status}`);
+      }
+      const { id } = await res.json();
 
-      if (!res.ok) throw new Error(`Erro ${res.status}`);
+      for (const file of anexos) {
+        const formData = new FormData();
+        formData.append("file", file);
+        const anexoRes = await apiFetch(`/nao-conformidades/${id}/anexos`, { method: "POST", body: formData });
+        if (!anexoRes.ok) {
+          toast.error(`Falha ao anexar "${file.name}".`);
+        }
+      }
 
       toast.success("Não conformidade registada com sucesso!");
-      navigate("/dashboard");
+      navigate("/tratar-nao-conformidade");
     } catch (e) {
-      setError("Ocorreu um erro ao enviar. Por favor tente novamente.");
-      toast.error("Erro ao registar a não conformidade.");
+      toast.error(e.message || "Erro ao registar a não conformidade.");
     } finally {
       setSubmitting(false);
     }
   };
-
-  const renderStep = () => {
-    switch (currentStepKey) {
-      case "origem":
-        return (
-          <div className="flex flex-col gap-3">
-            {ORIGENS.map(o => (
-              <RadioOption
-                key={o}
-                label={o}
-                checked={form.origem === o}
-                onChange={() => update("origem", o)}
-              />
-            ))}
-            <RadioOption
-              label="Outra:"
-              checked={form.origem === "__outra__"}
-              onChange={() => update("origem", "__outra__")}
-            />
-            {form.origem === "__outra__" && (
-              <input
-                autoFocus
-                className="mt-1 w-full border-2 rounded-lg px-3 py-2 text-sm outline-none transition"
-                style={{ borderColor: GOLD }}
-                placeholder="Descreva a origem..."
-                value={form.origemOutra}
-                onChange={e => update("origemOutra", e.target.value)}
-              />
-            )}
-          </div>
-        );
-
-      case "gravidade":
-        return (
-          <div className="flex flex-col gap-3">
-            {GRAVIDADES.map(g => (
-              <RadioOption
-                key={g}
-                label={g}
-                checked={form.gravidade === g}
-                onChange={() => update("gravidade", g)}
-                color={form.gravidade === g ? gravityColor[g] : undefined}
-              />
-            ))}
-          </div>
-        );
-
-      case "departamentos":
-        return (
-          <div className="flex flex-col gap-2">
-            {DEPARTAMENTOS.map(d => (
-              <CheckOption
-                key={d}
-                label={d}
-                checked={form.departamentos.includes(d)}
-                onChange={() => toggleDep(d)}
-              />
-            ))}
-            <div className="mt-1">
-              <label className="text-sm text-gray-600 font-medium mb-1 block">Outra:</label>
-              <input
-                className="w-full border-2 rounded-lg px-3 py-2 text-sm outline-none transition"
-                style={{ borderColor: form.departamentosOutra ? GOLD : "#e5e7eb" }}
-                placeholder="Indique outro departamento ou função..."
-                value={form.departamentosOutra}
-                onChange={e => update("departamentosOutra", e.target.value)}
-              />
-            </div>
-          </div>
-        );
-
-      case "descricao":
-        return (
-          <textarea
-            autoFocus
-            rows={6}
-            className="w-full border-2 rounded-lg px-3 py-2 text-sm outline-none resize-none transition"
-            style={{ borderColor: form.descricao ? GOLD : "#e5e7eb" }}
-            placeholder="Descreva detalhadamente a ocorrência..."
-            value={form.descricao}
-            onChange={e => update("descricao", e.target.value)}
-          />
-        );
-
-      case "correcaoRealizada":
-        return (
-          <div className="flex flex-col gap-3">
-            {["Sim", "Não"].map(opt => (
-              <RadioOption
-                key={opt}
-                label={opt}
-                checked={form.correcaoRealizada === opt}
-                onChange={() => update("correcaoRealizada", opt)}
-              />
-            ))}
-          </div>
-        );
-
-      case "descricaoCorrecao":
-        return (
-          <textarea
-            autoFocus
-            rows={6}
-            className="w-full border-2 rounded-lg px-3 py-2 text-sm outline-none resize-none transition"
-            style={{ borderColor: form.descricaoCorrecao ? GOLD : "#e5e7eb" }}
-            placeholder="Descreva as correções e ações efetuadas..."
-            value={form.descricaoCorrecao}
-            onChange={e => update("descricaoCorrecao", e.target.value)}
-          />
-        );
-
-      case "registadoPor":
-        return (
-          <input
-            autoFocus
-            className="w-full border-2 rounded-lg px-3 py-2 text-sm outline-none transition"
-            style={{ borderColor: form.registadoPor ? GOLD : "#e5e7eb" }}
-            placeholder="Primeiro e último nome..."
-            value={form.registadoPor}
-            onChange={e => update("registadoPor", e.target.value)}
-            onKeyDown={e => e.key === "Enter" && handleNext()}
-          />
-        );
-
-      case "__summary__":
-        return (
-          <div className="flex flex-col gap-0 rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
-            <div className="px-4 py-3 border-b" style={{ background: GOLD_LIGHT }}>
-              <span className="font-semibold text-sm" style={{ color: GOLD }}>
-                Reveja as suas respostas antes de enviar
-              </span>
-            </div>
-            <div className="px-4">
-              <SummaryRow
-                label="Origem da ocorrência"
-                value={getOrigemFinal()}
-                onEdit={() => handleJump(stepIndexFor("origem"))}
-              />
-              <SummaryRow
-                label="Gravidade"
-                value={
-                  <span style={{ color: gravityColor[form.gravidade], fontWeight: 600 }}>
-                    {form.gravidade}
-                  </span>
-                }
-                onEdit={() => handleJump(stepIndexFor("gravidade"))}
-              />
-              <SummaryRow
-                label="Departamentos / Funções"
-                value={getDepartamentosFinal()}
-                onEdit={() => handleJump(stepIndexFor("departamentos"))}
-              />
-              <SummaryRow
-                label="Descrição da ocorrência"
-                value={form.descricao}
-                onEdit={() => handleJump(stepIndexFor("descricao"))}
-              />
-              <SummaryRow
-                label="Correção realizada?"
-                value={form.correcaoRealizada}
-                onEdit={() => handleJump(stepIndexFor("correcaoRealizada"))}
-              />
-              {form.correcaoRealizada === "Sim" && (
-                <SummaryRow
-                  label="Descrição das correções"
-                  value={form.descricaoCorrecao}
-                  onEdit={() => handleJump(stepIndexFor("descricaoCorrecao"))}
-                />
-              )}
-              <SummaryRow
-                label="Registado por"
-                value={form.registadoPor}
-                onEdit={() => handleJump(stepIndexFor("registadoPor"))}
-              />
-              <SummaryRow label="E-mail" value={userEmail} />
-            </div>
-          </div>
-        );
-
-      default:
-        return null;
-    }
-  };
-
-  const questionLabel = isSummary ? null : steps[step]?.label;
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -519,85 +259,136 @@ export default function RegistoNaoConformidade() {
 
         <div className="flex-1 flex justify-center items-start p-6">
           <div className="w-full max-w-2xl">
-            {/* Header card */}
-            <div
-              className="rounded-2xl p-5 mb-6 shadow-sm"
-              style={{ background: `linear-gradient(135deg, ${GOLD} 0%, #a87428 100%)` }}
-            >
-              <h1 className="text-lg font-bold text-white mb-1">
-                Registo de Não Conformidades e Reclamações
-              </h1>
+            <div className="rounded-2xl p-5 mb-6 shadow-sm" style={{ background: `linear-gradient(135deg, ${GOLD} 0%, #a87428 100%)` }}>
+              <h1 className="text-lg font-bold text-white mb-1">Registo de Não Conformidades e Reclamações</h1>
               <p className="text-xs text-amber-100 leading-relaxed">
                 Este formulário tem como objetivo o registo de reclamações formais e/ou informais
                 realizadas por formadores/as, formandos/as, quadros internos e outras partes interessadas.
               </p>
-              {userEmail && (
-                <p className="text-xs text-amber-200 mt-2 font-medium">{userEmail}</p>
-              )}
+              {userEmail && <p className="text-xs text-amber-200 mt-2 font-medium">{userEmail}</p>}
             </div>
 
-            {/* Progress */}
-            <StepProgress steps={steps} current={step} maxStep={maxStep} onJump={handleJump} />
-
-            {/* Step card */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-6 pt-6 pb-2">
-                <div className="flex items-center gap-2 mb-1">
-                  <span
-                    className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                    style={{ background: GOLD_LIGHT, color: GOLD }}
-                  >
-                    {isSummary ? "Resumo" : `Pergunta ${step + 1} de ${steps.length - 1}`}
-                  </span>
-                  {!isSummary && steps[step]?.required && (
-                    <span className="text-xs text-red-500">* obrigatório</span>
-                  )}
-                </div>
-
-                {questionLabel && (
-                  <h2 className="text-base font-semibold text-gray-800 mb-4">{questionLabel}</h2>
+            <Section title="Origem da ocorrência" required error={errors.origem} sectionRef={refs.origem}>
+              <div className="flex flex-col gap-3">
+                {ORIGENS.map((o) => (
+                  <RadioOption key={o} label={o} checked={form.origem === o} onChange={() => update("origem", o)} />
+                ))}
+                <RadioOption label="Outra:" checked={form.origem === "__outra__"} onChange={() => update("origem", "__outra__")} />
+                {form.origem === "__outra__" && (
+                  <input
+                    className="mt-1 w-full border-2 rounded-lg px-3 py-2 text-sm outline-none transition"
+                    style={{ borderColor: GOLD }}
+                    placeholder="Descreva a origem..."
+                    value={form.origemOutra}
+                    onChange={(e) => update("origemOutra", e.target.value)}
+                  />
                 )}
               </div>
+            </Section>
 
-              <div className="px-6 pb-6">
-                {renderStep()}
+            <Section title="Gravidade da ocorrência" required error={errors.gravidade} sectionRef={refs.gravidade}>
+              <div className="flex flex-col gap-3">
+                {GRAVIDADES.map((g) => (
+                  <RadioOption
+                    key={g}
+                    label={g}
+                    checked={form.gravidade === g}
+                    onChange={() => update("gravidade", g)}
+                    color={form.gravidade === g ? gravityColor[g] : undefined}
+                  />
+                ))}
+              </div>
+            </Section>
 
-                {error && (
-                  <div className="mt-4 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2 border border-red-200">
-                    {error}
-                  </div>
-                )}
-
-                <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-100">
-                  <button
-                    onClick={handleBack}
-                    disabled={step === 0}
-                    className="px-4 py-2 rounded-lg text-sm font-medium border-2 transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed"
-                    style={{ borderColor: GOLD, color: GOLD }}
-                  >
-                    ← Anterior
-                  </button>
-
-                  {isSummary ? (
-                    <button
-                      onClick={handleSubmit}
-                      disabled={submitting}
-                      className="px-6 py-2 rounded-lg text-sm font-bold text-white transition-all duration-150 disabled:opacity-60 shadow"
-                      style={{ background: submitting ? "#9ca3af" : GOLD }}
-                    >
-                      {submitting ? "A enviar..." : "Enviar registo"}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handleNext}
-                      className="px-6 py-2 rounded-lg text-sm font-bold text-white transition-all duration-150 shadow"
-                      style={{ background: GOLD }}
-                    >
-                      Seguinte →
-                    </button>
-                  )}
+            <Section title="Departamentos / Funções envolvidos" required error={errors.departamentos} sectionRef={refs.departamentos}>
+              <div className="flex flex-col gap-2">
+                {DEPARTAMENTOS.map((d) => (
+                  <CheckOption key={d} label={d} checked={form.departamentos.includes(d)} onChange={() => toggleDep(d)} />
+                ))}
+                <div className="mt-1">
+                  <label className="text-sm text-gray-600 font-medium mb-1 block">Outra:</label>
+                  <input
+                    className="w-full border-2 rounded-lg px-3 py-2 text-sm outline-none transition"
+                    style={{ borderColor: form.departamentosOutra ? GOLD : "#e5e7eb" }}
+                    placeholder="Indique outro departamento ou função..."
+                    value={form.departamentosOutra}
+                    onChange={(e) => update("departamentosOutra", e.target.value)}
+                  />
                 </div>
               </div>
+            </Section>
+
+            <Section title="Descrição da ocorrência" required error={errors.descricao} sectionRef={refs.descricao}>
+              <textarea
+                rows={5}
+                className="w-full border-2 rounded-lg px-3 py-2 text-sm outline-none resize-none transition"
+                style={{ borderColor: form.descricao ? GOLD : "#e5e7eb" }}
+                placeholder="Descreva detalhadamente a ocorrência..."
+                value={form.descricao}
+                onChange={(e) => update("descricao", e.target.value)}
+              />
+            </Section>
+
+            <Section title="Foi realizada alguma correção?" required error={errors.correcaoRealizada} sectionRef={refs.correcaoRealizada}>
+              <div className="flex flex-col gap-3">
+                {["Sim", "Não"].map((opt) => (
+                  <RadioOption key={opt} label={opt} checked={form.correcaoRealizada === opt} onChange={() => update("correcaoRealizada", opt)} />
+                ))}
+              </div>
+              {form.correcaoRealizada === "Sim" && (
+                <div className="mt-3">
+                  <label className="text-sm text-gray-600 font-medium mb-1 block">Descrição das correções efetuadas</label>
+                  <textarea
+                    rows={5}
+                    className="w-full border-2 rounded-lg px-3 py-2 text-sm outline-none resize-none transition"
+                    style={{ borderColor: form.descricaoCorrecao ? GOLD : "#e5e7eb" }}
+                    placeholder="Descreva as correções e ações efetuadas..."
+                    value={form.descricaoCorrecao}
+                    onChange={(e) => update("descricaoCorrecao", e.target.value)}
+                  />
+                </div>
+              )}
+            </Section>
+
+            <Section title="Ocorrência registada por" error={errors.registadoPor} sectionRef={refs.registadoPor}>
+              <div
+                className="w-full border-2 rounded-lg px-3 py-2 text-sm"
+                style={{ borderColor: "#e5e7eb", background: "#f9fafb", color: "#111827", fontWeight: 500 }}
+              >
+                {username || "—"}
+              </div>
+              <p className="text-xs text-gray-400 mt-2">
+                Preenchido automaticamente com a pessoa autenticada, não editável. E-mail associado à sessão: {userEmail}
+              </p>
+            </Section>
+
+            <Section title="Pessoas envolvidas" subtitle="Colegas relacionados com esta ocorrência. Poderão consultar a NC e vir a ser escolhidos como responsáveis por ações corretivas.">
+              <EnvolvidosPicker value={envolvidos} onChange={setEnvolvidos} />
+            </Section>
+
+            <Section title="Anexos (PDF)" subtitle={`Documentos de suporte, opcional. Só PDF, até ${MAX_ANEXOS_MB}MB por ficheiro.`}>
+              <input type="file" accept="application/pdf" multiple onChange={handleFilesSelected} className="text-sm" />
+              {anexos.length > 0 && (
+                <ul className="mt-3 flex flex-col gap-1.5">
+                  {anexos.map((file, idx) => (
+                    <li key={`${file.name}-${idx}`} className="flex items-center justify-between text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
+                      <span className="truncate">{file.name}</span>
+                      <button type="button" onClick={() => removeAnexo(idx)} className="text-red-500 text-xs font-medium ml-2">Remover</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Section>
+
+            <div className="flex justify-end mt-2 mb-10">
+              <button
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="px-6 py-2.5 rounded-lg text-sm font-bold text-white transition-all duration-150 disabled:opacity-60 shadow"
+                style={{ background: submitting ? "#9ca3af" : GOLD }}
+              >
+                {submitting ? "A enviar..." : "Enviar registo"}
+              </button>
             </div>
           </div>
         </div>

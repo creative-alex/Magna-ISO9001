@@ -26,12 +26,13 @@ import Chat from "./features/chat/pages/Chat"
 import FirstLogin from "./features/auth/pages/FirstLogin";
 import { ToastContainer } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
-import MaintenancePage from "./shared/components/MaintenancePage";
 import TimeTrackingRegistos from "./features/timeTracking/pages/RegistosPage";
 import TimeTrackingEntities from "./features/timeTracking/pages/EntitiesPage";
 import TimeTrackingEntityUsers from "./features/timeTracking/pages/EntityUsers";
 import TimeTrackingUserDetails from "./features/timeTracking/pages/UserDetails";
 import NewEntity from "./features/timeTracking/pages/NewEntity";
+import RegistoNaoConformidade from "./features/naoConformidade/RegistoNaoConformidade";
+import TratarNaoConformidade from "./features/naoConformidade/TratamentoNaoConformidade";
 
 function App() {
   const navigate = useNavigate();
@@ -239,7 +240,7 @@ function App() {
           path="/registar-nao-conformidade"
           element={
             <ProtectedRoute>
-              <MaintenancePage title="Registo de Não Conformidades" />
+              <RegistoNaoConformidade />
             </ProtectedRoute>
           }
         />
@@ -247,7 +248,15 @@ function App() {
           path="/tratar-nao-conformidade"
           element={
             <ProtectedRoute>
-              <MaintenancePage title="Tratamento de Não Conformidades" />
+              <TratarNaoConformidade />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tratar-nao-conformidade/:id"
+          element={
+            <ProtectedRoute>
+              <TratarNaoConformidade />
             </ProtectedRoute>
           }
         />

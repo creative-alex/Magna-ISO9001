@@ -1,498 +1,409 @@
-import React, { useState, useContext } from "react";
-import { useNavigate } from "react-router-dom";
-import { UserContext } from "../../shared/context/userContext";
+import React, { useCallback, useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "react-toastify";
+import {
+  FaBoxArchive, FaCalendarDays, FaChevronRight, FaCircleCheck, FaClipboardCheck,
+  FaClipboardList, FaFileLines, FaGauge, FaTableCellsLarge, FaTableColumns, FaTimeline,
+  FaTriangleExclamation, FaUserCheck,
+} from "react-icons/fa6";
 import Sidebar from "../../shared/components/Sidebar";
 import Topbar from "../../shared/components/Topbar";
-import { toast } from "react-toastify";
+import { apiFetch } from "../../shared/utils/apiFetch";
+import { usePermissions } from "../../shared/hooks/usePermissions";
+import { NC_ESTADOS, ncEstadoLabel } from "./estados";
+import NaoConformidadeDetail from "./NaoConformidadeDetail";
 
 const GOLD = "#C8932F";
-const GOLD_LIGHT = "#f5e6ca";
+const gravityColor = { "Pouco grave": "#22c55e", "Grave": "#f59e0b", "Muito grave": "#ef4444" };
+const ESTADO_ICON = { registada: FaFileLines, para_tratamento: FaTriangleExclamation, tratada: FaClipboardCheck, fechada: FaCircleCheck };
 
-function buildSteps() {
-  return [
-    { key: "descricaoAnalise", label: "Descrição da Não Conformidade na perspetiva do/a(s) responsável/eis pela análise da Não Conformidade ou Reclamação", required: true },
-    { key: "analiseCausas", label: "Análise das Causas", required: true },
-    { key: "descricaoAcoesCorretivas", label: "Descrição das Ações Corretivas (ações implementadas tendo em vista o evitar de nova ocorrência da situação verificada)", required: true },
-    { key: "responsavelAcoesCorretivas", label: "Quem ficou responsável por implementar a(s) ação/ações corretiva(s)?", required: true },
-    { key: "prazoAcoesCorretivas", label: "Prazo para a implementação de ações corretivas", required: true },
-    { key: "verificacaoEficacia", label: "Como e em que prazo será possível verificar a eficácia das ações corretivas?", required: true },
-    { key: "outrasCorrecoes", label: "Descrição de outras Correções, Responsável e Prazo (ações implementadas tendo em vista minorar o impacto da ocorrência verificada)", required: false },
-    { key: "autorAnalise", label: "Autor/a(s) da análise e tratamento (por favor indique o seu primeiro e último nome)", required: false },
-    { key: "outrosEnvolvidos", label: "Outros envolvidos na análise e tratamento (por favor indique o primeiro e último nome)", required: false },
-    { key: "__summary__", label: "Confirmar e enviar", required: false },
-  ];
+const VIEW_MODES = [
+  { key: "kanban", label: "Kanban", icon: FaTableColumns },
+  { key: "grid", label: "Grelha", icon: FaTableCellsLarge },
+  { key: "timeline", label: "Linha do tempo", icon: FaTimeline },
+  { key: "tiles", label: "Resumo", icon: FaGauge },
+];
+
+const MONTHS_PT = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+
+function monthKey(iso) {
+  const d = iso ? new Date(iso) : null;
+  if (!d || Number.isNaN(d.getTime())) return "sem-data";
+  return `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`;
 }
 
-const initialForm = {
-  descricaoAnalise: "",
-  analiseCausas: "",
-  descricaoAcoesCorretivas: "",
-  responsavelAcoesCorretivas: "",
-  prazoAcoesCorretivas: "",
-  verificacaoEficacia: "",
-  outrasCorrecoes: "",
-  autorAnalise: "",
-  outrosEnvolvidos: "",
-};
+function monthLabel(iso) {
+  const d = iso ? new Date(iso) : null;
+  if (!d || Number.isNaN(d.getTime())) return "Sem data";
+  return `${MONTHS_PT[d.getMonth()]} de ${d.getFullYear()}`;
+}
 
-function StepProgress({ steps, current, maxStep, onJump }) {
+function formatDate(iso) {
+  if (!iso) return "-";
+  try { return new Date(iso).toLocaleDateString("pt-PT"); } catch { return iso; }
+}
+
+function acoesPct(nc) {
+  return nc.totalAcoes > 0 ? Math.round((nc.acoesEficazes / nc.totalAcoes) * 100) : 0;
+}
+
+function ProgressMini({ nc, className }) {
+  if (!nc.totalAcoes) return null;
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3 mb-6">
-      <div className="flex items-center gap-1">
-        {steps.map((s, i) => {
-          const isLast = i === steps.length - 1;
-          const done = i < current;
-          const active = i === current;
-          const visited = i <= maxStep;
-          const clickable = visited && i !== current;
-          return (
-            <React.Fragment key={s.key}>
-              <button
-                type="button"
-                disabled={!clickable}
-                onClick={() => onJump(i)}
-                title={visited ? s.label : undefined}
-                className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold transition-all duration-200 focus:outline-none"
-                style={{
-                  background: done ? GOLD : active ? "#fff" : visited ? "#fff" : "#f3f4f6",
-                  border: `2px solid ${visited || active ? GOLD : "#e5e7eb"}`,
-                  color: done ? "#fff" : active ? GOLD : visited ? GOLD : "#9ca3af",
-                  cursor: clickable ? "pointer" : "default",
-                  boxShadow: active ? `0 0 0 3px ${GOLD_LIGHT}` : "none",
-                }}
-              >
-                {i + 1}
-              </button>
-              {!isLast && (
-                <div
-                  className="flex-1 h-0.5 min-w-[6px] rounded transition-all duration-300"
-                  style={{ background: done ? GOLD : "#e5e7eb" }}
-                />
+    <span className={`flex items-center gap-1.5 flex-shrink-0 ${className || ""}`}>
+      <span className="w-8 h-1 rounded-full bg-gray-100 overflow-hidden">
+        <span className="block h-full rounded-full" style={{ width: `${acoesPct(nc)}%`, background: "#22c55e" }} />
+      </span>
+      {nc.acoesEficazes}/{nc.totalAcoes}
+    </span>
+  );
+}
+
+// --- Kanban: agrupado por estado - cor lateral passa a indicar gravidade, já que o
+// estado já está implícito na coluna.
+function KanbanCard({ nc, onClick }) {
+  const gColor = gravityColor[nc.gravidade] || "#6b7280";
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left bg-white rounded-xl border border-gray-100 shadow-sm p-3 hover:shadow-md hover:border-[#C8932F]/40 transition-all duration-150"
+      style={{ borderLeftWidth: 3, borderLeftColor: gColor }}
+    >
+      <div className="flex items-center justify-between gap-2 mb-1.5">
+        <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: `${gColor}1a`, color: gColor }}>
+          {nc.gravidade}
+        </span>
+        <span className="flex items-center gap-1 text-[11px] text-gray-400 flex-shrink-0">
+          <FaCalendarDays className="text-[9px]" /> {formatDate(nc.dataRegisto)}
+        </span>
+      </div>
+      <p className="text-sm text-gray-800 leading-snug line-clamp-2 mb-2">{nc.descricao}</p>
+      <div className="flex items-center justify-between gap-2 text-[11px] text-gray-500">
+        <span className="flex items-center gap-1 min-w-0">
+          <FaUserCheck className="text-gray-400 flex-shrink-0" />
+          <span className="truncate">{nc.responsavelTratamentoNome || "Por atribuir"}</span>
+        </span>
+        <ProgressMini nc={nc} />
+      </div>
+    </button>
+  );
+}
+
+function KanbanBoard({ lista, onOpen }) {
+  const porEstado = {};
+  Object.keys(NC_ESTADOS).forEach((k) => { porEstado[k] = []; });
+  lista.forEach((nc) => { (porEstado[nc.estado] || (porEstado[nc.estado] = [])).push(nc); });
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
+      {Object.entries(NC_ESTADOS).map(([key, meta]) => {
+        const items = porEstado[key] || [];
+        return (
+          <div key={key} className="bg-gray-100/70 rounded-2xl border border-gray-100 p-3 min-w-0">
+            <div className="flex items-center justify-between px-1 mb-3">
+              <span className="flex items-center gap-2 text-sm font-semibold" style={{ color: meta.color }}>
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: meta.color }} />
+                {meta.label}
+              </span>
+              <span className="text-xs font-semibold text-gray-400 bg-white border border-gray-200 rounded-full px-2 py-0.5 flex-shrink-0">
+                {items.length}
+              </span>
+            </div>
+            <div className="flex flex-col gap-2 overflow-y-auto max-h-[65vh] pr-0.5">
+              {items.length === 0 ? (
+                <p className="text-xs text-gray-400 italic px-1">Sem não conformidades.</p>
+              ) : (
+                items.map((nc) => <KanbanCard key={nc.id} nc={nc} onClick={() => onOpen(nc.id)} />)
               )}
-            </React.Fragment>
-          );
-        })}
-      </div>
-
-      <div className="mt-2 text-center text-xs text-gray-500">
-        <span className="font-semibold" style={{ color: GOLD }}>{steps[current]?.label}</span>
-        {current < steps.length - 1 && (
-          <span className="text-gray-400">  -  passo {current + 1} de {steps.length - 1}</span>
-        )}
-      </div>
-
-      {maxStep > 0 && (
-        <p className="text-center text-xs text-gray-400 mt-1">
-          Clique em qualquer número visitado para saltar diretamente para esse passo
-        </p>
-      )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-function SummaryRow({ label, value, onEdit }) {
+// --- Grelha: cartões compactos em 2-3 colunas, sem agrupamento por estado.
+function GridCard({ nc, onClick }) {
+  const eColor = NC_ESTADOS[nc.estado]?.color || "#6b7280";
+  const gColor = gravityColor[nc.gravidade] || "#6b7280";
   return (
-    <div className="py-3 border-b border-gray-100 last:border-0 flex items-start justify-between gap-3">
-      <div className="flex-1 min-w-0">
-        <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: GOLD }}>
-          {label}
-        </div>
-        <div className="text-sm text-gray-800 whitespace-pre-wrap break-words">
-          {value || <span className="italic text-gray-400">Não respondido</span>}
-        </div>
+    <button
+      onClick={onClick}
+      className="text-left bg-white rounded-2xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-[#C8932F]/40 transition-all duration-150"
+      style={{ borderLeftWidth: 4, borderLeftColor: eColor }}
+    >
+      <div className="flex items-center flex-wrap gap-1.5 mb-2">
+        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: `${eColor}1a`, color: eColor }}>
+          {ncEstadoLabel(nc.estado)}
+        </span>
+        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: `${gColor}1a`, color: gColor }}>
+          {nc.gravidade}
+        </span>
       </div>
-      {onEdit && (
-        <button
-          type="button"
-          onClick={onEdit}
-          className="flex-shrink-0 text-xs px-2 py-1 rounded-md border transition-all duration-150 font-medium"
-          style={{ borderColor: GOLD, color: GOLD, background: "#fff" }}
-          title="Editar esta resposta"
-        >
-          Editar
-        </button>
+      <p className="text-sm text-gray-800 line-clamp-3 mb-3 min-h-[3.6em]">{nc.descricao}</p>
+      <div className="flex items-center justify-between gap-2 text-xs text-gray-500 mb-1">
+        <span className="flex items-center gap-1 min-w-0">
+          <FaUserCheck className="text-gray-400 flex-shrink-0" />
+          <span className="truncate">{nc.responsavelTratamentoNome || "Por atribuir"}</span>
+        </span>
+        <span className="flex items-center gap-1 text-gray-400 flex-shrink-0">
+          <FaCalendarDays className="text-[10px]" /> {formatDate(nc.dataRegisto)}
+        </span>
+      </div>
+      {nc.totalAcoes > 0 && (
+        <div className="flex items-center gap-2 text-xs text-gray-500 mt-1.5">
+          <span className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+            <span className="block h-full rounded-full" style={{ width: `${acoesPct(nc)}%`, background: "#22c55e" }} />
+          </span>
+          {nc.acoesEficazes}/{nc.totalAcoes}
+        </div>
       )}
+    </button>
+  );
+}
+
+function GridView({ lista, onOpen }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {lista.map((nc) => <GridCard key={nc.id} nc={nc} onClick={() => onOpen(nc.id)} />)}
+    </div>
+  );
+}
+
+// --- Linha do tempo: agrupada por mês de registo, mais recente primeiro (a lista já vem
+// ordenada por dataRegisto desc da API, por isso não é preciso reordenar aqui).
+function TimelineRow({ nc, onClick, isLast }) {
+  const eColor = NC_ESTADOS[nc.estado]?.color || "#6b7280";
+  const gColor = gravityColor[nc.gravidade] || "#6b7280";
+  return (
+    <div className="relative flex gap-3">
+      <div className="flex flex-col items-center w-4 flex-shrink-0">
+        <span className="w-3.5 h-3.5 rounded-full border-2 bg-white flex-shrink-0 mt-2" style={{ borderColor: eColor }} />
+        {!isLast && <span className="flex-1 w-px bg-gray-200 mt-1" />}
+      </div>
+      <button
+        onClick={onClick}
+        className="flex-1 min-w-0 text-left bg-white rounded-xl shadow-sm border border-gray-100 px-3.5 py-2.5 mb-3 hover:shadow-md hover:border-[#C8932F]/40 transition-all duration-150"
+      >
+        <div className="flex items-center gap-2 flex-wrap mb-1">
+          <span className="text-[11px] text-gray-400 font-medium flex-shrink-0">{formatDate(nc.dataRegisto)}</span>
+          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: `${eColor}1a`, color: eColor }}>
+            {ncEstadoLabel(nc.estado)}
+          </span>
+          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: `${gColor}1a`, color: gColor }}>
+            {nc.gravidade}
+          </span>
+        </div>
+        <p className="text-sm text-gray-800 truncate">{nc.descricao}</p>
+        <div className="flex items-center justify-between gap-2 text-xs text-gray-500 mt-1">
+          <span className="flex items-center gap-1 min-w-0">
+            <FaUserCheck className="text-gray-400 flex-shrink-0" />
+            <span className="truncate">{nc.responsavelTratamentoNome || "Por atribuir"}</span>
+          </span>
+          <ProgressMini nc={nc} />
+        </div>
+      </button>
+    </div>
+  );
+}
+
+function TimelineView({ lista, onOpen }) {
+  const groups = [];
+  const byKey = new Map();
+  lista.forEach((nc) => {
+    const key = monthKey(nc.dataRegisto);
+    if (!byKey.has(key)) {
+      const group = { key, label: monthLabel(nc.dataRegisto), items: [] };
+      byKey.set(key, group);
+      groups.push(group);
+    }
+    byKey.get(key).items.push(nc);
+  });
+
+  return (
+    <div className="flex flex-col gap-6">
+      {groups.map((group) => (
+        <div key={group.key}>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-sm font-semibold text-gray-700 capitalize">{group.label}</span>
+            <span className="text-xs text-gray-400">({group.items.length})</span>
+            <span className="flex-1 h-px bg-gray-200" />
+          </div>
+          <div className="flex flex-col">
+            {group.items.map((nc, idx) => (
+              <TimelineRow key={nc.id} nc={nc} onClick={() => onOpen(nc.id)} isLast={idx === group.items.length - 1} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// --- Resumo: tiles KPI por estado + cartões finos, sem agrupamento.
+function KpiTile({ label, count, color, icon: Icon }) {
+  return (
+    <div className="flex items-center gap-3 bg-white rounded-xl border border-gray-100 px-4 py-3">
+      <span className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 text-sm" style={{ background: `${color}1a`, color }}>
+        <Icon />
+      </span>
+      <div>
+        <div className="text-lg font-bold text-gray-800 leading-tight">{count}</div>
+        <div className="text-[11px] text-gray-400 font-medium">{label}</div>
+      </div>
+    </div>
+  );
+}
+
+function ThinCard({ nc, onClick }) {
+  const eColor = NC_ESTADOS[nc.estado]?.color || "#6b7280";
+  const gColor = gravityColor[nc.gravidade] || "#6b7280";
+  return (
+    <button
+      onClick={onClick}
+      className="group relative w-full text-left bg-white rounded-xl shadow-sm border border-gray-100 pl-3 pr-8 py-2.5 hover:shadow-md hover:border-[#C8932F]/40 transition-all duration-150"
+      style={{ borderLeftWidth: 3, borderLeftColor: eColor }}
+    >
+      <FaChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-300 group-hover:text-[#C8932F] transition-colors" />
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: `${eColor}1a`, color: eColor }}>
+          {ncEstadoLabel(nc.estado)}
+        </span>
+        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: `${gColor}1a`, color: gColor }}>
+          {nc.gravidade}
+        </span>
+        <span className="text-sm text-gray-800 truncate flex-1 min-w-[120px]">{nc.descricao}</span>
+        <span className="flex items-center gap-1 text-xs text-gray-500 flex-shrink-0">
+          <FaUserCheck className="text-gray-400" /> {nc.responsavelTratamentoNome || "Por atribuir"}
+        </span>
+        <span className="text-xs text-gray-400 flex-shrink-0">{formatDate(nc.dataRegisto)}</span>
+      </div>
+    </button>
+  );
+}
+
+function TilesView({ lista, onOpen }) {
+  const counts = {};
+  Object.keys(NC_ESTADOS).forEach((k) => { counts[k] = 0; });
+  lista.forEach((nc) => { counts[nc.estado] = (counts[nc.estado] || 0) + 1; });
+
+  return (
+    <div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+        {Object.entries(NC_ESTADOS).map(([key, meta]) => (
+          <KpiTile key={key} label={meta.label} count={counts[key] || 0} color={meta.color} icon={ESTADO_ICON[key] || FaClipboardList} />
+        ))}
+      </div>
+      <div className="flex flex-col gap-2">
+        {lista.map((nc) => <ThinCard key={nc.id} nc={nc} onClick={() => onOpen(nc.id)} />)}
+      </div>
     </div>
   );
 }
 
 export default function TratamentoNaoConformidade() {
   const navigate = useNavigate();
-  const { userEmail } = useContext(UserContext);
-  const [form, setForm] = useState(initialForm);
-  const [step, setStep] = useState(0);
-  const [maxStep, setMaxStep] = useState(0);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-
-  const steps = buildSteps();
-  const currentStepKey = steps[step]?.key;
-  const isSummary = currentStepKey === "__summary__";
-
-  const update = (field, value) => setForm(f => ({ ...f, [field]: value }));
-
-  const validate = () => {
-    setError("");
-    switch (currentStepKey) {
-      case "descricaoAnalise":
-        if (!form.descricaoAnalise.trim()) return "Por favor descreva a Não Conformidade na perspetiva do/a(s) responsável/eis pela análise.";
-        break;
-      case "analiseCausas":
-        if (!form.analiseCausas.trim()) return "Por favor descreva a análise das causas.";
-        break;
-      case "descricaoAcoesCorretivas":
-        if (!form.descricaoAcoesCorretivas.trim()) return "Por favor descreva as ações corretivas.";
-        break;
-      case "responsavelAcoesCorretivas":
-        if (!form.responsavelAcoesCorretivas.trim()) return "Por favor indique quem ficou responsável pela implementação das ações corretivas.";
-        break;
-      case "prazoAcoesCorretivas":
-        if (!form.prazoAcoesCorretivas.trim()) return "Por favor indique o prazo para a implementação das ações corretivas.";
-        break;
-      case "verificacaoEficacia":
-        if (!form.verificacaoEficacia.trim()) return "Por favor indique como e em que prazo será possível verificar a eficácia das ações corretivas.";
-        break;
-      default:
-        break;
-    }
-    return null;
-  };
-
-  const stepIndexFor = (key) => steps.findIndex(s => s.key === key);
-
-  const handleNext = () => {
-    const err = validate();
-    if (err) { setError(err); return; }
-    setError("");
-    setStep(s => {
-      const next = s + 1;
-      setMaxStep(m => Math.max(m, next));
-      return next;
-    });
-  };
-
-  const handleBack = () => {
-    setError("");
-    setStep(s => s - 1);
-  };
-
-  const handleJump = (i) => {
-    setError("");
-    setStep(i);
-  };
-
-  const handleSubmit = async () => {
-    setSubmitting(true);
-    setError("");
+  const { id } = useParams();
+  const { isGestorQualidade } = usePermissions();
+  const [lista, setLista] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState(() => {
     try {
-      const payload = {
-        descricaoAnalise: form.descricaoAnalise,
-        analiseCausas: form.analiseCausas,
-        descricaoAcoesCorretivas: form.descricaoAcoesCorretivas,
-        responsavelAcoesCorretivas: form.responsavelAcoesCorretivas,
-        prazoAcoesCorretivas: form.prazoAcoesCorretivas,
-        verificacaoEficacia: form.verificacaoEficacia,
-        outrasCorrecoes: form.outrasCorrecoes || null,
-        autorAnalise: form.autorAnalise || null,
-        outrosEnvolvidos: form.outrosEnvolvidos || null,
-        emailUtilizador: userEmail,
-        dataRegisto: new Date().toISOString(),
-      };
+      const saved = localStorage.getItem("ncListViewMode");
+      return VIEW_MODES.some((v) => v.key === saved) ? saved : "kanban";
+    } catch { return "kanban"; }
+  });
 
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/nao-conformidades/tratamento`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+  useEffect(() => {
+    try { localStorage.setItem("ncListViewMode", viewMode); } catch { /* ignora, é só uma preferência de UI */ }
+  }, [viewMode]);
 
-      if (!res.ok) throw new Error(`Erro ${res.status}`);
-
-      toast.success("Análise e tratamento registados com sucesso!");
-      navigate("/dashboard");
-    } catch (e) {
-      setError("Ocorreu um erro ao enviar. Por favor tente novamente.");
-      toast.error("Erro ao registar a análise e tratamento.");
+  const fetchLista = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await apiFetch(`/nao-conformidades`);
+      if (!res.ok) throw new Error("Não foi possível carregar as não conformidades.");
+      setLista(await res.json());
+    } catch (err) {
+      toast.error(err.message);
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
-  };
+  }, []);
 
-  const renderStep = () => {
-    switch (currentStepKey) {
-      case "descricaoAnalise":
-        return (
-          <textarea
-            autoFocus
-            rows={6}
-            className="w-full border-2 rounded-lg px-3 py-2 text-sm outline-none resize-none transition"
-            style={{ borderColor: form.descricaoAnalise ? GOLD : "#e5e7eb" }}
-            placeholder="Descreva a Não Conformidade na perspetiva do/a(s) responsável/eis pela análise..."
-            value={form.descricaoAnalise}
-            onChange={e => update("descricaoAnalise", e.target.value)}
-          />
-        );
+  useEffect(() => { fetchLista(); }, [fetchLista]);
 
-      case "analiseCausas":
-        return (
-          <textarea
-            autoFocus
-            rows={6}
-            className="w-full border-2 rounded-lg px-3 py-2 text-sm outline-none resize-none transition"
-            style={{ borderColor: form.analiseCausas ? GOLD : "#e5e7eb" }}
-            placeholder="Descreva a análise das causas..."
-            value={form.analiseCausas}
-            onChange={e => update("analiseCausas", e.target.value)}
-          />
-        );
-
-      case "descricaoAcoesCorretivas":
-        return (
-          <textarea
-            autoFocus
-            rows={6}
-            className="w-full border-2 rounded-lg px-3 py-2 text-sm outline-none resize-none transition"
-            style={{ borderColor: form.descricaoAcoesCorretivas ? GOLD : "#e5e7eb" }}
-            placeholder="Descreva as ações corretivas implementadas..."
-            value={form.descricaoAcoesCorretivas}
-            onChange={e => update("descricaoAcoesCorretivas", e.target.value)}
-          />
-        );
-
-      case "responsavelAcoesCorretivas":
-        return (
-          <input
-            autoFocus
-            className="w-full border-2 rounded-lg px-3 py-2 text-sm outline-none transition"
-            style={{ borderColor: form.responsavelAcoesCorretivas ? GOLD : "#e5e7eb" }}
-            placeholder="Nome do/a responsável..."
-            value={form.responsavelAcoesCorretivas}
-            onChange={e => update("responsavelAcoesCorretivas", e.target.value)}
-            onKeyDown={e => e.key === "Enter" && handleNext()}
-          />
-        );
-
-      case "prazoAcoesCorretivas":
-        return (
-          <input
-            autoFocus
-            type="date"
-            className="w-full border-2 rounded-lg px-3 py-2 text-sm outline-none transition"
-            style={{ borderColor: form.prazoAcoesCorretivas ? GOLD : "#e5e7eb" }}
-            value={form.prazoAcoesCorretivas}
-            onChange={e => update("prazoAcoesCorretivas", e.target.value)}
-            onKeyDown={e => e.key === "Enter" && handleNext()}
-          />
-        );
-
-      case "verificacaoEficacia":
-        return (
-          <textarea
-            autoFocus
-            rows={6}
-            className="w-full border-2 rounded-lg px-3 py-2 text-sm outline-none resize-none transition"
-            style={{ borderColor: form.verificacaoEficacia ? GOLD : "#e5e7eb" }}
-            placeholder="Descreva como e em que prazo será possível verificar a eficácia das ações corretivas..."
-            value={form.verificacaoEficacia}
-            onChange={e => update("verificacaoEficacia", e.target.value)}
-          />
-        );
-
-      case "outrasCorrecoes":
-        return (
-          <textarea
-            autoFocus
-            rows={6}
-            className="w-full border-2 rounded-lg px-3 py-2 text-sm outline-none resize-none transition"
-            style={{ borderColor: form.outrasCorrecoes ? GOLD : "#e5e7eb" }}
-            placeholder="Descreva outras correções, responsável e prazo (opcional)..."
-            value={form.outrasCorrecoes}
-            onChange={e => update("outrasCorrecoes", e.target.value)}
-          />
-        );
-
-      case "autorAnalise":
-        return (
-          <input
-            autoFocus
-            className="w-full border-2 rounded-lg px-3 py-2 text-sm outline-none transition"
-            style={{ borderColor: form.autorAnalise ? GOLD : "#e5e7eb" }}
-            placeholder="Primeiro e último nome (opcional)..."
-            value={form.autorAnalise}
-            onChange={e => update("autorAnalise", e.target.value)}
-            onKeyDown={e => e.key === "Enter" && handleNext()}
-          />
-        );
-
-      case "outrosEnvolvidos":
-        return (
-          <input
-            autoFocus
-            className="w-full border-2 rounded-lg px-3 py-2 text-sm outline-none transition"
-            style={{ borderColor: form.outrosEnvolvidos ? GOLD : "#e5e7eb" }}
-            placeholder="Primeiro e último nome (opcional)..."
-            value={form.outrosEnvolvidos}
-            onChange={e => update("outrosEnvolvidos", e.target.value)}
-            onKeyDown={e => e.key === "Enter" && handleNext()}
-          />
-        );
-
-      case "__summary__":
-        return (
-          <div className="flex flex-col gap-0 rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
-            <div className="px-4 py-3 border-b" style={{ background: GOLD_LIGHT }}>
-              <span className="font-semibold text-sm" style={{ color: GOLD }}>
-                Reveja as suas respostas antes de enviar
-              </span>
-            </div>
-            <div className="px-4">
-              <SummaryRow
-                label="Descrição da Não Conformidade (perspetiva da análise)"
-                value={form.descricaoAnalise}
-                onEdit={() => handleJump(stepIndexFor("descricaoAnalise"))}
-              />
-              <SummaryRow
-                label="Análise das Causas"
-                value={form.analiseCausas}
-                onEdit={() => handleJump(stepIndexFor("analiseCausas"))}
-              />
-              <SummaryRow
-                label="Descrição das Ações Corretivas"
-                value={form.descricaoAcoesCorretivas}
-                onEdit={() => handleJump(stepIndexFor("descricaoAcoesCorretivas"))}
-              />
-              <SummaryRow
-                label="Responsável pela implementação"
-                value={form.responsavelAcoesCorretivas}
-                onEdit={() => handleJump(stepIndexFor("responsavelAcoesCorretivas"))}
-              />
-              <SummaryRow
-                label="Prazo para implementação"
-                value={form.prazoAcoesCorretivas}
-                onEdit={() => handleJump(stepIndexFor("prazoAcoesCorretivas"))}
-              />
-              <SummaryRow
-                label="Verificação da eficácia"
-                value={form.verificacaoEficacia}
-                onEdit={() => handleJump(stepIndexFor("verificacaoEficacia"))}
-              />
-              <SummaryRow
-                label="Outras Correções, Responsável e Prazo"
-                value={form.outrasCorrecoes}
-                onEdit={() => handleJump(stepIndexFor("outrasCorrecoes"))}
-              />
-              <SummaryRow
-                label="Autor/a(s) da análise e tratamento"
-                value={form.autorAnalise}
-                onEdit={() => handleJump(stepIndexFor("autorAnalise"))}
-              />
-              <SummaryRow
-                label="Outros envolvidos"
-                value={form.outrosEnvolvidos}
-                onEdit={() => handleJump(stepIndexFor("outrosEnvolvidos"))}
-              />
-              <SummaryRow label="E-mail" value={userEmail} />
-            </div>
-          </div>
-        );
-
-      default:
-        return null;
-    }
-  };
-
-  const questionLabel = isSummary ? null : steps[step]?.label;
+  const onOpen = (ncId) => navigate(`/tratar-nao-conformidade/${ncId}`);
 
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
 
       <div className="ml-[var(--sidebar-w,230px)] transition-[margin-left] duration-200 flex-1 min-w-0 flex flex-col min-h-screen">
-        <Topbar icon="🛠️" title="Análise e Tratamento de Não Conformidades/Reclamações" />
+        <Topbar icon="🛠️" title="Tratamento de Não Conformidades/Reclamações" />
 
-        <div className="flex-1 flex justify-center items-start p-6">
-          <div className="w-full max-w-2xl">
-            {/* Header card */}
-            <div
-              className="rounded-2xl p-5 mb-6 shadow-sm"
-              style={{ background: `linear-gradient(135deg, ${GOLD} 0%, #a87428 100%)` }}
-            >
-              <h1 className="text-lg font-bold text-white mb-1">
-                Análise e Tratamento de Não Conformidades/Reclamações
-              </h1>
-              <p className="text-xs text-amber-100 leading-relaxed">
-                Este formulário tem como objetivo a análise e tratamento de Não Conformidades/Reclamações.
-                Inclui a análise das causas e a implementação de ações corretivas, tendo em vista a
-                eliminação/redução do impacto das mesmas no Sistema.
-              </p>
-              {userEmail && (
-                <p className="text-xs text-amber-200 mt-2 font-medium">{userEmail}</p>
+        <div className="flex-1 p-6">
+          {id ? (
+            <div className="w-full max-w-3xl mx-auto">
+              <NaoConformidadeDetail id={id} onBack={() => navigate("/tratar-nao-conformidade")} onChanged={fetchLista} />
+            </div>
+          ) : (
+            <div className="w-full max-w-6xl mx-auto">
+              <div className="flex items-start gap-3 mb-6">
+                <span className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-base" style={{ background: "#f5e6ca", color: GOLD }}>
+                  <FaClipboardList />
+                </span>
+                <div className="min-w-0">
+                  <h1 className="text-xl font-bold text-gray-800 leading-tight">Tratamento de Não Conformidades/Reclamações</h1>
+                  <p className="text-xs text-gray-500 mt-1 leading-relaxed max-w-2xl">
+                    {isGestorQualidade
+                      ? "Consulte, catalogue, atribua responsáveis e acompanhe todas as não conformidades da organização."
+                      : "Pode consultar todas as não conformidades da organização. Só pode interagir (preencher o tratamento, marcar ações como implementadas, etc.) nas que lhe estiverem atribuídas ou em que estiver envolvido/a."}
+                  </p>
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="flex flex-col items-center justify-center gap-3 bg-white rounded-2xl border border-gray-100 p-12">
+                  <span className="w-6 h-6 rounded-full border-2 border-gray-200 animate-spin" style={{ borderTopColor: GOLD }} />
+                  <span className="text-sm text-gray-400">A carregar...</span>
+                </div>
+              ) : lista.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-2 text-center bg-white rounded-2xl border border-gray-100 p-12">
+                  <FaBoxArchive className="text-2xl text-gray-300 mb-1" />
+                  <span className="text-sm text-gray-400 italic">Nenhuma não conformidade encontrada.</span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <span className="text-xs text-gray-400 font-medium">
+                      {lista.length} não conformidade{lista.length === 1 ? "" : "s"} no total
+                    </span>
+                    <div className="flex gap-1 bg-white border border-gray-200 rounded-full p-1">
+                      {VIEW_MODES.map(({ key, label, icon: Icon }) => (
+                        <button
+                          key={key}
+                          title={label}
+                          onClick={() => setViewMode(key)}
+                          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-all duration-150"
+                          style={viewMode === key ? { background: GOLD, color: "#fff" } : { color: "#6b7280" }}
+                        >
+                          <Icon />
+                          <span className="hidden sm:inline">{label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {viewMode === "kanban" && <KanbanBoard lista={lista} onOpen={onOpen} />}
+                  {viewMode === "grid" && <GridView lista={lista} onOpen={onOpen} />}
+                  {viewMode === "timeline" && <TimelineView lista={lista} onOpen={onOpen} />}
+                  {viewMode === "tiles" && <TilesView lista={lista} onOpen={onOpen} />}
+                </>
               )}
             </div>
-
-            {/* Progress */}
-            <StepProgress steps={steps} current={step} maxStep={maxStep} onJump={handleJump} />
-
-            {/* Step card */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-6 pt-6 pb-2">
-                <div className="flex items-center gap-2 mb-1">
-                  <span
-                    className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                    style={{ background: GOLD_LIGHT, color: GOLD }}
-                  >
-                    {isSummary ? "Resumo" : `Pergunta ${step + 1} de ${steps.length - 1}`}
-                  </span>
-                  {!isSummary && steps[step]?.required && (
-                    <span className="text-xs text-red-500">* obrigatório</span>
-                  )}
-                </div>
-
-                {questionLabel && (
-                  <h2 className="text-base font-semibold text-gray-800 mb-4">{questionLabel}</h2>
-                )}
-              </div>
-
-              <div className="px-6 pb-6">
-                {renderStep()}
-
-                {error && (
-                  <div className="mt-4 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2 border border-red-200">
-                    {error}
-                  </div>
-                )}
-
-                <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-100">
-                  <button
-                    onClick={handleBack}
-                    disabled={step === 0}
-                    className="px-4 py-2 rounded-lg text-sm font-medium border-2 transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed"
-                    style={{ borderColor: GOLD, color: GOLD }}
-                  >
-                    ← Anterior
-                  </button>
-
-                  {isSummary ? (
-                    <button
-                      onClick={handleSubmit}
-                      disabled={submitting}
-                      className="px-6 py-2 rounded-lg text-sm font-bold text-white transition-all duration-150 disabled:opacity-60 shadow"
-                      style={{ background: submitting ? "#9ca3af" : GOLD }}
-                    >
-                      {submitting ? "A enviar..." : "Enviar registo"}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handleNext}
-                      className="px-6 py-2 rounded-lg text-sm font-bold text-white transition-all duration-150 shadow"
-                      style={{ background: GOLD }}
-                    >
-                      Seguinte →
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

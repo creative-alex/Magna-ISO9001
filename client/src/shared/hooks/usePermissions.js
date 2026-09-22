@@ -9,12 +9,17 @@ import { UserContext } from "../context/userContext";
 // isAdminOrHRorAdministrador, isSuperAdminOrGestorFinanceiro), para ficar óbvio qual é
 // a regra de backend correspondente a cada permissão composta aqui.
 export function usePermissions() {
-  const { nivelAcesso, uid, entidadesGeridasNomes } = useContext(UserContext);
+  const { nivelAcesso, uid, entidadesGeridasNomes, gestorQualidade } = useContext(UserContext);
 
   const isSuperAdmin = nivelAcesso === "SuperAdmin";
   const isGestorRH = nivelAcesso === "GestorRH";
   const isAdministrador = nivelAcesso === "Administrador";
   const isGestorFinanceiro = nivelAcesso === "GestorFinanceiro";
+  // Função de Gestor(a) de Qualidade: dimensão independente de nivelAcesso (ver
+  // gestorQualidade em users/{uid} e req.user.gestorQualidade em auth.js). Uma pessoa
+  // mantém as permissões do seu nivelAcesso e ganha, adicionalmente, estas - nunca troca
+  // uma pela outra.
+  const isGestorQualidade = gestorQualidade === true;
 
   const isAdminOrHR = isSuperAdmin || isGestorRH;
   const isAdminOrHRorAdministrador = isAdminOrHR || isAdministrador;
@@ -72,8 +77,27 @@ export function usePermissions() {
   const canEditCadastroRestrito = (targetEntidadeNome) =>
     isSuperAdmin || isGestorRH || (isAdministrador && isEntidadeInScope(targetEntidadeNome));
 
+  // Não Conformidades - ver naoConformidadeController.js no backend para a autoridade
+  // final de cada uma destas regras (o frontend só evita mostrar controlos sem efeito).
+  //   - Consultar: todos os autenticados (o backend filtra quais NC cada um vê/lista).
+  //   - Gerir (catalogar, atribuir/alterar responsável pela NC, verificar eficácia,
+  //     fechar): quem tem gestorQualidade=true, OU um SuperAdmin (autoridade máxima do
+  //     sistema, tem de conseguir manipular qualquer NC mesmo sem a função de Qualidade).
+  //   - Editar o questionário de tratamento e as ações corretivas de uma NC: só quem é o
+  //     responsável PELO TRATAMENTO dessa NC específica (nem a própria Gestora de
+  //     Qualidade o edita, só consulta) - por isso é uma função de (nc), não um booleano.
+  //     Um SuperAdmin também pode, pela mesma razão do parágrafo acima.
+  //   - Marcar uma ação como implementada: só quem é o responsável POR ESSA AÇÃO, ou um
+  //     SuperAdmin.
+  const canViewNaoConformidades = true;
+  const canManageNaoConformidades = isGestorQualidade || isSuperAdmin;
+  const canAssignNaoConformidade = isGestorQualidade || isSuperAdmin;
+  const canVerifyEficacia = isGestorQualidade || isSuperAdmin;
+  const canEditNaoConformidade = (nc) => !!nc && (nc.responsavelTratamentoUid === uid || isSuperAdmin);
+  const canMarkAcaoImplementada = (acao) => !!acao && (acao.responsavelUid === uid || isSuperAdmin);
+
   return {
-    isSuperAdmin, isGestorRH, isAdministrador, isGestorFinanceiro,
+    isSuperAdmin, isGestorRH, isAdministrador, isGestorFinanceiro, isGestorQualidade,
     isAdminOrHR, isAdminOrHRorAdministrador, isSuperAdminOrGestorFinanceiro,
     canManageUsers, canViewColaboradores,
     canViewPayroll, canEditPayroll,
@@ -81,5 +105,7 @@ export function usePermissions() {
     canManageFormacao, canManageMedicina,
     isEntidadeInScope,
     canViewCadastro, canEditCadastro, canEditCadastroRestrito,
+    canViewNaoConformidades, canManageNaoConformidades, canAssignNaoConformidade,
+    canVerifyEficacia, canEditNaoConformidade, canMarkAcaoImplementada,
   };
 }
