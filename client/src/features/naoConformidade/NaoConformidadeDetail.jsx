@@ -10,6 +10,7 @@ import { usePermissions } from "../../shared/hooks/usePermissions";
 import { NC_ESTADOS, ACAO_ESTADOS, GRAVIDADES, ncEstadoLabel, acaoEstadoLabel } from "./estados";
 import EnvolvidosPicker from "./components/EnvolvidosPicker";
 import AcoesCorretivasEditor, { novaAcaoVazia } from "./components/AcoesCorretivasEditor";
+import AnaliseCausasEditor, { novaCausaVazia } from "./components/AnaliseCausasEditor";
 
 const GOLD = "#C8932F";
 const gravityColor = { "Pouco grave": "#22c55e", "Grave": "#f59e0b", "Muito grave": "#ef4444" };
@@ -104,12 +105,24 @@ export default function NaoConformidadeDetail({ id, onBack, onChanged }) {
   const [editingEnvolvidos, setEditingEnvolvidos] = useState(false);
   const [envolvidosDraft, setEnvolvidosDraft] = useState([]);
   const [editingCatalog, setEditingCatalog] = useState(false);
-  const [catalogForm, setCatalogForm] = useState({ categoria: "", classificacao: "", notas: "" });
+  // "categoria" saiu do fluxo ativo de catalogação (ver pedido) - fica comentado no JSX,
+  // não removido daqui, para não perder o campo caso volte a ser necessário.
+  const [catalogForm, setCatalogForm] = useState({ /* categoria: "", */ notas: "" });
+  // Classificação deixou de ser um campo próprio da catalogação e passou a ser só o
+  // campo "gravidade" da NC (o mesmo que o autor preenche no registo) - a Gestora de
+  // Qualidade edita-o aqui, e o valor mais recente é sempre "o válido" em toda a NC.
+  const [gravidadeDraft, setGravidadeDraft] = useState("");
   const [editingResponsavel, setEditingResponsavel] = useState(false);
   const [responsavelDraft, setResponsavelDraft] = useState("");
   const [tratamentoForm, setTratamentoForm] = useState({
-    descricaoAnalise: "", analiseCausas: "", outrasCorrecoes: "", autorAnalise: "", outrosEnvolvidos: "",
+    descricaoAnalise: "",
+    // "outrasCorrecoes"/"autorAnalise"/"outrosEnvolvidos" estão desativados na UI (ver
+    // pedido) - mantidos no estado/payload para poderem ser reativados facilmente.
+    outrasCorrecoes: "", autorAnalise: "", outrosEnvolvidos: "",
   });
+  // "Análise das causas" deixou de ser um único texto e passou a ser uma lista de causas
+  // (ver AnaliseCausasEditor.jsx) - guardada à parte de tratamentoForm.
+  const [causasDraft, setCausasDraft] = useState([novaCausaVazia()]);
   const [acoesDraft, setAcoesDraft] = useState([novaAcaoVazia()]);
   const [tratamentoErrors, setTratamentoErrors] = useState({});
   const [eficaciaNotas, setEficaciaNotas] = useState({});
@@ -121,13 +134,17 @@ export default function NaoConformidadeDetail({ id, onBack, onChanged }) {
       if (!res.ok) throw new Error("Não foi possível carregar a não conformidade.");
       const data = await res.json();
       setNc(data);
-      setCatalogForm({
-        categoria: data.catalogacao?.categoria || "",
-        classificacao: data.catalogacao?.classificacao || "",
-        notas: data.catalogacao?.notas || "",
-      });
+      setCatalogForm({ notas: data.catalogacao?.notas || "" });
+      setGravidadeDraft(data.gravidade || "");
       setEnvolvidosDraft((data.envolvidos || []).map((e) => e.uid));
       setResponsavelDraft(data.responsavelTratamentoUid || "");
+      // Pré-preenche a descrição do questionário com a descrição da ocorrência já
+      // registada, para o responsável não ter de a reescrever/copiar à mão - só quando o
+      // tratamento ainda não foi submetido, e só na primeira carga (nunca sobrepõe o que a
+      // pessoa já esteja a escrever num refresh a meio da edição).
+      if (!data.tratamento) {
+        setTratamentoForm((f) => (f.descricaoAnalise ? f : { ...f, descricaoAnalise: data.descricao || "" }));
+      }
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -148,7 +165,10 @@ export default function NaoConformidadeDetail({ id, onBack, onChanged }) {
   };
 
   const handleSaveCatalogacao = () => runAction(async () => {
-    const res = await apiFetch(`/nao-conformidades/${id}/catalogacao`, { method: "PATCH", body: JSON.stringify(catalogForm) });
+    const res = await apiFetch(`/nao-conformidades/${id}/catalogacao`, {
+      method: "PATCH",
+      body: JSON.stringify({ notas: catalogForm.notas, ...(gravidadeDraft ? { gravidade: gravidadeDraft } : {}) }),
+    });
     if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error); }
     toast.success("Catalogação guardada.");
     setEditingCatalog(false);
@@ -175,7 +195,7 @@ export default function NaoConformidadeDetail({ id, onBack, onChanged }) {
   const validateTratamento = () => {
     const errs = {};
     if (!tratamentoForm.descricaoAnalise.trim()) errs.descricaoAnalise = "Descreva a não conformidade na perspetiva da análise.";
-    if (!tratamentoForm.analiseCausas.trim()) errs.analiseCausas = "Descreva a análise das causas.";
+    if (!causasDraft.some((c) => c.texto.trim())) errs.analiseCausas = "Indique pelo menos uma causa na análise das causas.";
     if (acoesDraft.length === 0) errs.acoes = "Defina pelo menos uma ação corretiva.";
     for (const a of acoesDraft) {
       if (!a.descricao.trim() || !a.responsavelUid || !a.prazoImplementacao || !a.prazoVerificacaoEficacia) {
@@ -195,6 +215,7 @@ export default function NaoConformidadeDetail({ id, onBack, onChanged }) {
         method: "POST",
         body: JSON.stringify({
           ...tratamentoForm,
+          analiseCausas: causasDraft.map((c) => c.texto.trim()).filter(Boolean),
           acoes: acoesDraft.map(({ descricao, responsavelUid, prazoImplementacao, prazoVerificacaoEficacia }) => ({
             descricao, responsavelUid, prazoImplementacao, prazoVerificacaoEficacia,
           })),
@@ -287,6 +308,11 @@ export default function NaoConformidadeDetail({ id, onBack, onChanged }) {
   const podeFechar = canManageNaoConformidades && nc.estado === "tratada" && nc.totalAcoes > 0 && nc.acoesEficazes === nc.totalAcoes;
   const totalAcoesNc = nc.acoes?.length || 0;
   const eficazesNc = nc.acoes?.filter((a) => a.estado === "eficaz").length || 0;
+  // "analiseCausas" passou a ser guardado como array (ver ponto 4 do pedido); aceita
+  // também o formato antigo (string única) por compatibilidade com NC já submetidas.
+  const causasExibidas = Array.isArray(nc.tratamento?.analiseCausas)
+    ? nc.tratamento.analiseCausas
+    : (nc.tratamento?.analiseCausas ? [nc.tratamento.analiseCausas] : []);
 
   return (
     <div>
@@ -362,12 +388,18 @@ export default function NaoConformidadeDetail({ id, onBack, onChanged }) {
       >
         {editingCatalog ? (
           <>
+            {/* "Categoria" saiu do fluxo ativo de catalogação - código mantido comentado
+                para reutilização futura, não apagado.
             <label className="text-xs text-gray-600 font-medium mb-1 block">Categoria</label>
             <input className="w-full border-2 rounded-lg px-3 py-2 text-sm outline-none transition mb-3" style={{ borderColor: "#e5e7eb" }}
               value={catalogForm.categoria} onChange={(e) => setCatalogForm({ ...catalogForm, categoria: e.target.value })} />
+            */}
             <label className="text-xs text-gray-600 font-medium mb-1 block">Classificação</label>
+            <p className="text-[11px] text-gray-400 mb-1">
+              Classificação inicial atribuída por quem registou a NC. Pode ser alterada aqui pela Gestora de Qualidade - o valor guardado passa a ser o válido em toda a NC.
+            </p>
             <select className="w-full border-2 rounded-lg px-3 py-2 text-sm outline-none transition mb-3 bg-white" style={{ borderColor: "#e5e7eb" }}
-              value={catalogForm.classificacao} onChange={(e) => setCatalogForm({ ...catalogForm, classificacao: e.target.value })}>
+              value={gravidadeDraft} onChange={(e) => setGravidadeDraft(e.target.value)}>
               <option value="">-- Selecione --</option>
               {GRAVIDADES.map((g) => <option key={g} value={g}>{g}</option>)}
             </select>
@@ -379,11 +411,8 @@ export default function NaoConformidadeDetail({ id, onBack, onChanged }) {
               <button
                 onClick={() => {
                   setEditingCatalog(false);
-                  setCatalogForm({
-                    categoria: nc.catalogacao?.categoria || "",
-                    classificacao: nc.catalogacao?.classificacao || "",
-                    notas: nc.catalogacao?.notas || "",
-                  });
+                  setCatalogForm({ notas: nc.catalogacao?.notas || "" });
+                  setGravidadeDraft(nc.gravidade || "");
                 }}
                 className="px-4 py-1.5 rounded-lg text-xs font-medium border border-gray-200 text-gray-500"
               >
@@ -393,8 +422,7 @@ export default function NaoConformidadeDetail({ id, onBack, onChanged }) {
           </>
         ) : (
           <>
-            <Field label="Categoria" value={nc.catalogacao?.categoria} />
-            <Field label="Classificação" value={nc.catalogacao?.classificacao} />
+            <Field label="Classificação" value={nc.gravidade} />
             <Field label="Notas" value={nc.catalogacao?.notas} />
           </>
         )}
@@ -437,27 +465,43 @@ export default function NaoConformidadeDetail({ id, onBack, onChanged }) {
         {nc.tratamento ? (
           <>
             <Field label="Descrição da não conformidade (perspetiva da análise)" value={nc.tratamento.descricaoAnalise} />
-            <Field label="Análise das causas" value={nc.tratamento.analiseCausas} />
+            <div className="mb-3">
+              <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: GOLD }}>Análise das causas</div>
+              {causasExibidas.length > 0 ? (
+                <ol className="list-decimal list-inside text-sm text-gray-800 space-y-1">
+                  {causasExibidas.map((c, i) => <li key={i}>{c}</li>)}
+                </ol>
+              ) : (
+                <span className="text-sm italic text-gray-400">Não indicado</span>
+              )}
+            </div>
+            {/* "Outras correções"/"Autor da análise"/"Outros envolvidos" desativados na UI -
+                código mantido comentado para reutilização futura, não apagado.
             <Field label="Outras correções, responsável e prazo" value={nc.tratamento.outrasCorrecoes} />
             <Field label="Autor/a(s) da análise e tratamento" value={nc.tratamento.autorAnalise} />
             <Field label="Outros envolvidos na análise e tratamento" value={nc.tratamento.outrosEnvolvidos} />
+            */}
           </>
         ) : podeEditarQuestionario ? (
           <>
             <label className="text-xs text-gray-600 font-medium mb-1 block">Descrição da não conformidade (perspetiva da análise) *</label>
+            <p className="text-[11px] text-gray-400 mb-1">Pré-preenchida com a descrição da ocorrência do registo original - pode ajustar se necessário.</p>
             <textarea rows={4} className="w-full border-2 rounded-lg px-3 py-2 text-sm outline-none resize-none transition mb-1" style={{ borderColor: "#e5e7eb" }}
               value={tratamentoForm.descricaoAnalise} onChange={(e) => setTratamentoForm({ ...tratamentoForm, descricaoAnalise: e.target.value })} />
             {tratamentoErrors.descricaoAnalise && <p className="text-xs text-red-500 mb-2">{tratamentoErrors.descricaoAnalise}</p>}
 
             <label className="text-xs text-gray-600 font-medium mb-1 block mt-2">Análise das causas *</label>
-            <textarea rows={4} className="w-full border-2 rounded-lg px-3 py-2 text-sm outline-none resize-none transition mb-1" style={{ borderColor: "#e5e7eb" }}
-              value={tratamentoForm.analiseCausas} onChange={(e) => setTratamentoForm({ ...tratamentoForm, analiseCausas: e.target.value })} />
-            {tratamentoErrors.analiseCausas && <p className="text-xs text-red-500 mb-2">{tratamentoErrors.analiseCausas}</p>}
+            <AnaliseCausasEditor causas={causasDraft} onChange={setCausasDraft} error={tratamentoErrors.analiseCausas} />
 
+            {/* "Outras correções, responsável e prazo" desativado na UI - código mantido
+                comentado para reutilização futura, não apagado.
             <label className="text-xs text-gray-600 font-medium mb-1 block mt-2">Outras correções, responsável e prazo (opcional)</label>
             <textarea rows={3} className="w-full border-2 rounded-lg px-3 py-2 text-sm outline-none resize-none transition mb-3" style={{ borderColor: "#e5e7eb" }}
               value={tratamentoForm.outrasCorrecoes} onChange={(e) => setTratamentoForm({ ...tratamentoForm, outrasCorrecoes: e.target.value })} />
+            */}
 
+            {/* "Autor/a(s) da análise" e "Outros envolvidos na análise" desativados na UI -
+                código mantido comentado para reutilização futura, não apagado.
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div>
                 <label className="text-xs text-gray-600 font-medium mb-1 block">Autor/a(s) da análise (opcional)</label>
@@ -470,8 +514,9 @@ export default function NaoConformidadeDetail({ id, onBack, onChanged }) {
                   value={tratamentoForm.outrosEnvolvidos} onChange={(e) => setTratamentoForm({ ...tratamentoForm, outrosEnvolvidos: e.target.value })} />
               </div>
             </div>
+            */}
 
-            <h4 className="text-sm font-semibold text-gray-800 mb-2">Ações corretivas *</h4>
+            <h4 className="text-sm font-semibold text-gray-800 mb-2 mt-4">Ações corretivas *</h4>
             <AcoesCorretivasEditor acoes={acoesDraft} onChange={setAcoesDraft} envolvidos={nc.envolvidos || []} errors={tratamentoErrors} />
 
             <button disabled={busy} onClick={handleSubmitTratamento} className="mt-4 px-5 py-2 rounded-lg text-sm font-bold text-white transition-opacity disabled:opacity-60" style={{ background: GOLD }}>

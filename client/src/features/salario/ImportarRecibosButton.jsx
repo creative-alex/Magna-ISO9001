@@ -170,12 +170,12 @@ export default function ImportarRecibosButton() {
       <button
         type="button"
         onClick={openModal}
-        title="Importar recibos de vencimento a partir de um PDF mensal"
+        title="Importar e enviar recibos de vencimento a partir de um PDF mensal"
         className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border cursor-pointer transition-colors"
         style={{ borderColor: GOLD, color: GOLD, background: "#fff" }}
       >
         <FaFileImport style={{ fontSize: 13 }} />
-        Importar recibos
+        Enviar recibos
       </button>
 
       {showModal && (

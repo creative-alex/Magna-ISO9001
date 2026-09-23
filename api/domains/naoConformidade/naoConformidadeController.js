@@ -19,6 +19,13 @@ const { validatePdfBuffer } = require("./pdfValidation");
 //   por_implementar -> implementada -> eficaz
 // Ambos são sempre derivados/escritos pelo backend, nunca aceites do cliente.
 
+// Único campo de classificação/gravidade da NC (campo "gravidade" no documento) - o autor
+// da NC atribui o valor inicial no registo (createNaoConformidade), e a Gestora de
+// Qualidade pode alterá-lo durante a catalogação (updateCatalogacao); o valor mais
+// recente é sempre "a classificação atualmente válida", não existem dois campos
+// separados. Mesma lista usada no frontend (RegistoNaoConformidade.jsx/estados.js).
+const GRAVIDADES_VALIDAS = ["Pouco grave", "Grave", "Muito grave"];
+
 function httpError(status, message) {
   const err = new Error(message);
   err.status = status;
@@ -121,7 +128,7 @@ function summarize(doc) {
     descricao: d.descricao,
     dataRegisto: tsToIso(d.dataRegisto),
     estado: d.estado,
-    catalogacao: d.catalogacao ? { categoria: d.catalogacao.categoria, classificacao: d.catalogacao.classificacao } : null,
+    catalogacao: d.catalogacao ? { notas: d.catalogacao.notas } : null,
     responsavelTratamentoUid: d.responsavelTratamentoUid || null,
     responsavelTratamentoNome: d.responsavelTratamentoNome || null,
     registadoPor: d.registadoPor,
@@ -251,16 +258,36 @@ const updateCatalogacao = async (req, res) => {
     if (!doc.exists) return res.status(404).json({ error: "Não conformidade não encontrada." });
     const data = doc.data();
 
-    const { categoria, classificacao, notas, envolvidos } = req.body;
+    // "categoria" saiu do fluxo ativo de catalogação (fica comentado, não apagado, para o
+    // caso de vir a ser reutilizado) - const { categoria, classificacao, notas, envolvidos } = req.body;
+    const { notas, gravidade, envolvidos } = req.body;
     const updates = {
       catalogacao: {
-        categoria: categoria || null,
-        classificacao: classificacao || null,
+        // categoria: categoria || null,
         notas: notas || null,
         atorUid: req.user.uid,
         em: admin.firestore.FieldValue.serverTimestamp(),
       },
     };
+
+    // "gravidade" é o único campo de classificação (ver nota em GRAVIDADES_VALIDAS) - a
+    // Gestora de Qualidade pode rever/alterar aqui o valor inicialmente atribuído pelo
+    // autor da NC; o novo valor passa a ser a classificação válida em toda a NC (badge,
+    // listagem, etc., que já leem sempre o mesmo campo "gravidade").
+    if (gravidade !== undefined) {
+      if (!GRAVIDADES_VALIDAS.includes(gravidade)) {
+        return res.status(400).json({ error: "Classificação inválida." });
+      }
+      if (gravidade !== data.gravidade) {
+        updates.gravidade = gravidade;
+        await addHistorico(docRef, {
+          tipo: "classificacao",
+          resumo: `Classificação alterada de "${data.gravidade || "-"}" para "${gravidade}"`,
+          atorUid: req.user.uid,
+          atorNome: req.user.nome || req.user.email,
+        });
+      }
+    }
 
     if (envolvidos !== undefined) {
       const envolvidosLimpos = await resolveEnvolvidos(envolvidos);
@@ -354,8 +381,16 @@ const submitTratamento = async (req, res) => {
     }
 
     const { descricaoAnalise, analiseCausas, outrasCorrecoes, autorAnalise, outrosEnvolvidos, acoes } = req.body;
-    if (!descricaoAnalise || !analiseCausas) {
-      return res.status(400).json({ error: "Descrição da análise e análise das causas são obrigatórias." });
+    if (!descricaoAnalise) {
+      return res.status(400).json({ error: "Descrição da não conformidade é obrigatória." });
+    }
+    // "Análise das causas" é uma lista de pontos, não um texto único (ver
+    // AnaliseCausasEditor.jsx no frontend) - guardada como array de strings.
+    const causasLimpa = Array.isArray(analiseCausas)
+      ? analiseCausas.map((c) => (typeof c === "string" ? c.trim() : "")).filter(Boolean)
+      : [];
+    if (causasLimpa.length === 0) {
+      return res.status(400).json({ error: "Indique pelo menos uma causa na análise das causas." });
     }
     if (!Array.isArray(acoes) || acoes.length === 0) {
       return res.status(400).json({ error: "Defina pelo menos uma ação corretiva." });
@@ -394,7 +429,11 @@ const submitTratamento = async (req, res) => {
     batch.update(docRef, {
       tratamento: {
         descricaoAnalise,
-        analiseCausas,
+        analiseCausas: causasLimpa,
+        // "outrasCorrecoes"/"autorAnalise"/"outrosEnvolvidos" saíram do fluxo ativo do
+        // questionário (ver campos comentados em NaoConformidadeDetail.jsx) - continuam
+        // aceites aqui (não removidos do modelo de dados), só deixam de ser preenchidos
+        // enquanto os campos estiverem desativados no frontend.
         outrasCorrecoes: outrasCorrecoes || null,
         autorAnalise: autorAnalise || null,
         outrosEnvolvidos: outrosEnvolvidos || null,
