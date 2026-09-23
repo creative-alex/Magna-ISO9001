@@ -229,7 +229,7 @@ function KmPendenteBadge({ count }) {
   if (!count) return null;
   return (
     <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 6, background: "#FEF3C7", color: "#92400E", whiteSpace: "nowrap" }}>
-      Quilómetros por validar{count > 1 ? ` (${count})` : ""}
+      Deslocações por validar{count > 1 ? ` (${count})` : ""}
     </span>
   );
 }

@@ -28,8 +28,8 @@ async function gerarRefDeslocacao(colRef, dia, mesNum, ano) {
 // Regista uma deslocação (Data/Motivo/Origem/Destino), com km/valor sempre calculados no
 // servidor (nunca confia num km vindo do cliente). Ao contrário de Ferias/BaixasMedicas/
 // AjustesPendentes, começa SEMPRE com Approved:false, seja quem for a criar (mesmo um
-// admin em nome de outro colaborador) - só approveDeslocacao (ação explícita da GestorRH)
-// muda isto, ver Modelo de dados no plano.
+// admin em nome de outro colaborador) - só approveDeslocacao (ação explícita da
+// GestorRH/GestorFinanceiro ou SuperAdmin) muda isto, ver Modelo de dados no plano.
 const createDeslocacao = async (req, res) => {
   try {
     const { mes, data, motivo, origem, destino, idaEVolta } = req.body;
@@ -216,7 +216,8 @@ const rejectDeslocacao = async (req, res) => {
 // Apaga uma deslocação própria (self-service, ou em nome de outro colaborador quando quem
 // chama tem permissão para isso - mesma resolveTargetUid de createDeslocacao/
 // listDeslocacoes) - só enquanto ainda estiver pendente; depois de aprovada já conta para o
-// vencimento e só a GestorRH a pode remover a partir daí (ver rejectDeslocacao).
+// vencimento e só a GestorRH/GestorFinanceiro (ou SuperAdmin) a pode remover a partir daí
+// (ver rejectDeslocacao).
 const deleteDeslocacao = async (req, res) => {
   try {
     const { id } = req.body;
