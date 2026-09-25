@@ -36,6 +36,7 @@ const AllEntities = () => {
   const [expanded, setExpanded] = useState({});
   const [usersByEntity, setUsersByEntity] = useState({});
   const [search, setSearch] = useState("");
+  const [ajustesPendentesByUid, setAjustesPendentesByUid] = useState({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -77,6 +78,20 @@ const AllEntities = () => {
         setError(err.message);
       } finally {
         setLoading(false);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await apiFetch(`/timetracking/pending-time-edits-uids`, { method: "POST" });
+        if (res.ok) {
+          const data = await res.json();
+          setAjustesPendentesByUid(data.contagemPorUid || {});
+        }
+      } catch (err) {
+        console.error("Erro ao carregar alterações de horas pendentes:", err);
       }
     })();
   }, []);
@@ -184,7 +199,7 @@ const AllEntities = () => {
                     </div>
                   ) : (
                     users.map((u, i) => (
-                      <UserListRow key={u.uid} user={u} onClick={openUser} isLast={i === users.length - 1} indent />
+                      <UserListRow key={u.uid} user={u} onClick={openUser} isLast={i === users.length - 1} indent ajustesPendentes={ajustesPendentesByUid[u.uid]} />
                     ))
                   )
                 )}

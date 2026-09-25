@@ -10,7 +10,7 @@ const formatMinutes = (min) => `${Math.floor(min / 60)}h ${min % 60}m`;
 // preencher automaticamente o défice todo. Auto-serviço usa sempre o próprio
 // uid (do token, sem enviar "uid"); um admin a compensar em nome de outro
 // colaborador passa o uid desse colaborador (tal como VacationButton/
-// BirthdayButton) — nunca o "username" do UserContext, que é o NOME da
+// BirthdayButton) - nunca o "username" do UserContext, que é o NOME da
 // pessoa, não o uid do Firebase.
 const CompensateOvertimeButton = ({ uid, date, deficitMinutes = 0, onSuccess }) => {
   const [showModal, setShowModal] = useState(false);

@@ -5,10 +5,10 @@ export const SITUACAO_CONJUGAL_OPTIONS = ["Não Casado(a)", "Casado(a)", "Casado
 export const GRAU_PARENTESCO_OPTIONS = ["Cônjuge/Companheiro(a)", "Pai", "Mãe", "Filho(a)", "Irmão(ã)", "Avô/Avó", "Amigo(a)", "Outro"];
 // Escalões do IRS Jovem (reforma OE2025, 10 anos de isenção).
 export const IRS_JOVEM_OPTIONS = [
-  "1º ano — 100% de isenção",
-  "2º ano ao 4º ano — 75% de isenção",
-  "5º ao 7º ano — 50% de isenção",
-  "8º ao 9º ano — 25% de isenção",
+  "1º ano - 100% de isenção",
+  "2º ano ao 4º ano - 75% de isenção",
+  "5º ao 7º ano - 50% de isenção",
+  "8º ao 9º ano - 25% de isenção",
 ];
 export const TIPO_CONTRATO_OPTIONS = [
   "Contrato sem termo", "Contrato a termo certo", "Contrato a termo incerto",
@@ -19,9 +19,9 @@ export const DEPARTAMENTO_OPTIONS = ["Formação", "Financeiro", "Marketing", "I
 export const TIPO_BAIXA_OPTIONS = [
   "Baixa médica",
   "Baixa por luto",
-  "Licença parental inicial (120 ou 150 dias) — partilhável entre a mãe e o pai",
-  "Licença parental inicial exclusiva do pai — período obrigatório e período facultativo",
-  "Licença parental exclusiva da mãe — 6 semanas obrigatórias a seguir ao parto",
+  "Licença parental inicial (120 ou 150 dias) - partilhável entre a mãe e o pai",
+  "Licença parental inicial exclusiva do pai - período obrigatório e período facultativo",
+  "Licença parental exclusiva da mãe - 6 semanas obrigatórias a seguir ao parto",
   "Licença por risco clínico durante a gravidez",
   "Licença por interrupção da gravidez",
   "Licença parental complementar (após a inicial, para prolongar o acompanhamento do filho)",
@@ -38,7 +38,7 @@ export const MOTIVO_CESSACAO_OPTIONS = [
   "Despedimento por justa causa",
   "Despedimento coletivo / extinção do posto de trabalho",
   "Mútuo acordo (revogação por acordo)",
-  "Período experimental — cessação durante o período",
+  "Período experimental - cessação durante o período",
   "Reforma",
   "Falecimento",
 ];
@@ -54,7 +54,7 @@ export const LOCAL_MORADA = {
   "Abrantes": "Praça Raimundo José Soares Mendes, Nº 21, 2200-366",
 };
 export const LOCAL_OPTION_LABELS = Object.fromEntries(
-  LOCAL_OPTIONS.map(o => [o, LOCAL_MORADA[o] ? `${o} — ${LOCAL_MORADA[o]}` : o])
+  LOCAL_OPTIONS.map(o => [o, LOCAL_MORADA[o] ? `${o} - ${LOCAL_MORADA[o]}` : o])
 );
 export const TIPO_CONTRATO_SEM_TERMO = "Contrato sem termo";
 export const TIPO_ESTAGIO_OPTIONS = ["Profissional", "Curricular"];

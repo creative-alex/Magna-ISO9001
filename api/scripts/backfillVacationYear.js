@@ -2,7 +2,7 @@
 // registo-ponto/*/Ferias e registo-ponto/*/DiasAniversario, parseado a partir
 // do campo "date" (formato dd-mm-yyyy). Necessário porque getVacationMap,
 // getUsedDaysForYear e getUsedBirthdayDaysForYear passaram a filtrar por
-// `.where("year", "==", ano)` em vez de ler a coleção toda — sem este backfill,
+// `.where("year", "==", ano)` em vez de ler a coleção toda - sem este backfill,
 // os documentos antigos (sem "year") deixariam de aparecer no mapa de férias.
 //
 // Idempotente: pode ser corrido mais que uma vez sem duplicar nem estragar nada

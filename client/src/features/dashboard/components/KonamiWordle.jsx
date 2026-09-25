@@ -510,7 +510,7 @@ export default function KonamiWordle() {
             />
             {syncError && (
               <p style={{ fontSize: 11, color: "#ef4444", marginTop: 6 }}>
-                Não foi possível sincronizar com o servidor — a lista ficou guardada só neste dispositivo.
+                Não foi possível sincronizar com o servidor - a lista ficou guardada só neste dispositivo.
               </p>
             )}
             <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "flex-end" }}>

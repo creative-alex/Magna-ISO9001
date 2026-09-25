@@ -230,7 +230,7 @@ export default function RegistoNaoConformidade() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `Erro ${res.status}`);
       }
-      const { id } = await res.json();
+      const { id, numero } = await res.json();
 
       for (const file of anexos) {
         const formData = new FormData();
@@ -241,7 +241,7 @@ export default function RegistoNaoConformidade() {
         }
       }
 
-      toast.success("Não conformidade registada com sucesso!");
+      toast.success(numero ? `Não conformidade NC ${numero} registada com sucesso!` : "Não conformidade registada com sucesso!");
       navigate("/tratar-nao-conformidade");
     } catch (e) {
       toast.error(e.message || "Erro ao registar a não conformidade.");
@@ -355,7 +355,7 @@ export default function RegistoNaoConformidade() {
                 className="w-full border-2 rounded-lg px-3 py-2 text-sm"
                 style={{ borderColor: "#e5e7eb", background: "#f9fafb", color: "#111827", fontWeight: 500 }}
               >
-                {username || "—"}
+                {username || "-"}
               </div>
               <p className="text-xs text-gray-400 mt-2">
                 Preenchido automaticamente com a pessoa autenticada, não editável. E-mail associado à sessão: {userEmail}

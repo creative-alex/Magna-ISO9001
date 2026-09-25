@@ -1,0 +1,20 @@
+<p style="margin:0 0 20px;font-size:16px;font-weight:600;color:#111827;">Olá {{nome}},</p>
+<p style="margin:0 0 16px;">Foi designado(a) como responsável pelo tratamento da não conformidade <strong style="color:#C8932F;">NC {{numero}}</strong>.</p>
+<p style="margin:0 0 16px;">Dispõe de <strong style="color:#C8932F;">{{dias}} dia(s) útil(eis)</strong> para marcar a reunião de análise e tratamento da Não Conformidade.</p>
+<p style="margin:0 0 28px;">A reunião deverá contar com a presença de todos os elementos envolvidos e do(s) Gestor(es) de Qualidade.</p>
+
+{{#if envolvidos.length}}
+<p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#111827;">Pessoas envolvidas nesta Não Conformidade:</p>
+<ul style="margin:0 0 28px;padding-left:20px;">
+  {{#each envolvidos}}
+  <li style="margin:0 0 4px;color:#111827;">{{this.nome}}</li>
+  {{/each}}
+</ul>
+{{/if}}
+
+<div style="height:1px;background-color:#F0EDE6;margin:0 0 24px;"></div>
+
+<p style="margin:0;color:#111827;">
+  Cumprimentos,<br/>
+  <a href="https://magnaiso9001.comenius.pt/tratar-nao-conformidade" style="color:#C8932F;font-weight:600;text-decoration:none;">Aceder às Não Conformidades</a>
+</p>

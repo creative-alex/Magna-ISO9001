@@ -769,7 +769,7 @@ export default function Cadastro() {
               const isCollapsed = !!collapsedBlocks[c.id];
               const summaryExtra = (field.tipoOptions && c.tipo) || (field.entidadeLabel && c.entidade) || "";
               const summary = c.dataInicio || c.dataFim
-                ? `${fmtDate(c.dataInicio)} — ${fmtDate(c.dataFim)}${summaryExtra ? ` · ${summaryExtra}` : ""}`
+                ? `${fmtDate(c.dataInicio)} - ${fmtDate(c.dataFim)}${summaryExtra ? ` · ${summaryExtra}` : ""}`
                 : `Adicionar ${field.itemSingular}`;
               const blocoErro = errosDoBloco[c.id]?.message;
               return (

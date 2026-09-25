@@ -80,7 +80,7 @@ const TableRow = ({
         {item.edicaoPendente?.horaEntrada && (
           <span
             className="inline-flex ml-[5px] text-[#C8932F] cursor-help"
-            title={`Pedido de alteração pendente: entrada ${item.edicaoPendente.horaEntrada} — ${item.edicaoPendente.justificativa}`}
+            title={`Pedido de alteração pendente: entrada ${item.edicaoPendente.horaEntrada} - ${item.edicaoPendente.justificativa}`}
           >
             <FaHourglassHalf />
           </span>
@@ -91,7 +91,7 @@ const TableRow = ({
         {item.edicaoPendente?.horaSaida && (
           <span
             className="inline-flex ml-[5px] text-[#C8932F] cursor-help"
-            title={`Pedido de alteração pendente: saída ${item.edicaoPendente.horaSaida} — ${item.edicaoPendente.justificativa}`}
+            title={`Pedido de alteração pendente: saída ${item.edicaoPendente.horaSaida} - ${item.edicaoPendente.justificativa}`}
           >
             <FaHourglassHalf />
           </span>

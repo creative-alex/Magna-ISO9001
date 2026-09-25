@@ -93,7 +93,7 @@ export function usePermissions() {
   const canManageNaoConformidades = isGestorQualidade || isSuperAdmin;
   const canAssignNaoConformidade = isGestorQualidade || isSuperAdmin;
   const canVerifyEficacia = isGestorQualidade || isSuperAdmin;
-  const canEditNaoConformidade = (nc) => !!nc && (nc.responsavelTratamentoUid === uid || isSuperAdmin);
+  const canEditNaoConformidade = (nc) => !!nc && (nc.responsavelTratamento?.uid === uid || isSuperAdmin);
   const canMarkAcaoImplementada = (acao) => !!acao && (acao.responsavelUid === uid || isSuperAdmin);
 
   return {

@@ -267,7 +267,7 @@ function TerminarVencimentoModal({ onConfirm, onCancel, loading }) {
 
         <div className="px-6 pt-5 pb-6">
           <p className="text-sm font-semibold text-gray-900 leading-relaxed mb-3">
-            Ação global — fecha o mês para todos os colaboradores que ainda não o tenham confirmado.
+            Ação global - fecha o mês para todos os colaboradores que ainda não o tenham confirmado.
           </p>
           <p className="text-sm text-gray-700 leading-relaxed mb-6">
             Ao executar esta ação, o mês será fechado para <strong>todos os colaboradores que permanecem com o fecho pendente</strong>.

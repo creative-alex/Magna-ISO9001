@@ -2,6 +2,7 @@ const admin = require("firebase-admin");
 const { resolveTargetUid } = require("./helpers");
 const { isMonthClosed, refreshFechoMensalSnapshotIfClosed, MENSAGEM_MES_FECHADO } = require("../../shared/lib/monthLock");
 const { isWeekendOrHolidayDDMM } = require("./holidays");
+const { isAdministrador, entidadeNoAmbito } = require("../../shared/middleware/auth");
 const db = admin.firestore();
 
 // Formato aceite: "DD-MM-YYYY" (mesmo formato usado em Ferias/BaixasMedicas).
@@ -29,11 +30,16 @@ function registoIdFor(dd, mm, yyyy) {
 // Aplica de facto as horas pedidas ao registo oficial do dia (Registos/{registoId}),
 // tal como updateUserTime, mas podendo mexer nos dois campos de uma só vez.
 async function applyTimeEdit(userId, dd, mm, yyyy, horaEntrada, horaSaida) {
-  const registoRef = db.collection("registo-ponto").doc(userId).collection("Registos").doc(registoIdFor(dd, mm, yyyy));
+  const registoId = registoIdFor(dd, mm, yyyy);
+  const registoRef = db.collection("registo-ponto").doc(userId).collection("Registos").doc(registoId);
   const updateData = { timestamp: new Date(yyyy, mm - 1, dd) };
   if (horaEntrada) updateData.horaEntrada = horaEntrada;
   if (horaSaida) updateData.horaSaida = horaSaida;
+  // Log temporário de diagnóstico (ver conversa sobre dias aprovados em AjustesPendentes
+  // que não aparecem em Registos) - remover depois de confirmada a causa.
+  console.log("[applyTimeEdit] a escrever", { userId, registoId, updateData });
   await registoRef.set(updateData, { merge: true });
+  console.log("[applyTimeEdit] escrita concluída com sucesso", { userId, registoId });
 }
 
 // Pedido de alteração das horas de um dia passado: um colaborador comum fica sempre
@@ -192,13 +198,17 @@ const approveTimeEdit = async (req, res) => {
     }
 
     const ajuste = ajusteDoc.data();
+    // Log temporário de diagnóstico - remover depois de confirmada a causa.
+    console.log("[approveTimeEdit] pedido lido", { userId, dd, mm, yyyy, ajuste });
     await applyTimeEdit(userId, dd, mm, yyyy, ajuste.horaEntrada, ajuste.horaSaida);
+    console.log("[approveTimeEdit] applyTimeEdit concluído, a marcar Approved:true");
     await ajusteRef.update({
       Approved: true,
       approvedAt: admin.firestore.FieldValue.serverTimestamp(),
       approvedBy: req.user.uid,
     });
     await refreshFechoMensalSnapshotIfClosed(userId, `${String(dd).padStart(2, "0")}-${String(mm).padStart(2, "0")}-${yyyy}`, req.user.uid);
+    console.log("[approveTimeEdit] concluído com sucesso");
 
     return res.status(200).json({ message: "Alteração de horas aprovada com sucesso" });
   } catch (error) {
@@ -231,7 +241,41 @@ const rejectTimeEdit = async (req, res) => {
   }
 };
 
+// Contagem de pedidos de alteração de horas por aprovar, por colaborador - usada para o
+// aviso na lista de colaboradores de /ponto/entidades (mesmo padrão de
+// getUidsComDeslocacoesPendentes). Lê a collection group inteira e filtra aqui, tal como
+// nas deslocações, para não depender de um índice de collection group em "Approved".
+// Um Administrador só recebe os colaboradores da sua própria entidade.
+const getUidsComAjustesPendentes = async (req, res) => {
+  try {
+    const snapshot = await db.collectionGroup("AjustesPendentes").get();
+    let contagemPorUid = {};
+    snapshot.forEach((doc) => {
+      if (doc.data().Approved === false) {
+        const uid = doc.ref.parent.parent.id;
+        contagemPorUid[uid] = (contagemPorUid[uid] || 0) + 1;
+      }
+    });
+
+    const uids = Object.keys(contagemPorUid);
+    if (isAdministrador(req.user?.nivelAcesso) && uids.length) {
+      const userDocs = await db.getAll(...uids.map((uid) => db.collection("users").doc(uid)));
+      contagemPorUid = Object.fromEntries(
+        userDocs
+          .filter((d) => d.exists && entidadeNoAmbito(req.user, d.data().entidade))
+          .map((d) => [d.id, contagemPorUid[d.id]])
+      );
+    }
+
+    return res.status(200).json({ contagemPorUid });
+  } catch (error) {
+    console.error("Erro ao buscar colaboradores com alterações de horas pendentes:", error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
+  getUidsComAjustesPendentes,
   requestTimeEdit,
   getPendingTimeEdits,
   approveTimeEdit,

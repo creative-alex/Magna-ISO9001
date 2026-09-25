@@ -40,6 +40,7 @@ const {
   getPendingTimeEdits,
   approveTimeEdit,
   rejectTimeEdit,
+  getUidsComAjustesPendentes,
 } = require('./timeEditRequestController');
 const {
   getUserRecords,
@@ -125,5 +126,8 @@ router.post("/debug-corrupt-overtime", requireAuth, requireAdmin, debugCorruptOv
 router.post("/delete-corrupt-overtime", requireAuth, requireAdmin, deleteCorruptOvertime);
 router.delete("/deleteRegister", requireAuth, requireAdmin, deleteRegister);
 router.post("/deleteUser", requireAuth, requireAdminOrEntidadeAdmin, deleteUser);
+// Aviso de alterações de horas por aprovar na lista de /ponto/entidades - o Administrador
+// só recebe os da sua entidade (filtragem no controller).
+router.post("/pending-time-edits-uids", requireAuth, requireAdminOrEntidadeAdmin, getUidsComAjustesPendentes);
 
 module.exports = router;

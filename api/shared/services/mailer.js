@@ -63,8 +63,11 @@ async function sendMail({ to, subject, html, entidade }) {
     return;
   }
   if (!NODEEMAIL || !NODEPASSWORD) {
-    console.error("Nenhuma conta de no-reply configurada (NODEEMAIL/NODEPASSWORD)  -  email não enviado:", subject);
-    return;
+    // Tem de lançar erro (não só registar e sair em silêncio) - senão quem chama sendMail
+    // (ex.: sendReminderEmailToColaborador) marca o lembrete como enviado com sucesso
+    // mesmo sem ter enviado nada, e a interface mostra "Email enviado" sem o email
+    // alguma vez chegar.
+    throw new Error("Nenhuma conta de no-reply configurada (NODEEMAIL/NODEPASSWORD) - email não enviado.");
   }
 
   const logoAttachment = getLogoAttachment(entidade);

@@ -259,7 +259,7 @@ const REMINDER_VARIANT = {
 // prazo e de que dias sem ausência válida podem contar como falta se não confirmar.
 const URGENT_REMINDER_VARIANT = {
   template: "fecho-mensal-urgente",
-  subject: (mesLabel) => `Lembrete — confirmação dos registos de ${mesLabel}`,
+  subject: (mesLabel) => `Lembrete - confirmação dos registos de ${mesLabel}`,
   sentAtField: "secondReminderSentAt",
 };
 

@@ -8,6 +8,35 @@ const { isMonthClosed, MENSAGEM_MES_FECHADO } = require("../../shared/lib/monthL
 const MES_REGEX = /^\d{4}-\d{2}$/;
 const DATA_REGEX = /^(\d{2})-(\d{2})-(\d{4})$/;
 
+// Gestão de deslocações em nome de qualquer colaborador (registar/listar/editar em
+// /salarios/:id, ver SalarioColaborador.jsx): SuperAdmin/GestorRH/GestorFinanceiro - mesmo
+// âmbito de requireAdminOrHRorFinanceiro em deslocacoesRoutes.js. resolveTargetUid sozinho
+// não serve aqui porque não inclui o GestorFinanceiro (e é partilhado com férias/baixas).
+function canManageDeslocacoesDeOutros(req) {
+  return isAdminOrHR(req.user?.nivelAcesso) || isGestorFinanceiro(req.user?.nivelAcesso);
+}
+
+async function resolveDeslocacaoTargetUid(req) {
+  const targetUid = req.body?.uid;
+  if (targetUid && targetUid !== req.user.uid && canManageDeslocacoesDeOutros(req)) {
+    return { uid: targetUid, error: null };
+  }
+  return resolveTargetUid(req);
+}
+
+async function calcularKmEValor(origem, destino, idaEVolta) {
+  // Ida e volta no mesmo dia (A -> B -> A): um único pedido à Routes API para a distância
+  // de ida, depois duplicada aqui - nunca se pede à API o trajeto de volta em separado
+  // (mesmo troço ao contrário), para não duplicar consumo/custo por nada.
+  const kmIda = await calcularDistanciaKm(origem, destino);
+  const km = idaEVolta ? Math.round(kmIda * 2 * 10) / 10 : kmIda;
+
+  const geralDoc = await db.collection("parametrosSalario").doc("geral").get();
+  const valorKm = geralDoc.exists ? (geralDoc.data().valor_km_deslocacao ?? null) : null;
+  const valor = valorKm != null ? Math.round(km * valorKm * 100) / 100 : null;
+  return { km, valorKm, valor };
+}
+
 // Mesma convenção de ID "registo_DDMMAAAA" usada em Ferias/registos do livro de ponto,
 // com um sufixo (_2, _3, ...) quando já existe uma deslocação nesse dia - ao contrário de
 // Ferias (no máximo 1/dia), uma deslocação pode ter mais do que uma no mesmo dia (ex.:
@@ -47,7 +76,7 @@ const createDeslocacao = async (req, res) => {
       return res.status(400).json({ error: "A data da deslocação tem de pertencer ao mês indicado" });
     }
 
-    const { uid: userId, error: authError } = await resolveTargetUid(req);
+    const { uid: userId, error: authError } = await resolveDeslocacaoTargetUid(req);
     if (authError) return res.status(403).json({ error: authError });
 
     // O próprio colaborador não pode registar deslocações num mês já fechado (ver
@@ -58,15 +87,7 @@ const createDeslocacao = async (req, res) => {
       return res.status(403).json({ error: MENSAGEM_MES_FECHADO });
     }
 
-    // Ida e volta no mesmo dia (A -> B -> A): um único pedido à Routes API para a distância
-    // de ida, depois duplicada aqui - nunca se pede à API o trajeto de volta em separado
-    // (mesmo troço ao contrário), para não duplicar consumo/custo por nada.
-    const kmIda = await calcularDistanciaKm(origem, destino);
-    const km = idaEVolta ? Math.round(kmIda * 2 * 10) / 10 : kmIda;
-
-    const geralDoc = await db.collection("parametrosSalario").doc("geral").get();
-    const valorKm = geralDoc.exists ? (geralDoc.data().valor_km_deslocacao ?? null) : null;
-    const valor = valorKm != null ? Math.round(km * valorKm * 100) / 100 : null;
+    const { km, valorKm, valor } = await calcularKmEValor(origem, destino, idaEVolta);
 
     const deslocacoesRef = db.collection("users").doc(userId).collection("deslocacoes");
     const deslocacaoRef = await gerarRefDeslocacao(deslocacoesRef, dataMatch[1], dataMatch[2], dataMatch[3]);
@@ -104,7 +125,7 @@ const listDeslocacoes = async (req, res) => {
       return res.status(400).json({ error: "Mês inválido (formato esperado AAAA-MM)" });
     }
 
-    const { uid: userId, error: authError } = await resolveTargetUid(req);
+    const { uid: userId, error: authError } = await resolveDeslocacaoTargetUid(req);
     if (authError) return res.status(403).json({ error: authError });
 
     const snapshot = await db.collection("users").doc(userId).collection("deslocacoes")
@@ -185,6 +206,62 @@ const approveDeslocacao = async (req, res) => {
     return res.status(200).json({ message: "Deslocação aprovada com sucesso" });
   } catch (error) {
     console.error("Erro ao aprovar deslocação:", error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+// Edição de uma deslocação (pendente ou já aprovada) pela GestorRH/GestorFinanceiro ou
+// SuperAdmin, a partir de /salarios/:id - rota protegida por requireAdminOrHRorFinanceiro.
+// Mantém o estado Approved (quem edita é quem aprova) e só volta a pedir a distância à
+// Routes API se origem/destino/ida-e-volta mudarem; caso contrário km/valor ficam como
+// estavam (não recalcula com um €/km entretanto alterado).
+const updateDeslocacao = async (req, res) => {
+  try {
+    const { uid, id, data, motivo, origem, destino, idaEVolta } = req.body;
+    if (!uid || !id) {
+      return res.status(400).json({ error: "Faltam campos obrigatórios: uid e/ou id" });
+    }
+    if (!data || !motivo || !origem || !destino) {
+      return res.status(400).json({ error: "Faltam campos obrigatórios: data, motivo, origem e/ou destino" });
+    }
+    const dataMatch = data.match(DATA_REGEX);
+    if (!dataMatch) {
+      return res.status(400).json({ error: "Data inválida (formato esperado DD-MM-AAAA)" });
+    }
+    const mes = `${dataMatch[3]}-${dataMatch[2]}`;
+
+    const deslocacaoRef = db.collection("users").doc(uid).collection("deslocacoes").doc(id);
+    const deslocacaoDoc = await deslocacaoRef.get();
+    if (!deslocacaoDoc.exists) {
+      return res.status(404).json({ error: "Deslocação não encontrada" });
+    }
+    const atual = deslocacaoDoc.data();
+
+    const trajetoMudou = origem !== atual.origem || destino !== atual.destino || !!idaEVolta !== !!atual.idaEVolta;
+    const { km, valorKm, valor } = trajetoMudou
+      ? await calcularKmEValor(origem, destino, idaEVolta)
+      : { km: atual.km, valorKm: atual.valorKm ?? null, valor: atual.valor ?? null };
+
+    await deslocacaoRef.update({
+      mes,
+      data,
+      motivo,
+      origem,
+      destino,
+      idaEVolta: !!idaEVolta,
+      km,
+      valorKm,
+      valor,
+      updatedBy: req.user.uid,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return res.status(200).json({
+      message: "Deslocação atualizada com sucesso",
+      deslocacao: { id, mes, data, motivo, origem, destino, idaEVolta: !!idaEVolta, km, valor, Approved: !!atual.Approved },
+    });
+  } catch (error) {
+    console.error("Erro ao atualizar deslocação:", error);
     return res.status(500).json({ error: error.message });
   }
 };
@@ -288,6 +365,7 @@ module.exports = {
   getPendingDeslocacoes,
   approveDeslocacao,
   rejectDeslocacao,
+  updateDeslocacao,
   deleteDeslocacao,
   getUidsComDeslocacoesPendentes,
 };

@@ -50,6 +50,15 @@ export default function Colaboradores() {
                 }
               : undefined
           }
+          // Aviso por colaborador - ao contrário da contagem por entidade acima, inclui
+          // também os Administradores (o NIF deles tem de estar preenchido na mesma).
+          renderMemberExtra={(c) =>
+            !c.temNif ? (
+              <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 6, background: "#FEE2E2", color: "#B91C1C", whiteSpace: "nowrap" }}>
+                Falta NIF
+              </span>
+            ) : null
+          }
         />
       </div>
     </div>

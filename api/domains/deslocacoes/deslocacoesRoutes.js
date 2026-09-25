@@ -7,6 +7,7 @@ const {
   getPendingDeslocacoes,
   approveDeslocacao,
   rejectDeslocacao,
+  updateDeslocacao,
   deleteDeslocacao,
   getUidsComDeslocacoesPendentes,
 } = require("./deslocacoesController");
@@ -23,8 +24,8 @@ function requireAdminOrHRorFinanceiro(req, res, next) {
   next();
 }
 
-// A distinção self/admin-em-nome-de-outro já é feita por resolveTargetUid dentro do
-// controller (mesma convenção de /timetracking/vacation).
+// A distinção self/admin-em-nome-de-outro já é feita dentro do controller
+// (resolveDeslocacaoTargetUid: resolveTargetUid + GestorFinanceiro, ver deslocacoesController.js).
 router.post("/", requireAuth, createDeslocacao);
 router.post("/list", requireAuth, listDeslocacoes);
 router.delete("/", requireAuth, deleteDeslocacao);
@@ -34,6 +35,7 @@ router.delete("/", requireAuth, deleteDeslocacao);
 router.post("/pending", requireAuth, requireAdminOrHRorFinanceiro, getPendingDeslocacoes);
 router.post("/approve", requireAuth, requireAdminOrHRorFinanceiro, approveDeslocacao);
 router.post("/reject", requireAuth, requireAdminOrHRorFinanceiro, rejectDeslocacao);
+router.put("/", requireAuth, requireAdminOrHRorFinanceiro, updateDeslocacao);
 
 // Aviso "Quilómetros por validar" na lista de /salarios - visibilidade mais larga
 // (inclui GestorFinanceiro) do que a aprovação em si; a permissão exata é validada

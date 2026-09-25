@@ -114,6 +114,9 @@ export default function NaoConformidadeDetail({ id, onBack, onChanged }) {
   const [gravidadeDraft, setGravidadeDraft] = useState("");
   const [editingResponsavel, setEditingResponsavel] = useState(false);
   const [responsavelDraft, setResponsavelDraft] = useState("");
+  // Prazo (dias úteis) obrigatório para o responsável marcar a reunião - definido sempre
+  // que se atribui/altera o responsável (ver handleAssignResponsavel).
+  const [prazoReuniaoDraft, setPrazoReuniaoDraft] = useState("");
   const [tratamentoForm, setTratamentoForm] = useState({
     descricaoAnalise: "",
     // "outrasCorrecoes"/"autorAnalise"/"outrosEnvolvidos" estão desativados na UI (ver
@@ -137,7 +140,8 @@ export default function NaoConformidadeDetail({ id, onBack, onChanged }) {
       setCatalogForm({ notas: data.catalogacao?.notas || "" });
       setGravidadeDraft(data.gravidade || "");
       setEnvolvidosDraft((data.envolvidos || []).map((e) => e.uid));
-      setResponsavelDraft(data.responsavelTratamentoUid || "");
+      setResponsavelDraft(data.responsavelTratamento?.uid || "");
+      setPrazoReuniaoDraft(data.responsavelTratamento?.reuniao?.prazoDias ? String(data.responsavelTratamento.reuniao.prazoDias) : "");
       // Pré-preenche a descrição do questionário com a descrição da ocorrência já
       // registada, para o responsável não ter de a reescrever/copiar à mão - só quando o
       // tratamento ainda não foi submetido, e só na primeira carga (nunca sobrepõe o que a
@@ -185,7 +189,12 @@ export default function NaoConformidadeDetail({ id, onBack, onChanged }) {
 
   const handleAssignResponsavel = () => runAction(async () => {
     if (!responsavelDraft) { toast.error("Selecione um responsável."); return; }
-    const res = await apiFetch(`/nao-conformidades/${id}/responsavel`, { method: "PATCH", body: JSON.stringify({ responsavelUid: responsavelDraft }) });
+    const dias = Number(prazoReuniaoDraft);
+    if (!Number.isInteger(dias) || dias <= 0) { toast.error("Indique o prazo (em dias úteis) para a marcação da reunião."); return; }
+    const res = await apiFetch(`/nao-conformidades/${id}/responsavel`, {
+      method: "PATCH",
+      body: JSON.stringify({ responsavelUid: responsavelDraft, prazoReuniaoDias: dias }),
+    });
     if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error); }
     toast.success("Responsável pela não conformidade atribuído.");
     setEditingResponsavel(false);
@@ -303,7 +312,7 @@ export default function NaoConformidadeDetail({ id, onBack, onChanged }) {
   }
   if (!nc) return <div className="p-6 text-sm text-gray-500">Não conformidade não encontrada.</div>;
 
-  const podeAnexar = isGestorQualidade || isSuperAdmin || nc.registadoPorUid === uid || nc.responsavelTratamentoUid === uid;
+  const podeAnexar = isGestorQualidade || isSuperAdmin || nc.registadoPor?.uid === uid || nc.responsavelTratamento?.uid === uid;
   const podeEditarQuestionario = canEditNaoConformidade(nc);
   const podeFechar = canManageNaoConformidades && nc.estado === "tratada" && nc.totalAcoes > 0 && nc.acoesEficazes === nc.totalAcoes;
   const totalAcoesNc = nc.acoes?.length || 0;
@@ -336,6 +345,10 @@ export default function NaoConformidadeDetail({ id, onBack, onChanged }) {
         )}
       </div>
 
+      {nc.numero && (
+        <h2 className="text-lg font-bold mb-3" style={{ color: GOLD }}>NC {nc.numero}</h2>
+      )}
+
       <EstadoStepper estado={nc.estado} />
 
       <div className="flex flex-wrap items-center gap-2 mb-5">
@@ -350,7 +363,7 @@ export default function NaoConformidadeDetail({ id, onBack, onChanged }) {
         <Field label="Descrição da ocorrência" value={nc.descricao} />
         <Field label="Correção realizada?" value={nc.correcaoRealizada} />
         {nc.correcaoRealizada === "Sim" && <Field label="Descrição das correções efetuadas" value={nc.descricaoCorrecao} />}
-        <Field label="Registado por" value={nc.registadoPor} />
+        <Field label="Registado por" value={nc.registadoPor?.nome} />
       </Card>
 
       <Card
@@ -433,23 +446,42 @@ export default function NaoConformidadeDetail({ id, onBack, onChanged }) {
         icon={<FaUserCheck />}
         actions={canAssignNaoConformidade && !editingResponsavel && (
           <button onClick={() => setEditingResponsavel(true)} className="text-xs font-semibold flex-shrink-0" style={{ color: GOLD }}>
-            {nc.responsavelTratamentoUid ? "Alterar" : "Atribuir"}
+            {nc.responsavelTratamento?.uid ? "Alterar" : "Atribuir"}
           </button>
         )}
       >
         {editingResponsavel ? (
           <>
+            <label className="text-xs text-gray-600 font-medium mb-1 block">Responsável *</label>
             <select className="w-full border-2 rounded-lg px-3 py-2 text-sm outline-none transition mb-3 bg-white" style={{ borderColor: "#e5e7eb" }}
               value={responsavelDraft} onChange={(e) => setResponsavelDraft(e.target.value)}>
               <option value="">-- Selecione uma pessoa envolvida --</option>
               {(nc.envolvidos || []).map((e) => <option key={e.uid} value={e.uid}>{e.nome}</option>)}
             </select>
+            <label className="text-xs text-gray-600 font-medium mb-1 block">Prazo para marcação da reunião (dias úteis) *</label>
+            <p className="text-[11px] text-gray-400 mb-1">
+              A contar a partir de agora. O responsável recebe um email a avisar do prazo assim que confirmar.
+            </p>
+            <input
+              type="number"
+              min={1}
+              step={1}
+              className="w-full border-2 rounded-lg px-3 py-2 text-sm outline-none transition mb-3"
+              style={{ borderColor: "#e5e7eb" }}
+              placeholder="Ex.: 5"
+              value={prazoReuniaoDraft}
+              onChange={(e) => setPrazoReuniaoDraft(e.target.value)}
+            />
             <div className="flex gap-2">
               <button disabled={busy} onClick={handleAssignResponsavel} className="px-4 py-1.5 rounded-lg text-xs font-bold text-white" style={{ background: GOLD }}>
-                {nc.responsavelTratamentoUid ? "Alterar responsável" : "Atribuir responsável"}
+                {nc.responsavelTratamento?.uid ? "Alterar responsável" : "Atribuir responsável"}
               </button>
               <button
-                onClick={() => { setEditingResponsavel(false); setResponsavelDraft(nc.responsavelTratamentoUid || ""); }}
+                onClick={() => {
+                  setEditingResponsavel(false);
+                  setResponsavelDraft(nc.responsavelTratamento?.uid || "");
+                  setPrazoReuniaoDraft(nc.responsavelTratamento?.reuniao?.prazoDias ? String(nc.responsavelTratamento.reuniao.prazoDias) : "");
+                }}
                 className="px-4 py-1.5 rounded-lg text-xs font-medium border border-gray-200 text-gray-500"
               >
                 Cancelar
@@ -457,7 +489,17 @@ export default function NaoConformidadeDetail({ id, onBack, onChanged }) {
             </div>
           </>
         ) : (
-          <Field label="Responsável" value={nc.responsavelTratamentoNome} />
+          <>
+            <Field label="Responsável" value={nc.responsavelTratamento?.nome} />
+            {nc.responsavelTratamento?.uid && (
+              <Field
+                label="Prazo para marcação da reunião"
+                value={nc.responsavelTratamento.reuniao?.prazoDias
+                  ? `${nc.responsavelTratamento.reuniao.prazoDias} dia(s) útil(eis) - até ${formatDate(nc.responsavelTratamento.reuniao.prazoData) || nc.responsavelTratamento.reuniao.prazoData}`
+                  : null}
+              />
+            )}
+          </>
         )}
       </Card>
 
@@ -525,7 +567,7 @@ export default function NaoConformidadeDetail({ id, onBack, onChanged }) {
           </>
         ) : (
           <p className="text-sm text-gray-400 italic">
-            {nc.responsavelTratamentoUid ? "Aguarda que o responsável pela não conformidade preencha o tratamento." : "Aguarda atribuição de um responsável pela não conformidade."}
+            {nc.responsavelTratamento?.uid ? "Aguarda que o responsável pela não conformidade preencha o tratamento." : "Aguarda atribuição de um responsável pela não conformidade."}
           </p>
         )}
       </Card>

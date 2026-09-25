@@ -6,7 +6,7 @@ import Sidebar from "../../shared/components/Sidebar";
 import Topbar from "../../shared/components/Topbar";
 import {
   FaSackDollar, FaCalendarDays, FaCreditCard, FaFileInvoiceDollar, FaCarSide,
-  FaPencil, FaCheck, FaArrowLeft, FaTrash,
+  FaPencil, FaCheck, FaArrowLeft, FaTrash, FaPlus,
 } from "react-icons/fa6";
 import { apiFetch } from "../../shared/utils/apiFetch";
 import { usePermissions } from "../../shared/hooks/usePermissions";
@@ -29,6 +29,24 @@ const INITIAL_FORM = ALL_MONTHLY_FIELDS.reduce((acc, f) => {
 function getCurrentMonth() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+const EMPTY_DESLOCACAO_FORM = { id: null, data: "", motivo: "", origem: "", destino: "", idaEVolta: false };
+
+// DD-MM-AAAA (formato guardado no backend) <-> AAAA-MM-DD (<input type="date">).
+function dataParaInput(data) {
+  if (!data) return "";
+  const [d, m, y] = data.split("-");
+  return `${y}-${m}-${d}`;
+}
+function inputParaData(valor) {
+  const [y, m, d] = valor.split("-");
+  return `${d}-${m}-${y}`;
+}
+
+function getUltimoDiaMes(mes) {
+  const [y, m] = mes.split("-").map(Number);
+  return `${mes}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
 }
 
 function getMesLabel(mes) {
@@ -77,6 +95,7 @@ export default function SalarioColaborador() {
   const [diasFerias, setDiasFerias] = useState(null);
   const [diasBaixaMedica, setDiasBaixaMedica] = useState(null);
   const [diasFalta, setDiasFalta] = useState(null);
+  const [diasLicenca, setDiasLicenca] = useState(null);
   const [fechoConfirmado, setFechoConfirmado] = useState(false);
   const [form, setForm] = useState(INITIAL_FORM);
   const [reciboPath, setReciboPath] = useState(null);
@@ -85,6 +104,12 @@ export default function SalarioColaborador() {
   const [removingRecibo, setRemovingRecibo] = useState(false);
   const [deslocacoesPendentes, setDeslocacoesPendentes] = useState([]);
   const [processingDeslocacaoId, setProcessingDeslocacaoId] = useState(null);
+  // Deslocações do mês selecionado (aprovadas e pendentes) + formulário de registar/editar
+  // em nome do colaborador - mesmo âmbito de canApproveDeslocacoes.
+  const [deslocacoesMes, setDeslocacoesMes] = useState([]);
+  const [showDeslocacaoForm, setShowDeslocacaoForm] = useState(false);
+  const [deslocacaoForm, setDeslocacaoForm] = useState(EMPTY_DESLOCACAO_FORM);
+  const [submittingDeslocacao, setSubmittingDeslocacao] = useState(false);
   const isencaoDependePessoa = escalaoVencimento === "II";
 
   useEffect(() => {
@@ -113,6 +138,7 @@ export default function SalarioColaborador() {
         setDiasFerias(data.dias_ferias);
         setDiasBaixaMedica(data.dias_baixa_medica);
         setDiasFalta(data.dias_falta);
+        setDiasLicenca(data.dias_licenca);
         setFechoConfirmado(!!data.fecho_confirmado);
         setForm({ ...INITIAL_FORM, ...(data.form || {}) });
         setReciboPath(data.recibo_path || null);
@@ -160,6 +186,93 @@ export default function SalarioColaborador() {
     fetchDeslocacoesPendentes();
   }, [fetchDeslocacoesPendentes]);
 
+  const fetchDeslocacoesMes = useCallback(async () => {
+    if (!canApproveDeslocacoes) return;
+    try {
+      const res = await apiFetch("/deslocacoes/list", {
+        method: "POST",
+        body: JSON.stringify({ uid: id, mes }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDeslocacoesMes(data.deslocacoes || []);
+      } else {
+        setDeslocacoesMes([]);
+      }
+    } catch (e) {
+      console.error(e);
+      setDeslocacoesMes([]);
+    }
+  }, [id, mes, canApproveDeslocacoes]);
+
+  useEffect(() => {
+    fetchDeslocacoesMes();
+    setShowDeslocacaoForm(false);
+    setDeslocacaoForm(EMPTY_DESLOCACAO_FORM);
+  }, [fetchDeslocacoesMes]);
+
+  const refreshDeslocacoes = () => Promise.all([fetchDeslocacoesMes(), fetchDeslocacoesPendentes(), fetchSalario()]);
+
+  const handleNovaDeslocacao = () => {
+    setDeslocacaoForm(EMPTY_DESLOCACAO_FORM);
+    setShowDeslocacaoForm(true);
+  };
+
+  const handleEditarDeslocacao = (d) => {
+    setDeslocacaoForm({
+      id: d.id, data: dataParaInput(d.data), motivo: d.motivo || "", origem: d.origem || "",
+      destino: d.destino || "", idaEVolta: !!d.idaEVolta,
+    });
+    setShowDeslocacaoForm(true);
+  };
+
+  const handleCancelarDeslocacao = () => {
+    setShowDeslocacaoForm(false);
+    setDeslocacaoForm(EMPTY_DESLOCACAO_FORM);
+  };
+
+  const handleSubmitDeslocacao = async (e) => {
+    e.preventDefault();
+    const { id: deslocacaoId, data, motivo, origem, destino, idaEVolta } = deslocacaoForm;
+    if (!data || !motivo.trim() || !origem.trim() || !destino.trim()) {
+      toast.error("Preencha todos os campos da deslocação", { position: "top-right" });
+      return;
+    }
+    const isEdit = !!deslocacaoId;
+    // Um registo novo tem de ser do mês selecionado (o backend confirma); na edição a data
+    // pode mudar de mês (ex.: corrigir uma viagem registada no mês errado).
+    if (!isEdit && data.slice(0, 7) !== mes) {
+      toast.error("A data da deslocação tem de pertencer ao mês selecionado", { position: "top-right" });
+      return;
+    }
+    const errorMsg = isEdit ? "Falha ao atualizar a deslocação" : "Falha ao registar a deslocação";
+
+    setSubmittingDeslocacao(true);
+    try {
+      const payload = {
+        uid: id, data: inputParaData(data), motivo: motivo.trim(), origem: origem.trim(),
+        destino: destino.trim(), idaEVolta,
+      };
+      const res = await apiFetch("/deslocacoes", {
+        method: isEdit ? "PUT" : "POST",
+        body: JSON.stringify(isEdit ? { ...payload, id: deslocacaoId } : { ...payload, mes }),
+      });
+      const resData = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(resData.error || errorMsg, { position: "top-right" });
+        return;
+      }
+      handleCancelarDeslocacao();
+      await refreshDeslocacoes();
+      toast.success(isEdit ? "Deslocação atualizada" : "Deslocação registada, aguarda aprovação", { position: "top-right", autoClose: 2500 });
+    } catch (err) {
+      console.error(err);
+      toast.error(errorMsg, { position: "top-right" });
+    } finally {
+      setSubmittingDeslocacao(false);
+    }
+  };
+
   const handleApproveDeslocacao = async (deslocacao) => {
     setProcessingDeslocacaoId(deslocacao.id);
     try {
@@ -168,7 +281,7 @@ export default function SalarioColaborador() {
         body: JSON.stringify({ uid: id, id: deslocacao.id }),
       });
       if (res.ok) {
-        await Promise.all([fetchDeslocacoesPendentes(), fetchSalario()]);
+        await refreshDeslocacoes();
         toast.success("Deslocação aprovada", { position: "top-right", autoClose: 2000 });
       } else {
         toast.error("Falha ao aprovar a deslocação", { position: "top-right" });
@@ -189,7 +302,7 @@ export default function SalarioColaborador() {
         body: JSON.stringify({ uid: id, id: deslocacao.id }),
       });
       if (res.ok) {
-        await Promise.all([fetchDeslocacoesPendentes(), fetchSalario()]);
+        await refreshDeslocacoes();
         toast.success("Deslocação rejeitada", { position: "top-right", autoClose: 2000 });
       } else {
         toast.error("Falha ao rejeitar a deslocação", { position: "top-right" });
@@ -554,6 +667,142 @@ export default function SalarioColaborador() {
                   </div>
                 </div>
 
+                {/* Registo/edição em nome do colaborador pela GestorRH/GestorFinanceiro (ou
+                    SuperAdmin) - ver updateDeslocacao/resolveDeslocacaoTargetUid no backend.
+                    Um registo novo entra pendente, como qualquer outro. */}
+                {canApproveDeslocacoes && (
+                  <div style={{ borderTop: "1px solid #f3f4f6", padding: 18 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: GOLD, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                        Deslocações de {getMesLabel(mes)}
+                      </span>
+                      {!showDeslocacaoForm && (
+                        <button
+                          type="button"
+                          onClick={handleNovaDeslocacao}
+                          style={{
+                            display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 12px", fontSize: 11, fontWeight: 600,
+                            cursor: "pointer", borderRadius: 6, border: `1px solid ${GOLD}`, background: "#fff", color: GOLD,
+                          }}
+                        >
+                          <FaPlus size={9} /> Adicionar deslocação
+                        </button>
+                      )}
+                    </div>
+
+                    {showDeslocacaoForm && (
+                      <form onSubmit={handleSubmitDeslocacao} style={{ background: "#FAF3E6", borderRadius: 8, padding: 12, marginBottom: 10 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 10 }}>
+                          {deslocacaoForm.id ? "Editar deslocação" : "Nova deslocação"}
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: "10px 14px" }}>
+                          <div>
+                            <span style={labelStyle}>Data</span>
+                            <input
+                              type="date" required value={deslocacaoForm.data}
+                              min={deslocacaoForm.id ? undefined : `${mes}-01`}
+                              max={deslocacaoForm.id ? undefined : getUltimoDiaMes(mes)}
+                              onChange={(e) => setDeslocacaoForm((f) => ({ ...f, data: e.target.value }))}
+                              style={{ ...inputStyle, background: "#fff" }}
+                            />
+                          </div>
+                          <div>
+                            <span style={labelStyle}>Motivo de Deslocação</span>
+                            <input
+                              type="text" required value={deslocacaoForm.motivo}
+                              onChange={(e) => setDeslocacaoForm((f) => ({ ...f, motivo: e.target.value }))}
+                              style={{ ...inputStyle, background: "#fff" }}
+                            />
+                          </div>
+                          <div>
+                            <span style={labelStyle}>Origem (morada)</span>
+                            <input
+                              type="text" required value={deslocacaoForm.origem}
+                              onChange={(e) => setDeslocacaoForm((f) => ({ ...f, origem: e.target.value }))}
+                              style={{ ...inputStyle, background: "#fff" }}
+                            />
+                          </div>
+                          <div>
+                            <span style={labelStyle}>Destino (morada)</span>
+                            <input
+                              type="text" required value={deslocacaoForm.destino}
+                              onChange={(e) => setDeslocacaoForm((f) => ({ ...f, destino: e.target.value }))}
+                              style={{ ...inputStyle, background: "#fff" }}
+                            />
+                          </div>
+                        </div>
+                        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#4b5563", marginTop: 10, cursor: "pointer" }}>
+                          <input
+                            type="checkbox" checked={deslocacaoForm.idaEVolta}
+                            onChange={(e) => setDeslocacaoForm((f) => ({ ...f, idaEVolta: e.target.checked }))}
+                          />
+                          Fez o regresso no mesmo dia (ida e volta)
+                        </label>
+                        <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
+                          <button
+                            type="submit" disabled={submittingDeslocacao}
+                            style={{
+                              padding: "5px 14px", fontSize: 11, fontWeight: 600, cursor: submittingDeslocacao ? "wait" : "pointer",
+                              borderRadius: 6, border: `1px solid ${GOLD}`, background: GOLD, color: "#fff", opacity: submittingDeslocacao ? 0.6 : 1,
+                            }}
+                          >
+                            {submittingDeslocacao ? "A calcular..." : "Guardar"}
+                          </button>
+                          <button
+                            type="button" disabled={submittingDeslocacao} onClick={handleCancelarDeslocacao}
+                            style={{
+                              padding: "5px 14px", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                              borderRadius: 6, border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280",
+                            }}
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </form>
+                    )}
+
+                    {deslocacoesMes.length === 0 ? (
+                      <div style={{ fontSize: 12, color: "#9ca3af" }}>Sem deslocações registadas neste mês.</div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {deslocacoesMes.map((d) => (
+                          <div key={d.id} style={{ border: "1px solid #f3f4f6", borderRadius: 8, padding: 10, display: "flex", flexDirection: "column", gap: 4 }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <span style={{ fontSize: 12.5, fontWeight: 600, color: "#374151" }}>{d.data}</span>
+                                <span style={{
+                                  fontSize: 10.5, padding: "1px 8px", borderRadius: 999, fontWeight: 500,
+                                  background: d.Approved ? "#DCFCE7" : "#FEF3C7", color: d.Approved ? "#15803D" : "#92400E",
+                                }}>
+                                  {d.Approved ? "Aprovada" : "Pendente"}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                disabled={submittingDeslocacao}
+                                onClick={() => handleEditarDeslocacao(d)}
+                                style={{
+                                  display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", fontSize: 11, fontWeight: 600,
+                                  cursor: "pointer", borderRadius: 6, border: "1px solid #e5e7eb", background: "#fff", color: "#374151",
+                                }}
+                              >
+                                <FaPencil size={9} /> Editar
+                              </button>
+                            </div>
+                            <span style={{ fontSize: 11.5, color: "#374151" }}>
+                              {d.origem} → {d.destino}{d.idaEVolta ? ` → ${d.origem}` : ""} · {d.km} km{d.idaEVolta ? " (ida e volta)" : ""}
+                              {d.valor != null ? ` · ${d.valor.toFixed(2)} €` : ""}
+                            </span>
+                            <span style={{ fontSize: 11.5, color: "#6b7280", fontStyle: "italic" }}>
+                              Motivo de Deslocação: {d.motivo}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Aprovação pela GestorRH (ou SuperAdmin) - mesmo âmbito de requireAdminOrHR
                     no backend, independente de canManage (GestorFinanceiro não aprova). Sem
                     filtro por mês: mostra pendentes de qualquer mês, tal como
@@ -569,6 +818,17 @@ export default function SalarioColaborador() {
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                             <span style={{ fontSize: 12.5, fontWeight: 600, color: "#374151" }}>{d.data}</span>
                             <div style={{ display: "flex", gap: 6 }}>
+                              <button
+                                type="button"
+                                disabled={processingDeslocacaoId === d.id}
+                                onClick={() => handleEditarDeslocacao(d)}
+                                style={{
+                                  padding: "4px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                                  borderRadius: 6, border: "1px solid #e5e7eb", background: "#fff", color: "#374151",
+                                }}
+                              >
+                                Editar
+                              </button>
                               <button
                                 type="button"
                                 disabled={processingDeslocacaoId === d.id}
@@ -633,7 +893,7 @@ export default function SalarioColaborador() {
                   </div>
                   <div>
                     <span style={labelStyle}>Licenças</span>
-                    <div style={{ fontSize: 13, color: "#9ca3af", fontWeight: 500 }}> - </div>
+                    <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{diasLicenca ?? " - "}</div>
                   </div>
                   <div>
                     <span style={labelStyle}>Faltas</span>

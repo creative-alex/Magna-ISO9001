@@ -77,11 +77,12 @@ function KanbanCard({ nc, onClick }) {
           <FaCalendarDays className="text-[9px]" /> {formatDate(nc.dataRegisto)}
         </span>
       </div>
+      {nc.numero && <p className="text-[11px] font-semibold mb-1" style={{ color: GOLD }}>NC {nc.numero}</p>}
       <p className="text-sm text-gray-800 leading-snug line-clamp-2 mb-2">{nc.descricao}</p>
       <div className="flex items-center justify-between gap-2 text-[11px] text-gray-500">
         <span className="flex items-center gap-1 min-w-0">
           <FaUserCheck className="text-gray-400 flex-shrink-0" />
-          <span className="truncate">{nc.responsavelTratamentoNome || "Por atribuir"}</span>
+          <span className="truncate">{nc.responsavelTratamento?.nome || "Por atribuir"}</span>
         </span>
         <ProgressMini nc={nc} />
       </div>
@@ -141,11 +142,12 @@ function GridCard({ nc, onClick }) {
           {nc.gravidade}
         </span>
       </div>
+      {nc.numero && <p className="text-[11px] font-semibold mb-1" style={{ color: GOLD }}>NC {nc.numero}</p>}
       <p className="text-sm text-gray-800 line-clamp-3 mb-3 min-h-[3.6em]">{nc.descricao}</p>
       <div className="flex items-center justify-between gap-2 text-xs text-gray-500 mb-1">
         <span className="flex items-center gap-1 min-w-0">
           <FaUserCheck className="text-gray-400 flex-shrink-0" />
-          <span className="truncate">{nc.responsavelTratamentoNome || "Por atribuir"}</span>
+          <span className="truncate">{nc.responsavelTratamento?.nome || "Por atribuir"}</span>
         </span>
         <span className="flex items-center gap-1 text-gray-400 flex-shrink-0">
           <FaCalendarDays className="text-[10px]" /> {formatDate(nc.dataRegisto)}
@@ -195,11 +197,12 @@ function TimelineRow({ nc, onClick, isLast }) {
             {nc.gravidade}
           </span>
         </div>
+        {nc.numero && <p className="text-[11px] font-semibold mb-0.5" style={{ color: GOLD }}>NC {nc.numero}</p>}
         <p className="text-sm text-gray-800 truncate">{nc.descricao}</p>
         <div className="flex items-center justify-between gap-2 text-xs text-gray-500 mt-1">
           <span className="flex items-center gap-1 min-w-0">
             <FaUserCheck className="text-gray-400 flex-shrink-0" />
-            <span className="truncate">{nc.responsavelTratamentoNome || "Por atribuir"}</span>
+            <span className="truncate">{nc.responsavelTratamento?.nome || "Por atribuir"}</span>
           </span>
           <ProgressMini nc={nc} />
         </div>
@@ -273,9 +276,10 @@ function ThinCard({ nc, onClick }) {
         <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: `${gColor}1a`, color: gColor }}>
           {nc.gravidade}
         </span>
+        {nc.numero && <span className="text-[11px] font-semibold flex-shrink-0" style={{ color: GOLD }}>NC {nc.numero}</span>}
         <span className="text-sm text-gray-800 truncate flex-1 min-w-[120px]">{nc.descricao}</span>
         <span className="flex items-center gap-1 text-xs text-gray-500 flex-shrink-0">
-          <FaUserCheck className="text-gray-400" /> {nc.responsavelTratamentoNome || "Por atribuir"}
+          <FaUserCheck className="text-gray-400" /> {nc.responsavelTratamento?.nome || "Por atribuir"}
         </span>
         <span className="text-xs text-gray-400 flex-shrink-0">{formatDate(nc.dataRegisto)}</span>
       </div>
