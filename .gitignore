@@ -1,5 +1,6 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+.claude
 
 # Ignorar node_modules nas pastas api e front-end
 api/node_modules/
@@ -17,3 +18,4 @@ api/scripts/migration-output/
 # Grafo de contexto gerado pelo Madar (graphify-ts)
 out/
 
+.github\workflows\
