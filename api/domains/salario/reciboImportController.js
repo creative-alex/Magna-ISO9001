@@ -2,9 +2,8 @@ const admin = require("firebase-admin");
 const { PDFDocument } = require("pdf-lib");
 const pdfParse = require("pdf-parse");
 const db = require("../../shared/db/firebase").db;
-const { isSuperAdminOrGestorFinanceiro } = require("../../shared/middleware/auth");
 const { sendMail, renderEmail } = require("../../shared/services/mailer");
-const { MES_REGEX, getMesLabel } = require("./salarioController");
+const { MES_REGEX, getMesLabel, canManageRecibo } = require("./salarioController");
 const { extractNifFromText, extractNomeFromText, buildNifIndex, classifyPage } = require("./reciboImportService");
 
 const bucket = admin.storage().bucket();
@@ -62,8 +61,8 @@ const MOTIVO_LABELS = {
 // em "review" para resolução manual (upload individual já existente), nunca é descartado.
 const importRecibos = async (req, res) => {
   try {
-    if (!isSuperAdminOrGestorFinanceiro(req.user?.nivelAcesso)) {
-      return res.status(403).json({ error: "Acesso restrito a administradores e gestores financeiros" });
+    if (!canManageRecibo(req)) {
+      return res.status(403).json({ error: "Acesso restrito a administradores e gestores de recursos humanos" });
     }
 
     const { mes } = req.params;
@@ -252,10 +251,10 @@ const importRecibos = async (req, res) => {
         pagina: r.pagina, uid: r.uid, nome: r.nome || null, email: usersByUid.get(r.uid)?.email || null,
       })),
       // NIF em claro (não mascarado) nas páginas de revisão: este ecrã já é exclusivo de
-      // quem também vê o NIF completo no Cadastro (ver isSuperAdminOrGestorFinanceiro
-      // acima), e sem ele não é possível procurar/confirmar manualmente o colaborador
-      // certo para um "nif_desconhecido"/"nif_ambiguo" - mascarar aqui só impedia a
-      // própria resolução do caso.
+      // quem também vê o NIF completo no Cadastro (SuperAdmin/GestorFinanceiro/GestorRH,
+      // ver canManageRecibo acima), e sem ele não é possível procurar/confirmar
+      // manualmente o colaborador certo para um "nif_desconhecido"/"nif_ambiguo" -
+      // mascarar aqui só impedia a própria resolução do caso.
       // "nomePdf": nome tal como impresso na própria página (extractNomeFromText) - só
       // preenchido quando não há "nome" (esse vem do cadastro, é sempre prioritário). Serve
       // só de contexto para o RH saber a quem associar o NIF; nunca decide a associação.

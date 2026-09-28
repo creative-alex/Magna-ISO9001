@@ -67,6 +67,10 @@ export default function SalarioColaborador() {
   // Edição exclusiva de SuperAdmin/Gestor Financeiro  -  GestorRH mantém consulta
   // (ver canViewList/canView) mas já não pode editar dados salariais.
   const canManage = canEditPayroll;
+  // Emitir/remover o recibo de vencimento: à parte da edição dos restantes dados
+  // salariais - GestorRH também gere recibos (mesmo âmbito de canManageRecibo no
+  // backend), por isso não depende de canManage nem do editMode geral da página.
+  const canManageRecibo = canManage || isAdminOrHR;
   const canViewList = canViewPayroll;
   const isSelf = uid === id;
   // Administrador só tem acesso de leitura (o backend confirma que o colaborador é da
@@ -924,7 +928,7 @@ export default function SalarioColaborador() {
                   <div>
                     <span style={labelStyle}>Recibo (PDF)</span>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      {editMode && (
+                      {canManageRecibo && (
                         <label
                           style={{
                             display: "flex", alignItems: "center", gap: 6,
@@ -961,7 +965,7 @@ export default function SalarioColaborador() {
                           {viewingRecibo ? "A abrir..." : "Ver"}
                         </button>
                       )}
-                      {reciboPath && canManage && (
+                      {reciboPath && canManageRecibo && (
                         <button
                           type="button"
                           onClick={handleRemoveRecibo}

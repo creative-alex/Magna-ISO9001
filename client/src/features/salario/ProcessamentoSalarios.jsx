@@ -311,9 +311,9 @@ export default function ProcessamentoSalarios() {
   // do dia 25 (mesmo prazo do fecho normal) - backend aceita os três (ver
   // requireAdminOrHRorFinanceiro), esta restrição de dia é só de interface.
   const canTerminarVencimento = isSuperAdmin || ((isGestorRH || isGestorFinanceiro) && new Date().getDate() >= 25);
-  // Importação de recibos em lote: mesma restrição do upload manual (ver canAccess em
-  // salarioController.js/uploadRecibo) - GestorRH mantém consulta mas não pode importar.
-  const canImportarRecibos = canEditPayroll;
+  // Importação de recibos em lote: mesma restrição do upload manual (ver
+  // canManageRecibo em salarioController.js/uploadRecibo) - GestorRH também pode.
+  const canImportarRecibos = canEditPayroll || isGestorRH;
 
   useEffect(() => {
     // Esta página (parâmetros + lista de colaboradores) é só para admin/RH/

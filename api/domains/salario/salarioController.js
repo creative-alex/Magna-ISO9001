@@ -7,16 +7,23 @@ const { sendMail, renderEmail } = require("../../shared/services/mailer");
 
 const bucket = admin.storage().bucket();
 
-// Edição (guardar dados salariais / enviar recibo): exclusiva de SuperAdmin e
-// Gestor Financeiro. GestorRH mantém leitura (ver canRead) mas já não edita  -
-// separação de funções entre RH e Financeiro.
+// Edição de dados salariais (escalão, isenção, cartão coverflex, ...): exclusiva de
+// SuperAdmin e Gestor Financeiro. GestorRH mantém leitura (ver canRead) mas já não
+// edita  -  separação de funções entre RH e Financeiro.
 function canAccess(req) {
   return isSuperAdminOrGestorFinanceiro(req.user?.nivelAcesso);
 }
 
+// Emitir/remover o recibo de vencimento: à parte da edição dos restantes dados
+// salariais acima - GestorRH também gere recibos (é uma tarefa administrativa, não
+// financeira), por isso junta-se aqui isAdminOrHR a canAccess.
+function canManageRecibo(req) {
+  return canAccess(req) || isAdminOrHR(req.user?.nivelAcesso);
+}
+
 // Leitura: admin/RH/Gestor Financeiro vê qualquer colaborador; Administrador vê os
 // colaboradores da sua própria entidade; um colaborador comum só pode consultar os
-// seus próprios dados (nunca editar nem enviar recibos - isso continua restrito a canAccess).
+// seus próprios dados (nunca editar - isso continua restrito a canAccess/canManageRecibo).
 function canRead(req, id, targetEntidade) {
   return isAdminOrHR(req.user?.nivelAcesso) || isGestorFinanceiro(req.user?.nivelAcesso) || req.user?.uid === id
     || (isAdministrador(req.user?.nivelAcesso) && entidadeNoAmbito(req.user, targetEntidade));
@@ -244,7 +251,7 @@ const saveSalario = async (req, res) => {
 
 const uploadRecibo = async (req, res) => {
   try {
-    if (!canAccess(req)) {
+    if (!canManageRecibo(req)) {
       return res.status(403).json({ error: "Acesso restrito a administradores e gestores de recursos humanos" });
     }
 
@@ -311,7 +318,7 @@ const uploadRecibo = async (req, res) => {
 
 const deleteRecibo = async (req, res) => {
   try {
-    if (!canAccess(req)) {
+    if (!canManageRecibo(req)) {
       return res.status(403).json({ error: "Acesso restrito a administradores e gestores de recursos humanos" });
     }
 
@@ -478,4 +485,4 @@ const exportFechoMensal = async (req, res) => {
   }
 };
 
-module.exports = { getSalario, saveSalario, uploadRecibo, deleteRecibo, exportFechoMensal, getMesLabel, MES_REGEX };
+module.exports = { getSalario, saveSalario, uploadRecibo, deleteRecibo, exportFechoMensal, getMesLabel, MES_REGEX, canManageRecibo };
