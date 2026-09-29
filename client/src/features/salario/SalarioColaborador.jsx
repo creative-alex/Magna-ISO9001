@@ -62,8 +62,10 @@ export default function SalarioColaborador() {
   const { uid, username } = useContext(UserContext);
   const { isAdministrador, isAdminOrHR, isGestorFinanceiro, canViewPayroll, canEditPayroll } = usePermissions();
   // Aprovação de deslocações (ver api/domains/deslocacoes/): mesmo âmbito de
-  // requireAdminOrHRorFinanceiro no backend - SuperAdmin/GestorRH/GestorFinanceiro.
-  const canApproveDeslocacoes = isAdminOrHR || isGestorFinanceiro;
+  // requireAdminOrHRorFinanceiro no backend - SuperAdmin/GestorRH/Administrador/
+  // GestorFinanceiro. Administrador incluído aqui a pedido explícito - ao contrário de
+  // canViewPayroll/canEditPayroll abaixo, onde continua de fora de propósito.
+  const canApproveDeslocacoes = isAdminOrHR || isAdministrador || isGestorFinanceiro;
   // Edição exclusiva de SuperAdmin/Gestor Financeiro  -  GestorRH mantém consulta
   // (ver canViewList/canView) mas já não pode editar dados salariais.
   const canManage = canEditPayroll;

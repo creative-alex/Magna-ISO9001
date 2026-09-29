@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { requireAuth, isAdminOrHR, isGestorFinanceiro } = require("../../shared/middleware/auth");
+const { requireAuth, isAdminOrHR, isAdministrador, isGestorFinanceiro } = require("../../shared/middleware/auth");
 const {
   createDeslocacao,
   listDeslocacoes,
@@ -12,13 +12,16 @@ const {
   getUidsComDeslocacoesPendentes,
 } = require("./deslocacoesController");
 
-// Aprovação de deslocações: SuperAdmin/GestorRH/GestorFinanceiro - ao contrário do resto do
-// processamento salarial (canAccess em salarioController.js, exclusivo de SuperAdmin/
-// GestorFinanceiro), aqui GestorRH também aprova, já que a viagem em si é uma questão de
-// RH mesmo que o valor entre no vencimento (mesmo padrão de requireAdminOrHRorFinanceiro
-// em fechoMensalRoutes.js).
+// Aprovação de deslocações: SuperAdmin/GestorRH/Administrador/GestorFinanceiro - ao
+// contrário do resto do processamento salarial (canAccess em salarioController.js,
+// exclusivo de SuperAdmin/GestorFinanceiro), aqui GestorRH também aprova, já que a viagem
+// em si é uma questão de RH mesmo que o valor entre no vencimento (mesmo padrão de
+// requireAdminOrHRorFinanceiro em fechoMensalRoutes.js). Administrador incluído aqui a
+// pedido explícito - ao contrário de canViewPayroll/fecho mensal (ver
+// ProcessamentoSalarios.jsx), onde continua de fora de propósito, esta ação (gerir
+// deslocações em /salarios/:id) é tratada como uma área separada.
 function requireAdminOrHRorFinanceiro(req, res, next) {
-  if (!isAdminOrHR(req.user?.nivelAcesso) && !isGestorFinanceiro(req.user?.nivelAcesso)) {
+  if (!isAdminOrHR(req.user?.nivelAcesso) && !isAdministrador(req.user?.nivelAcesso) && !isGestorFinanceiro(req.user?.nivelAcesso)) {
     return res.status(403).json({ error: "Acesso restrito a administradores, RH ou financeiro" });
   }
   next();

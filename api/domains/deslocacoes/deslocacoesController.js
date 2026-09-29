@@ -2,18 +2,22 @@ const admin = require("firebase-admin");
 const db = admin.firestore();
 const { resolveTargetUid } = require("../timeTracking/helpers");
 const { calcularDistanciaKm } = require("../../shared/services/googleRoutes");
-const { isAdminOrHR, isGestorFinanceiro } = require("../../shared/middleware/auth");
+const { isAdminOrHR, isAdministrador, isGestorFinanceiro } = require("../../shared/middleware/auth");
 const { isMonthClosed, MENSAGEM_MES_FECHADO } = require("../../shared/lib/monthLock");
 
 const MES_REGEX = /^\d{4}-\d{2}$/;
 const DATA_REGEX = /^(\d{2})-(\d{2})-(\d{4})$/;
 
 // Gestão de deslocações em nome de qualquer colaborador (registar/listar/editar em
-// /salarios/:id, ver SalarioColaborador.jsx): SuperAdmin/GestorRH/GestorFinanceiro - mesmo
-// âmbito de requireAdminOrHRorFinanceiro em deslocacoesRoutes.js. resolveTargetUid sozinho
-// não serve aqui porque não inclui o GestorFinanceiro (e é partilhado com férias/baixas).
+// /salarios/:id, ver SalarioColaborador.jsx): SuperAdmin/GestorRH/Administrador/
+// GestorFinanceiro - mesmo âmbito de requireAdminOrHRorFinanceiro em
+// deslocacoesRoutes.js. Ao contrário de outras áreas de RH/cadastro, um Administrador não
+// fica restrito à sua própria entidade aqui - mesmo âmbito (sem restrição de entidade) que
+// já se aplicava a GestorRH/GestorFinanceiro nesta funcionalidade especificamente.
+// resolveTargetUid sozinho não serve aqui porque não inclui o GestorFinanceiro/
+// Administrador (e é partilhado com férias/baixas).
 function canManageDeslocacoesDeOutros(req) {
-  return isAdminOrHR(req.user?.nivelAcesso) || isGestorFinanceiro(req.user?.nivelAcesso);
+  return isAdminOrHR(req.user?.nivelAcesso) || isAdministrador(req.user?.nivelAcesso) || isGestorFinanceiro(req.user?.nivelAcesso);
 }
 
 async function resolveDeslocacaoTargetUid(req) {
