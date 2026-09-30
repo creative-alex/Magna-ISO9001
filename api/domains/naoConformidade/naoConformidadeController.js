@@ -391,6 +391,72 @@ const listNaoConformidades = async (req, res) => {
   }
 };
 
+// Indicadores do dashboard (registadas/abertas por ano, taxa de tratamento, tempo médio
+// de tratamento por gravidade). UMA única leitura da coleção "nao-conformidades" (nunca
+// uma query por ano, nunca um read a "users" - tudo o que é preciso já está no próprio
+// documento da NC: ano, estado, gravidade, dataRegisto, tratadaEm). Devolve só os
+// agregados já calculados (não a lista de NC), para o dashboard nunca ter de transferir
+// nem processar dados por NC que não precisa.
+const getIndicadores = async (req, res) => {
+  try {
+    const snapshot = await db.collection("nao-conformidades").get();
+
+    const registadasPorAno = {};
+    const abertasPorAno = {};
+    let tratadasOuFechadas = 0;
+    const somaDiasPorGravidade = {};
+    const contagemPorGravidade = {};
+
+    snapshot.forEach((doc) => {
+      const d = doc.data();
+      const ano = d.ano || (d.dataRegisto?.toDate ? d.dataRegisto.toDate().getFullYear() : null);
+      if (ano) {
+        registadasPorAno[ano] = (registadasPorAno[ano] || 0) + 1;
+        if (d.estado !== "fechada") {
+          abertasPorAno[ano] = (abertasPorAno[ano] || 0) + 1;
+        }
+      }
+
+      if (d.estado === "tratada" || d.estado === "fechada") {
+        tratadasOuFechadas += 1;
+      }
+
+      // Tempo até "tratada": só para NC que já têm as duas datas fiáveis (nunca inventa
+      // uma data de tratamento para quem ainda não lá chegou, nem para NC fechadas antes
+      // de "tratadaEm" existir - ver nota em marcarAcaoImplementada).
+      if (d.tratadaEm?.toMillis && d.dataRegisto?.toMillis && d.gravidade) {
+        const dias = (d.tratadaEm.toMillis() - d.dataRegisto.toMillis()) / (1000 * 60 * 60 * 24);
+        somaDiasPorGravidade[d.gravidade] = (somaDiasPorGravidade[d.gravidade] || 0) + dias;
+        contagemPorGravidade[d.gravidade] = (contagemPorGravidade[d.gravidade] || 0) + 1;
+      }
+    });
+
+    const tempoMedioTratamentoDias = {};
+    for (const gravidade of GRAVIDADES_VALIDAS) {
+      const n = contagemPorGravidade[gravidade] || 0;
+      tempoMedioTratamentoDias[gravidade] = n > 0
+        ? Math.round((somaDiasPorGravidade[gravidade] / n) * 10) / 10
+        : null;
+    }
+
+    const registadas = snapshot.size;
+    return res.json({
+      registadasPorAno,
+      abertasPorAno,
+      taxaTratamento: {
+        tratadasOuFechadas,
+        registadas,
+        percentagem: registadas > 0 ? Math.round((tratadasOuFechadas / registadas) * 1000) / 10 : null,
+      },
+      tempoMedioTratamentoDias,
+      amostraTempoMedioPorGravidade: contagemPorGravidade,
+    });
+  } catch (error) {
+    console.error("Erro ao calcular indicadores de não conformidades:", error);
+    return res.status(500).json({ error: "Erro interno do servidor" });
+  }
+};
+
 // 1 leitura do documento + 1 leitura da subcoleção de ações (sem N+1). Consulta aberta a
 // qualquer colaborador autenticado - ver nota em listNaoConformidades sobre o que
 // continua restrito.
@@ -684,6 +750,11 @@ const marcarAcaoImplementada = async (req, res) => {
       const updates = { acoesImplementadas: novasImplementadas };
       if (novasImplementadas >= (ncData.totalAcoes || 0) && ncData.estado === "para_tratamento") {
         updates.estado = "tratada";
+        // Único momento em que a NC passa a "tratada" - grava aqui, e só aqui, a data
+        // exata dessa transição (nunca calculada a posteriori). Usada pelo indicador do
+        // dashboard "Tempo médio de tratamento" (dashboardIndicadores); sem isto não
+        // haveria forma fiável de saber quando uma NC deixou de estar "para_tratamento".
+        updates.tratadaEm = admin.firestore.FieldValue.serverTimestamp();
       }
       tx.update(docRef, updates);
     });
@@ -898,6 +969,7 @@ const deleteNaoConformidade = async (req, res) => {
 module.exports = {
   createNaoConformidade,
   listNaoConformidades,
+  getIndicadores,
   getNaoConformidade,
   updateCatalogacao,
   updateResponsavel,

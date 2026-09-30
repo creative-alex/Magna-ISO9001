@@ -63,13 +63,23 @@ const registerEntry = async (req, res) => {
 
     console.log("Gerado registoId:", registoId);
 
-    await userDocRef.collection("Registos").doc(registoId).set({
+    // O set() abaixo (sem merge) substitui o documento do dia por inteiro. Uma entrada
+    // num dia ainda sem registo nunca altera o saldo anual de horas extra (sem saída não
+    // há horas contadas - ver calcularHorasHelper em reportsController.js), mas se já
+    // existia um documento desse dia (ex.: com horaSaida ou horas_compensatorias) a
+    // substituição pode alterá-lo. "registoAnteriorExistia" diz ao frontend se precisa de
+    // voltar a pedir /overtime-summary (ver RegistosPage.jsx) - o comportamento da
+    // escrita em si não muda.
+    const registoRef = userDocRef.collection("Registos").doc(registoId);
+    const registoAnterior = await registoRef.get();
+
+    await registoRef.set({
       horaEntrada,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
 
     console.log("Entrada registada com sucesso no Firestore.");
-    return res.status(201).json({ message: "Entrada registada com sucesso", registoId });
+    return res.status(201).json({ message: "Entrada registada com sucesso", registoId, registoAnteriorExistia: registoAnterior.exists });
   } catch (error) {
     console.error("Erro ao registar entrada:", error);
     return res.status(500).json({ error: error.message });

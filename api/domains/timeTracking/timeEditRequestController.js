@@ -243,12 +243,24 @@ const rejectTimeEdit = async (req, res) => {
 
 // Contagem de pedidos de alteração de horas por aprovar, por colaborador - usada para o
 // aviso na lista de colaboradores de /ponto/entidades (mesmo padrão de
-// getUidsComDeslocacoesPendentes). Lê a collection group inteira e filtra aqui, tal como
-// nas deslocações, para não depender de um índice de collection group em "Approved".
+// getUidsComDeslocacoesPendentes). Os pedidos aprovados nunca são apagados (ver
+// approveTimeEdit), por isso ler a collection group inteira lia todo o histórico só
+// para contar os pendentes - agora filtra Approved == false na própria query.
+// Essa query precisa do índice de campo único "Approved" com âmbito collection group em
+// AjustesPendentes; enquanto não existir, o Firestore responde FAILED_PRECONDITION e cai
+// na leitura completa de antes (mesmo resultado, só mais leituras).
 // Um Administrador só recebe os colaboradores da sua própria entidade.
+const FAILED_PRECONDITION = 9;
 const getUidsComAjustesPendentes = async (req, res) => {
   try {
-    const snapshot = await db.collectionGroup("AjustesPendentes").get();
+    let snapshot;
+    try {
+      snapshot = await db.collectionGroup("AjustesPendentes").where("Approved", "==", false).get();
+    } catch (queryError) {
+      if (queryError.code !== FAILED_PRECONDITION) throw queryError;
+      console.warn("[getUidsComAjustesPendentes] Índice collection group de AjustesPendentes.Approved em falta - a usar leitura completa:", queryError.message);
+      snapshot = await db.collectionGroup("AjustesPendentes").get();
+    }
     let contagemPorUid = {};
     snapshot.forEach((doc) => {
       if (doc.data().Approved === false) {

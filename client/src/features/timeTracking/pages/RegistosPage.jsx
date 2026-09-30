@@ -16,7 +16,14 @@ const RegistosPage = () => {
   // reloadTick é passado como prop normal (não como key), para que cada componente
   // decida por si quando recarregar os seus próprios dados, sem remontar.
   const [reloadTick, setReloadTick] = useState(0);
-  const reloadRegistos = () => setReloadTick(k => k + 1);
+  // Saldo anual de horas extra (TotalSummary -> /overtime-summary, que lê os Registos do
+  // ano inteiro): só recarrega quando o que mudou o pode alterar - ver
+  // handleEntryRegistered. Todas as outras recargas continuam a atualizá-lo.
+  const [overtimeReloadTick, setOvertimeReloadTick] = useState(0);
+  const reloadRegistos = () => {
+    setReloadTick(k => k + 1);
+    setOvertimeReloadTick(k => k + 1);
+  };
 
   // Estado de entrada/saída de hoje, partilhado pelos dois botões - ver nota em
   // entryRegisterButton.jsx/exitRegisterButton.jsx (era /checkEntry + /checkEntry +
@@ -39,9 +46,17 @@ const RegistosPage = () => {
     return () => { cancelled = true; };
   }, [username]);
 
-  const handleEntryRegistered = () => {
+  // Uma entrada num dia sem registo não altera o saldo de horas extra (sem saída não há
+  // horas contadas), por isso não vale a pena voltar a ler o ano inteiro de Registos. Se
+  // a entrada substituiu um registo já existente desse dia (registoAnteriorExistia, ver
+  // registerEntry) ou a resposta não o indicar, recarrega tudo como antes.
+  const handleEntryRegistered = (data) => {
     setEntryStatus((s) => ({ ...s, hasEntry: true }));
-    reloadRegistos();
+    if (data?.registoAnteriorExistia === false) {
+      setReloadTick(k => k + 1);
+    } else {
+      reloadRegistos();
+    }
   };
 
   const handleLeaveRegistered = () => {
@@ -119,6 +134,7 @@ const RegistosPage = () => {
             <Client.TotalSummary
               username={username}
               reloadTick={reloadTick}
+              overtimeReloadTick={overtimeReloadTick}
               calendarData={calendarData}
               calendarLoading={calendarLoading}
             />

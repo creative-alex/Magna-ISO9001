@@ -20,7 +20,11 @@ const MONTH_NAMES_FULL = [
 // esta e a pontoTable.jsx pediam os mesmos dados (mesmo username/mês/ano) de forma
 // independente, duplicando a leitura mais cara da página. O saldo anual de horas
 // extra (2º useEffect) e o resumo anual/modal continuam à parte, sem alteração.
-const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick = 0, calendarData, calendarLoading = false }) => {
+// overtimeReloadTick (opcional): sinal próprio para recarregar o saldo anual de horas
+// extra, separado de reloadTick porque nem todas as recargas o alteram (ex.: uma
+// entrada num dia sem registo - ver handleEntryRegistered em RegistosPage.jsx). Sem
+// esta prop, o saldo segue reloadTick como antes.
+const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick = 0, overtimeReloadTick, calendarData, calendarLoading = false }) => {
   const [totais, setTotais] = useState({
     totalHoras: "0h 0m",
     totalExtras: "0h 0m",
@@ -38,7 +42,11 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [showOvertimeModal, setShowOvertimeModal] = useState(false);
   const [expandedMonth, setExpandedMonth] = useState(null);
-  const [mesFechado, setMesFechado] = useState(false);
+  // Estado do fecho deste mês (POST /fecho-mensal/status), pedido uma única vez aqui e
+  // partilhado com o MonthlyClosingButton abaixo - antes cada um fazia o seu próprio
+  // pedido, com o mesmo mês, e cada pedido recalcula no backend o resumo do mês inteiro.
+  const [fechoStatus, setFechoStatus] = useState(null);
+  const [fechoStatusLoading, setFechoStatusLoading] = useState(true);
   const mesAtual = `${new Date().getFullYear()}-${String(month).padStart(2, '0')}`;
 
   // "Pedir Baixa Médica" (tal como "Fecho Mensal" logo abaixo) desaparece quando o
@@ -49,15 +57,18 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick
   useEffect(() => {
     if (!username) return;
     let cancelled = false;
+    setFechoStatusLoading(true);
     apiFetch('/fecho-mensal/status', {
       method: 'POST',
       body: JSON.stringify({ mes: mesAtual }),
     })
       .then((r) => (r.ok ? r.json() : null))
-      .then((data) => { if (!cancelled) setMesFechado(!!data?.confirmed); })
-      .catch(() => { if (!cancelled) setMesFechado(false); });
+      .then((data) => { if (!cancelled) setFechoStatus(data); })
+      .catch(() => { if (!cancelled) setFechoStatus(null); })
+      .finally(() => { if (!cancelled) setFechoStatusLoading(false); });
     return () => { cancelled = true; };
   }, [username, mesAtual]);
+  const mesFechado = !!fechoStatus?.confirmed;
 
   // Função para extrair apenas a hora no formato HH:MM
   const extractTime = (timeString) => {
@@ -213,6 +224,7 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick
   // Saldo anual de horas extra: bruto acumulado (meses nunca reduzidos por faltas)
   // menos o que já foi usado para compensar dias curtos  -  cálculo único e
   // autoritativo feito no backend (getOvertimeSummary/computeAnnualOvertimeBalance).
+  const overtimeTick = overtimeReloadTick ?? reloadTick;
   useEffect(() => {
     if (!username) return;
     const currentYear = new Date().getFullYear();
@@ -230,7 +242,7 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick
         setAccumulatedCompensated(data.totalCompensatedMinutes ?? 0);
       })
       .catch((err) => console.error("Erro ao buscar saldo anual de horas extra:", err));
-  }, [username, reloadTick]);
+  }, [username, overtimeTick]);
 
   const fetchYearlyData = async () => {
     if (!username) return;
@@ -393,6 +405,8 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick
         )}
         <MonthlyClosingButton
           mes={mesAtual}
+          initialStatus={fechoStatus}
+          initialStatusLoading={fechoStatusLoading}
           mesLabel={`${MONTH_NAMES_FULL[month - 1]} de ${new Date().getFullYear()}`}
           triggerClassName="mt-2 cursor-pointer bg-transparent border-none text-sm font-medium flex items-center justify-center gap-1.5 text-gold"
         />

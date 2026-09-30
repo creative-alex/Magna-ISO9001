@@ -499,10 +499,17 @@ const getOvertimeSummary = async (req, res) => {
 };
 
 // Resumo anual de assiduidade (Faltas/Férias/Baixas Médicas) para a página de
-// detalhe do colaborador. Reutiliza calculateMonthlyAttendanceSummary (mesma
-// lógica usada no processamento de salários) mês a mês, para que os totais
-// anuais fiquem consistentes com a tabela mensal do livro de ponto: dias
-// inteiros (não frações) e feriados/férias/baixas/aniversário excluídos.
+// detalhe do colaborador. Usa o mesmo cálculo mensal do processamento de salários
+// (computeMonthlyAttendance), mês a mês, para que os totais anuais fiquem
+// consistentes com a tabela mensal do livro de ponto: dias inteiros (não frações) e
+// feriados/férias/baixas/aniversário excluídos.
+//
+// Antes chamava calculateMonthlyAttendanceSummary 12 vezes, o que relia 12x os mesmos
+// dados anuais (users/{uid}, cedências/baixas do Cadastro e Ferias/BaixasMedicas/
+// DiasAniversario "where year") - agora cada um é lido uma única vez e os 12 meses são
+// calculados em memória. Os Registos passam a ser 1 query do ano inteiro, repartida
+// por mês com exatamente os mesmos limites das 12 queries mensais (ver
+// isTimestampInRange) - os mesmos documentos, lidos uma vez.
 const getYearlySummary = async (req, res) => {
   try {
     const { year } = req.body;
@@ -510,15 +517,45 @@ const getYearlySummary = async (req, res) => {
     const { uid: userId, error: authError } = await resolveTargetUid(req);
     if (authError) return res.status(403).json({ error: authError });
 
+    const currentYear = year || new Date().getFullYear();
+
+    const userContext = await loadAttendanceUserContext(userId);
+
+    const { firstDay: yearStart } = getMonthBounds(currentYear, 1);
+    const { lastDay: yearEnd } = getMonthBounds(currentYear, 12);
+    const registoPontoRef = db.collection("registo-ponto").doc(userId);
+    const [registosSnapshot, feriasSnapshot, baixasSnapshot, aniversarioSnapshot] = await Promise.all([
+      registoPontoRef.collection("Registos")
+        .where("timestamp", ">=", yearStart)
+        .where("timestamp", "<=", yearEnd)
+        .get(),
+      registoPontoRef.collection("Ferias").where("year", "==", currentYear).get(),
+      registoPontoRef.collection("BaixasMedicas").where("year", "==", currentYear).get(),
+      registoPontoRef.collection("DiasAniversario").where("year", "==", currentYear).get(),
+    ]);
+
+    const registosAno = registosSnapshot.docs.map(doc => doc.data());
+    const ferias = feriasSnapshot.docs.map(doc => doc.data());
+    const baixas = baixasSnapshot.docs.map(doc => doc.data());
+    const aniversario = aniversarioSnapshot.docs.map(doc => doc.data());
     const now = new Date();
-    const currentYear = year || now.getFullYear();
 
     let diasFerias = 0;
     let diasBaixaMedica = 0;
     let diasFalta = 0;
 
     for (let month = 1; month <= 12; month++) {
-      const monthSummary = await calculateMonthlyAttendanceSummary({ uid: userId, year: currentYear, month });
+      const { firstDay, lastDay } = getMonthBounds(currentYear, month);
+      const monthSummary = computeMonthlyAttendance({
+        year: currentYear,
+        month,
+        now,
+        userContext,
+        registos: registosAno.filter(registo => isTimestampInRange(registo.timestamp, firstDay, lastDay)),
+        ferias,
+        baixas,
+        aniversario,
+      });
       diasFerias += monthSummary.diasFerias;
       diasBaixaMedica += monthSummary.diasBaixaMedica;
       diasFalta += monthSummary.diasFalta;
@@ -549,59 +586,131 @@ const getYearlySummary = async (req, res) => {
 // permite fechar o mês antes do dia 25 sem esperar pelos dias que ainda faltam
 // decorrer. Sem este parâmetro o comportamento é exatamente o mesmo de sempre.
 async function calculateMonthlyAttendanceSummary({ uid, year, month, assumeWorkedFrom }) {
-  // users/{uid} lido uma única vez e partilhado pelas 3 leituras abaixo, em vez de cada
-  // uma reler o mesmo documento de forma independente (ver nota acima).
-  const userDoc = await db.collection('users').doc(uid).get();
-  const userData = userDoc.exists ? userDoc.data() : null;
-  const userCreatedAt = extractUserCreatedAt(userData);
-  const sede = extractUserSede(userData);
-  const cadastroAusencias = await getUserCadastroAusencias(uid, userData);
+  const userContext = await loadAttendanceUserContext(uid);
   const now = new Date();
 
-  const firstDay = new Date(year, month - 1, 1);
-  const lastDay = new Date(year, month, 0, 23, 59, 59);
+  const { firstDay, lastDay } = getMonthBounds(year, month);
 
-  const registosRef = db.collection("registo-ponto").doc(uid).collection("Registos");
-  const registosSnapshot = await registosRef
+  const registoPontoRef = db.collection("registo-ponto").doc(uid);
+  const registosSnapshot = await registoPontoRef.collection("Registos")
     .where("timestamp", ">=", firstDay)
     .where("timestamp", "<=", lastDay)
     .get();
 
+  // Ferias: só os dias deste mês (ver getMonthAbsenceDocs) - antes lia o ano inteiro
+  // (~20+ documentos por colaborador) para usar apenas os do mês pedido.
+  // BaixasMedicas/DiasAniversario continuam filtradas por "year" (todos os documentos
+  // destas coleções já têm este campo - ver backfill e escrita em createMedicalLeave/
+  // toggleBirthdayDay): têm quase sempre 0-1 documentos por ano (o dia de aniversário é
+  // no máximo 1/ano), e como cada query custa pelo menos 1 leitura, os 2 lotes "in" do
+  // mês custariam mais do que 1 query anual.
+  const [ferias, baixasSnapshot, aniversarioSnapshot] = await Promise.all([
+    getMonthAbsenceDocs(registoPontoRef.collection("Ferias"), getDatasDoMes(year, month), year),
+    registoPontoRef.collection("BaixasMedicas").where("year", "==", year).get(),
+    registoPontoRef.collection("DiasAniversario").where("year", "==", year).get(),
+  ]);
+
+  return computeMonthlyAttendance({
+    year,
+    month,
+    assumeWorkedFrom,
+    now,
+    userContext,
+    registos: registosSnapshot.docs.map(doc => doc.data()),
+    ferias,
+    baixas: baixasSnapshot.docs.map(doc => doc.data()),
+    aniversario: aniversarioSnapshot.docs.map(doc => doc.data()),
+  });
+}
+
+// users/{uid} (sede, createdAt, situação contratual) e as cedências/baixas do Cadastro
+// - iguais para qualquer mês, por isso getYearlySummary lê-os uma só vez para os 12.
+// As cedências/baixas do Cadastro são blocos com início/fim que podem atravessar meses,
+// por isso continuam a ser lidos por inteiro (não há um filtro por mês equivalente).
+async function loadAttendanceUserContext(uid) {
+  // users/{uid} lido uma única vez e partilhado pelas 3 leituras abaixo, em vez de cada
+  // uma reler o mesmo documento de forma independente (ver nota acima).
+  const userDoc = await db.collection('users').doc(uid).get();
+  const userData = userDoc.exists ? userDoc.data() : null;
+  return {
+    userCreatedAt: extractUserCreatedAt(userData),
+    sede: extractUserSede(userData),
+    cadastroAusencias: await getUserCadastroAusencias(uid, userData),
+  };
+}
+
+// Limites (hora local do servidor) usados desde sempre na query mensal de Registos.
+function getMonthBounds(year, month) {
+  return {
+    firstDay: new Date(year, month - 1, 1),
+    lastDay: new Date(year, month, 0, 23, 59, 59),
+  };
+}
+
+// Mesma semântica de where("timestamp", ">=", firstDay).where("timestamp", "<=", lastDay)
+// - comparação exata em segundos/nanossegundos do Timestamp, sem arredondar a
+// milissegundos (toDate() arredondaria), para a repartição do ano por meses em
+// getYearlySummary devolver exatamente os mesmos documentos que as queries mensais.
+function isTimestampInRange(timestamp, firstDay, lastDay) {
+  if (!timestamp || typeof timestamp.seconds !== "number") return false;
+  const compare = (a, b) => (a.seconds - b.seconds) || (a.nanoseconds - b.nanoseconds);
+  return compare(timestamp, admin.firestore.Timestamp.fromDate(firstDay)) >= 0
+    && compare(timestamp, admin.firestore.Timestamp.fromDate(lastDay)) <= 0;
+}
+
+// Todas as datas do mês no formato gravado em Ferias.date ("DD-MM-AAAA", sempre com dois
+// dígitos - ver createVacation/toggleVacationDay; confirmado nos dados existentes, todos
+// os documentos com "year" seguem este formato).
+function getDatasDoMes(year, month) {
+  const mm = String(month).padStart(2, "0");
+  const diasNoMes = new Date(year, month, 0).getDate();
+  return Array.from({ length: diasNoMes }, (_, i) => `${String(i + 1).padStart(2, "0")}-${mm}-${year}`);
+}
+
+// "date" é uma string "DD-MM-AAAA", que não ordena cronologicamente - por isso um
+// intervalo (>=/<=) nesse campo daria resultados errados; usa-se "in" com as datas do
+// mês, em lotes de 30 (limite do Firestore), tal como getUserRecords. O filtro "year"
+// que a query anual aplicava mantém-se aqui em memória, para o conjunto de documentos
+// considerado ser exatamente o mesmo de antes (um documento com a data certa mas sem o
+// campo "year" continua de fora).
+async function getMonthAbsenceDocs(collectionRef, datasDoMes, year) {
+  const lotes = [];
+  for (let i = 0; i < datasDoMes.length; i += 30) {
+    lotes.push(datasDoMes.slice(i, i + 30));
+  }
+  const snapshots = await Promise.all(lotes.map(lote => collectionRef.where("date", "in", lote).get()));
+  return snapshots
+    .flatMap(snapshot => snapshot.docs.map(doc => doc.data()))
+    .filter(data => data.year === year);
+}
+
+// Datas em Ferias/BaixasMedicas aparecem tanto em "DD-MM" como em "DD-MM-YYYY"
+// (ver getYearlySummary acima)  -  normalizar para {dia, mes, ano}.
+function parseDocDate(dateStr) {
+  if (!dateStr || !dateStr.includes("-")) return null;
+  const parts = dateStr.split("-");
+  if (parts.length === 2) return { dia: parseInt(parts[0]), mes: parseInt(parts[1]), ano: null };
+  if (parts[0].length === 4) return { ano: parseInt(parts[0]), mes: parseInt(parts[1]), dia: parseInt(parts[2]) };
+  return { dia: parseInt(parts[0]), mes: parseInt(parts[1]), ano: parseInt(parts[2]) };
+}
+
+// Cálculo de um mês a partir de dados já lidos (sem acessos ao Firestore) - partilhado
+// por calculateMonthlyAttendanceSummary (1 mês) e getYearlySummary (12 meses com os
+// mesmos dados anuais). "registos" são só os do mês; ferias/baixas/aniversario podem
+// incluir outros meses do mesmo ano (são filtrados abaixo pelo mês, como sempre foram).
+function computeMonthlyAttendance({ year, month, assumeWorkedFrom, now, userContext, registos, ferias, baixas, aniversario }) {
+  const { userCreatedAt, sede, cadastroAusencias } = userContext;
+
   let diasTrabalhados = 0;
   const registoPorDia = {};
-  registosSnapshot.forEach(doc => {
-    const registo = doc.data();
+  registos.forEach(registo => {
     if (registo.horaEntrada && registo.horaSaida) diasTrabalhados++;
     registoPorDia[registo.timestamp.toDate().getDate()] = registo;
   });
 
-  // Datas em Ferias/BaixasMedicas aparecem tanto em "DD-MM" como em "DD-MM-YYYY"
-  // (ver getYearlySummary acima)  -  normalizar para {dia, mes, ano}.
-  function parseDocDate(dateStr) {
-    if (!dateStr || !dateStr.includes("-")) return null;
-    const parts = dateStr.split("-");
-    if (parts.length === 2) return { dia: parseInt(parts[0]), mes: parseInt(parts[1]), ano: null };
-    if (parts[0].length === 4) return { ano: parseInt(parts[0]), mes: parseInt(parts[1]), dia: parseInt(parts[2]) };
-    return { dia: parseInt(parts[0]), mes: parseInt(parts[1]), ano: parseInt(parts[2]) };
-  }
-
-  const feriasRef = db.collection("registo-ponto").doc(uid).collection("Ferias");
-  const baixasRef = db.collection("registo-ponto").doc(uid).collection("BaixasMedicas");
-  const aniversarioRef = db.collection("registo-ponto").doc(uid).collection("DiasAniversario");
-  // Filtradas por "year" (todos os documentos destas 3 coleções já têm este campo -
-  // ver backfill e escrita em createVacation/createMedicalLeave/toggleVacationDay/
-  // toggleBirthdayDay) em vez de ler o histórico completo do colaborador e filtrar
-  // aqui em memória só pelo mês pedido.
-  const [feriasSnapshot, baixasSnapshot, aniversarioSnapshot] = await Promise.all([
-    feriasRef.where("year", "==", year).get(),
-    baixasRef.where("year", "==", year).get(),
-    aniversarioRef.where("year", "==", year).get(),
-  ]);
-
   let diasFerias = 0;
   const feriasDias = new Set();
-  feriasSnapshot.forEach(doc => {
-    const data = doc.data();
+  ferias.forEach(data => {
     if (data.Approved !== true) return;
     const parsed = parseDocDate(data.date);
     if (!parsed || parsed.mes !== month || (parsed.ano !== null && parsed.ano !== year)) return;
@@ -611,8 +720,7 @@ async function calculateMonthlyAttendanceSummary({ uid, year, month, assumeWorke
 
   let diasBaixaMedica = 0;
   const baixasDias = new Set();
-  baixasSnapshot.forEach(doc => {
-    const data = doc.data();
+  baixas.forEach(data => {
     if (data.Approved !== true) return;
     const parsed = parseDocDate(data.date);
     if (!parsed || parsed.mes !== month || (parsed.ano !== null && parsed.ano !== year)) return;
@@ -624,8 +732,7 @@ async function calculateMonthlyAttendanceSummary({ uid, year, month, assumeWorke
   // como "dia trabalhado" nem entra na quota de férias.
   let diasAniversario = 0;
   const aniversarioDias = new Set();
-  aniversarioSnapshot.forEach(doc => {
-    const data = doc.data();
+  aniversario.forEach(data => {
     if (data.Approved !== true) return;
     const parsed = parseDocDate(data.date);
     if (!parsed || parsed.mes !== month || (parsed.ano !== null && parsed.ano !== year)) return;

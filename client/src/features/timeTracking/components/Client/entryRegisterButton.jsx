@@ -25,7 +25,10 @@ const EntryButton = ({ hasEntry, loading, fontSize = '1.5vw', buttonHeight = '5v
           position: 'top-right',
           autoClose: 3000
         });
-        if (onSuccess) onSuccess();
+        // A resposta diz se a entrada substituiu um registo já existente desse dia (ver
+        // registerEntry) - o pai usa isto para decidir se o saldo de horas extra mudou.
+        const data = await response.json().catch(() => null);
+        if (onSuccess) onSuccess(data);
       } else {
         throw new Error('Resposta não OK do servidor');
       }

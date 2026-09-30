@@ -36,7 +36,11 @@ function formatDiaMes(data) {
 // tal como RequestTimeEditButton). Mostra o resumo/dias devolvidos por
 // POST /fecho-mensal/status e, se ainda não confirmado, permite confirmar via
 // POST /fecho-mensal/confirm  -  ver api/domains/fechoMensal/fechoMensalController.js.
-const MonthlyClosingButton = ({ mes, mesLabel, triggerClassName, onSuccess }) => {
+// initialStatus/initialStatusLoading (opcionais): quando o pai já pediu
+// /fecho-mensal/status para este mesmo mês (TotalSummary, que precisa de saber se o mês
+// está fechado), a verificação inicial usa esse resultado em vez de repetir o pedido.
+// Abrir o modal e confirmar continuam a pedir o estado atualizado, como antes.
+const MonthlyClosingButton = ({ mes, mesLabel, triggerClassName, onSuccess, initialStatus, initialStatusLoading }) => {
   const [showModal, setShowModal] = useState(false);
   // Verificação inicial (silenciosa, sem toast) só para decidir se o botão sequer aparece -
   // separada de "loading" (usada dentro do modal) para uma falha/refetch ao reabrir não
@@ -94,10 +98,22 @@ const MonthlyClosingButton = ({ mes, mesLabel, triggerClassName, onSuccess }) =>
   // O botão só deve aparecer depois de o colaborador ter recebido o email de aviso (dia 20)
   // - ou já ter confirmado (ex.: um admin confirmou em nome dele antes disso) - nunca antes,
   // para não convidar a confirmar um mês que ainda nem foi avisado.
+  // hasParentStatus tem de ser "a prop foi passada" (mesmo que o pai ainda esteja a
+  // carregar), não "já tem dados" - senão cairia no pedido próprio enquanto o pai carrega.
+  const hasParentStatus = initialStatusLoading !== undefined;
   useEffect(() => {
+    if (hasParentStatus) {
+      if (initialStatusLoading) {
+        setInitialLoading(true);
+        return;
+      }
+      setStatus(initialStatus ?? null);
+      setInitialLoading(false);
+      return;
+    }
     setInitialLoading(true);
     fetchStatus({ silent: true });
-  }, [fetchStatus]);
+  }, [hasParentStatus, initialStatus, initialStatusLoading, fetchStatus]);
 
   const fetchDeslocacoes = useCallback(async () => {
     setDeslocacoesLoading(true);

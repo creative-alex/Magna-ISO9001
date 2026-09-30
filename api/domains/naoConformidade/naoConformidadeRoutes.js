@@ -7,6 +7,9 @@ const controller = require("./naoConformidadeController");
 
 router.post("/", requireAuth, controller.createNaoConformidade);
 router.get("/", requireAuth, controller.listNaoConformidades);
+// Tem de vir antes de "/:id" (Express casaria "/indicadores" com :id="indicadores"
+// senão) - agregados para o dashboard, ver getIndicadores.
+router.get("/indicadores", requireAuth, controller.getIndicadores);
 router.get("/:id", requireAuth, controller.getNaoConformidade);
 router.patch("/:id/catalogacao", requireAuth, requireGestorQualidade, controller.updateCatalogacao);
 router.patch("/:id/responsavel", requireAuth, requireGestorQualidade, controller.updateResponsavel);

@@ -28,47 +28,99 @@ import {
 
 const GOLD = "#C8932F";
 
-// Duração entre duas datas ("aaaa-mm-dd"), devolvida já formatada em meses e dias
-// (ex: "9 meses e 12 dias")  -  ou null se as datas faltarem ou forem inválidas.
-function formatDuracao(inicioStr, fimStr) {
-  if (!inicioStr || !fimStr) return null;
-  const inicio = new Date(inicioStr);
-  const fim = new Date(fimStr);
-  if (Number.isNaN(inicio.getTime()) || Number.isNaN(fim.getTime()) || fim < inicio) return null;
+const DIA_MS = 24 * 60 * 60 * 1000;
 
+// "aaaa-mm-dd" -> Date, ou null se faltar ou for inválida.
+function parseData(str) {
+  if (!str) return null;
+  const d = new Date(str);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+// Diferença de calendário entre duas datas (fim >= inicio), em meses completos + dias restantes.
+function diferencaMesesDias(inicio, fim) {
   let meses = (fim.getFullYear() - inicio.getFullYear()) * 12 + (fim.getMonth() - inicio.getMonth());
   let dias = fim.getDate() - inicio.getDate();
   if (dias < 0) {
     meses -= 1;
     dias += new Date(fim.getFullYear(), fim.getMonth(), 0).getDate();
   }
+  return { meses, dias };
+}
 
+// Duração entre duas datas ("aaaa-mm-dd"), devolvida já formatada em meses e dias
+// (ex: "9 meses e 12 dias")  -  ou null se as datas faltarem ou forem inválidas.
+function formatDuracao(inicioStr, fimStr) {
+  const inicio = parseData(inicioStr);
+  const fim = parseData(fimStr);
+  if (!inicio || !fim || fim < inicio) return null;
+
+  const { meses, dias } = diferencaMesesDias(inicio, fim);
   const partes = [];
   if (meses > 0) partes.push(`${meses} ${meses === 1 ? "mês" : "meses"}`);
   if (dias > 0 || partes.length === 0) partes.push(`${dias} ${dias === 1 ? "dia" : "dias"}`);
   return partes.join(" e ");
 }
 
-// Antiguidade entre duas datas, em anos e meses (ex: "1 ano e 8 meses")  -  ao contrário de
-// formatDuracao (meses/dias), pensado para durações longas como o tempo de casa.
-function formatAntiguidade(inicioStr, fimStr) {
-  if (!inicioStr || !fimStr) return null;
-  const inicio = new Date(inicioStr);
-  const fim = new Date(fimStr);
-  if (Number.isNaN(inicio.getTime()) || Number.isNaN(fim.getTime()) || fim < inicio) return null;
-
-  let anos = fim.getFullYear() - inicio.getFullYear();
-  let meses = fim.getMonth() - inicio.getMonth();
-  if (fim.getDate() < inicio.getDate()) meses -= 1;
-  if (meses < 0) {
-    anos -= 1;
-    meses += 12;
-  }
-
+// Nº total de meses em anos e meses (ex: "1 ano e 8 meses")  -  ao contrário de
+// formatDuracao (meses/dias), pensado para durações longas como a antiguidade.
+function formatAntiguidade(totalMeses) {
+  if (totalMeses === null || totalMeses === undefined) return null;
+  const anos = Math.floor(totalMeses / 12);
+  const meses = totalMeses % 12;
   const partes = [];
   if (anos > 0) partes.push(`${anos} ${anos === 1 ? "ano" : "anos"}`);
   if (meses > 0 || partes.length === 0) partes.push(`${meses} ${meses === 1 ? "mês" : "meses"}`);
   return partes.join(" e ");
+}
+
+// Antiguidade total, em meses, a partir do contrato atual (data_admissao -> data_fim_contrato,
+// ou até hoje se não tiver fim) e dos contratos anteriores ({dataInicio, dataFim}). Não é uma
+// soma das durações: os períodos são unidos, por isso dias sobrepostos contam uma só vez e
+// intervalos sem contrato não contam. Datas de fim são inclusivas e limitadas a hoje (um
+// contrato com fim no futuro só conta até ao presente). Contratos anteriores sem data de
+// fim são ignorados (não dá para saber até quando duraram). null se não houver nenhum período.
+function calcularAntiguidadeMeses(form, contratosAnteriores, hojeStr) {
+  const hoje = parseData(hojeStr);
+  const periodos = [
+    { inicio: form.data_admissao, fim: form.data_fim_contrato || hojeStr },
+    ...(contratosAnteriores || []).map(c => ({ inicio: c.dataInicio, fim: c.dataFim })),
+  ]
+    .map(p => {
+      const inicio = parseData(p.inicio);
+      const fim = parseData(p.fim);
+      if (!inicio || !fim || inicio > hoje) return null;
+      const fimLimitado = fim > hoje ? hoje : fim;
+      if (fimLimitado < inicio) return null;
+      // Fim exclusivo (dia seguinte), para o último dia de cada contrato também contar.
+      return { inicio, fim: new Date(fimLimitado.getTime() + DIA_MS) };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.inicio - b.inicio);
+
+  if (periodos.length === 0) return null;
+
+  // Une períodos sobrepostos ou seguidos (ex: um contrato termina a 31/08 e o seguinte começa a 01/09).
+  const unidos = [];
+  periodos.forEach(p => {
+    const ultimo = unidos[unidos.length - 1];
+    if (ultimo && p.inicio <= ultimo.fim) {
+      if (p.fim > ultimo.fim) ultimo.fim = p.fim;
+    } else {
+      unidos.push({ ...p });
+    }
+  });
+
+  // Soma meses de calendário de cada período; os dias que sobram de todos os períodos
+  // juntos convertem-se em meses a 30 dias por mês.
+  let totalMeses = 0;
+  let totalDias = 0;
+  unidos.forEach(p => {
+    const { meses, dias } = diferencaMesesDias(p.inicio, p.fim);
+    totalMeses += meses;
+    totalDias += dias;
+  });
+  return totalMeses + Math.floor(totalDias / 30);
 }
 
 const SECTIONS = [
@@ -134,7 +186,7 @@ const SECTIONS = [
     Icon: FaFileContract,
     restricted: true,
     fields: [
-      { key: "tipo_contrato", label: "Tipo de contrato celebrado", type: "select", options: TIPO_CONTRATO_OPTIONS },
+      { key: "tipo_contrato", label: "Tipo de contrato atual", type: "select", options: TIPO_CONTRATO_OPTIONS },
       { key: "situacao_contratual", label: "Situação contratual", type: "select", options: SITUACAO_CONTRATUAL_OPTIONS },
       { key: "motivo_cessacao", label: "Motivo da cessação", type: "select", options: MOTIVO_CESSACAO_OPTIONS, showIf: f => f.situacao_contratual === SITUACAO_CESSADO },
       { key: "role", label: "Função", type: "text", list: "funcao", newRow: true },
@@ -142,8 +194,19 @@ const SECTIONS = [
       { key: "sede", label: "Local de trabalho", type: "select", options: LOCAL_OPTIONS, optionLabels: LOCAL_OPTION_LABELS },
       { key: "data_admissao", label: "Data de admissão", type: "date" },
       { key: "data_fim_contrato", label: "Data de fim de contrato", type: "date", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_SEM_TERMO },
-      { key: "tempo_casa", label: "Duração do contrato de trabalho", type: "tenure", fromKey: "data_admissao", toKey: "data_fim_contrato" },
-      { key: "digitalizacao_contrato", label: "Contrato (todas as páginas)", type: "file", storageName: "Contrato_Trabalho" },
+      { key: "antiguidade", label: "Antiguidade", type: "tenure", historyKey: "contratos_anteriores" },
+      { key: "digitalizacao_contrato", label: "Contrato atual (todas as páginas)", type: "file", storageName: "Contrato_Trabalho" },
+      // Os campos acima são o contrato atual; os anteriores ficam aqui como histórico, um
+      // bloco independente por contrato (subcoleção users/{id}/contratosAnteriores).
+      {
+        key: "contratos_anteriores", label: "Contratos anteriores", type: "blocks", apiKey: "contratosAnteriores",
+        storageFolder: "contratosAnteriores",
+        itemSingular: "contrato", addLabel: "Adicionar contrato", emptyLabel: "Sem contratos anteriores registados",
+        tipoLabel: "Tipo de contrato", tipoOptions: TIPO_CONTRATO_OPTIONS,
+        entidadeLabel: "Entidade empregadora", list: "entidades",
+        dataFimLabel: "Data de fim", pdfName: "contrato", observacaoLabel: "Observação",
+        sortByDataInicio: true,
+      },
       {
         key: "cedencias_temporarias", label: "Cedências temporárias", type: "blocks", apiKey: "cedencias",
         storageFolder: "cedenciasTemporarias",
@@ -460,7 +523,15 @@ export default function Cadastro() {
       setForm({ ...INITIAL_FORM, ...(data.form || {}), email: data.email || "" });
       setDocRefs(data.docs || {});
       setTargetEntidadeNome(data.entidade || null);
-      const novosBlockLists = BLOCK_FIELDS.reduce((acc, f) => { acc[f.key] = data[f.apiKey] || []; return acc; }, {});
+      // "sortByDataInicio" (contratos anteriores): mostra o histórico por ordem cronológica
+      // em vez da ordem dos ids na subcoleção; blocos sem data de início ficam no fim.
+      const novosBlockLists = BLOCK_FIELDS.reduce((acc, f) => {
+        const lista = data[f.apiKey] || [];
+        acc[f.key] = f.sortByDataInicio
+          ? [...lista].sort((a, b) => (a.dataInicio || "9999").localeCompare(b.dataInicio || "9999"))
+          : lista;
+        return acc;
+      }, {});
       setBlockLists(novosBlockLists);
       // Blocos já com data de início preenchida (ou seja, já existiam antes desta consulta)
       // começam colapsados, para a lista não ficar comprida por omissão. Um bloco novo,
@@ -767,7 +838,7 @@ export default function Cadastro() {
               const isViewing = viewing[uploadKey];
               const hasPdf = !!c.pdf;
               const isCollapsed = !!collapsedBlocks[c.id];
-              const summaryExtra = (field.tipoOptions && c.tipo) || (field.entidadeLabel && c.entidade) || "";
+              const summaryExtra = [field.tipoOptions && c.tipo, field.entidadeLabel && c.entidade].filter(Boolean).join(" · ");
               const summary = c.dataInicio || c.dataFim
                 ? `${fmtDate(c.dataInicio)} - ${fmtDate(c.dataFim)}${summaryExtra ? ` · ${summaryExtra}` : ""}`
                 : `Adicionar ${field.itemSingular}`;
@@ -800,8 +871,8 @@ export default function Cadastro() {
                   </div>
                   {!isCollapsed && (
                     <div style={{ marginTop: 10 }}>
-                      {/* Tipo/Entidade + as duas datas juntos na mesma linha  -  os dois campos são
-                          mutuamente exclusivos por tipo de bloco, por isso nunca passam de 3 por linha. */}
+                      {/* Tipo/Entidade + as duas datas juntos na mesma grelha  -  quando o bloco tem
+                          os dois (contratos anteriores), a 2.ª data passa para a linha seguinte. */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
                         {field.tipoOptions && (
                           <div style={{ minWidth: 0 }}>
@@ -915,11 +986,11 @@ export default function Cadastro() {
                   color: "#6b7280", fontSize: 12.5, fontWeight: 500, background: "#fafafa",
                 }}
               >
-                <FaPlus style={{ fontSize: 11 }} /> REGISTAR 
+                <FaPlus style={{ fontSize: 11 }} /> {field.addLabel || "REGISTAR"}
               </div>
             )}
             {!editable && blocks.length === 0 && (
-              <div style={{ fontSize: 11.5, color: "#9ca3af" }}>Sem {label.toLowerCase()} registadas</div>
+              <div style={{ fontSize: 11.5, color: "#9ca3af" }}>{field.emptyLabel || `Sem ${label.toLowerCase()} registadas`}</div>
             )}
           </div>
         </div>
@@ -1088,15 +1159,15 @@ export default function Cadastro() {
     }
 
     if (type === "tenure") {
-      // Conta desde "fromKey" até "toKey"  -  se "toKey" ainda não estiver preenchido
-      // (contrato ainda ativo, sem data de fim), conta até hoje.
-      const fim = dataSource[field.toKey] || new Date().toISOString().slice(0, 10);
-      const tempo = formatAntiguidade(dataSource[field.fromKey], fim);
+      // Contrato atual + contratos anteriores (blockLists[historyKey], por isso atualiza-se
+      // logo ao adicionar/editar/remover um contrato)  -  ver calcularAntiguidadeMeses.
+      const hoje = new Date().toISOString().slice(0, 10);
+      const tempo = formatAntiguidade(calcularAntiguidadeMeses(dataSource, blockLists[field.historyKey], hoje));
       return (
         <div key={key} style={layoutStyle}>
           <span style={labelStyle}>{label}</span>
           <div style={{ fontSize: 13, color: tempo ? "#111827" : "#9ca3af", fontWeight: 500 }}>
-            {tempo || "Preenche a data de admissão"}
+            {tempo || "Preenche a data de admissão ou os contratos anteriores"}
           </div>
         </div>
       );

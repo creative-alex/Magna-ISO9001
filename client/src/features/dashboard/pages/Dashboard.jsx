@@ -9,11 +9,12 @@ import { filterTree } from "../utils/filterTree";
 import DeleteButton from "../components/DeleteButton";
 import CreateTableButton from "../components/CreateTableButton";
 import PdfPreviewButton from "../components/PdfPreviewButton";
-import { FaFile, FaCheck, FaStar, FaRegStar } from "react-icons/fa6";
+import { FaFile, FaStar, FaRegStar } from "react-icons/fa6";
 import AIAssistant from "../../aiAssistant/components/AIAssistant";
 import KonamiWordle from "../components/KonamiWordle";
 import { apiFetch } from "../../../shared/utils/apiFetch";
 import { usePermissions } from "../../../shared/hooks/usePermissions";
+import { GRAVIDADES } from "../../naoConformidade/estados";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -24,10 +25,12 @@ export default function Dashboard() {
 
   const [processOwners, setProcessOwners] = useState({});
   const [fileTree, setFileTree] = useState([]);
-  const [totalUsers, setTotalUsers] = useState(null);
   const [expandedProcess, setExpandedProcess] = useState(null);
   const [activeTab, setActiveTab] = useState("todos");
   const [searchTerm, setSearchTerm] = useState("");
+  // Indicadores de Não Conformidades (ver GET /nao-conformidades/indicadores) - uma única
+  // leitura agregada no backend, nunca uma leitura por NC nem por ano aqui no frontend.
+  const [ncIndicadores, setNcIndicadores] = useState(null);
 
   const reloadFileTree = () =>
     apiFetch(`/files/list-files-tree`)
@@ -37,13 +40,18 @@ export default function Dashboard() {
     reloadFileTree();
     apiFetch(`/files/process-owners`)
       .then(r => r.json()).then(setProcessOwners).catch(() => {});
-    // "/users/getAllUsers" é restrito a SuperAdmin (ver requireAdmin em userRoutes.js) -
-    // só vale a pena chamar para quem tem acesso, senão é sempre um 403.
-    if (isSuperAdmin) {
-      apiFetch(`/users/getAllUsers`)
-        .then(r => r.json()).then(data => setTotalUsers(Array.isArray(data) ? data.length : data.users?.length ?? null)).catch(() => {});
-    }
-  }, [isSuperAdmin]);
+    apiFetch(`/nao-conformidades/indicadores`)
+      .then(r => r.json()).then(setNcIndicadores).catch(() => {});
+  }, []);
+
+  // Total de NC abertas (soma de todos os anos) - usado no KPI do topo e no painel
+  // lateral; derivado do mesmo agregado já recebido, sem pedido extra ao backend.
+  const totalNcAbertas = ncIndicadores
+    ? Object.values(ncIndicadores.abertasPorAno).reduce((acc, n) => acc + n, 0)
+    : null;
+  const anosNc = ncIndicadores
+    ? [...new Set([...Object.keys(ncIndicadores.registadasPorAno), ...Object.keys(ncIndicadores.abertasPorAno)])].sort((a, b) => b - a)
+    : [];
 
   const handleSelectFile = (filePath) => {
     const formattedPath = filePath.replace(/\s/g, '-').replace(/\//g, '__');
@@ -74,6 +82,10 @@ export default function Dashboard() {
 
   const dotColor = { ok: "#22c55e", warn: gold, alert: "#ef4444" };
 
+  const ncSubHeaderStyle = { fontSize: 11, fontWeight: 600, color: "#6b7280", marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.3 };
+  const ncRowStyle = { display: "flex", justifyContent: "space-between", fontSize: 13, padding: "5px 0", borderBottom: "1px solid #f9fafb" };
+  const ncEmptyStyle = { fontSize: 12.5, color: "#9ca3af", fontStyle: "italic" };
+
   const ICON_SIZE = 13;
   const iconBtnBase = "bg-transparent border-0 p-1 cursor-pointer flex items-center justify-center rounded flex-shrink-0";
   const favoriteBtnClass = `${iconBtnBase} text-[#C8932F] hover:bg-[#FFF7E6]`;
@@ -90,8 +102,13 @@ export default function Dashboard() {
   const kpis = [
     { label: "Processos", value: totalProcessos, sub: "no sistema", bar: 100 },
     { label: "Procedimentos", value: totalProcedimentos, sub: "documentados", bar: Math.min(100, totalProcedimentos * 3) },
-    { label: "Não conformidades", value: 0, sub: "abertas", bar: 0, barColor: "#ef4444" },
-    { label: "Colaboradores", value: totalUsers ?? " - ", sub: "com acesso", noBar: true },
+    {
+      label: "Não conformidades",
+      value: totalNcAbertas ?? " - ",
+      sub: "abertas",
+      bar: totalNcAbertas ? Math.min(100, totalNcAbertas * 10) : 0,
+      barColor: "#ef4444",
+    },
   ];
 
   return (
@@ -200,23 +217,6 @@ export default function Dashboard() {
             {/* Painel lateral */}
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
-              {/* Não conformidades */}
-              <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-                <div style={{ padding: "14px 18px 10px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>Não conformidades</span>
-                  <span style={{ fontSize: 12, color: gold, cursor: "pointer" }}
-                    onClick={() => window.open('https://docs.google.com/forms/d/e/1FAIpQLSePnbZJUGv7J_YW0MKXn-E61t_naMr25TO2nk_GRDdR8Z13MQ/viewform', '_blank')}>
-                    registar →
-                  </span>
-                </div>
-                <div style={{ padding: "20px 18px", color: "#9ca3af", fontSize: 13, textAlign: "center" }}>
-                  <div style={{ fontSize: 30, marginBottom: 8, display: "flex", justifyContent: "center" }}>
-                    <FaCheck style={{ color: "#22c55e" }} />
-                  </div>
-                  Sem não conformidades abertas
-                </div>
-              </div>
-
               {/* Favoritos */}
               <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
                 <div style={{ padding: "14px 18px 10px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -241,6 +241,83 @@ export default function Dashboard() {
                       <span style={{ fontSize: 11, color: "#d1d5db" }}>›</span>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              {/* Indicadores de Não Conformidades */}
+              <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+                <div style={{ padding: "14px 18px 10px", borderBottom: "1px solid #f3f4f6" }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>Indicadores de Não Conformidades</span>
+                </div>
+                <div style={{ padding: 18 }}>
+                  {!ncIndicadores ? (
+                    <div style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: "12px 0" }}>A carregar indicadores...</div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                      {/* Nº de NC registadas por ano */}
+                      <div>
+                        <div style={ncSubHeaderStyle}>Nº de NC registadas por ano</div>
+                        {anosNc.length === 0 ? (
+                          <div style={ncEmptyStyle}>Sem registos.</div>
+                        ) : anosNc.map((ano) => (
+                          <div key={ano} style={ncRowStyle}>
+                            <span style={{ color: "#374151" }}>{ano}</span>
+                            <span style={{ fontWeight: 600, color: "#111827" }}>{ncIndicadores.registadasPorAno[ano] || 0}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Nº de NC abertas por ano */}
+                      <div>
+                        <div style={ncSubHeaderStyle}>Nº de NC abertas por ano</div>
+                        {anosNc.length === 0 ? (
+                          <div style={ncEmptyStyle}>Sem registos.</div>
+                        ) : anosNc.map((ano) => (
+                          <div key={ano} style={ncRowStyle}>
+                            <span style={{ color: "#374151" }}>{ano}</span>
+                            <span style={{ fontWeight: 600, color: (ncIndicadores.abertasPorAno[ano] || 0) > 0 ? "#ef4444" : "#111827" }}>
+                              {ncIndicadores.abertasPorAno[ano] || 0}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Taxa de tratamento (todas as NC, todos os anos) */}
+                      <div>
+                        <div style={ncSubHeaderStyle}>Taxa de tratamento</div>
+                        {ncIndicadores.taxaTratamento.registadas === 0 ? (
+                          <div style={ncEmptyStyle}>Sem NC registadas.</div>
+                        ) : (
+                          <>
+                            <div style={{ fontSize: 28, fontWeight: 700, color: gold }}>{ncIndicadores.taxaTratamento.percentagem}%</div>
+                            <div style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 4, lineHeight: 1.5 }}>
+                              {ncIndicadores.taxaTratamento.tratadasOuFechadas} de {ncIndicadores.taxaTratamento.registadas} NC já em
+                              "Tratada" ou "Fechada" (todos os anos)
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Tempo médio de tratamento em dias, por gravidade */}
+                      <div>
+                        <div style={ncSubHeaderStyle}>Tempo médio de tratamento</div>
+                        {GRAVIDADES.map((g) => {
+                          const dias = ncIndicadores.tempoMedioTratamentoDias[g];
+                          return (
+                            <div key={g} style={ncRowStyle}>
+                              <span style={{ color: "#374151" }}>{g}</span>
+                              <span style={{ fontWeight: 600, color: "#111827" }}>
+                                {dias != null ? `${dias.toLocaleString("pt-PT", { minimumFractionDigits: 1 })} dias` : "Sem dados"}
+                              </span>
+                            </div>
+                          );
+                        })}
+                        <div style={{ fontSize: 10.5, color: "#d1d5db", marginTop: 8, lineHeight: 1.4 }}>
+                          Só considera NC que já atingiram o estado "Tratada" (registo até tratamento).
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

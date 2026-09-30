@@ -72,7 +72,29 @@ const RESTRICTED_DOC_KEYS = [
 const BLOCK_COLLECTIONS = [
   { collection: "cedencias", requestKey: "cedencias" },
   { collection: "baixasMedicas", requestKey: "baixasMedicas" },
+  // Histórico de contratos anteriores (o contrato atual continua nos campos tipo_contrato/
+  // data_admissao/data_fim_contrato do documento do user). Subcoleção com nome próprio
+  // para não entrar nos collectionGroup('cedencias') usados no livro de ponto/estado.
+  // "idPorDataInicio": o id de cada documento é o ano-mês de início (ver idsPorDataInicio).
+  { collection: "contratosAnteriores", requestKey: "contratosAnteriores", idPorDataInicio: true },
 ];
+
+// Ids "AAAA-MM" a partir da data de início de cada bloco (ex: "2022-08"), com sufixo
+// (_2, _3, ...) quando há mais do que um no mesmo mês - mesma ideia dos "registo_DDMMAAAA"
+// das Ferias/deslocações. Blocos sem data de início ficam "sem_data". Os ids são
+// recalculados a cada gravação (os blocos chegam do frontend com um id temporário, e
+// mudar a data de início muda o id), por ordem de data de início e, em empate, do id
+// recebido, para o mesmo conjunto de contratos dar sempre os mesmos ids.
+function idsPorDataInicio(items) {
+  const ordenados = [...items].sort((a, b) =>
+    (a.dataInicio || "9999").localeCompare(b.dataInicio || "9999") || String(a.id).localeCompare(String(b.id)));
+  const usados = {};
+  return ordenados.map(item => {
+    const base = /^\d{4}-\d{2}/.test(item.dataInicio || "") ? item.dataInicio.slice(0, 7) : "sem_data";
+    usados[base] = (usados[base] || 0) + 1;
+    return { ...item, id: usados[base] === 1 ? base : `${base}_${usados[base]}` };
+  });
+}
 
 // Situações contratuais que tiram o colaborador do quadro ativo - mesmo critério de
 // ColaboradoresGroupedList.jsx (só colaboradores ativos aparecem agrupados por entidade,
@@ -83,8 +105,9 @@ const INACTIVE_STATUSES = ["Cessado", "Suspenso", "Reformado"];
 // Substitui o conteúdo de uma subcoleção de "blocos" pelos itens recebidos (cada um
 // identificado pelo seu próprio id de documento)  -  cria/atualiza os que vieram no
 // pedido e apaga os que já não constam da lista.
-async function syncBlockCollection(collectionRef, items) {
-  const incoming = Array.isArray(items) ? items.filter(it => it && it.id) : [];
+async function syncBlockCollection(collectionRef, items, { idPorDataInicio = false } = {}) {
+  const recebidos = Array.isArray(items) ? items.filter(it => it && it.id) : [];
+  const incoming = idPorDataInicio ? idsPorDataInicio(recebidos) : recebidos;
   const existingSnap = await collectionRef.get();
   const existingIds = new Set(existingSnap.docs.map(doc => doc.id));
   const incomingIds = new Set(incoming.map(it => it.id));
@@ -305,8 +328,8 @@ const saveCadastro = async (req, res) => {
     // estas subcoleções  -  um utilizador sem privilégio pode enviá-las de volta tal como
     // as recebeu (o campo continua "só de leitura" no frontend), por isso ignoramo-las aqui.
     if (privileged) {
-      await Promise.all(BLOCK_COLLECTIONS.map(({ collection, requestKey }) =>
-        syncBlockCollection(userDocRef.collection(collection), req.body[requestKey])
+      await Promise.all(BLOCK_COLLECTIONS.map(({ collection, requestKey, idPorDataInicio }) =>
+        syncBlockCollection(userDocRef.collection(collection), req.body[requestKey], { idPorDataInicio })
       ));
     }
 
