@@ -329,8 +329,8 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick
     <>
       <div className="flex flex-col p-6 text-gold w-full lg:w-[280px] shrink-0 bg-[rgba(169,169,169,0.1)] rounded-lg">
         <h2 className="text-2xl font-bold mb-4">Totais</h2>
-        <p className="mb-2"><strong>Horas Extra (mês):</strong> <span className={totais.totalExtras.startsWith('-') ? 'text-danger' : ''}>{totais.totalExtras}</span></p>
         <p className="mb-2"><strong>Horas Extra (ano):</strong> {accumulatedExtras === null ? '...' : <span className={accumulatedExtras < 0 ? 'text-danger' : ''}>{formatarMinutos(accumulatedExtras)}</span>}</p>
+        <p className="mb-2"><strong>Horas Extra (mês):</strong> <span className={totais.totalExtras.startsWith('-') ? 'text-danger' : ''}>{totais.totalExtras}</span></p>
         <p className="mb-2"><strong>Faltas:</strong> {totais.diasFalta}</p>
         <p className="mb-2"><strong>Férias:</strong> {totais.diasFerias}</p>
         {/* <p className="mb-2"><strong>🎂 Aniversário:</strong> {totais.diasAniversario}</p> */}

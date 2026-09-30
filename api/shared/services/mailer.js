@@ -13,6 +13,11 @@ const transporter = nodemailer.createTransport({
   port: 465,
   secure: true, // true porque é a porta 465 (SSL)
   auth: { user: NODEEMAIL, pass: NODEPASSWORD },
+  // Pool com poucas ligações: envios em lote (ex.: importação de recibos) abriam uma
+  // ligação SMTP por email em simultâneo e o Gmail recusava as que excediam o limite
+  // de ligações concorrentes - esses emails perdiam-se.
+  pool: true,
+  maxConnections: 3,
 });
 
 const TEMPLATES_DIR = path.join(__dirname, "emailTemplates");

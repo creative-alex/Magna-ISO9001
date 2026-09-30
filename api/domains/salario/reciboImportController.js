@@ -232,14 +232,23 @@ const importRecibos = async (req, res) => {
       const mesLabel = getMesLabel(mes);
       Promise.allSettled(finalOk.map((r) => {
         const userData = usersByUid.get(r.uid);
-        if (!userData?.email) return Promise.resolve();
+        if (!userData?.email) {
+          console.error(`Colaborador ${r.uid} sem email  -  notificação de recibo (lote) não enviada`);
+          return Promise.resolve();
+        }
         return sendMail({
           to: userData.email,
           subject: `Recibo de vencimento disponível - ${mesLabel}`,
           html: renderEmail("recibo-vencimento", { nome: userData.nome || "", mesLabel, eyebrow: "Recibo de vencimento" }),
           entidade: userData.entidade,
         });
-      })).catch(() => {});
+      })).then((results) => {
+        results.forEach((result, idx) => {
+          if (result.status === "rejected") {
+            console.error(`Erro ao enviar email de recibo (lote) ao colaborador ${finalOk[idx].uid}:`, result.reason);
+          }
+        });
+      });
     }
 
     res.json({
