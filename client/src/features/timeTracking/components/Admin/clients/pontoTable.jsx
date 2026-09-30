@@ -16,7 +16,6 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
   const [dados, setDados] = useState([]);
   const [totais, setTotais] = useState({
     totalHoras: "0h 0m",
-    totalNormais: "0h 0m",
     totalExtras: "0h 0m",
     diasFalta: 0,
     diasFerias: 0,
@@ -56,8 +55,6 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
 
       const diasNoMes = new Date(year, month, 0).getDate();
       let totalMinutos = 0;
-      let totalMinutosNormais = 0;
-      let totalMinutosExtras = 0;
 
       let novosDados = Array.from({ length: diasNoMes }, (_, i) => ({
         dia: `${String(i + 1).padStart(2, "0")}-${String(month).padStart(2, "0")}`,
@@ -75,6 +72,10 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
 
       const data = response.ok ? await response.json() : { registos: [] };
       const registos = Array.isArray(data.registos) ? data.registos : [];
+      // Horas extra = só as registadas explicitamente (HorasExtraManual); o tempo de
+      // ponto além das 8h / fora das 08:30-17:00 não conta como hora extra.
+      const totalMinutosExtras = (Array.isArray(data.manualOvertime) ? data.manualOvertime : [])
+        .reduce((sum, mo) => sum + (mo.totalMinutes || 0), 0);
 
       // Processar férias aprovadas
       const ferias = Array.isArray(data.ferias)
@@ -246,7 +247,7 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
           }
           
           // Caso seja um registo normal de trabalho
-          const { total, extra, minutos, minutosExtras, minutosFalta } = calcularHoras(registo.horaEntrada, registo.horaSaida, dataAtual);
+          const { total, minutos, minutosFalta } = calcularHoras(registo.horaEntrada, registo.horaSaida, dataAtual);
           const minutosCompensados = registo.horasCompensatorias || 0;
           const isCompensado = minutosCompensados > 0;
           // Dia compensado: soma-se o que foi trabalhado com o que foi coberto
@@ -254,14 +255,11 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
           // compensar, pode não ser o défice todo  -  ver CompensateOvertimeButton).
           const minutosNormaisFinal = isCompensado ? (minutos + minutosCompensados) : minutos;
           totalMinutos += minutosNormaisFinal;
-          totalMinutosNormais += minutosNormaisFinal;
-          totalMinutosExtras += minutosExtras;
           return {
             ...item,
             horaEntrada: registo.horaEntrada || "-",
             horaSaida: registo.horaSaida || "-",
             total: isCompensado ? formatarMinutos(minutosNormaisFinal) : total,
-            extra,
             compensated: isCompensado,
             compensatedMinutes: minutosCompensados,
             minutosFalta: minutosFalta || 0,
@@ -290,8 +288,7 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
       const diasAniversario = novosDados.filter((d) => d.isAniversario).length;
 
       const novosTotais = {
-        totalHoras: formatarMinutos(totalMinutos + totalMinutosExtras),
-        totalNormais: formatarMinutos(totalMinutosNormais),
+        totalHoras: formatarMinutos(totalMinutos),
         totalExtras: formatarMinutos(totalMinutosExtras),
         diasFalta,
         diasFerias,
@@ -312,7 +309,6 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
       console.error("❌ Erro ao buscar horários:", error);
       setTotais({
         totalHoras: "0h 0m",
-        totalNormais: "0h 0m",
         totalExtras: "0h 0m",
         diasFalta: 0,
         diasFerias: 0,

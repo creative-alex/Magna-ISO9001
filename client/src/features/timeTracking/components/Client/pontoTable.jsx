@@ -91,7 +91,7 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
         const horaSaidaExtraida   = extractTime(registo?.horaSaida);
         const horasCalculadas = (horaEntradaExtraida && horaSaidaExtraida && !isFerias && !isBaixa && !isAniversario)
           ? calcularHoras(horaEntradaExtraida, horaSaidaExtraida, dataObj)
-          : { total: "-", extra: "-", minutos: 0, minutosExtras: 0, minutosFalta: 0 };
+          : { total: "-", minutos: 0, minutosFalta: 0 };
 
         return {
           dia,
@@ -102,8 +102,6 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
           // pelo saldo anual de horas extra (o utilizador escolhe quanto quer
           // compensar, pode não ser o défice todo  -  ver CompensateOvertimeButton).
           total: isCompensado ? formatarMinutos(horasCalculadas.minutos + minutosCompensados) : horasCalculadas.total,
-          extra: horasCalculadas.extra,
-          minutosExtras: horasCalculadas.minutosExtras || 0,
           minutosFalta: horasCalculadas.minutosFalta || 0,
           manualOvertime: hasManualOvertime ? `${Math.floor(manualOvertimeTotalMinutes / 60)}h ${manualOvertimeTotalMinutes % 60}m` : null,
           manualOvertimeMinutes: manualOvertimeTotalMinutes,
@@ -268,7 +266,6 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
   // Calcular totais
   const calcularTotais = () => {
     let totalMinutosTrabalho = 0;
-    let totalMinutosExtras = 0;
     let totalManualOvertime = 0;
 
     dados.forEach(item => {
@@ -278,13 +275,13 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
           totalMinutosTrabalho += parseInt(match[1]) * 60 + parseInt(match[2]);
         }
       }
-      totalMinutosExtras += item.minutosExtras || 0;
       totalManualOvertime += item.manualOvertimeMinutes || 0;
     });
 
     // Bruto: o mensal já não é reduzido pelas faltas do dia  -  ver
     // CompensateOvertimeButton, que desconta do saldo anual em vez do mensal.
-    const totalExtrasLiquido = totalMinutosExtras + totalManualOvertime;
+    // Só horas extra registadas manualmente - o ponto nunca gera horas extra.
+    const totalExtrasLiquido = totalManualOvertime;
 
     return {
       totalTrabalho: formatarMinutos(totalMinutosTrabalho),

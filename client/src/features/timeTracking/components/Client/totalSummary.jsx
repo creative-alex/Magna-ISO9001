@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { FaStopwatch, FaChartColumn } from 'react-icons/fa6';
-import { calcularHoras, formatarMinutos } from '../../utils/calcHours';
+import { formatarMinutos } from '../../utils/calcHours';
 import { getHolidaysForSede } from '../../../../shared/utils/holidays';
 import { isBlocoAtivoEm, isDiaForaDeAtivo } from '../../../../shared/utils/absenceBlocks';
 import ManualOvertimeButton from './manualOvertime';
@@ -26,15 +26,12 @@ const MONTH_NAMES_FULL = [
 // esta prop, o saldo segue reloadTick como antes.
 const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick = 0, overtimeReloadTick, calendarData, calendarLoading = false }) => {
   const [totais, setTotais] = useState({
-    totalHoras: "0h 0m",
     totalExtras: "0h 0m",
-    totalCompensado: "0h 0m",
     diasFalta: 0,
     diasFerias: 0,
     diasAniversario: 0,
   });
   const [accumulatedExtras, setAccumulatedExtras] = useState(null);
-  const [accumulatedCompensated, setAccumulatedCompensated] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showYearlyModal, setShowYearlyModal] = useState(false);
   const [yearlyData, setYearlyData] = useState([]);
@@ -94,20 +91,13 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick
         const dataFimContrato = data.dataFimContrato || null;
 
         const allHolidays = getHolidaysForSede(data.sede, currentYear);
-        const isSpecialStatus = (h) => {
-          if (!h || h === '-') return false;
-          const low = h.toLowerCase();
-          return low.startsWith('feria') || low.startsWith('féria') || low.startsWith('baixa') || low.startsWith('aniversario');
-        };
         const parseDDMM = (d) => (d && d.length >= 5 && d[2] === '-') ? d.slice(0, 5) : d;
         const feriasSet = new Set(ferias.filter(f => f.approved).map(f => parseDDMM(f.date || '')));
         const baixasSet = new Set(baixas.filter(b => b.approved).map(b => parseDDMM(b.date || '')));
         const aniversarioSet = new Set(aniversario.filter(a => a.approved).map(a => parseDDMM(a.date || '')));
 
         // Calcular totais
-        let totalMinutos = 0;
         let totalMinutosExtras = 0;
-        let totalMinutosCompensados = 0;
         let diasFalta = 0;
 
         const diasNoMes = new Date(currentYear, month, 0).getDate();
@@ -132,21 +122,7 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick
           const isLicencaOuBaixaCadastro = licencasOuBaixasCadastro.some((b) => isBlocoAtivoEm(b, dataIso));
           const isForaDeAtivo = isDiaForaDeAtivo(situacaoContratual, dataFimContrato, dataIso);
 
-          if (registo && registo.horaEntrada && registo.horaSaida && !isSpecialStatus(registo.horaEntrada)) {
-            const horaEntrada = extractTime(registo.horaEntrada);
-            const horaSaida = extractTime(registo.horaSaida);
-
-            if (horaEntrada && horaSaida) {
-              const resCalc = calcularHoras(horaEntrada, horaSaida, dataAtual);
-              // Dia compensado: soma-se o que foi coberto pelo saldo anual de
-              // horas extra (o utilizador escolhe quanto, pode não ser o défice
-              // todo), para que as 40h semanais/mensais reflitam sempre a
-              // compensação  -  ver CompensateOvertimeButton.
-              totalMinutos += resCalc.minutos + (registo.horasCompensatorias || 0);
-              totalMinutosExtras += resCalc.minutosExtras;
-              totalMinutosCompensados += registo.horasCompensatorias || 0;
-            }
-          } else if (isPast && isWorkday && !isHoliday && !isFerias && !isBaixa && !isAniversario && !isCedencia && !isLicencaOuBaixaCadastro && !isForaDeAtivo && !registo) {
+          if (isPast && isWorkday && !isHoliday && !isFerias && !isBaixa && !isAniversario && !isCedencia && !isLicencaOuBaixaCadastro && !isForaDeAtivo && !registo) {
             diasFalta++;
           }
         }
@@ -162,9 +138,7 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick
         // CompensateOvertimeButton, que desconta o défice do saldo anual em vez
         // do mensal.
         setTotais({
-          totalHoras: formatarMinutos(totalMinutos),
           totalExtras: formatarMinutos(totalMinutosExtras),
-          totalCompensado: formatarMinutos(totalMinutosCompensados),
           diasFalta,
           diasFerias: ferias.filter(f => f.approved).length,
           diasAniversario: aniversario.filter(a => a.approved).length,
@@ -239,7 +213,6 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick
       .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
       .then(data => {
         setAccumulatedExtras(data.totalNetOvertimeMinutes ?? 0);
-        setAccumulatedCompensated(data.totalCompensatedMinutes ?? 0);
       })
       .catch((err) => console.error("Erro ao buscar saldo anual de horas extra:", err));
   }, [username, overtimeTick]);
@@ -279,26 +252,10 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick
         const ferias = data.ferias || [];
         const manualOvertime = data.manualOvertime || [];
 
-        let totalMinutos = 0;
         let totalMinutosExtras = 0;
 
-        const diasNoMes = new Date(selectedYear, monthNum, 0).getDate();
-
-        for (let i = 0; i < diasNoMes; i++) {
-          const registo = registos.find((r) => new Date(r.timestamp).getDate() === i + 1);
-
-          if (registo && registo.horaEntrada && registo.horaSaida) {
-            const horaEntrada = extractTime(registo.horaEntrada);
-            const horaSaida = extractTime(registo.horaSaida);
-
-            if (horaEntrada && horaSaida) {
-              const dataAtual = new Date(selectedYear, monthNum - 1, i + 1);
-              const resCalc = calcularHoras(horaEntrada, horaSaida, dataAtual);
-              totalMinutos += resCalc.minutos + (registo.horasCompensatorias || 0);
-              totalMinutosExtras += resCalc.minutosExtras;
-            }
-          }
-        }
+        // Mês com pelo menos um dia com entrada e saída - decide se aparece na tabela
+        const temRegistos = registos.some(r => extractTime(r.horaEntrada) && extractTime(r.horaSaida));
 
         // Adicionar horas extras manuais ao total
         manualOvertime.forEach(mo => {
@@ -311,7 +268,7 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick
         return {
           month: monthNames[index],
           monthNum: monthNum,
-          totalHoras: formatarMinutos(totalMinutos),
+          temRegistos,
           totalExtras: formatarMinutos(totalMinutosExtras),
           diasFerias: ferias.length,
         };
@@ -372,11 +329,8 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick
     <>
       <div className="flex flex-col p-6 text-gold w-full lg:w-[280px] shrink-0 bg-[rgba(169,169,169,0.1)] rounded-lg">
         <h2 className="text-2xl font-bold mb-4">Totais</h2>
-        <p className="mb-2"><strong>Horas Normais:</strong> {totais.totalHoras}</p>
         <p className="mb-2"><strong>Horas Extra (mês):</strong> <span className={totais.totalExtras.startsWith('-') ? 'text-danger' : ''}>{totais.totalExtras}</span></p>
-        <p className="mb-2"><strong>Horas Extra (total):</strong> {accumulatedExtras === null ? '...' : <span className={accumulatedExtras < 0 ? 'text-danger' : ''}>{formatarMinutos(accumulatedExtras)}</span>}</p>
-        <p className="mb-2"><strong>Horas Compensadas (mês):</strong> <span className="text-blue-600">{totais.totalCompensado}</span></p>
-        <p className="mb-2"><strong>Horas Compensadas (total):</strong> {accumulatedCompensated === null ? '...' : <span className="text-blue-600">{formatarMinutos(accumulatedCompensated)}</span>}</p>
+        <p className="mb-2"><strong>Horas Extra (ano):</strong> {accumulatedExtras === null ? '...' : <span className={accumulatedExtras < 0 ? 'text-danger' : ''}>{formatarMinutos(accumulatedExtras)}</span>}</p>
         <p className="mb-2"><strong>Faltas:</strong> {totais.diasFalta}</p>
         <p className="mb-2"><strong>Férias:</strong> {totais.diasFerias}</p>
         {/* <p className="mb-2"><strong>🎂 Aniversário:</strong> {totais.diasAniversario}</p> */}
@@ -471,14 +425,13 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick
                   <thead>
                     <tr className="border-b-2 border-gray-300 bg-gold-light">
                       <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gold whitespace-nowrap sticky left-0 z-10 bg-gold-light">Mês</th>
-                      <th className="text-right py-3 px-2 sm:px-4 font-semibold text-gold whitespace-nowrap">Horas Normais</th>
                       <th className="text-right py-3 px-2 sm:px-4 font-semibold text-gold whitespace-nowrap">Horas Extras</th>
                       <th className="text-right py-3 px-2 sm:px-4 font-semibold text-gold whitespace-nowrap">Dias de Férias</th>
                     </tr>
                   </thead>
                   <tbody>
                     {yearlyData
-                      .filter(monthData => monthData.totalHoras !== '0h 0m')
+                      .filter(monthData => monthData.temRegistos || monthData.totalExtras !== '0h 0m')
                       .map((monthData, index) => (
                       <React.Fragment key={index}>
                         <tr
@@ -494,13 +447,12 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick
                               )}
                             </span>
                           </td>
-                          <td className="text-right py-3 px-2 sm:px-4 text-warning whitespace-nowrap">{monthData.totalHoras}</td>
                           <td className="text-right py-3 px-2 sm:px-4 text-success whitespace-nowrap">{monthData.totalExtras}</td>
                           <td className="text-right py-3 px-2 sm:px-4 text-gray-700 whitespace-nowrap">{monthData.diasFerias}</td>
                         </tr>
                         {expandedMonth === monthData.monthNum && (
                           <tr>
-                            <td colSpan="4" className="p-2 sm:p-5 bg-[#f8f9fa] border-t-2 border-[#dee2e6]">
+                            <td colSpan="3" className="p-2 sm:p-5 bg-[#f8f9fa] border-t-2 border-[#dee2e6]">
                               <TimeTrackingTable className="overflow-x-auto" username={username} month={monthData.monthNum} year={selectedYear} />
                             </td>
                           </tr>
@@ -511,17 +463,6 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick
                   <tfoot>
                     <tr className="border-t-2 border-gray-300 font-bold bg-gold-light">
                       <td className="py-3 px-2 sm:px-4 text-gold whitespace-nowrap sticky left-0 z-10 bg-gold-light">Total</td>
-                      <td className="text-right py-3 px-2 sm:px-4 text-warning whitespace-nowrap">
-                        {formatarMinutos(
-                          yearlyData.reduce((acc, m) => {
-                            const match = m.totalHoras.match(/(\d+)h (\d+)m/);
-                            if (match) {
-                              return acc + parseInt(match[1]) * 60 + parseInt(match[2]);
-                            }
-                            return acc;
-                          }, 0)
-                        )}
-                      </td>
                       <td className="text-right py-3 px-2 sm:px-4 text-success whitespace-nowrap">
                         {formatarMinutos(
                           yearlyData.reduce((acc, m) => {

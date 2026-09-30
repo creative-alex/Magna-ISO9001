@@ -134,7 +134,6 @@ const ExportExcel = ({ dados, totais, username, month }) => {
     // Adicionar linhas de totais
     const totaisData = [
       ["Total de Horas", totais?.totalHoras || ""],
-      ["Total de Horas Normais", totais?.totalNormais || ""],
       ["Total Horas Extras", totais?.totalExtras || ""],
       ["Faltas", totais?.diasFalta !== undefined ? totais.diasFalta : ""],
       ["Férias", totais?.diasFerias !== undefined ? totais.diasFerias : ""],

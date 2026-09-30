@@ -283,25 +283,10 @@ const UserDetails = ({ selectedUser }) => {
         body: JSON.stringify({ uid: userName, year: selectedYear }),
       });
 
-      let totalHoras = "0h 0m";
       let totalExtras = "0h 0m";
 
       if (overtimeResponse.ok) {
         const overtimeData = await overtimeResponse.json();
-        // Calcular total de horas normais a partir dos dados mensais
-        const totalMinutosNormais = overtimeData.monthlyOvertime?.reduce((acc, month) => {
-          const horas = parseInt(month.totalHours?.split('h')[0] || 0);
-          const minutos = parseInt(month.totalHours?.split(' ')[1]?.split('m')[0] || 0);
-          return acc + horas * 60 + minutos;
-        }, 0) || 0;
-
-        const formatarMinutos = (minutos) => {
-          const horas = Math.floor(minutos / 60);
-          const mins = minutos % 60;
-          return `${horas}h ${mins}m`;
-        };
-
-        totalHoras = formatarMinutos(totalMinutosNormais);
         totalExtras = overtimeData.totalOvertimeHours || "0h 0m";
       }
 
@@ -324,7 +309,6 @@ const UserDetails = ({ selectedUser }) => {
       }
 
       const totaisAnuais = {
-        totalHoras,
         totalExtras,
         diasFalta,
         diasFerias,

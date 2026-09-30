@@ -4,15 +4,17 @@ const { getHolidaysDDMM } = require("./holidays");
 const { isBlocoAtivoEm, labelBaixaOuLicenca } = require("../../shared/lib/absenceBlocks");
 const db = admin.firestore();
 
-// Função auxiliar para calcular horas (similar à do frontend)
-function calcularHorasHelper(horaEntrada, horaSaida, date = null) {
-  if (!horaEntrada || !horaSaida) return { minutos: 0, minutosExtras: 0 };
+// Função auxiliar para calcular horas (similar à do frontend). Devolve só os minutos
+// normais do dia (máx. 8h): tempo registado além das 8h / fora das 08:30-17:00 NÃO é
+// hora extra - horas extra são apenas as registadas explicitamente em HorasExtraManual.
+function calcularHorasHelper(horaEntrada, horaSaida) {
+  if (!horaEntrada || !horaSaida) return { minutos: 0 };
 
   const [hEntrada, mEntrada] = horaEntrada.split(':').map(Number);
   const [hSaida, mSaida] = horaSaida.split(':').map(Number);
 
   if (isNaN(hEntrada) || isNaN(mEntrada) || isNaN(hSaida) || isNaN(mSaida)) {
-    return { minutos: 0, minutosExtras: 0 };
+    return { minutos: 0 };
   }
 
   let minutosTrabalhados = (hSaida * 60 + mSaida) - (hEntrada * 60 + mEntrada);
@@ -23,9 +25,8 @@ function calcularHorasHelper(horaEntrada, horaSaida, date = null) {
 
   // Fins de semana são tratados como dias normais
   const minutosNormais = Math.min(minutosTrabalhados, 480);
-  const minutosExtras = Math.max(0, minutosTrabalhados - 480);
 
-  return { minutos: minutosNormais, minutosExtras };
+  return { minutos: minutosNormais };
 }
 
 // Função auxiliar para formatar minutos
@@ -113,7 +114,8 @@ function isDiaForaDeAtivo({ situacaoContratual, dataFimContrato }, dataIso) {
   return true;
 }
 
-// Saldo anual de horas extra: bruto acumulado (Registos + HorasExtraManual do ano,
+// Saldo anual de horas extra: bruto acumulado (só HorasExtraManual do ano - os Registos
+// de ponto nunca geram horas extra automaticamente,
 // sem subtrair faltas  -  o mensal passa a não se mexer, ver compensateShortDay em
 // timeTrackingController.js) menos o que já foi usado para compensar dias curtos
 // (campo "horas_compensatorias", gravado no próprio Registos do dia compensado).
@@ -133,10 +135,6 @@ async function computeAnnualOvertimeBalance(uid, year) {
   let compensatedMinutes = 0;
   registosSnapshot.forEach(doc => {
     const data = doc.data();
-    if (data.horaEntrada && data.horaSaida) {
-      const { minutosExtras } = calcularHorasHelper(data.horaEntrada, data.horaSaida, data.timestamp.toDate());
-      grossMinutes += minutosExtras;
-    }
     compensatedMinutes += data.horas_compensatorias || 0;
   });
 
@@ -397,14 +395,12 @@ const getOvertimeSummary = async (req, res) => {
       }
 
       if (data.horaEntrada && data.horaSaida) {
-        const { minutos, minutosExtras } = calcularHorasHelper(data.horaEntrada, data.horaSaida, date);
+        const { minutos } = calcularHorasHelper(data.horaEntrada, data.horaSaida);
         // Dia compensado: soma-se o que foi coberto pelo saldo anual (o utilizador
         // escolhe quanto, pode não ser o défice todo), para que as 40h
         // semanais/mensais reflitam sempre a compensação  -  ver compensateShortDay.
         monthlyData[monthKey].totalMinutes += minutos + (data.horas_compensatorias || 0);
-        monthlyData[monthKey].overtimeMinutes += minutosExtras;
         monthlyData[monthKey].workDays++;
-        totalOvertimeMinutes += minutosExtras;
       }
 
       totalCompensatedMinutes += data.horas_compensatorias || 0;
@@ -445,7 +441,7 @@ const getOvertimeSummary = async (req, res) => {
       totalManualOvertimeMinutes += data.totalMinutes || 0;
     });
 
-    // Somar horas extras automáticas e manuais
+    // Só horas extra manuais - não há horas extra automáticas a partir dos Registos
     totalOvertimeMinutes += totalManualOvertimeMinutes;
 
     for (let month = 1; month <= 12; month++) {

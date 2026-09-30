@@ -1,13 +1,16 @@
 import { isWeekend } from './dateHelpers';
 
+// Horas extra NÃO são calculadas aqui: tempo registado além das 8h / fora das
+// 08:30-17:00 (ou ao fim de semana) não conta automaticamente como hora extra.
+// Só contam as registadas explicitamente como Hora Extra (HorasExtraManual).
 export const calcularHoras = (entrada, saida, date = null) => {
-    if (!entrada || !saida) return { total: "-", extra: "-", minutos: 0, minutosExtras: 0, minutosFalta: 480 };
+    if (!entrada || !saida) return { total: "-", minutos: 0, minutosFalta: 480 };
   
     const [hEntrada, mEntrada] = entrada.split(":").map(Number);
     const [hSaida, mSaida] = saida.split(":").map(Number);
   
     if (isNaN(hEntrada) || isNaN(mEntrada) || isNaN(hSaida) || isNaN(mSaida)) {
-      return { total: "-", extra: "-", minutos: 0, minutosExtras: 0, minutosFalta: 480 };
+      return { total: "-", minutos: 0, minutosFalta: 480 };
     }
   
     let minutosTrabalhados = (hSaida * 60 + mSaida) - (hEntrada * 60 + mEntrada);
@@ -18,25 +21,13 @@ export const calcularHoras = (entrada, saida, date = null) => {
     // Verificar se é fim de semana
     const isWeekendDay = isWeekend(date);
     
-    let minutosNormais, minutosExtras, minutosFalta;
-    
-    if (isWeekendDay) {
-      // Nos fins de semana, todas as horas são consideradas extra
-      minutosNormais = 0;
-      minutosExtras = minutosTrabalhados;
-      minutosFalta = 0; // Não há falta nos fins de semana
-    } else {
-      // Lógica normal para dias de semana
-      minutosNormais = Math.min(minutosTrabalhados, 480);
-      minutosExtras = Math.max(0, minutosTrabalhados - 480);
-      minutosFalta = Math.max(0, 480 - minutosTrabalhados);
-    }
+    const minutosNormais = Math.min(minutosTrabalhados, 480);
+    // Não há falta nos fins de semana
+    const minutosFalta = isWeekendDay ? 0 : Math.max(0, 480 - minutosTrabalhados);
   
     return {
       total: formatarMinutos(minutosTrabalhados),
-      extra: minutosExtras > 0 ? formatarMinutos(minutosExtras) : "-",
       minutos: minutosNormais,
-      minutosExtras,
       minutosFalta
     };
   };

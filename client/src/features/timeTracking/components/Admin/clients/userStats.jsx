@@ -51,7 +51,6 @@ const AnnualStats = ({
   if (!(totaisAnuais || (selectedMonth && totais))) return null;
 
   const stats = [
-    { label: "Horas Normais", value: selectedMonth ? (totais?.totalHoras || "0h 0m") : (totaisAnuais?.totalHoras || "0h 0m") },
     { label: "Horas Extra", value: selectedMonth ? (totais?.totalExtras || "0h 0m") : (totaisAnuais?.totalExtras || "0h 0m") },
     { label: "Faltas", value: selectedMonth ? (totais?.diasFalta || 0) : (totaisAnuais?.diasFalta || 0) },
     { label: "Férias", value: selectedMonth ? (totais?.diasFerias || 0) : (totaisAnuais?.diasFerias || 0) },
