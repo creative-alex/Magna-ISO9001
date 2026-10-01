@@ -21,13 +21,14 @@ export const calcularHoras = (entrada, saida, date = null) => {
     // Verificar se é fim de semana
     const isWeekendDay = isWeekend(date);
     
-    const minutosNormais = Math.min(minutosTrabalhados, 480);
     // Não há falta nos fins de semana
     const minutosFalta = isWeekendDay ? 0 : Math.max(0, 480 - minutosTrabalhados);
   
     return {
       total: formatarMinutos(minutosTrabalhados),
-      minutos: minutosNormais,
+      // Tempo real de ponto (sem limite de 8h/dia) - é o que os totais de Horas
+      // Trabalhadas somam, igual ao que a coluna mostra (total).
+      minutos: minutosTrabalhados,
       minutosFalta
     };
   };

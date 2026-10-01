@@ -37,6 +37,8 @@ const AllEntities = () => {
   const [usersByEntity, setUsersByEntity] = useState({});
   const [search, setSearch] = useState("");
   const [ajustesPendentesByUid, setAjustesPendentesByUid] = useState({});
+  const [horasExtraPendentesByUid, setHorasExtraPendentesByUid] = useState({});
+  const [compensacoesPendentesByUid, setCompensacoesPendentesByUid] = useState({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -92,6 +94,29 @@ const AllEntities = () => {
         }
       } catch (err) {
         console.error("Erro ao carregar alterações de horas pendentes:", err);
+      }
+    })();
+  }, []);
+
+  // Horas extra por aprovar - a rota é só para GestorRH/SuperAdmin (403 para os outros
+  // níveis, que simplesmente não veem o aviso).
+  useEffect(() => {
+    (async () => {
+      try {
+        const [resHorasExtra, resCompensacoes] = await Promise.all([
+          apiFetch(`/timetracking/pending-manual-overtime-uids`, { method: "POST" }),
+          apiFetch(`/timetracking/pending-compensations-uids`, { method: "POST" }),
+        ]);
+        if (resHorasExtra.ok) {
+          const data = await resHorasExtra.json();
+          setHorasExtraPendentesByUid(data.contagemPorUid || {});
+        }
+        if (resCompensacoes.ok) {
+          const data = await resCompensacoes.json();
+          setCompensacoesPendentesByUid(data.contagemPorUid || {});
+        }
+      } catch (err) {
+        console.error("Erro ao carregar horas extra pendentes:", err);
       }
     })();
   }, []);
@@ -199,7 +224,7 @@ const AllEntities = () => {
                     </div>
                   ) : (
                     users.map((u, i) => (
-                      <UserListRow key={u.uid} user={u} onClick={openUser} isLast={i === users.length - 1} indent ajustesPendentes={ajustesPendentesByUid[u.uid]} />
+                      <UserListRow key={u.uid} user={u} onClick={openUser} isLast={i === users.length - 1} indent ajustesPendentes={ajustesPendentesByUid[u.uid]} horasExtraPendentes={horasExtraPendentesByUid[u.uid]} compensacoesPendentes={compensacoesPendentesByUid[u.uid]} />
                     ))
                   )
                 )}

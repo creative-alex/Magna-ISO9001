@@ -2,11 +2,13 @@ const admin = require("firebase-admin");
 const { resolveTargetUid } = require("./helpers");
 const { getHolidaysDDMM } = require("./holidays");
 const { isBlocoAtivoEm, labelBaixaOuLicenca } = require("../../shared/lib/absenceBlocks");
+const { isHoraExtraAprovada, camposAprovacao } = require("./overtimeApprovalController");
 const db = admin.firestore();
 
-// Função auxiliar para calcular horas (similar à do frontend). Devolve só os minutos
-// normais do dia (máx. 8h): tempo registado além das 8h / fora das 08:30-17:00 NÃO é
-// hora extra - horas extra são apenas as registadas explicitamente em HorasExtraManual.
+// Função auxiliar para calcular horas (igual a calcularHoras no frontend). Devolve o
+// tempo real de ponto do dia (sem limite de 8h): tempo além das 8h / fora das
+// 08:30-17:00 conta como trabalhado mas NÃO é hora extra - horas extra são apenas as
+// registadas explicitamente em HorasExtraManual.
 function calcularHorasHelper(horaEntrada, horaSaida) {
   if (!horaEntrada || !horaSaida) return { minutos: 0 };
 
@@ -24,9 +26,21 @@ function calcularHorasHelper(horaEntrada, horaSaida) {
   }
 
   // Fins de semana são tratados como dias normais
-  const minutosNormais = Math.min(minutosTrabalhados, 480);
+  return { minutos: minutosTrabalhados };
+}
 
-  return { minutos: minutosNormais };
+// Horas extra manuais de um ano. Filtra pelo ano embutido em "date" (DD-MM-YYYY),
+// que todos os documentos têm, em vez de .where("year", "==", ...): registos antigos,
+// criados antes de existir o campo "year", ficavam de fora do total anual e do saldo
+// (o mensal via /calendar filtra por "date" e mostrava-os, daí a discrepância).
+async function getManualOvertimeDocsForYear(uid, year) {
+  const snapshot = await db
+    .collection("registo-ponto")
+    .doc(uid)
+    .collection("HorasExtraManual")
+    .get();
+  const ano = String(year);
+  return snapshot.docs.filter(doc => (doc.data().date || "").split("-")[2] === ano);
 }
 
 // Função auxiliar para formatar minutos
@@ -138,16 +152,10 @@ async function computeAnnualOvertimeBalance(uid, year) {
     compensatedMinutes += data.horas_compensatorias || 0;
   });
 
-  // Filtrado por "year" (todos os documentos já têm este campo) em vez de ler a
-  // coleção inteira e filtrar aqui pelo ano embutido em "date".
-  const manualOvertimeSnapshot = await db
-    .collection("registo-ponto")
-    .doc(uid)
-    .collection("HorasExtraManual")
-    .where("year", "==", year)
-    .get();
+  const manualOvertimeDocs = await getManualOvertimeDocsForYear(uid, year);
 
-  manualOvertimeSnapshot.forEach(doc => {
+  // Só as horas extra aprovadas pela GestorRH entram no saldo (ver overtimeApprovalController.js).
+  manualOvertimeDocs.filter(doc => isHoraExtraAprovada(doc.data())).forEach(doc => {
     grossMinutes += doc.data().totalMinutes || 0;
   });
 
@@ -269,7 +277,33 @@ const getUserRecords = async (req, res) => {
             totalMinutes,
             description: data.description || "",
             startHour: data.startHour || "",
-            endHour: data.endHour || ""
+            endHour: data.endHour || "",
+            ...camposAprovacao(data)
+          };
+        })
+      );
+    }
+
+    // Pedidos de compensação do mês (todos os estados) - para a coluna "Compensação Horas"
+    // mostrar também os pendentes/rejeitados. Só os aprovados têm efeito (o campo
+    // horas_compensatorias do registo do dia) - ver compensationApprovalController.js.
+    const pedidosCompensacaoRef = db
+      .collection("registo-ponto")
+      .doc(userId)
+      .collection("PedidosCompensacao");
+    let compensacoesInfos = [];
+    for (let i = 0; i < listaDeDatas.length; i += 30) {
+      const batch = listaDeDatas.slice(i, i + 30);
+      const pedidosSnapshot = await pedidosCompensacaoRef.where("date", "in", batch).get();
+      compensacoesInfos.push(
+        ...pedidosSnapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            date: data.date,
+            minutos: data.minutos || 0,
+            saldoDisponivel: data.saldoDisponivel ?? null,
+            ...camposAprovacao(data)
           };
         })
       );
@@ -335,6 +369,7 @@ const getUserRecords = async (req, res) => {
       baixas: baixasInfos,
       aniversario: aniversarioInfos,
       manualOvertime: manualOvertimeInfos,
+      compensacoes: compensacoesInfos,
       createdAt: userCreatedAt ? userCreatedAt.toISOString() : null,
       sede,
       situacaoContratual: cadastroAusencias.situacaoContratual,
@@ -396,30 +431,27 @@ const getOvertimeSummary = async (req, res) => {
 
       if (data.horaEntrada && data.horaSaida) {
         const { minutos } = calcularHorasHelper(data.horaEntrada, data.horaSaida);
-        // Dia compensado: soma-se o que foi coberto pelo saldo anual (o utilizador
-        // escolhe quanto, pode não ser o défice todo), para que as 40h
-        // semanais/mensais reflitam sempre a compensação  -  ver compensateShortDay.
-        monthlyData[monthKey].totalMinutes += minutos + (data.horas_compensatorias || 0);
+        // Só tempo de ponto (entrada/saída) - a compensação (horas_compensatorias) é
+        // contada à parte em totalCompensatedMinutes e nunca somada às horas trabalhadas.
+        monthlyData[monthKey].totalMinutes += minutos;
         monthlyData[monthKey].workDays++;
       }
 
       totalCompensatedMinutes += data.horas_compensatorias || 0;
+      // DEBUG horas extra
+      if (data.horas_compensatorias) {
+        console.log(`[DEBUG horas extra] compensado ${doc.id} (${date.toLocaleDateString("pt-PT")}): -${data.horas_compensatorias} min`);
+      }
     });
 
-    // Buscar horas extras manuais
-    const manualOvertimeRef = db
-      .collection("registo-ponto")
-      .doc(userId)
-      .collection("HorasExtraManual");
-
-    // Sem campo "timestamp" nesta subcoleção  -  filtra-se pelo campo "year" (todos os
-    // documentos já o têm, ver backfill/escrita em registerManualOvertime) em vez de
-    // ler a coleção inteira e filtrar aqui pelo ano embutido em "date".
-    const manualOvertimeSnapshot = await manualOvertimeRef.where("year", "==", currentYear).get();
+    // Buscar horas extras manuais (ver getManualOvertimeDocsForYear) - só as aprovadas
+    // pela GestorRH contam para o resumo e o saldo (ver overtimeApprovalController.js).
+    const manualOvertimeDocs = (await getManualOvertimeDocsForYear(userId, currentYear))
+      .filter(doc => isHoraExtraAprovada(doc.data()));
 
     let totalManualOvertimeMinutes = 0;
 
-    manualOvertimeSnapshot.forEach(doc => {
+    manualOvertimeDocs.forEach(doc => {
       const data = doc.data();
       // Extrair mês da data no formato DD-MM-YYYY (o ano já vem filtrado pela query acima)
       const dateParts = data.date.split('-');
@@ -439,6 +471,8 @@ const getOvertimeSummary = async (req, res) => {
 
       monthlyData[monthKey].manualOvertimeMinutes += data.totalMinutes || 0;
       totalManualOvertimeMinutes += data.totalMinutes || 0;
+      // DEBUG horas extra
+      console.log(`[DEBUG horas extra] extra manual ${doc.id} (${data.date} ${data.startHour}-${data.endHour}): +${data.totalMinutes || 0} min`);
     });
 
     // Só horas extra manuais - não há horas extra automáticas a partir dos Registos
@@ -477,6 +511,8 @@ const getOvertimeSummary = async (req, res) => {
       });
 
     const totalNetOvertimeMinutes = Math.max(0, totalOvertimeMinutes - totalCompensatedMinutes);
+    // DEBUG horas extra
+    console.log(`[DEBUG horas extra] uid=${userId} ano=${currentYear}: bruto ${totalOvertimeMinutes} min - compensado ${totalCompensatedMinutes} min = ${totalOvertimeMinutes - totalCompensatedMinutes} min -> líquido (mín. 0) ${totalNetOvertimeMinutes} min`);
 
     return res.status(200).json({
       monthlyOvertime: monthlyArray,
@@ -832,5 +868,6 @@ module.exports = {
   getOvertimeSummary,
   getYearlySummary,
   calculateMonthlyAttendanceSummary,
-  computeAnnualOvertimeBalance
+  computeAnnualOvertimeBalance,
+  getManualOvertimeDocsForYear
 };

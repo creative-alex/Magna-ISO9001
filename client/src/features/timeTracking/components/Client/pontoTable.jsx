@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import TableRow from './tableRow';
 import { calcularHoras, formatarMinutos } from '../../utils/calcHours';
+import { minutosHorasExtraAprovadas } from '../../utils/horasExtra';
 import ContextMenu from './contextMenu';
 import ManualOvertimeModal from './ManualOvertimeModal';
 import { apiFetch } from '../../../../shared/utils/apiFetch';
@@ -12,7 +13,7 @@ import { apiFetch } from '../../../../shared/utils/apiFetch';
 // calendarData é null (ex: dentro do modal de "resumo anual", onde cada mês
 // expandido é um mês/ano arbitrário e diferente do da página principal), a tabela
 // continua a fazer o seu próprio pedido, tal como sempre fez.
-const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year = new Date().getFullYear(), className = '', onDataChanged, reloadTick = 0, calendarData, calendarLoading = false }) => {
+const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year = new Date().getFullYear(), className = '', onDataChanged, reloadTick = 0, calendarData, calendarLoading = false, saldoHorasExtra }) => {
   const [dados, setDados] = useState([]);
   const [loading, setLoading] = useState(true);
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, dayIndex: null });
@@ -60,6 +61,7 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
       const diasNoMes = new Date(year, month, 0).getDate();
       const registos = data.registos || [];
       const manualOvertimeData = data.manualOvertime || [];
+      const compensacoesData = data.compensacoes || [];
       const ferias = data.ferias || [];
       const baixas = data.baixas || [];
       const aniversario = data.aniversario || [];
@@ -98,10 +100,10 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
           diaCompleto,
           horaEntrada,
           horaSaida,
-          // Dia compensado: soma-se o que foi trabalhado com o que foi coberto
-          // pelo saldo anual de horas extra (o utilizador escolhe quanto quer
-          // compensar, pode não ser o défice todo  -  ver CompensateOvertimeButton).
-          total: isCompensado ? formatarMinutos(horasCalculadas.minutos + minutosCompensados) : horasCalculadas.total,
+          // Horas Trabalhadas = só o tempo de entrada/saída do ponto. A compensação fica
+          // exclusivamente em "Compensação Horas" (compensatedMinutes) e as horas extra em
+          // "Horas Extra" - nunca somadas aqui. Dia compensado sem ponto mostra 0h.
+          total: isCompensado && horasCalculadas.total === "-" ? "0h 0m" : horasCalculadas.total,
           minutosFalta: horasCalculadas.minutosFalta || 0,
           manualOvertime: hasManualOvertime ? `${Math.floor(manualOvertimeTotalMinutes / 60)}h ${manualOvertimeTotalMinutes % 60}m` : null,
           manualOvertimeMinutes: manualOvertimeTotalMinutes,
@@ -111,6 +113,9 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
           baixaPendente: isBaixa,
           compensated: isCompensado,
           compensatedMinutes: minutosCompensados,
+          // Pedidos de compensação do dia (pendentes/aprovados/rejeitados) - só o efeito
+          // dos aprovados está em compensatedMinutes (ver compensationApprovalController.js).
+          compensationRequests: compensacoesData.filter(p => p.date === diaCompleto),
           edicaoPendente: ajustesPendentesPorDia[diaCompleto] || null
         };
       });
@@ -238,7 +243,8 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
         <th className="px-4 py-3 text-left font-semibold text-gold uppercase text-xs tracking-wide border-b-2 border-gray-200">Hora Entrada</th>
         <th className="px-4 py-3 text-left font-semibold text-gold uppercase text-xs tracking-wide border-b-2 border-gray-200">Hora Saída</th>
         <th className="px-4 py-3 text-left font-semibold text-gold uppercase text-xs tracking-wide border-b-2 border-gray-200">Horas Trabalhadas</th>
-        {/* <th className="px-4 py-3 text-left font-semibold text-gold uppercase text-xs tracking-wide border-b-2 border-gray-200">Horas Extras</th> */}
+        <th className="px-4 py-3 text-left font-semibold text-gold uppercase text-xs tracking-wide border-b-2 border-gray-200">Horas Extra</th>
+        <th className="px-4 py-3 text-left font-semibold text-gold uppercase text-xs tracking-wide border-b-2 border-gray-200">Compensação Horas</th>
       </tr>
     </thead>
   );
@@ -255,6 +261,8 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
                 <td className="px-4 py-3"><div className="h-3 w-14 rounded-full bg-gray-100 animate-pulse" style={{ animationDelay: `${i * 60}ms` }} /></td>
                 <td className="px-4 py-3"><div className="h-3 w-14 rounded-full bg-gray-100 animate-pulse" style={{ animationDelay: `${i * 60}ms` }} /></td>
                 <td className="px-4 py-3"><div className="h-3 w-20 rounded-full bg-gray-100 animate-pulse" style={{ animationDelay: `${i * 60}ms` }} /></td>
+                <td className="px-4 py-3"><div className="h-3 w-12 rounded-full bg-gray-100 animate-pulse" style={{ animationDelay: `${i * 60}ms` }} /></td>
+                <td className="px-4 py-3"><div className="h-3 w-12 rounded-full bg-gray-100 animate-pulse" style={{ animationDelay: `${i * 60}ms` }} /></td>
               </tr>
             ))}
           </tbody>
@@ -275,12 +283,12 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
           totalMinutosTrabalho += parseInt(match[1]) * 60 + parseInt(match[2]);
         }
       }
-      totalManualOvertime += item.manualOvertimeMinutes || 0;
+      totalManualOvertime += minutosHorasExtraAprovadas(item.manualOvertimeEntries);
     });
 
     // Bruto: o mensal já não é reduzido pelas faltas do dia  -  ver
     // CompensateOvertimeButton, que desconta do saldo anual em vez do mensal.
-    // Só horas extra registadas manualmente - o ponto nunca gera horas extra.
+    // Só horas extra registadas manualmente e aprovadas - o ponto nunca gera horas extra.
     const totalExtrasLiquido = totalManualOvertime;
 
     return {
@@ -307,6 +315,7 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
                 hideTooltip={hideTooltip}
                 openOvertimeManager={openOvertimeManager}
                 onCompensated={handleCompensated}
+                saldoHorasExtra={saldoHorasExtra}
               />
             ))}
           </tbody>
@@ -314,7 +323,7 @@ const TimeTrackingTable = ({ username, month = new Date().getMonth() + 1, year =
             <tr>
               <td colSpan="3" className="text-right p-3">Total:</td>
               <td className="text-warning p-3">{totais.totalTrabalho}</td>
-              {/* <td className={`p-3 ${totais.totalExtras.startsWith('-') ? 'text-danger' : 'text-success'}`}>{totais.totalExtras}</td> */}
+              <td className="p-3" colSpan="2"></td>
             </tr>
           </tfoot>
       </table>

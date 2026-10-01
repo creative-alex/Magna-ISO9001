@@ -20,6 +20,9 @@ const RegistosPage = () => {
   // ano inteiro): só recarrega quando o que mudou o pode alterar - ver
   // handleEntryRegistered. Todas as outras recargas continuam a atualizá-lo.
   const [overtimeReloadTick, setOvertimeReloadTick] = useState(0);
+  // Saldo anual líquido de horas extra (vem da TotalSummary, que já pede
+  // /overtime-summary) - passado à PontoTable para o botão "Compensar".
+  const [saldoHorasExtra, setSaldoHorasExtra] = useState(undefined);
   const reloadRegistos = () => {
     setReloadTick(k => k + 1);
     setOvertimeReloadTick(k => k + 1);
@@ -127,6 +130,7 @@ const RegistosPage = () => {
                   calendarData={calendarData}
                   calendarLoading={calendarLoading}
                   onDataChanged={reloadRegistos}
+                  saldoHorasExtra={saldoHorasExtra}
                 />
               </div>
             </div>
@@ -137,6 +141,7 @@ const RegistosPage = () => {
               overtimeReloadTick={overtimeReloadTick}
               calendarData={calendarData}
               calendarLoading={calendarLoading}
+              onSaldoChange={setSaldoHorasExtra}
             />
           </div>
         </main>

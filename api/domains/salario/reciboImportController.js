@@ -2,8 +2,7 @@ const admin = require("firebase-admin");
 const { PDFDocument } = require("pdf-lib");
 const pdfParse = require("pdf-parse");
 const db = require("../../shared/db/firebase").db;
-const { sendMail, renderEmail } = require("../../shared/services/mailer");
-const { MES_REGEX, getMesLabel, canManageRecibo } = require("./salarioController");
+const { MES_REGEX, canManageRecibo, sendReciboEmail } = require("./salarioController");
 const { extractNifFromText, extractNomeFromText, buildNifIndex, classifyPage } = require("./reciboImportService");
 
 const bucket = admin.storage().bucket();
@@ -229,19 +228,13 @@ const importRecibos = async (req, res) => {
     // resposta e sem que uma falha de SMTP faça a confirmação parecer ter falhado. Reaproveita
     // os dados já lidos em usersByUid, sem nenhuma leitura Firestore adicional.
     if (isConfirmacao && finalOk.length > 0) {
-      const mesLabel = getMesLabel(mes);
       Promise.allSettled(finalOk.map((r) => {
         const userData = usersByUid.get(r.uid);
         if (!userData?.email) {
           console.error(`Colaborador ${r.uid} sem email  -  notificação de recibo (lote) não enviada`);
           return Promise.resolve();
         }
-        return sendMail({
-          to: userData.email,
-          subject: `Recibo de vencimento disponível - ${mesLabel}`,
-          html: renderEmail("recibo-vencimento", { nome: userData.nome || "", mesLabel, eyebrow: "Recibo de vencimento" }),
-          entidade: userData.entidade,
-        });
+        return sendReciboEmail(userData, mes);
       })).then((results) => {
         results.forEach((result, idx) => {
           if (result.status === "rejected") {

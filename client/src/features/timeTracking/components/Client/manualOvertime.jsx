@@ -71,7 +71,7 @@ const ManualOvertimeButton = ({ username, onOvertimeRegistered, isOpen = false, 
           hours,
           minutes,
           date: formData.date,
-          description: formData.description || "Horas extras trabalhadas após horário normal"
+          description: formData.description || ""
         }),
       });
 
@@ -81,7 +81,7 @@ const ManualOvertimeButton = ({ username, onOvertimeRegistered, isOpen = false, 
 
       const data = await response.json();
       
-      toast.success(`Horas extras registadas com sucesso! (${hours}h ${minutes}m)`);
+      toast.success(`Hora extra registada (${hours}h ${minutes}m) - pendente de aprovação pela GestorRH`);
       
       // Resetar formulário
       setFormData({

@@ -1,26 +1,10 @@
 const admin = require("firebase-admin");
 const { resolveTargetUid } = require("./helpers");
-const { computeAnnualOvertimeBalance } = require("./reportsController");
+const { getManualOvertimeDocsForYear } = require("./reportsController");
+const { ESTADOS_HORA_EXTRA, camposAprovacao, notificarGestoresRHHoraExtra } = require("./overtimeApprovalController");
 const { isAdminOrHR, isAdministrador } = require("../../shared/middleware/auth");
 const { refreshFechoMensalSnapshotIfClosed } = require("../../shared/lib/monthLock");
 const db = admin.firestore();
-
-// Mesma regra de cálculo de horas de calcHours.js (frontend) e calcularHorasHelper
-// (reportsController.js): pausa de 30min descontada acima de 5h trabalhadas, dia
-// obrigatório de 480min (8h), só para dias de semana (fins de semana não têm falta).
-function calcularMinutosFaltaDia(horaEntrada, horaSaida, date) {
-  const diaSemana = date.getDay();
-  if (diaSemana === 0 || diaSemana === 6) return 0;
-
-  const [hEntrada, mEntrada] = (horaEntrada || "").split(":").map(Number);
-  const [hSaida, mSaida] = (horaSaida || "").split(":").map(Number);
-  if ([hEntrada, mEntrada, hSaida, mSaida].some(Number.isNaN)) return 0;
-
-  let minutosTrabalhados = (hSaida * 60 + mSaida) - (hEntrada * 60 + mEntrada);
-  if (minutosTrabalhados > 300) minutosTrabalhados -= 30;
-
-  return Math.max(0, 480 - minutosTrabalhados);
-}
 
 // NOTA: o ID do documento em "registo-ponto" é, por omissão, o UID do
 // Firebase Auth do utilizador autenticado (req.user.uid)  -  nunca um valor
@@ -445,8 +429,11 @@ const registerManualOvertime = async (req, res) => {
     }
 
     const overtimeId = `overtime_${dd}${mm}${yyyy}_${Date.now()}`;
+    const colaboradorNome = req.userData?.nome || null;
 
-    await overtimeCollection.doc(overtimeId).set({
+    const registo = {
+      uid: userId,
+      colaboradorNome,
       startHour: startHour,
       endHour: endHour,
       date: formattedDate,
@@ -454,14 +441,26 @@ const registerManualOvertime = async (req, res) => {
       hours: hoursNum,
       minutes: minutesNum,
       totalMinutes: totalMinutes,
-      description: description || "Horas extras trabalhadas após horário normal"
-    });
+      // Sem descrição fica vazio (nunca um texto fixo) - ver ManualOvertimeCell.jsx
+      description: (description || "").trim(),
+      // Toda a hora extra manual fica pendente até a GestorRH a decidir (ver
+      // overtimeApprovalController.js) - nunca aprovada automaticamente.
+      estado: ESTADOS_HORA_EXTRA.PENDENTE,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      approvedAt: null,
+      approvedBy: null,
+      approvedByNome: null,
+    };
+    await overtimeCollection.doc(overtimeId).set(registo);
 
     console.log("Horas extras manuais registadas com sucesso no Firestore.");
+    await notificarGestoresRHHoraExtra({ uid: userId, colaboradorNome, entidade: req.userData?.entidade, registo });
+
     return res.status(201).json({
-      message: "Horas extras registadas com sucesso",
+      message: "Hora extra registada - pendente de aprovação",
       overtimeId,
-      totalMinutes
+      totalMinutes,
+      estado: ESTADOS_HORA_EXTRA.PENDENTE
     });
   } catch (error) {
     console.error("Erro ao registar horas extras manuais:", error);
@@ -481,19 +480,14 @@ const getManualOvertimeForMonth = async (req, res) => {
     const userId = req.user.uid;
     const targetYear = year || new Date().getFullYear();
 
-    const userDocRef = db.collection("registo-ponto").doc(userId);
-
-    // Buscar as horas extras manuais do ano pedido (filtradas em vez de ler a coleção
-    // inteira) - corrige também um bug latente: sem o filtro de ano, o mesmo mês em
-    // anos diferentes era somado junto (só se comparava o mês, nunca o ano).
-    const manualOvertimeSnapshot = await userDocRef
-      .collection("HorasExtraManual")
-      .where("year", "==", targetYear)
-      .get();
+    // Só as horas extras manuais do ano pedido - sem o filtro de ano, o mesmo mês em
+    // anos diferentes era somado junto (só se comparava o mês, nunca o ano). Ver
+    // getManualOvertimeDocsForYear sobre porque não se filtra pelo campo "year".
+    const manualOvertimeDocs = await getManualOvertimeDocsForYear(userId, targetYear);
 
     const manualOvertimeByDay = {};
 
-    manualOvertimeSnapshot.forEach(doc => {
+    manualOvertimeDocs.forEach(doc => {
       const data = doc.data();
       const dateParts = data.date.split('-');
       const monthFromDate = parseInt(dateParts[1]);
@@ -518,8 +512,9 @@ const getManualOvertimeForMonth = async (req, res) => {
           hours: data.hours || 0,
           minutes: data.minutes || 0,
           totalMinutes: data.totalMinutes,
-          description: data.description || "Horas extras",
-          date: data.date
+          description: data.description || "",
+          date: data.date,
+          ...camposAprovacao(data)
         });
       }
     });
@@ -599,12 +594,24 @@ const updateManualOvertime = async (req, res) => {
       hours: hoursNum,
       minutes: minutesNum,
       totalMinutes: totalMinutes,
-      description: description || "Horas extras trabalhadas após horário normal"
+      // Sem descrição fica vazio (nunca um texto fixo) - ver ManualOvertimeCell.jsx
+      description: (description || "").trim(),
+      // Editar uma hora extra (mesmo já aprovada ou rejeitada) volta a pô-la pendente:
+      // a decisão da GestorRH foi sobre os valores antigos.
+      estado: ESTADOS_HORA_EXTRA.PENDENTE,
+      approvedAt: null,
+      approvedBy: null,
+      approvedByNome: null,
+      rejectedAt: admin.firestore.FieldValue.delete(),
+      rejectedBy: admin.firestore.FieldValue.delete(),
+      rejectedByNome: admin.firestore.FieldValue.delete(),
+      motivoRejeicao: admin.firestore.FieldValue.delete()
     });
 
     console.log("Horas extras manuais atualizadas com sucesso no Firestore.");
     return res.status(200).json({
-      message: "Horas extras atualizadas com sucesso",
+      message: "Hora extra atualizada - pendente de aprovação",
+      estado: ESTADOS_HORA_EXTRA.PENDENTE,
       overtimeId,
       totalMinutes
     });
@@ -648,93 +655,8 @@ const deleteManualOvertime = async (req, res) => {
   }
 };
 
-// Compensa um dia com menos de 8h descontando do saldo anual de horas extra a
-// quantidade que o próprio utilizador escolher (até ao défice do dia, nunca mais
-// -  ver CompensateOvertimeButton, que também oferece um preenchimento automático
-// até ao défice completo). Nunca mexe no mês, que passa a acumular sempre  -  ver
-// computeAnnualOvertimeBalance em reportsController.js. Guarda o valor usado no
-// próprio Registos do dia (campo "horas_compensatorias", mesmo doc/ID determinístico
-// "registo_DDMMYYYY" usado por registerEntry/updateUserTime), sem coleção separada.
-// Suporta tanto o próprio colaborador como um admin a compensar em nome de outro
-// (resolveTargetUid), tal como getUserRecords/getOvertimeSummary.
-const compensateShortDay = async (req, res) => {
-  try {
-    const { date, minutes } = req.body;
-
-    if (!date || !/^\d{2}-\d{2}-\d{4}$/.test(date)) {
-      return res.status(400).json({ error: "Campo obrigatório: date (formato DD-MM-YYYY)" });
-    }
-
-    const minutosPedidos = parseInt(minutes);
-    if (!Number.isInteger(minutosPedidos) || minutosPedidos <= 0) {
-      return res.status(400).json({ error: "Indica quantos minutos queres compensar" });
-    }
-
-    const { uid: userId, error: authError } = await resolveTargetUid(req);
-    if (authError) return res.status(403).json({ error: authError });
-
-    const [dd, mm, yyyy] = date.split("-").map(Number);
-    const dataAtual = new Date(yyyy, mm - 1, dd);
-    if (dataAtual.getDate() !== dd || dataAtual.getMonth() !== mm - 1) {
-      return res.status(400).json({ error: "Data inválida" });
-    }
-
-    const registoRef = db
-      .collection("registo-ponto")
-      .doc(userId)
-      .collection("Registos")
-      .doc(`registo_${String(dd).padStart(2, "0")}${String(mm).padStart(2, "0")}${yyyy}`);
-
-    const registoDoc = await registoRef.get();
-    const registo = registoDoc.exists ? registoDoc.data() : null;
-
-    // Um dia com registo mas incompleto (só entrada ou só saída) não dá para calcular
-    // o défice  -  bloqueado tal como antes. Sem registo nenhum (falta total) já é
-    // permitido: conta como défice do dia inteiro (ver minutosFalta abaixo).
-    if (registo && (!registo.horaEntrada || !registo.horaSaida)) {
-      return res.status(400).json({ error: "Este dia não tem défice de horas para compensar" });
-    }
-
-    if (registo?.horas_compensatorias > 0) {
-      return res.status(400).json({ error: "Este dia já foi compensado" });
-    }
-
-    const minutosFalta = registo
-      ? calcularMinutosFaltaDia(registo.horaEntrada, registo.horaSaida, dataAtual)
-      : 480;
-    if (minutosFalta <= 0) {
-      return res.status(400).json({ error: "Este dia não tem défice de horas para compensar" });
-    }
-
-    if (minutosPedidos > minutosFalta) {
-      return res.status(400).json({ error: `Não é possível compensar mais do que o défice deste dia (${Math.floor(minutosFalta / 60)}h ${minutosFalta % 60}m)` });
-    }
-
-    const { netMinutes } = await computeAnnualOvertimeBalance(userId, yyyy);
-    if (netMinutes < minutosPedidos) {
-      return res.status(400).json({ error: "Saldo anual de horas extra insuficiente para compensar este dia" });
-    }
-
-    const updateData = { horas_compensatorias: minutosPedidos };
-    if (!registoDoc.exists) {
-      // Dia sem nenhum registo (falta total)  -  cria o documento só para guardar a
-      // compensação. "timestamp" tem de ser a data compensada, nunca a data de hoje
-      // (serverTimestamp), porque é usado noutros sítios (ex.: registoPorDia em
-      // calculateMonthlyAttendanceSummary) para saber a que dia do mês pertence.
-      updateData.timestamp = dataAtual;
-    }
-    await registoRef.set(updateData, { merge: true });
-
-    return res.status(200).json({
-      message: "Dia compensado com sucesso",
-      date,
-      minutesCompensated: minutosPedidos
-    });
-  } catch (error) {
-    console.error("Erro ao compensar dia:", error);
-    return res.status(500).json({ error: error.message });
-  }
-};
+// O pedido de compensação (antigo compensateShortDay) passou para
+// compensationApprovalController.js: fica pendente até a GestorRH o aprovar.
 
 const checkTimeTracking = async (req, res) => {
   try {
@@ -837,7 +759,6 @@ module.exports = {
   getManualOvertimeForMonth,
   updateManualOvertime,
   deleteManualOvertime,
-  compensateShortDay,
   debugCorruptOvertime,
   deleteCorruptOvertime,
 };

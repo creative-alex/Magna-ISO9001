@@ -11,6 +11,13 @@ const AnnualStats = ({
   feriasPendentes,
   pendingTimeEdits,
   baixasPendentes,
+  horasExtraPendentes,
+  podeDecidirHorasExtra,
+  handleApproveHoraExtra,
+  handleRejectHoraExtra,
+  compensacoesPendentes,
+  handleApproveCompensacao,
+  handleRejectCompensacao,
   deslocacoesPendentes,
   userName,
   dados,
@@ -181,6 +188,89 @@ const AnnualStats = ({
                   {ajuste.horaSaida && <>Saída: <strong>{ajuste.horaSaida}</strong></>}
                 </span>
                 <span className="text-[11.5px] text-gray-500 italic">{ajuste.justificativa}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {horasExtraPendentes?.length > 0 && (
+        <div className="px-[18px] py-4 border-t border-gray-100">
+          <h3 className="text-[11px] uppercase tracking-wider text-[#C8932F] font-semibold mb-3">Horas Extra Pendentes</h3>
+          <ul className="flex flex-col gap-2">
+            {horasExtraPendentes.map((horaExtra) => (
+              <li key={horaExtra.id} className="flex flex-col gap-1.5 p-2.5 bg-[#FAF3E6] rounded-lg">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[12.5px] font-semibold text-gray-700">
+                    {horaExtra.date.replace(/-/g, '/')}
+                    {' '}({Math.floor(horaExtra.totalMinutes / 60)}h {horaExtra.totalMinutes % 60}m)
+                  </span>
+                  {podeDecidirHorasExtra && (
+                    <div className="flex gap-1.5">
+                      <button
+                        className="bg-green-600 text-white border-0 px-2.5 py-1 rounded-full text-xs cursor-pointer transition-colors duration-200 hover:bg-green-700"
+                        onClick={() => handleApproveHoraExtra(horaExtra)}
+                      >
+                        Aprovar
+                      </button>
+                      <button
+                        className="bg-red-600 text-white border-0 px-2.5 py-1 rounded-full text-xs cursor-pointer transition-colors duration-200 hover:bg-red-700"
+                        onClick={() => handleRejectHoraExtra(horaExtra)}
+                      >
+                        Rejeitar
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {horaExtra.startHour && horaExtra.endHour && (
+                  <span className="text-[11.5px] text-gray-600">
+                    Horário: <strong>{horaExtra.startHour} – {horaExtra.endHour}</strong>
+                  </span>
+                )}
+                <span className="text-[11.5px] text-gray-500 italic">{horaExtra.description || "Sem descrição"}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {compensacoesPendentes?.length > 0 && (
+        <div className="px-[18px] py-4 border-t border-gray-100">
+          <h3 className="text-[11px] uppercase tracking-wider text-[#C8932F] font-semibold mb-3">Compensações Pendentes</h3>
+          <ul className="flex flex-col gap-2">
+            {compensacoesPendentes.map((pedido) => (
+              <li key={pedido.id} className="flex flex-col gap-1.5 p-2.5 bg-[#FAF3E6] rounded-lg">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[12.5px] font-semibold text-gray-700">
+                    {pedido.date.replace(/-/g, '/')}
+                    {' '}({Math.floor(pedido.minutos / 60)}h {pedido.minutos % 60}m)
+                  </span>
+                  {podeDecidirHorasExtra && (
+                    <div className="flex gap-1.5">
+                      <button
+                        className="bg-green-600 text-white border-0 px-2.5 py-1 rounded-full text-xs cursor-pointer transition-colors duration-200 hover:bg-green-700"
+                        onClick={() => handleApproveCompensacao(pedido)}
+                      >
+                        Aprovar
+                      </button>
+                      <button
+                        className="bg-red-600 text-white border-0 px-2.5 py-1 rounded-full text-xs cursor-pointer transition-colors duration-200 hover:bg-red-700"
+                        onClick={() => handleRejectCompensacao(pedido)}
+                      >
+                        Rejeitar
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <span className="text-[11.5px] text-gray-600">
+                  Défice do dia: <strong>{Math.floor(pedido.minutosFalta / 60)}h {pedido.minutosFalta % 60}m</strong>
+                  {pedido.saldoDisponivel != null && (
+                    <> · Saldo no pedido: <strong>{Math.floor(pedido.saldoDisponivel / 60)}h {pedido.saldoDisponivel % 60}m</strong></>
+                  )}
+                </span>
+                {pedido.requestedByNome && (
+                  <span className="text-[11.5px] text-gray-500 italic">Pedido por {pedido.requestedByNome}</span>
+                )}
               </li>
             ))}
           </ul>

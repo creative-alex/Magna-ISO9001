@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { toast } from 'react-toastify';
 import { apiFetch } from '../../../../shared/utils/apiFetch';
+import { usePermissions } from '../../../../shared/hooks/usePermissions';
 
 const formatMinutes = (min) => `${Math.floor(min / 60)}h ${min % 60}m`;
 
@@ -12,7 +13,10 @@ const formatMinutes = (min) => `${Math.floor(min / 60)}h ${min % 60}m`;
 // colaborador passa o uid desse colaborador (tal como VacationButton/
 // BirthdayButton) - nunca o "username" do UserContext, que é o NOME da
 // pessoa, não o uid do Firebase.
-const CompensateOvertimeButton = ({ uid, date, deficitMinutes = 0, onSuccess }) => {
+// saldoMinutos: saldo anual de horas extra disponível (totalNetOvertimeMinutes de
+// /overtime-summary). Sem saldo (ou ainda a carregar) o botão não aparece; com
+// saldo, o máximo a compensar é o menor entre o défice do dia e o saldo.
+const CompensateOvertimeButton = ({ uid, date, deficitMinutes = 0, saldoMinutos, onSuccess }) => {
   const [showModal, setShowModal] = useState(false);
   const [hours, setHours] = useState('');
   const [minutes, setMinutes] = useState('');
@@ -30,9 +34,17 @@ const CompensateOvertimeButton = ({ uid, date, deficitMinutes = 0, onSuccess }) 
     setShowModal(false);
   };
 
+  // SuperAdmin pode pedir sempre (qualquer dia, sem saldo nem limite do défice) - o
+  // backend aceita o pedido (ver semLimites em compensationApprovalController.js), mas a
+  // aprovação continua a validar défice e saldo.
+  const { isSuperAdmin } = usePermissions();
+  const saldo = saldoMinutos || 0;
+  const maxMinutes = isSuperAdmin ? (deficitMinutes > 0 ? deficitMinutes : 480) : Math.min(deficitMinutes, saldo);
+  const limitadoPeloSaldo = !isSuperAdmin && saldo < deficitMinutes;
+
   const handleAutoFill = () => {
-    setHours(String(Math.floor(deficitMinutes / 60)));
-    setMinutes(String(deficitMinutes % 60));
+    setHours(String(Math.floor(maxMinutes / 60)));
+    setMinutes(String(maxMinutes % 60));
   };
 
   const totalMinutesChosen = (parseInt(hours) || 0) * 60 + (parseInt(minutes) || 0);
@@ -44,7 +56,11 @@ const CompensateOvertimeButton = ({ uid, date, deficitMinutes = 0, onSuccess }) 
       toast.error('Indica quantas horas queres compensar');
       return;
     }
-    if (totalMinutesChosen > deficitMinutes) {
+    if (!isSuperAdmin && totalMinutesChosen > saldo) {
+      toast.error(`Saldo anual de horas extra insuficiente (disponível: ${formatMinutes(saldo)})`);
+      return;
+    }
+    if (!isSuperAdmin && totalMinutesChosen > deficitMinutes) {
       toast.error(`Não podes compensar mais do que o défice deste dia (${formatMinutes(deficitMinutes)})`);
       return;
     }
@@ -59,11 +75,13 @@ const CompensateOvertimeButton = ({ uid, date, deficitMinutes = 0, onSuccess }) 
       const data = await response.json();
 
       if (!response.ok) {
-        toast.error(data.error || "Erro ao compensar o dia");
+        toast.error(data.error || "Erro ao pedir a compensação");
         return;
       }
 
-      toast.success(`${formatMinutes(totalMinutesChosen)} compensadas com o saldo anual de horas extra`);
+      // O pedido fica pendente: só depois de a GestorRH o aprovar é que a compensação tem
+      // efeito (e consome o saldo) - ver compensationApprovalController.js.
+      toast.success(`Pedido de compensação de ${formatMinutes(totalMinutesChosen)} enviado - pendente de aprovação pela GestorRH`);
       setShowModal(false);
       if (onSuccess) onSuccess();
     } catch (err) {
@@ -74,12 +92,14 @@ const CompensateOvertimeButton = ({ uid, date, deficitMinutes = 0, onSuccess }) 
     }
   };
 
+  if (saldo <= 0 && !isSuperAdmin) return null;
+
   return (
     <>
       <button
         onClick={openModal}
-        title="Compensar défice deste dia com o saldo anual de horas extra"
-        className="ml-2 px-2 py-0.5 text-xs font-medium border border-gold rounded text-gold bg-transparent cursor-pointer transition-colors hover:bg-gold hover:text-white"
+        title="Compensar défice deste dia com o saldo anual de horas extra aprovadas"
+        className="px-2 py-0.5 text-xs font-medium border border-gold rounded text-gold bg-transparent cursor-pointer transition-colors hover:bg-gold hover:text-white"
       >
         Compensar
       </button>
@@ -103,7 +123,10 @@ const CompensateOvertimeButton = ({ uid, date, deficitMinutes = 0, onSuccess }) 
             <h2 className="text-xl font-bold text-gray-800 mb-2">Compensar dia</h2>
             <p className="text-sm text-gray-600 mb-5">
               Défice deste dia: <strong>{formatMinutes(deficitMinutes)}</strong>. Escolhe quantas horas queres
-              descontar do saldo anual de horas extra para compensar este dia.
+              descontar do saldo anual de horas extra aprovadas para compensar este dia (horas extra pendentes de aprovação não contam). Saldo disponível: <strong>{formatMinutes(saldo)}</strong>.
+            </p>
+            <p className="text-xs text-gray-500 -mt-3 mb-5">
+              O pedido fica pendente de aprovação pela GestorRH e só é descontado do saldo depois de aprovado.
             </p>
 
             <form onSubmit={handleSubmit}>
@@ -138,7 +161,9 @@ const CompensateOvertimeButton = ({ uid, date, deficitMinutes = 0, onSuccess }) 
                 onClick={handleAutoFill}
                 className="mb-5 text-xs font-medium underline text-gold bg-transparent border-none cursor-pointer"
               >
-                Preencher automaticamente até ao défice ({formatMinutes(deficitMinutes)})
+                {limitadoPeloSaldo
+                  ? `Preencher automaticamente com o saldo disponível (${formatMinutes(maxMinutes)})`
+                  : `Preencher automaticamente até ao défice (${formatMinutes(maxMinutes)})`}
               </button>
 
               <div className="flex gap-3">

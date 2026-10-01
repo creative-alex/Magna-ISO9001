@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { toast } from 'react-toastify';
 import { apiFetch } from '../../../../shared/utils/apiFetch';
+import { ESTADOS_HORA_EXTRA, LABEL_ESTADO_HORA_EXTRA, estadoHoraExtra } from '../../utils/horasExtra';
 
 
 const ManualOvertimeModal = ({ 
@@ -79,7 +80,7 @@ const ManualOvertimeModal = ({
 
       if (!response.ok) throw new Error('Erro ao atualizar');
 
-      toast.success('Horas extras atualizadas!');
+      toast.success('Hora extra atualizada - volta a ficar pendente de aprovação');
       handleCancelEdit();
       if (onUpdate) onUpdate();
     } catch (error) {
@@ -201,6 +202,15 @@ const ManualOvertimeModal = ({
                       <div className="text-sm mb-2">
                         <span className="font-medium text-gray-700">Total: </span>
                         <span className="text-[#C8932F] font-bold">{entry.hours}h {entry.minutes}m</span>
+                      </div>
+                      <div className="text-sm mb-2">
+                        <span className="font-medium text-gray-700">Estado: </span>
+                        <span className={estadoHoraExtra(entry) === ESTADOS_HORA_EXTRA.APROVADA ? "text-success font-semibold" : estadoHoraExtra(entry) === ESTADOS_HORA_EXTRA.REJEITADA ? "text-danger font-semibold" : "text-[#C8932F] font-semibold"}>
+                          {LABEL_ESTADO_HORA_EXTRA[estadoHoraExtra(entry)]}
+                        </span>
+                        {estadoHoraExtra(entry) === ESTADOS_HORA_EXTRA.REJEITADA && entry.motivoRejeicao && (
+                          <span className="text-gray-600"> - {entry.motivoRejeicao}</span>
+                        )}
                       </div>
                       {entry.description && (
                         <div className="text-sm">

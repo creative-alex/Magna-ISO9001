@@ -1,6 +1,11 @@
 import React from 'react';
 import { FaHourglassHalf } from 'react-icons/fa6';
 import CompensateOvertimeButton from '../Shared/compensateOvertimeButton';
+import { formatarMinutos } from '../../utils/calcHours';
+import ManualOvertimeCell from '../Shared/ManualOvertimeCell';
+import CompensationCell from '../Shared/CompensationCell';
+import { ESTADOS_HORA_EXTRA, estadoHoraExtra } from '../../utils/horasExtra';
+import { usePermissions } from '../../../../shared/hooks/usePermissions';
 
 const TableRow = ({
   item,
@@ -10,7 +15,8 @@ const TableRow = ({
   showTooltip,
   hideTooltip,
   openOvertimeManager,
-  onCompensated
+  onCompensated,
+  saldoHorasExtra
 }) => {
   // Função para extrair apenas a hora no formato HH:MM
   const extractTime = (timeString) => {
@@ -36,6 +42,10 @@ const TableRow = ({
   const isFeriasPendente = item.feriasPendente;
   const isBaixaPendente = item.baixaPendente;
   const isCompensado = item.compensated;
+  const temPedidoCompensacaoPendente = (item.compensationRequests || []).some((p) => estadoHoraExtra(p) === ESTADOS_HORA_EXTRA.PENDENTE);
+  // SuperAdmin pode pedir compensação em qualquer dia (ver compensateOvertimeButton.jsx).
+  const { isSuperAdmin } = usePermissions();
+  const podeCompensar = (isLessThanEightHours || isSuperAdmin) && !isCompensado && !temPedidoCompensacaoPendente;
 
   // Debug log
   if (item.manualOvertime) {
@@ -97,18 +107,23 @@ const TableRow = ({
           </span>
         )}
       </td>
-      <td className={`px-4 py-3 text-left border-b border-gray-200 ${isCompensado ? "text-blue-600 font-semibold" : ""}`}>
+      <td className="px-4 py-3 text-left border-b border-gray-200">
         {item.total}
-        {isCompensado && (
-          <span className="font-normal"> ({Math.floor(item.compensatedMinutes / 60)}h {item.compensatedMinutes % 60}m compensadas)</span>
-        )}
-        {isLessThanEightHours && !isCompensado && (
-          <CompensateOvertimeButton date={item.diaCompleto} deficitMinutes={item.minutosFalta} onSuccess={onCompensated} />
-        )}
       </td>
-      {/* <td className={`px-4 py-3 text-left border-b border-gray-200 ${item.extra !== '-' && item.extra !== '0h 0m' ? 'text-success' : ''}`}>
-        {item.extra !== '-' && item.extra !== '0h 0m' ? item.extra : '-'}
-      </td> */}
+      {/* Horas extra: só as registadas manualmente (HorasExtraManual do dia), com estado e motivo de cada registo no tooltip. */}
+      <td className="px-4 py-3 text-left border-b border-gray-200">
+        <ManualOvertimeCell entries={item.manualOvertimeEntries} />
+      </td>
+      {/* Compensação: a efetiva (aprovada) do dia, pedidos pendentes/rejeitados e, se o dia
+          tiver défice, não estiver compensado e não houver já um pedido pendente, o botão
+          "Compensar" (cria um pedido - ver compensationApprovalController.js). */}
+      <td className="px-4 py-3 text-left border-b border-gray-200">
+        <CompensationCell compensatedMinutes={item.compensatedMinutes} pedidos={item.compensationRequests}>
+          {podeCompensar && (
+            <CompensateOvertimeButton date={item.diaCompleto} deficitMinutes={item.minutosFalta} saldoMinutos={saldoHorasExtra} onSuccess={onCompensated} />
+          )}
+        </CompensationCell>
+      </td>
     </tr>
   );
 };

@@ -1,18 +1,24 @@
 import { useState, useEffect } from "react";
 import { apiFetch } from "../../../../../shared/utils/apiFetch";
 import { calcularHoras, formatarMinutos } from "../../../utils/calcHours";
+import { minutosHorasExtraAprovadas, ESTADOS_HORA_EXTRA, estadoHoraExtra } from "../../../utils/horasExtra";
 import RegisterVacation from "../../Shared/vacationButton";
 import DeleteRegister from "./deleteRegisterButton";
 import MedicalLeave from "../../Shared/medicalLeave";
 import BirthdayButton from "../../Shared/birthdayButton";
 import CompensateOvertimeButton from "../../Shared/compensateOvertimeButton";
+import ManualOvertimeCell from "../../Shared/ManualOvertimeCell";
+import CompensationCell from "../../Shared/CompensationCell";
 import { getHolidaysForSede } from "../../../../../shared/utils/holidays";
 import { isBlocoAtivoEm, isDiaForaDeAtivo, labelBaixaOuLicenca } from "../../../../../shared/utils/absenceBlocks";
+import { usePermissions } from "../../../../../shared/hooks/usePermissions";
 
 
 
 
-const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) => {
+const TableHours = ({ username, month, year, onTotaisChange, onDadosChange, saldoHorasExtra, onCompensated, reloadTick = 0 }) => {
+  // SuperAdmin pode pedir compensação em qualquer dia (ver compensateOvertimeButton.jsx).
+  const { isSuperAdmin } = usePermissions();
   const [dados, setDados] = useState([]);
   const [totais, setTotais] = useState({
     totalHoras: "0h 0m",
@@ -29,7 +35,7 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
   useEffect(() => {
     if (!username || !month || !year) return;
     fetchData();
-  }, [username, month, year]);
+  }, [username, month, year, reloadTick]);
 
   // Fechar context menu ao clicar fora
   useEffect(() => {
@@ -72,10 +78,9 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
 
       const data = response.ok ? await response.json() : { registos: [] };
       const registos = Array.isArray(data.registos) ? data.registos : [];
-      // Horas extra = só as registadas explicitamente (HorasExtraManual); o tempo de
-      // ponto além das 8h / fora das 08:30-17:00 não conta como hora extra.
-      const totalMinutosExtras = (Array.isArray(data.manualOvertime) ? data.manualOvertime : [])
-        .reduce((sum, mo) => sum + (mo.totalMinutes || 0), 0);
+      // Horas extra = só as registadas explicitamente (HorasExtraManual) e aprovadas pela
+      // GestorRH; o tempo de ponto além das 8h / fora das 08:30-17:00 não conta como hora extra.
+      const totalMinutosExtras = minutosHorasExtraAprovadas(Array.isArray(data.manualOvertime) ? data.manualOvertime : []);
 
       // Processar férias aprovadas
       const ferias = Array.isArray(data.ferias)
@@ -250,16 +255,16 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
           const { total, minutos, minutosFalta } = calcularHoras(registo.horaEntrada, registo.horaSaida, dataAtual);
           const minutosCompensados = registo.horasCompensatorias || 0;
           const isCompensado = minutosCompensados > 0;
-          // Dia compensado: soma-se o que foi trabalhado com o que foi coberto
-          // pelo saldo anual de horas extra (o utilizador escolhe quanto quer
-          // compensar, pode não ser o défice todo  -  ver CompensateOvertimeButton).
-          const minutosNormaisFinal = isCompensado ? (minutos + minutosCompensados) : minutos;
-          totalMinutos += minutosNormaisFinal;
+          // Horas Trabalhadas = só o tempo de entrada/saída do ponto. A compensação fica
+          // exclusivamente na coluna "Compensação Horas" (nunca somada aqui), tal como as
+          // horas extra manuais ficam só em "Horas Extra". Um dia compensado sem ponto
+          // (falta total) mostra 0h trabalhadas.
+          totalMinutos += minutos;
           return {
             ...item,
             horaEntrada: registo.horaEntrada || "-",
             horaSaida: registo.horaSaida || "-",
-            total: isCompensado ? formatarMinutos(minutosNormaisFinal) : total,
+            total: isCompensado && total === "-" ? "0h 0m" : total,
             compensated: isCompensado,
             compensatedMinutes: minutosCompensados,
             minutosFalta: minutosFalta || 0,
@@ -282,7 +287,27 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
         return item;
       });
 
-      const diasFalta = novosDados.filter((d) => d.total === "0h 0m" && !d.isFerias && !d.isBaixaMedica && !d.isAniversario && !d.isCedencia && !d.isLicencaOuBaixaCadastro && !d.isForaDeAtivo).length;
+      // Horas extra manuais por dia (data.manualOvertime vem com "date" DD-MM-YYYY),
+      // incluindo dias sem registo de ponto - para a coluna "Horas Extra".
+      // Cada registo é guardado à parte (manualOvertimeEntries) para o tooltip mostrar o motivo de cada um.
+      const manualOvertimePorDia = {};
+      (Array.isArray(data.manualOvertime) ? data.manualOvertime : []).forEach((mo) => {
+        (manualOvertimePorDia[mo.date] = manualOvertimePorDia[mo.date] || []).push(mo);
+      });
+      const compensacoes = Array.isArray(data.compensacoes) ? data.compensacoes : [];
+      novosDados = novosDados.map((d) => {
+        const entries = manualOvertimePorDia[`${d.dia}-${year}`] || [];
+        return {
+          ...d,
+          // Pedidos de compensação do dia (todos os estados) - o efeito dos aprovados está
+          // em compensatedMinutes (horas_compensatorias do registo).
+          compensationRequests: compensacoes.filter((p) => p.date === `${d.dia}-${year}`),
+          manualOvertimeEntries: entries,
+          manualOvertimeMinutes: entries.reduce((sum, mo) => sum + (mo.totalMinutes || 0), 0),
+        };
+      });
+
+      const diasFalta = novosDados.filter((d) => d.total === "0h 0m" && !d.compensated && !d.isFerias && !d.isBaixaMedica && !d.isAniversario && !d.isCedencia && !d.isLicencaOuBaixaCadastro && !d.isForaDeAtivo).length;
       const diasFerias = novosDados.filter((d) => d.isFerias).length;
       const diasBaixaMedica = novosDados.filter((d) => d.isBaixaMedica).length;
       const diasAniversario = novosDados.filter((d) => d.isAniversario).length;
@@ -412,7 +437,8 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
               <th className="px-4 py-3 text-left font-semibold text-gold uppercase text-xs tracking-wide border-b-2 border-gray-200 sticky top-0 bg-white">Hora Entrada</th>
               <th className="px-4 py-3 text-left font-semibold text-gold uppercase text-xs tracking-wide border-b-2 border-gray-200 sticky top-0 bg-white">Hora Saída</th>
               <th className="px-4 py-3 text-left font-semibold text-gold uppercase text-xs tracking-wide border-b-2 border-gray-200 sticky top-0 bg-white">Total Horas Trabalhadas</th>
-              {/*<th>Horas Extra</th>*/}
+              <th className="px-4 py-3 text-left font-semibold text-gold uppercase text-xs tracking-wide border-b-2 border-gray-200 sticky top-0 bg-white">Horas Extra</th>
+              <th className="px-4 py-3 text-left font-semibold text-gold uppercase text-xs tracking-wide border-b-2 border-gray-200 sticky top-0 bg-white">Compensação Horas</th>
             </tr>
           </thead>
           <tbody>
@@ -423,7 +449,10 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
               const isLessThanEightHours = item.total !== "-" && parseInt(item.total.split("h")[0]) < 8;
               // Compensável tanto com registo parcial (défice) como com falta total (0h 0m,
               // sem registo)  -  em ambos os casos item.total é numérico e ainda não compensado.
-              const isCompensavel = isLessThanEightHours && !item.compensated;
+              // Também não com um pedido de compensação já pendente para o dia.
+              // SuperAdmin pode pedir em qualquer dia (ver compensateOvertimeButton.jsx).
+              const isCompensavel = (isLessThanEightHours || isSuperAdmin) && !item.compensated
+                && !(item.compensationRequests || []).some((p) => estadoHoraExtra(p) === ESTADOS_HORA_EXTRA.PENDENTE);
 
               return (
                 <tr key={index} onContextMenu={(e) => abrirContextMenu(e, index)} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
@@ -472,16 +501,23 @@ const TableHours = ({ username, month, year, onTotaisChange, onDadosChange }) =>
                       item.horaSaida
                     )}
                   </td>
-                  <td className={`px-4 py-3 text-left border-b border-gray-200 ${item.compensated ? "text-blue-600 font-semibold" : isLessThanEightHours ? "text-danger font-semibold" : ""}`}>
+                  <td className={`px-4 py-3 text-left border-b border-gray-200 ${isLessThanEightHours && !item.compensated ? "text-danger font-semibold" : ""}`}>
                     {item.total}
-                    {item.compensated && (
-                      <span className="font-normal"> ({Math.floor(item.compensatedMinutes / 60)}h {item.compensatedMinutes % 60}m compensadas)</span>
-                    )}
-                    {isCompensavel && (
-                      <CompensateOvertimeButton uid={username} date={`${item.dia}-${year}`} deficitMinutes={item.minutosFalta} onSuccess={fetchData} />
-                    )}
                   </td>
-                  {/*<td>{item.extra}</td>*/}
+                  {/* Horas extra: só as registadas manualmente (HorasExtraManual do dia), com estado e motivo de cada registo no tooltip. */}
+                  <td className="px-4 py-3 text-left border-b border-gray-200">
+                    <ManualOvertimeCell entries={item.manualOvertimeEntries} />
+                  </td>
+                  {/* Compensação: a efetiva (aprovada) do dia, pedidos pendentes/rejeitados e, se o dia
+                      puder ser compensado, o botão "Compensar" (cria um pedido - ver
+                      compensationApprovalController.js). */}
+                  <td className="px-4 py-3 text-left border-b border-gray-200">
+                    <CompensationCell compensatedMinutes={item.compensatedMinutes} pedidos={item.compensationRequests}>
+                      {isCompensavel && (
+                        <CompensateOvertimeButton uid={username} date={`${item.dia}-${year}`} deficitMinutes={item.minutosFalta} saldoMinutos={saldoHorasExtra} onSuccess={() => { fetchData(); if (onCompensated) onCompensated(); }} />
+                      )}
+                    </CompensationCell>
+                  </td>
                 </tr>
               );
             })}

@@ -39,9 +39,17 @@ const UserDetails = ({ selectedUser }) => {
   const [showDetails, setShowDetails] = useState(true);
   const [totais, setTotais] = useState(null);
   const [totaisAnuais, setTotaisAnuais] = useState(null);
+  // Saldo anual líquido de horas extra em minutos (para o botão "Compensar").
+  const [saldoHorasExtra, setSaldoHorasExtra] = useState(undefined);
   const [feriasPendentes, setFeriasPendentes] = useState([]);
   const [pendingTimeEdits, setPendingTimeEdits] = useState([]);
   const [baixasPendentes, setBaixasPendentes] = useState([]);
+  // Horas extra manuais pendentes de aprovação (só GestorRH/SuperAdmin as veem e decidem).
+  const [horasExtraPendentes, setHorasExtraPendentes] = useState([]);
+  // Pedidos de compensação pendentes de aprovação (mesmo fluxo das horas extra).
+  const [compensacoesPendentes, setCompensacoesPendentes] = useState([]);
+  // Recarrega a tabela do mês depois de aprovar/rejeitar uma hora extra (estado na coluna).
+  const [tabelaReloadTick, setTabelaReloadTick] = useState(0);
   const [deslocacoesPendentes, setDeslocacoesPendentes] = useState([]);
   const [fechoMensal, setFechoMensal] = useState(null);
   const [entidadesOptions, setEntidadesOptions] = useState([]);
@@ -60,7 +68,7 @@ const UserDetails = ({ selectedUser }) => {
   // SuperAdmin, que continuam exclusivos do SuperAdmin  -  o backend também impõe isto
   // (updateUserDetails/normalizeNivelAcessoForActor), mas o formulário fica
   // coerente com o que é aceite.
-  const { isAdministrador, isSuperAdmin, isGestorRH } = usePermissions();
+  const { isAdministrador, isSuperAdmin, isGestorRH, isAdminOrHR } = usePermissions();
   // Caso raro de um Administrador que gere mais do que uma entidade: em vez de
   // bloquear o campo "Entidade", deixa mover o colaborador entre as que gere (ver
   // entidadesGeridasPor no backend).
@@ -158,6 +166,10 @@ const UserDetails = ({ selectedUser }) => {
         // Buscar pedidos de baixa médica pendentes
         await fetchBaixasPendentes();
 
+        // Buscar horas extra e pedidos de compensação pendentes de aprovação
+        await fetchHorasExtraPendentes();
+        await fetchCompensacoesPendentes();
+
         // Buscar deslocações pendentes
         await fetchDeslocacoesPendentes();
 
@@ -208,6 +220,104 @@ const UserDetails = ({ selectedUser }) => {
       }
     } catch (err) {
       setPendingTimeEdits([]);
+    }
+  };
+
+  const fetchHorasExtraPendentes = async () => {
+    // A rota é só para GestorRH/SuperAdmin (requireAdminOrHR) - um Administrador não
+    // aprova horas extra, por isso nem pede a lista.
+    if (!isAdminOrHR) {
+      setHorasExtraPendentes([]);
+      return;
+    }
+    try {
+      const response = await apiFetch(`/timetracking/pending-manual-overtime`, {
+        method: "POST",
+        body: JSON.stringify({ uid: userName }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setHorasExtraPendentes(data.pendentes || []);
+      } else {
+        setHorasExtraPendentes([]);
+      }
+    } catch (err) {
+      setHorasExtraPendentes([]);
+    }
+  };
+
+  const fetchCompensacoesPendentes = async () => {
+    // Tal como as horas extra: rota só para GestorRH/SuperAdmin (requireAdminOrHR).
+    if (!isAdminOrHR) {
+      setCompensacoesPendentes([]);
+      return;
+    }
+    try {
+      const response = await apiFetch(`/timetracking/pending-compensations`, {
+        method: "POST",
+        body: JSON.stringify({ uid: userName }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCompensacoesPendentes(data.pendentes || []);
+      } else {
+        setCompensacoesPendentes([]);
+      }
+    } catch (err) {
+      setCompensacoesPendentes([]);
+    }
+  };
+
+  const decidirCompensacao = async (pedido, aprovar) => {
+    let motivoRejeicao;
+    if (!aprovar) {
+      motivoRejeicao = window.prompt("Motivo da rejeição (opcional):", "");
+      if (motivoRejeicao === null) return;
+    }
+    try {
+      const response = await apiFetch(`/timetracking/${aprovar ? "approve" : "reject"}-compensation`, {
+        method: "POST",
+        body: JSON.stringify({ uid: userName, pedidoId: pedido.id, motivoRejeicao }),
+      });
+      if (response.ok) {
+        await fetchCompensacoesPendentes();
+        // Coluna "Compensação Horas" e saldo anual (só as aprovadas consomem saldo).
+        setTabelaReloadTick((k) => k + 1);
+        await fetchTotaisAnuais();
+      } else {
+        const data = await response.json().catch(() => ({}));
+        alert(data.error || `Erro ao ${aprovar ? "aprovar" : "rejeitar"} compensação.`);
+      }
+    } catch (err) {
+      console.error(`Erro ao ${aprovar ? "aprovar" : "rejeitar"} compensação:`, err);
+      alert(`Erro ao ${aprovar ? "aprovar" : "rejeitar"} compensação.`);
+    }
+  };
+
+  const decidirHoraExtra = async (horaExtra, aprovar) => {
+    let motivoRejeicao;
+    if (!aprovar) {
+      // Motivo opcional - cancelar o prompt cancela a rejeição.
+      motivoRejeicao = window.prompt("Motivo da rejeição (opcional):", "");
+      if (motivoRejeicao === null) return;
+    }
+    try {
+      const response = await apiFetch(`/timetracking/${aprovar ? "approve" : "reject"}-manual-overtime`, {
+        method: "POST",
+        body: JSON.stringify({ uid: userName, overtimeId: horaExtra.id, motivoRejeicao }),
+      });
+      if (response.ok) {
+        await fetchHorasExtraPendentes();
+        // Estado na coluna "Horas Extra" e saldo anual (só conta as aprovadas).
+        setTabelaReloadTick((k) => k + 1);
+        await fetchTotaisAnuais();
+      } else {
+        const data = await response.json().catch(() => ({}));
+        alert(data.error || `Erro ao ${aprovar ? "aprovar" : "rejeitar"} hora extra.`);
+      }
+    } catch (err) {
+      console.error(`Erro ao ${aprovar ? "aprovar" : "rejeitar"} hora extra:`, err);
+      alert(`Erro ao ${aprovar ? "aprovar" : "rejeitar"} hora extra.`);
     }
   };
 
@@ -287,7 +397,16 @@ const UserDetails = ({ selectedUser }) => {
 
       if (overtimeResponse.ok) {
         const overtimeData = await overtimeResponse.json();
-        totalExtras = overtimeData.totalOvertimeHours || "0h 0m";
+        // DEBUG horas extra
+        console.log("[DEBUG horas extra] uid:", userName, "ano:", selectedYear);
+        console.log("[DEBUG horas extra] bruto (HorasExtraManual):", overtimeData.totalOvertimeHours);
+        console.log("[DEBUG horas extra] compensado (horas_compensatorias):", overtimeData.totalCompensatedHours || "0h 0m", `(${overtimeData.totalCompensatedMinutes} min)`);
+        console.log("[DEBUG horas extra] líquido = max(0, bruto - compensado):", overtimeData.totalNetOvertimeHours, `(${overtimeData.totalNetOvertimeMinutes} min)`);
+        console.table(overtimeData.monthlyOvertime);
+        // Saldo líquido (bruto menos o já usado a compensar dias curtos), o mesmo
+        // valor que o colaborador vê em "Horas Extra (ano)" na totalSummary.jsx.
+        totalExtras = overtimeData.totalNetOvertimeHours || "0h 0m";
+        setSaldoHorasExtra(overtimeData.totalNetOvertimeMinutes ?? 0);
       }
 
       // Buscar dados de férias, faltas e baixas médicas do ano todo
@@ -643,6 +762,8 @@ const handleDadosChange = (novosDados) => {
   fetchFeriasPendentes();
   fetchPendingTimeEdits();
   fetchBaixasPendentes();
+  fetchHorasExtraPendentes();
+  fetchCompensacoesPendentes();
 };
 
 // Normalizar entidade para URL (usar no breadcrumb)
@@ -879,7 +1000,7 @@ const normalizedEntityUrl = userDetails?.entidade
 
                     {selectedMonth ? (
                       <div style={{ marginTop: 16, borderRadius: 8, border: "1px solid #f3f4f6", overflow: "hidden" }}>
-                        <TableHours username={userName} month={selectedMonth} year={selectedYear} onTotaisChange={handleTotaisChange} onDadosChange={handleDadosChange} />
+                        <TableHours username={userName} month={selectedMonth} year={selectedYear} onTotaisChange={handleTotaisChange} onDadosChange={handleDadosChange} saldoHorasExtra={saldoHorasExtra} onCompensated={fetchTotaisAnuais} reloadTick={tabelaReloadTick} />
                       </div>
                     ) : (
                       <div style={{ flex: 1, minHeight: 120, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>
@@ -899,6 +1020,14 @@ const normalizedEntityUrl = userDetails?.entidade
                   feriasPendentes={feriasPendentes}
                   pendingTimeEdits={pendingTimeEdits}
                   baixasPendentes={baixasPendentes}
+                  horasExtraPendentes={horasExtraPendentes}
+                  // Ninguém aprova a própria hora extra (o backend também o impede).
+                  podeDecidirHorasExtra={isAdminOrHR && userName !== actorUid}
+                  handleApproveHoraExtra={(h) => decidirHoraExtra(h, true)}
+                  handleRejectHoraExtra={(h) => decidirHoraExtra(h, false)}
+                  compensacoesPendentes={compensacoesPendentes}
+                  handleApproveCompensacao={(p) => decidirCompensacao(p, true)}
+                  handleRejectCompensacao={(p) => decidirCompensacao(p, false)}
                   deslocacoesPendentes={deslocacoesPendentes}
                   userName={userDetails?.nome}
                   dados={dados}

@@ -13,7 +13,27 @@ function AjustesPendentesBadge({ count }) {
   );
 }
 
-export default function UserListRow({ user, onClick, isLast, indent = false, ajustesPendentes = 0 }) {
+// Aviso de horas extra manuais por aprovar pela GestorRH (ver overtimeApprovalController.js).
+function HorasExtraPendentesBadge({ count }) {
+  if (!count) return null;
+  return (
+    <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 6, background: "#FEF3C7", color: "#92400E", whiteSpace: "nowrap" }}>
+      Horas extra por aprovar{count > 1 ? ` (${count})` : ""}
+    </span>
+  );
+}
+
+// Aviso de pedidos de compensação por aprovar (ver compensationApprovalController.js).
+function CompensacoesPendentesBadge({ count }) {
+  if (!count) return null;
+  return (
+    <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 6, background: "#FEF3C7", color: "#92400E", whiteSpace: "nowrap" }}>
+      Compensações por aprovar{count > 1 ? ` (${count})` : ""}
+    </span>
+  );
+}
+
+export default function UserListRow({ user, onClick, isLast, indent = false, ajustesPendentes = 0, horasExtraPendentes = 0, compensacoesPendentes = 0 }) {
   return (
     <div
       onClick={() => onClick(user)}
@@ -32,6 +52,8 @@ export default function UserListRow({ user, onClick, isLast, indent = false, aju
         <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 1 }}>{user.email}</div>
       </div>
       <AjustesPendentesBadge count={ajustesPendentes} />
+      <HorasExtraPendentesBadge count={horasExtraPendentes} />
+      <CompensacoesPendentesBadge count={compensacoesPendentes} />
       <FaChevronRight style={{ fontSize: 11, color: "#d1d5db", flexShrink: 0 }} />
     </div>
   );

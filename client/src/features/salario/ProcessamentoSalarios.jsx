@@ -7,6 +7,7 @@ import Topbar from "../../shared/components/Topbar";
 import ColaboradoresGroupedList from "../../shared/components/ColaboradoresGroupedList";
 import ExportFechoMensalButton from "./ExportFechoMensalButton";
 import ImportarRecibosButton from "./ImportarRecibosButton";
+import NotificarRecibosButton from "./NotificarRecibosButton";
 import { FaPencil, FaCheck, FaSliders, FaChevronDown, FaTriangleExclamation, FaXmark } from "react-icons/fa6";
 import { apiFetch } from "../../shared/utils/apiFetch";
 import { usePermissions } from "../../shared/hooks/usePermissions";
@@ -495,7 +496,12 @@ export default function ProcessamentoSalarios() {
           }
           renderGroupExtra={
             canSeeFechoMensal
-              ? (entidade) => <ExportFechoMensalButton entidade={entidade} compact closed={entidadeClosedMap.get(entidade)} />
+              ? (entidade) => (
+                  <div className="flex items-center gap-2">
+                    {canImportarRecibos && <NotificarRecibosButton entidade={entidade} mes={mesAtual} />}
+                    <ExportFechoMensalButton entidade={entidade} compact closed={entidadeClosedMap.get(entidade)} />
+                  </div>
+                )
               : undefined
           }
           renderMemberExtra={

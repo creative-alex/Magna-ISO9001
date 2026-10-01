@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { FaStopwatch, FaChartColumn } from 'react-icons/fa6';
 import { formatarMinutos } from '../../utils/calcHours';
+import { minutosHorasExtraAprovadas } from '../../utils/horasExtra';
 import { getHolidaysForSede } from '../../../../shared/utils/holidays';
 import { isBlocoAtivoEm, isDiaForaDeAtivo } from '../../../../shared/utils/absenceBlocks';
 import ManualOvertimeButton from './manualOvertime';
@@ -24,7 +25,7 @@ const MONTH_NAMES_FULL = [
 // extra, separado de reloadTick porque nem todas as recargas o alteram (ex.: uma
 // entrada num dia sem registo - ver handleEntryRegistered em RegistosPage.jsx). Sem
 // esta prop, o saldo segue reloadTick como antes.
-const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick = 0, overtimeReloadTick, calendarData, calendarLoading = false }) => {
+const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick = 0, overtimeReloadTick, calendarData, calendarLoading = false, onSaldoChange }) => {
   const [totais, setTotais] = useState({
     totalExtras: "0h 0m",
     diasFalta: 0,
@@ -127,12 +128,8 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick
           }
         }
 
-        // Adicionar horas extras manuais ao total
-        manualOvertime.forEach(mo => {
-          if (mo.totalMinutes) {
-            totalMinutosExtras += mo.totalMinutes;
-          }
-        });
+        // Adicionar horas extras manuais ao total - só as aprovadas pela GestorRH
+        totalMinutosExtras += minutosHorasExtraAprovadas(manualOvertime);
 
         // Bruto: o mensal já não é reduzido pelas faltas do dia  -  ver
         // CompensateOvertimeButton, que desconta o défice do saldo anual em vez
@@ -213,6 +210,8 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick
       .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
       .then(data => {
         setAccumulatedExtras(data.totalNetOvertimeMinutes ?? 0);
+        // Partilhado com a PontoTable (botão "Compensar" só aparece com saldo).
+        if (onSaldoChange) onSaldoChange(data.totalNetOvertimeMinutes ?? 0);
       })
       .catch((err) => console.error("Erro ao buscar saldo anual de horas extra:", err));
   }, [username, overtimeTick]);
@@ -257,12 +256,8 @@ const TotaisSummary = ({ username, month = new Date().getMonth() + 1, reloadTick
         // Mês com pelo menos um dia com entrada e saída - decide se aparece na tabela
         const temRegistos = registos.some(r => extractTime(r.horaEntrada) && extractTime(r.horaSaida));
 
-        // Adicionar horas extras manuais ao total
-        manualOvertime.forEach(mo => {
-          if (mo.totalMinutes) {
-            totalMinutosExtras += mo.totalMinutes;
-          }
-        });
+        // Adicionar horas extras manuais ao total - só as aprovadas pela GestorRH
+        totalMinutosExtras += minutosHorasExtraAprovadas(manualOvertime);
 
         // Bruto: o mensal já não é reduzido por faltas (ver CompensateOvertimeButton).
         return {

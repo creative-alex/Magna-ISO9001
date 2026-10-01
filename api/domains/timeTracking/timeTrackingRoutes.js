@@ -20,7 +20,6 @@ const {
   getManualOvertimeForMonth,
   updateManualOvertime,
   deleteManualOvertime,
-  compensateShortDay,
   debugCorruptOvertime,
   deleteCorruptOvertime,
 } = require('./timeTrackingController');
@@ -48,6 +47,19 @@ const {
   getYearlySummary,
 } = require('./reportsController');
 const { ping } = require('./utilsController');
+const {
+  getPendingManualOvertime,
+  approveManualOvertime,
+  rejectManualOvertime,
+  getUidsComHorasExtraPendentes,
+} = require('./overtimeApprovalController');
+const {
+  requestCompensation,
+  getPendingCompensations,
+  approveCompensation,
+  rejectCompensation,
+  getUidsComCompensacoesPendentes,
+} = require('./compensationApprovalController');
 const {
   getVacationMap,
   toggleVacationDay,
@@ -84,7 +96,18 @@ router.post("/register-manual-overtime", requireAuth, registerManualOvertime);
 router.post("/get-manual-overtime", requireAuth, getManualOvertimeForMonth);
 router.put("/update-manual-overtime", requireAuth, updateManualOvertime);
 router.delete("/delete-manual-overtime", requireAuth, deleteManualOvertime);
-router.post("/compensate-short-day", requireAuth, compensateShortDay);
+// Aprovação de horas extra manuais: só GestorRH (e SuperAdmin) - ver overtimeApprovalController.js.
+router.post("/pending-manual-overtime", requireAuth, requireAdminOrHR, getPendingManualOvertime);
+router.post("/approve-manual-overtime", requireAuth, requireAdminOrHR, approveManualOvertime);
+router.post("/reject-manual-overtime", requireAuth, requireAdminOrHR, rejectManualOvertime);
+router.post("/pending-manual-overtime-uids", requireAuth, requireAdminOrHR, getUidsComHorasExtraPendentes);
+// "Compensar" cria só um pedido pendente; a compensação efetiva só é aplicada ao aprovar
+// (GestorRH/SuperAdmin) - ver compensationApprovalController.js.
+router.post("/compensate-short-day", requireAuth, requestCompensation);
+router.post("/pending-compensations", requireAuth, requireAdminOrHR, getPendingCompensations);
+router.post("/approve-compensation", requireAuth, requireAdminOrHR, approveCompensation);
+router.post("/reject-compensation", requireAuth, requireAdminOrHR, rejectCompensation);
+router.post("/pending-compensations-uids", requireAuth, requireAdminOrHR, getUidsComCompensacoesPendentes);
 router.get("/ping", requireAuth, ping);
 // Calendário de férias de toda a equipa  -  informação visível a qualquer
 // colaborador autenticado (não é dado sensível de admin), usado tanto pela

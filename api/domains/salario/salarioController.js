@@ -40,6 +40,18 @@ function getMesLabel(mes) {
   return `${MES_LABELS[Number(m) - 1]} de ${ano}`;
 }
 
+// Email "Recibo de vencimento disponível" - partilhado pelo upload individual, pela
+// importação em lote (reciboImportController.js) e pela notificação por entidade.
+function sendReciboEmail(userData, mes) {
+  const mesLabel = getMesLabel(mes);
+  return sendMail({
+    to: userData.email,
+    subject: `Recibo de vencimento disponível - ${mesLabel}`,
+    html: renderEmail("recibo-vencimento", { nome: userData.nome || "", mesLabel, eyebrow: "Recibo de vencimento" }),
+    entidade: userData.entidade,
+  });
+}
+
 // Campos mensais  -  cada mês é o seu próprio documento em users/{id}/salarios/{mes}.
 // Nota: o valor do subsídio de alimentação e o valor/km de deslocações são iguais
 // para todos e vêm de parametrosSalario.
@@ -293,15 +305,8 @@ const uploadRecibo = async (req, res) => {
     }, { merge: true });
 
     if (userData.email) {
-      const mesLabel = getMesLabel(mes);
-      const nome = userData.nome || "";
       try {
-        await sendMail({
-          to: userData.email,
-          subject: `Recibo de vencimento disponível  -  ${mesLabel}`,
-          html: renderEmail("recibo-vencimento", { nome, mesLabel, eyebrow: "Recibo de vencimento" }),
-          entidade: userData.entidade,
-        });
+        await sendReciboEmail(userData, mes);
       } catch (mailError) {
         console.error("Erro ao enviar email de notificação de recibo:", mailError);
       }
@@ -312,6 +317,81 @@ const uploadRecibo = async (req, res) => {
     res.json({ message: "Recibo guardado com sucesso", recibo_path: filePath });
   } catch (error) {
     console.error("Erro ao guardar recibo:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+};
+
+// (Re)envio manual do email de recibo a todos os colaboradores de uma entidade que já têm
+// recibo guardado nesse mês - botão junto ao nome de cada entidade em
+// ProcessamentoSalarios.jsx. Serve sobretudo para recuperar notificações que falharam
+// (ex.: SMTP em baixo na importação em lote). "entidade" vai pelo nome, tal como devolvido
+// por getColaboradores/ColaboradoresGroupedList (ver exportFechoMensal). Os envios são
+// sequenciais e aguardados, para a resposta dizer exatamente quantos saíram.
+const notificarRecibosEntidade = async (req, res) => {
+  try {
+    if (!canManageRecibo(req)) {
+      return res.status(403).json({ error: "Acesso restrito a administradores e gestores de recursos humanos" });
+    }
+
+    const { mes } = req.params;
+    if (!MES_REGEX.test(mes)) {
+      return res.status(400).json({ error: "Mês inválido (formato esperado AAAA-MM)" });
+    }
+    const { entidade } = req.body;
+    if (typeof entidade !== "string" || !entidade) {
+      return res.status(400).json({ error: "Entidade em falta" });
+    }
+
+    const [usersSnapshot, entidadesSnapshot] = await Promise.all([
+      db.collection("users").get(),
+      db.collection("entidades").get(),
+    ]);
+    const entidadeNomes = {};
+    entidadesSnapshot.forEach((doc) => { entidadeNomes[doc.id] = doc.data().nome || doc.id; });
+
+    const membros = usersSnapshot.docs.filter((doc) => {
+      const data = doc.data();
+      if (isSuperAdmin(data.nivelAcesso)) return false;
+      if (data.situacao_contratual && data.situacao_contratual !== "Ativo") return false;
+      const entidadeId = data.entidade ? data.entidade.replace("entidades/", "") : null;
+      const entidadeKey = entidadeId ? (entidadeNomes[entidadeId] || entidadeId) : "Sem entidade";
+      return entidadeKey === entidade;
+    });
+    if (membros.length === 0) {
+      return res.json({ enviados: 0, semEmail: [], falhados: [], message: "Nenhum colaborador ativo nesta entidade" });
+    }
+
+    const salarioDocs = await db.getAll(...membros.map((doc) => doc.ref.collection("salarios").doc(mes)));
+    const comRecibo = membros.filter((doc, idx) => salarioDocs[idx].exists && salarioDocs[idx].data().recibo_path);
+    if (comRecibo.length === 0) {
+      return res.json({ enviados: 0, semEmail: [], falhados: [], message: `Nenhum colaborador de ${entidade} tem recibo guardado em ${getMesLabel(mes)}` });
+    }
+
+    let enviados = 0;
+    const semEmail = [];
+    const falhados = [];
+    for (const doc of comRecibo) {
+      const data = doc.data();
+      if (!data.email) {
+        semEmail.push(data.nome || doc.id);
+        continue;
+      }
+      try {
+        await sendReciboEmail(data, mes);
+        enviados += 1;
+        await doc.ref.collection("salarios").doc(mes).set({
+          recibo_notificado_at: admin.firestore.FieldValue.serverTimestamp(),
+          recibo_notificado_by: req.user.uid,
+        }, { merge: true });
+      } catch (mailError) {
+        console.error(`Erro ao enviar email de recibo (entidade) ao colaborador ${doc.id}:`, mailError);
+        falhados.push({ nome: data.nome || doc.id, erro: mailError.message });
+      }
+    }
+
+    res.json({ enviados, semEmail, falhados, total: comRecibo.length });
+  } catch (error) {
+    console.error("Erro ao notificar recibos da entidade:", error);
     res.status(500).json({ error: "Erro interno do servidor" });
   }
 };
@@ -485,4 +565,4 @@ const exportFechoMensal = async (req, res) => {
   }
 };
 
-module.exports = { getSalario, saveSalario, uploadRecibo, deleteRecibo, exportFechoMensal, getMesLabel, MES_REGEX, canManageRecibo };
+module.exports = { getSalario, saveSalario, uploadRecibo, deleteRecibo, notificarRecibosEntidade, exportFechoMensal, getMesLabel, sendReciboEmail, MES_REGEX, canManageRecibo };
