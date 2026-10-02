@@ -361,8 +361,13 @@ export default function SalarioColaborador() {
       formData.append("file", file);
       const res = await apiFetch(`/salario/${id}/${mes}/recibo`, { method: "POST", body: formData });
       if (res.ok) {
+        const data = await res.json().catch(() => ({}));
         await fetchSalario();
-        toast.success("Recibo guardado e email enviado ao colaborador", { position: "top-right", autoClose: 3000 });
+        if (data.emailEnviado) {
+          toast.success("Recibo guardado e email enviado ao colaborador", { position: "top-right", autoClose: 3000 });
+        } else {
+          toast.warn(`Recibo guardado, mas o email não foi enviado: ${data.emailErro || "erro desconhecido"}`, { position: "top-right", autoClose: false });
+        }
       } else {
         const data = await res.json().catch(() => ({}));
         toast.error(data.error || "Falha ao enviar o recibo", { position: "top-right" });

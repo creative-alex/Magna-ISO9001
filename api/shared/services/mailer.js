@@ -20,6 +20,22 @@ const transporter = nodemailer.createTransport({
   maxConnections: 3,
 });
 
+// Diagnóstico no arranque: testa a ligação/login SMTP e deixa o resultado nos logs, para
+// que um problema de credenciais ou de rede em produção (ex.: Render) seja visível logo em
+// cada deploy, em vez de só aparecer quando um email falha. Nunca regista a password,
+// só o tamanho (uma App Password do Google tem 16 carateres, sem espaços).
+if (NODEEMAIL && NODEPASSWORD) {
+  const contaMascarada = NODEEMAIL.replace(/^(.{3}).*(@.*)$/, "$1***$2");
+  transporter.verify()
+    .then(() => console.log(`[mailer] SMTP OK (${contaMascarada})`))
+    .catch((err) => console.error(
+      `[mailer] SMTP FALHOU (${contaMascarada}, password com ${NODEPASSWORD.length} carateres):`,
+      err.code, err.responseCode || "", err.message
+    ));
+} else {
+  console.error("[mailer] NODEEMAIL/NODEPASSWORD não definidos - nenhum email será enviado");
+}
+
 const TEMPLATES_DIR = path.join(__dirname, "emailTemplates");
 const compiledTemplates = new Map();
 function compileTemplate(name) {

@@ -74,6 +74,17 @@ function formatAntiguidade(totalMeses) {
   return partes.join(" e ");
 }
 
+// Duração de um contrato em anos e meses (os dias que sobram não contam), com a data de
+// fim inclusiva (01/01 a 31/12 dá "1 ano"). Sem data de fim, conta até hoje. Ao contrário da
+// antiguidade, um fim no futuro conta por inteiro (é a duração do contrato, não o tempo já
+// cumprido). null se faltar a data de início ou as datas forem inválidas.
+function formatDuracaoContrato(inicioStr, fimStr, hojeStr) {
+  const inicio = parseData(inicioStr);
+  const fim = parseData(fimStr || hojeStr);
+  if (!inicio || !fim || fim < inicio) return null;
+  return formatAntiguidade(diferencaMesesDias(inicio, new Date(fim.getTime() + DIA_MS)).meses);
+}
+
 // Antiguidade total, em meses, a partir do contrato atual (data_admissao -> data_fim_contrato,
 // ou até hoje se não tiver fim) e dos contratos anteriores ({dataInicio, dataFim}). Não é uma
 // soma das durações: os períodos são unidos, por isso dias sobrepostos contam uma só vez e
@@ -186,22 +197,27 @@ const SECTIONS = [
     Icon: FaFileContract,
     restricted: true,
     fields: [
-      { key: "tipo_contrato", label: "Tipo de contrato atual", type: "select", options: TIPO_CONTRATO_OPTIONS },
+      // Campos do contrato atual: "inBlock" tira-os da grelha da secção e mostra-os, em vez
+      // disso, como o último bloco da lista "Contratos de trabalho" (ver o campo "blocks"
+      // com currentKeys). Continuam a ser campos normais do documento do user.
+      { key: "tipo_contrato", label: "Tipo de contrato", type: "select", options: TIPO_CONTRATO_OPTIONS, inBlock: true },
       { key: "situacao_contratual", label: "Situação contratual", type: "select", options: SITUACAO_CONTRATUAL_OPTIONS },
+      { key: "antiguidade", label: "Antiguidade", type: "tenure", historyKey: "contratos_anteriores" },
       { key: "motivo_cessacao", label: "Motivo da cessação", type: "select", options: MOTIVO_CESSACAO_OPTIONS, showIf: f => f.situacao_contratual === SITUACAO_CESSADO },
       { key: "role", label: "Função", type: "text", list: "funcao", newRow: true },
       { key: "departamento", label: "Departamento", type: "select", options: DEPARTAMENTO_OPTIONS },
       { key: "sede", label: "Local de trabalho", type: "select", options: LOCAL_OPTIONS, optionLabels: LOCAL_OPTION_LABELS },
-      { key: "data_admissao", label: "Data de admissão", type: "date" },
-      { key: "data_fim_contrato", label: "Data de fim de contrato", type: "date", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_SEM_TERMO },
-      { key: "antiguidade", label: "Antiguidade", type: "tenure", historyKey: "contratos_anteriores" },
-      { key: "digitalizacao_contrato", label: "Contrato atual (todas as páginas)", type: "file", storageName: "Contrato_Trabalho" },
-      // Os campos acima são o contrato atual; os anteriores ficam aqui como histórico, um
-      // bloco independente por contrato (subcoleção users/{id}/contratosAnteriores).
+      { key: "data_admissao", label: "Data de admissão", type: "date", inBlock: true },
+      { key: "data_fim_contrato", label: "Data de fim de contrato", type: "date", showIf: f => f.tipo_contrato !== TIPO_CONTRATO_SEM_TERMO, inBlock: true },
+      { key: "digitalizacao_contrato", label: "Contrato (todas as páginas)", type: "file", storageName: "Contrato_Trabalho", inBlock: true },
+      // Contratos anteriores (subcoleção users/{id}/contratosAnteriores, um bloco por contrato)
+      // e, no fim da lista, o contrato atual, montado a partir dos campos "currentKeys" acima.
       {
-        key: "contratos_anteriores", label: "Contratos anteriores", type: "blocks", apiKey: "contratosAnteriores",
+        key: "contratos_anteriores", label: "Contratos de trabalho", type: "blocks", apiKey: "contratosAnteriores",
         storageFolder: "contratosAnteriores",
-        itemSingular: "contrato", addLabel: "Adicionar contrato", emptyLabel: "Sem contratos anteriores registados",
+        currentKeys: ["tipo_contrato", "data_admissao", "data_fim_contrato", "digitalizacao_contrato"],
+        showDuracao: true,
+        itemSingular: "contrato", addLabel: "Adicionar contrato anterior", emptyLabel: "Sem contratos de trabalho registados",
         tipoLabel: "Tipo de contrato", tipoOptions: TIPO_CONTRATO_OPTIONS,
         entidadeLabel: "Entidade empregadora", list: "entidades",
         dataFimLabel: "Data de fim", pdfName: "contrato", observacaoLabel: "Observação",
@@ -404,6 +420,8 @@ function extensaoFicheiro(filename) {
 // própria em users/{id}/{apiKey} (ver BLOCK_COLLECTIONS no ca DOdastroController), não no
 // documento do user  -  por isso ficam fora do "form" e são geridos em blockLists.
 const BLOCK_FIELDS = ALL_FIELDS.filter(f => f.type === "blocks");
+// Id do bloco do contrato atual em collapsedBlocks (não é um bloco da subcoleção).
+const CURRENT_BLOCK_ID = "__contrato_atual";
 const INITIAL_BLOCK_LISTS = BLOCK_FIELDS.reduce((acc, f) => { acc[f.key] = []; return acc; }, {});
 
 function novoBlocoId() {
@@ -539,7 +557,7 @@ export default function Cadastro() {
       setCollapsedBlocks(Object.values(novosBlockLists).flat().reduce((acc, b) => {
         if (b.dataInicio) acc[b.id] = true;
         return acc;
-      }, {}));
+      }, { [CURRENT_BLOCK_ID]: !!data.form?.data_admissao }));
       return true;
     }
     return false;
@@ -760,6 +778,19 @@ export default function Cadastro() {
 
   const labelStyle = { fontSize: 11, color: "#6b7280", marginBottom: 4, display: "block" };
 
+  // Célula "Duração" dos contratos de trabalho (só de leitura, calculada das datas).
+  const renderDuracaoContrato = (inicio, fim) => {
+    const duracao = formatDuracaoContrato(inicio, fim, new Date().toISOString().slice(0, 10));
+    return (
+      <div key="__duracao" style={{ minWidth: 0 }}>
+        <span style={labelStyle}>Duração</span>
+        <div style={{ fontSize: 13, color: duracao ? "#111827" : "#9ca3af", fontWeight: 500 }}>
+          {duracao ? `${duracao}${fim ? "" : " (até hoje)"}` : " - "}
+        </div>
+      </div>
+    );
+  };
+
   const renderValue = (field, dataSource) => {
     const value = dataSource[field.key];
     if (field.type === "date" && value) {
@@ -872,7 +903,8 @@ export default function Cadastro() {
                   {!isCollapsed && (
                     <div style={{ marginTop: 10 }}>
                       {/* Tipo/Entidade + as duas datas juntos na mesma grelha  -  quando o bloco tem
-                          os dois (contratos anteriores), a 2.ª data passa para a linha seguinte. */}
+                          os dois (contratos anteriores), as datas começam numa linha nova, para a
+                          data de início e a de fim ficarem sempre lado a lado. */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
                         {field.tipoOptions && (
                           <div style={{ minWidth: 0 }}>
@@ -902,7 +934,7 @@ export default function Cadastro() {
                             )}
                           </div>
                         )}
-                        <div style={{ minWidth: 0 }}>
+                        <div style={field.tipoOptions && field.entidadeLabel ? { minWidth: 0, gridColumnStart: 1 } : { minWidth: 0 }}>
                           <span style={labelStyle}>Data de início</span>
                           {editable ? (
                             <input type="date" value={c.dataInicio} onChange={e => handleChangeBlock(key, c.id, { dataInicio: e.target.value })} style={inputStyle} />
@@ -925,6 +957,7 @@ export default function Cadastro() {
                             <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{fmtDate(c.dataFim)}</div>
                           )}
                         </div>
+                        {field.showDuracao && renderDuracaoContrato(c.dataInicio, c.dataFim)}
                       </div>
                       {field.observacaoLabel && (
                         <div style={{ marginTop: 10 }}>
@@ -977,6 +1010,47 @@ export default function Cadastro() {
                 </div>
               );
             })}
+            {field.currentKeys && (() => {
+              // Contrato atual: mesmo aspeto dos blocos acima, mas os campos são os do próprio
+              // documento do user (renderField normal, com a validação de getFieldErrors).
+              const currentFields = field.currentKeys.map(k => FIELD_BY_KEY[k])
+                .filter(f => !f.showIf || f.showIf(dataSource));
+              const temErro = editable && currentFields.some(f => errors[f.key]);
+              const isCollapsed = !!collapsedBlocks[CURRENT_BLOCK_ID] && !temErro;
+              const summaryExtra = [dataSource.tipo_contrato, targetEntidadeNome].filter(Boolean).join(" · ");
+              const summary = dataSource.data_admissao || dataSource.data_fim_contrato
+                ? `${fmtDate(dataSource.data_admissao)} - ${fmtDate(dataSource.data_fim_contrato)}${summaryExtra ? ` · ${summaryExtra}` : ""}`
+                : `${summaryExtra || "Contrato atual"}`;
+              return (
+                <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12, background: "#fafafa" }}>
+                  <div
+                    onClick={() => toggleBlockCollapsed(CURRENT_BLOCK_ID)}
+                    style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, cursor: "pointer" }}
+                  >
+                    <FaChevronDown style={{
+                      fontSize: 11, color: "#9ca3af", flexShrink: 0, transition: "transform 0.15s",
+                      transform: isCollapsed ? "rotate(-90deg)" : "none",
+                    }} />
+                    <span style={{ fontSize: 12.5, fontWeight: 600, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {summary}
+                    </span>
+                  </div>
+                  {!isCollapsed && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3" style={{ marginTop: 10 }}>
+                      {/* Tipo numa linha; admissão, fim e duração na seguinte (como nos anteriores). */}
+                      {currentFields.map(f => renderField(f.key === "data_admissao" ? { ...f, newRow: true } : f, editable, dataSource, errors, blockErrs))
+                        .flatMap((el, i) => {
+                          const k = currentFields[i].key;
+                          const ultimaData = currentFields.some(f => f.key === "data_fim_contrato") ? "data_fim_contrato" : "data_admissao";
+                          return field.showDuracao && k === ultimaData
+                            ? [el, renderDuracaoContrato(dataSource.data_admissao, dataSource.data_fim_contrato)]
+                            : [el];
+                        })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             {editable && (
               <div
                 onClick={() => handleAddBlock(key)}
@@ -989,7 +1063,7 @@ export default function Cadastro() {
                 <FaPlus style={{ fontSize: 11 }} /> {field.addLabel || "REGISTAR"}
               </div>
             )}
-            {!editable && blocks.length === 0 && (
+            {!editable && blocks.length === 0 && !field.currentKeys && (
               <div style={{ fontSize: 11.5, color: "#9ca3af" }}>{field.emptyLabel || `Sem ${label.toLowerCase()} registadas`}</div>
             )}
           </div>
@@ -1337,7 +1411,8 @@ export default function Cadastro() {
           {!loading && SECTIONS.map(section => {
             const sectionEditable = editMode && (!section.restricted || canEditRestricted);
             const sectionData = form;
-            const visibleFields = section.fields.filter(f => !f.showIf || f.showIf(sectionData));
+            // Campos "inBlock" (contrato atual) são desenhados dentro do campo "blocks" que os lista em currentKeys.
+            const visibleFields = section.fields.filter(f => !f.inBlock && (!f.showIf || f.showIf(sectionData)));
 
             if (section.isEstagio) {
               const estagioHasData = hasEstagioData(sectionData, docRefs);

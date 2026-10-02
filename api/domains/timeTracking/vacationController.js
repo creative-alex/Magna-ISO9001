@@ -2,6 +2,7 @@ const admin = require("firebase-admin");
 const { resolveTargetUid } = require("./helpers");
 const { isMonthClosed, refreshFechoMensalSnapshotIfClosed, MENSAGEM_MES_FECHADO } = require("../../shared/lib/monthLock");
 const { isWeekendOrHolidayDDMM, pad2 } = require("./holidays");
+const { baixaPdfPathFor, isPdfBaixaSolto } = require("../../shared/lib/baixaPdfPath");
 const db = admin.firestore();
 
 // Mesma regra de bloqueio usada no mapa de férias (ver getBlockedReason em
@@ -203,6 +204,13 @@ const createMedicalLeave = async (req, res) => {
 
     console.log("A registar baixa médica para o user:", userId, "-", parsedDays, "dias úteis a partir de", startDate);
 
+    // Arruma o PDF na pasta do colaborador (ver api/shared/lib/baixaPdfPath.js).
+    let pdfPathFinal = pdfPath;
+    if (isPdfBaixaSolto(pdfPath)) {
+      pdfPathFinal = baixaPdfPathFor(userId, startYear, pdfPath);
+      await admin.storage().bucket().file(pdfPath).move(pdfPathFinal);
+    }
+
     const userDocRef = db.collection("registo-ponto").doc(userId);
     const requestId = userDocRef.collection("BaixasMedicas").doc().id;
     const batch = db.batch();
@@ -214,7 +222,7 @@ const createMedicalLeave = async (req, res) => {
         year: y,
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
         Approved,
-        pdfPath,
+        pdfPath: pdfPathFinal,
         requestId,
         totalDiasUteis: parsedDays,
       });
